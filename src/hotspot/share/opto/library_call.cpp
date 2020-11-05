@@ -2852,7 +2852,7 @@ Node* LibraryCallKit::load_klass_from_mirror_common(Node* mirror,
                                                     int offset) {
   if (region == NULL)  never_see_null = true;
   Node* p = basic_plus_adr(mirror, offset);
-  const TypeKlassPtr*  kls_type = TypeKlassPtr::OBJECT_OR_NULL;
+  const TypeKlassPtr*  kls_type = TypeInstKlassPtr::OBJECT_OR_NULL;
   Node* kls = _gvn.transform(LoadKlassNode::make(_gvn, NULL, immutable_memory(), p, TypeRawPtr::BOTTOM, kls_type));
   Node* null_ctl = top();
   kls = null_check_oop(kls, &null_ctl, never_see_null);
@@ -3041,7 +3041,7 @@ bool LibraryCallKit::inline_native_Class_query(vmIntrinsics::ID id) {
       phi->add_req(makecon(TypeInstPtr::make(env()->Object_klass()->java_mirror())));
     // If we fall through, it's a plain class.  Get its _super.
     p = basic_plus_adr(kls, in_bytes(Klass::super_offset()));
-    kls = _gvn.transform(LoadKlassNode::make(_gvn, NULL, immutable_memory(), p, TypeRawPtr::BOTTOM, TypeKlassPtr::OBJECT_OR_NULL));
+    kls = _gvn.transform(LoadKlassNode::make(_gvn, NULL, immutable_memory(), p, TypeRawPtr::BOTTOM, TypeInstKlassPtr::OBJECT_OR_NULL));
     null_ctl = top();
     kls = null_check_oop(kls, &null_ctl);
     if (null_ctl != top()) {
@@ -3183,7 +3183,7 @@ bool LibraryCallKit::inline_native_subtype_check() {
   record_for_igvn(region);
 
   const TypePtr* adr_type = TypeRawPtr::BOTTOM;   // memory type of loads
-  const TypeKlassPtr* kls_type = TypeKlassPtr::OBJECT_OR_NULL;
+  const TypeKlassPtr* kls_type = TypeInstKlassPtr::OBJECT_OR_NULL;
   int class_klass_offset = java_lang_Class::klass_offset();
 
   // First null-check both mirrors and load each mirror's klass metaobject.

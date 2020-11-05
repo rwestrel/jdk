@@ -225,7 +225,7 @@ Node *SubTypeCheckNode::Ideal(PhaseGVN *phase, bool can_reshape) {
 #endif
     Node *p2 = phase->transform(new AddPNode(subklass,subklass,chk_off_X));
     Node *kmem = phase->C->immutable_memory();
-    Node *nkls = phase->transform(LoadKlassNode::make(*phase, NULL, kmem, p2, phase->type(p2)->is_ptr(), TypeKlassPtr::OBJECT_OR_NULL));
+    Node *nkls = phase->transform(LoadKlassNode::make(*phase, NULL, kmem, p2, phase->type(p2)->is_ptr(), TypeInstKlassPtr::OBJECT_OR_NULL));
 
     Node* res = new CmpPNode(superklass, nkls);
     Node* cmp = phase->transform(res);
