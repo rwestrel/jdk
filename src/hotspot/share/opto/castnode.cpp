@@ -49,6 +49,7 @@ Node* ConstraintCastNode::Identity(PhaseGVN* phase) {
 // Take 'join' of input and cast-up type
 const Type* ConstraintCastNode::Value(PhaseGVN* phase) const {
   if (in(0) && phase->type(in(0)) == Type::TOP) return Type::TOP;
+
   const Type* ft = phase->type(in(1))->filter_speculative(_type);
 
 #ifdef ASSERT
@@ -225,6 +226,24 @@ Node *CastIINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   Node* progress = ConstraintCastNode::Ideal(phase, can_reshape);
   if (progress != NULL) {
     return progress;
+  }
+
+  if (in(1) != NULL && in(1)->Opcode() == Op_AddI && in(1)->in(2) != NULL) {
+    const TypeInt* con = phase->type(in(1)->in(2))->isa_int();
+    const TypeInt* this_type = this->type()->is_int();
+    if (con != NULL && con->singleton()) {
+      jint i = con->get_con();
+      if ((i > 0 && this_type->_lo >= min_jint + i) ||
+          (i < 0 && this_type->_hi <= max_jint + i)) {
+        Node* cast = new CastIINode(in(1)->in(1),
+                                    TypeInt::make(this_type->_lo - i, this_type->_hi - i, this_type->_widen),
+                                    _carry_dependency, _range_check_dependency);
+        cast->set_req(0, in(0));
+        cast = phase->transform(cast);
+        Node* add = new AddINode(cast, in(1)->in(2));
+        return add;
+      }
+    }
   }
 
   // Similar to ConvI2LNode::Ideal() for the same reasons
