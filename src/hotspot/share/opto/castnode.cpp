@@ -264,7 +264,7 @@ Node *CastIINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   const TypeInteger* rx = NULL;
   const TypeInteger* ry = NULL;
   // Similar to ConvI2LNode::Ideal() for the same reasons
-  if (!_range_check_dependency && Compile::push_thru_add(phase, z, this_type, rx, ry, T_INT)) {
+  if (UseNewCode2 && !_range_check_dependency && Compile::push_thru_add(phase, z, this_type, rx, ry, T_INT)) {
     if (igvn == NULL) {
       // Postpone this optimization to iterative GVN, where we can handle deep
       // AddI chains without an exponential number of recursive Ideal() calls.
