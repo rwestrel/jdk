@@ -208,10 +208,14 @@ Node *MulINode::Ideal(PhaseGVN *phase, bool can_reshape) {
     unsigned int bit2 = abs_con-bit1;
     bit2 = bit2 & (0-bit2);          // Extract 2nd bit
     if (bit2 + bit1 == abs_con) {    // Found all bits in con?
-      Node *n1 = phase->transform( new LShiftINode(in(1), phase->intcon(log2_uint(bit1))));
-      Node *n2 = phase->transform( new LShiftINode(in(1), phase->intcon(log2_uint(bit2))));
-      res = new AddINode(n2, n1);
-
+      if (phase->C->post_loop_opts_phase()) {
+        Node* n1 = phase->transform(new LShiftINode(in(1), phase->intcon(log2_uint(bit1))));
+        Node* n2 = phase->transform(new LShiftINode(in(1), phase->intcon(log2_uint(bit2))));
+        res = new AddINode(n2, n1);
+      } else {
+        phase->C->record_for_post_loop_opts_igvn(this);
+        return MulNode::Ideal(phase, can_reshape);
+      }
     } else if (is_power_of_2(abs_con+1)) {
       // Sleezy: power-of-2 -1.  Next time be generic.
       unsigned int temp = abs_con + 1;
