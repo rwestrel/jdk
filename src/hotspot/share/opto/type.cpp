@@ -5156,7 +5156,19 @@ const Type *TypeKlassPtr::filter_helper(const Type *kills, bool include_speculat
   const TypeKlassPtr* ktkp = kills->isa_instklassptr();
 
   if (ft->empty()) {
+    if (!empty() && ktkp != NULL && ktkp->klass()->is_loaded() && ktkp->klass()->is_interface())
+      return kills;             // Uplift to interface
+
     return Type::TOP;           // Canonical empty value
+  }
+
+  // Interface klass type could be exact in opposite to interface type,
+  // return it here instead of incorrect Constant ptr J/L/Object (6894807).
+  if (ftkp != NULL && ktkp != NULL &&
+      ftkp->is_loaded() &&  ftkp->klass()->is_interface() &&
+      !ftkp->klass_is_exact() && // Keep exact interface klass
+      ktkp->is_loaded() && !ktkp->klass()->is_interface()) {
+    return ktkp->cast_to_ptr_type(ftkp->ptr());
   }
 
   return ft;
