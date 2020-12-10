@@ -853,7 +853,7 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
         method()->print_name(); tty->cr();
       } else if (PrintOpto && (Verbose || WizardMode)) {
         tty->print("Bailing out on unloaded exception type ");
-        extype->klass()->print_name();
+        extype->instance_klass()->print_name();
         tty->print(" at bci:%d in ", bci());
         method()->print_name(); tty->cr();
       }
@@ -863,7 +863,7 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
       push_ex_oop(ex_oop);
       uncommon_trap(Deoptimization::Reason_unloaded,
                     Deoptimization::Action_reinterpret,
-                    extype->klass(), "!loaded exception");
+                    extype->instance_klass(), "!loaded exception");
       set_bci(iter().cur_bci()); // put it back
       continue;
     }
@@ -910,7 +910,7 @@ void Parse::catch_inline_exceptions(SafePointNode* ex_map) {
 
   // determine potential exception handlers
   ciExceptionHandlerStream handlers(method(), bci(),
-                                    ex_type->klass()->as_instance_klass(),
+                                    ex_type->instance_klass(),
                                     ex_type->klass_is_exact());
 
   // Start executing from the given throw state.  (Keep its stack, for now.)
@@ -1128,9 +1128,8 @@ ciMethod* Compile::optimize_inlining(ciMethod* caller, ciInstanceKlass* klass,
     if (!receiver_type->isa_instptr()) {
       return NULL;
     }
-
-    ciInstanceKlass *ikl = receiver_type->klass()->as_instance_klass();
-    if (ikl->is_loaded() && ikl->is_initialized() && !ikl->is_interface() &&
+    ciInstanceKlass *ikl = receiver_type->is_instptr()->instance_klass();
+    if (ikl->is_loaded() && ikl->is_initialized() &&
         (ikl == actual_receiver || ikl->is_subtype_of(actual_receiver))) {
       // ikl is a same or better type than the original actual_receiver,
       // e.g. static receiver from bytecodes.

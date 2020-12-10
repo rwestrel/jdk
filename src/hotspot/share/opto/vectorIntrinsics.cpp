@@ -38,7 +38,7 @@ static bool is_vector(ciKlass* klass) {
 static bool check_vbox(const TypeInstPtr* vbox_type) {
   assert(vbox_type->klass_is_exact(), "");
 
-  ciInstanceKlass* ik = vbox_type->klass()->as_instance_klass();
+  ciInstanceKlass* ik = vbox_type->instance_klass();
   assert(is_vector(ik), "not a vector");
 
   ciField* fd1 = ik->get_field_by_name(ciSymbols::ETYPE_name(), ciSymbols::class_signature(), /* is_static */ true);
@@ -80,7 +80,7 @@ Node* GraphKit::box_vector(Node* vector, const TypeInstPtr* vbox_type, BasicType
 Node* GraphKit::unbox_vector(Node* v, const TypeInstPtr* vbox_type, BasicType elem_bt, int num_elem, bool shuffle_to_vector) {
   assert(EnableVectorSupport, "");
   const TypeInstPtr* vbox_type_v = gvn().type(v)->is_instptr();
-  if (vbox_type->klass() != vbox_type_v->klass()) {
+  if (vbox_type->instance_klass() != vbox_type_v->instance_klass()) {
     return NULL; // arguments don't agree on vector shapes
   }
   if (vbox_type_v->maybe_null()) {

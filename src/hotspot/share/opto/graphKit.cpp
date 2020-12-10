@@ -526,7 +526,7 @@ void GraphKit::uncommon_trap_if_should_post_on_exceptions(Deoptimization::DeoptR
 }
 
 //------------------------------builtin_throw----------------------------------
-void GraphKit::builtin_throw(Deoptimization::DeoptReason reason, Node* arg) {
+void GraphKit::builtin_throw(Deoptimization::DeoptReason reason) {
   bool must_throw = true;
 
   if (env()->jvmti_can_post_on_exceptions()) {
@@ -1221,7 +1221,7 @@ Node* GraphKit::null_check_common(Node* value, BasicType type,
       const Type *t = _gvn.type( value );
 
       const TypeOopPtr* tp = t->isa_oopptr();
-      if (tp != NULL && tp->klass() != NULL && !tp->klass()->is_loaded()
+      if (tp != NULL && !tp->is_loaded()
           // Only for do_null_check, not any of its siblings:
           && !assert_null && null_control == NULL) {
         // Usually, any field access or invocation on an unloaded oop type
@@ -1235,12 +1235,13 @@ Node* GraphKit::null_check_common(Node* value, BasicType type,
         // Our access to the unloaded class will only be correct
         // after it has been loaded and initialized, which requires
         // a trip through the interpreter.
+        ciKlass* klass = tp->unloaded_klass();
 #ifndef PRODUCT
-        if (WizardMode) { tty->print("Null check of unloaded "); tp->klass()->print(); tty->cr(); }
+        if (WizardMode) { tty->print("Null check of unloaded "); klass->print(); tty->cr(); }
 #endif
         uncommon_trap(Deoptimization::Reason_unloaded,
                       Deoptimization::Action_reinterpret,
-                      tp->klass(), "!loaded");
+                      klass, "!loaded");
         return top();
       }
 
@@ -2792,8 +2793,8 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
     return C->top();             // false path is dead; no test needed.
 
   if (gvn.type(superklass)->singleton()) {
-    ciKlass* superk = gvn.type(superklass)->is_klassptr()->klass();
-    ciKlass* subk   = gvn.type(subklass)->is_klassptr()->klass();
+    const TypeKlassPtr* superk = gvn.type(superklass)->is_klassptr();
+    const TypeKlassPtr* subk   = gvn.type(subklass)->is_klassptr();
 
     // In the common case of an exact superklass, try to fold up the
     // test before generating code.  You may ask, why not just generate
@@ -2804,7 +2805,7 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
     //    Foo[] fa = blah(); Foo x = fa[0]; fa[1] = x;
     // Here, the type of 'fa' is often exact, so the store check
     // of fa[1]=x will fold up, without testing the nullness of x.
-    switch (C->static_subtype_check(superk, subk)) {
+    switch (C->static_subtype_check(superk, subk->cast_to_exactness(false))) {
     case Compile::SSC_always_false:
       {
         Node* always_fail = *ctrl;
@@ -3092,7 +3093,7 @@ void GraphKit::clinit_barrier(ciInstanceKlass* ik, ciMethod* context) {
 // If the profile has seen exactly one type, narrow to exactly that type.
 // Subsequent type checks will always fold up.
 Node* GraphKit::maybe_cast_profiled_receiver(Node* not_null_obj,
-                                             ciKlass* require_klass,
+                                             const TypeKlassPtr* require_klass,
                                              ciKlass* spec_klass,
                                              bool safe_for_replace) {
   if (!UseTypeProfile || !TypeProfileCasts) return NULL;
@@ -3110,7 +3111,7 @@ Node* GraphKit::maybe_cast_profiled_receiver(Node* not_null_obj,
   ciKlass* exact_kls = spec_klass == NULL ? profile_has_unique_klass() : spec_klass;
   if (exact_kls != NULL) {// no cast failures here
     if (require_klass == NULL ||
-        C->static_subtype_check(require_klass, exact_kls) == Compile::SSC_always_true) {
+        C->static_subtype_check(require_klass, TypeKlassPtr::make(exact_kls)->cast_to_exactness(false)) == Compile::SSC_always_true) {
       // If we narrow the type to match what the type profile sees or
       // the speculative type, we can then remove the rest of the
       // cast.
@@ -3235,10 +3236,10 @@ Node* GraphKit::gen_instanceof(Node* obj, Node* superklass, bool safe_for_replac
   // Do we know the type check always succeed?
   bool known_statically = false;
   if (_gvn.type(superklass)->singleton()) {
-    ciKlass* superk = _gvn.type(superklass)->is_klassptr()->klass();
-    ciKlass* subk = _gvn.type(obj)->is_oopptr()->klass();
-    if (subk != NULL && subk->is_loaded()) {
-      int static_res = C->static_subtype_check(superk, subk);
+    const TypeKlassPtr* superk = _gvn.type(superklass)->is_klassptr();
+    const TypeKlassPtr* subk = _gvn.type(obj)->is_oopptr()->as_klass_type();
+    if (subk->is_loaded()) {
+      int static_res = C->static_subtype_check(superk, subk->cast_to_exactness(false));
       known_statically = (static_res == Compile::SSC_always_true || static_res == Compile::SSC_always_false);
     }
   }
@@ -3297,7 +3298,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
                               Node* *failure_control) {
   kill_dead_locals();           // Benefit all the uncommon traps
   const TypeKlassPtr *tk = _gvn.type(superklass)->is_klassptr();
-  const Type *toop = TypeOopPtr::make_from_klass(tk->klass());
+  const Type *toop = tk->cast_to_exactness(false)->as_instance_type();
 
   // Fast cutout:  Check the case that the cast is vacuously true.
   // This detects the common cases where the test will short-circuit
@@ -3307,8 +3308,8 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
   // for example, in some objArray manipulations, such as a[i]=a[j].)
   if (tk->singleton()) {
     const TypeOopPtr* objtp = _gvn.type(obj)->isa_oopptr();
-    if (objtp != NULL && objtp->klass() != NULL) {
-      switch (C->static_subtype_check(tk->klass(), objtp->klass())) {
+    if (objtp != NULL) {
+      switch (C->static_subtype_check(tk, objtp->as_klass_type()->cast_to_exactness(false))) {
       case Compile::SSC_always_true:
         // If we know the type check always succeed then we don't use
         // the profiling data at this bytecode. Don't lose it, feed it
@@ -3318,7 +3319,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
         // It needs a null check because a null will *pass* the cast check.
         // A non-null value will always produce an exception.
         if (!objtp->maybe_null()) {
-          builtin_throw(Deoptimization::Reason_class_check, makecon(TypeKlassPtr::make(objtp->klass())));
+          builtin_throw(Deoptimization::Reason_class_check);
           return top();
         } else if (!too_many_traps_or_recompiles(Deoptimization::Reason_null_assert)) {
           return null_assert(obj);
@@ -3379,7 +3380,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
     // a speculative type use it to perform an exact cast.
     ciKlass* spec_obj_type = obj_type->speculative_type();
     if (spec_obj_type != NULL || data != NULL) {
-      cast_obj = maybe_cast_profiled_receiver(not_null_obj, tk->klass(), spec_obj_type, safe_for_replace);
+      cast_obj = maybe_cast_profiled_receiver(not_null_obj, tk, spec_obj_type, safe_for_replace);
       if (cast_obj != NULL) {
         if (failure_control != NULL) // failure is now impossible
           (*failure_control) = top();
@@ -3400,7 +3401,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
       if (not_subtype_ctrl != top()) { // If failure is possible
         PreserveJVMState pjvms(this);
         set_control(not_subtype_ctrl);
-        builtin_throw(Deoptimization::Reason_class_check, load_object_klass(not_null_obj));
+        builtin_throw(Deoptimization::Reason_class_check);
       }
     } else {
       (*failure_control) = not_subtype_ctrl;
@@ -3606,10 +3607,18 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
 Node* GraphKit::get_layout_helper(Node* klass_node, jint& constant_value) {
   const TypeKlassPtr* inst_klass = _gvn.type(klass_node)->isa_klassptr();
   if (!StressReflectiveCode && inst_klass != NULL) {
-    ciKlass* klass = inst_klass->klass();
     bool    xklass = inst_klass->klass_is_exact();
-    if (xklass || klass->is_array_klass()) {
-      jint lhelper = klass->layout_helper();
+    if (xklass || inst_klass->isa_aryklassptr()) {
+      jint lhelper;
+      if (inst_klass->isa_aryklassptr()) {
+        BasicType elem = inst_klass->as_instance_type()->isa_aryptr()->elem()->array_element_basic_type();
+        if (elem == T_ARRAY || elem == T_NARROWOOP) {
+          elem = T_OBJECT;
+        }
+        lhelper = Klass::array_layout_helper(elem);
+      } else {
+        lhelper = inst_klass->is_instklassptr()->exact_klass()->layout_helper();
+      }
       if (lhelper != Klass::_lh_neutral_value) {
         constant_value = lhelper;
         return (Node*) NULL;
@@ -3681,7 +3690,7 @@ Node* GraphKit::set_output_for_allocation(AllocateNode* alloc,
       int            elemidx  = C->get_alias_index(telemref);
       hook_memory_on_init(*this, elemidx, minit_in, minit_out);
     } else if (oop_type->isa_instptr()) {
-      ciInstanceKlass* ik = oop_type->klass()->as_instance_klass();
+      ciInstanceKlass* ik = oop_type->is_instptr()->instance_klass();
       for (int i = 0, len = ik->nof_nonstatic_fields(); i < len; i++) {
         ciField* field = ik->nonstatic_field_at(i);
         if (field->offset() >= TrackedInitializationLimit * HeapWordSize)
@@ -3784,7 +3793,7 @@ Node* GraphKit::new_instance(Node* klass_node,
   // It's what we cast the result to.
   const TypeKlassPtr* tklass = _gvn.type(klass_node)->isa_klassptr();
   if (!tklass)  tklass = TypeInstKlassPtr::OBJECT;
-  const TypeOopPtr* oop_type = tklass->as_instance_type();
+  const TypeOopPtr* oop_type = tklass->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
 
   // Now generate allocation code
 
@@ -3969,7 +3978,7 @@ Node* GraphKit::new_array(Node* klass_node,     // array klass (maybe variable)
   // (This happens via a non-constant argument to inline_native_newArray.)
   // In any case, the value of klass_node provides the desired array type.
   const TypeInt* length_type = _gvn.find_int_type(length);
-  const TypeOopPtr* ary_type = _gvn.type(klass_node)->is_klassptr()->as_instance_type();
+  const TypeOopPtr* ary_type = _gvn.type(klass_node)->is_klassptr()->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
   if (ary_type->isa_aryptr() && length_type != NULL) {
     // Try to get a better type than POS for the size
     ary_type = ary_type->is_aryptr()->cast_to_size(length_type);

@@ -466,7 +466,7 @@ void JVMState::format(PhaseRegAlloc *regalloc, const Node *n, outputStream* st) 
       st->cr();
       st->print("        # ScObj" INT32_FORMAT " ", i);
       SafePointScalarObjectNode* spobj = scobjs.at(i);
-      ciKlass* cik = spobj->bottom_type()->is_oopptr()->klass();
+      ciKlass* cik = spobj->bottom_type()->is_oopptr()->exact_klass();
       assert(cik->is_instance_klass() ||
              cik->is_array_klass(), "Not supported allocation.");
       ciInstanceKlass *iklass = NULL;
@@ -788,11 +788,11 @@ bool CallNode::may_modify(const TypeOopPtr *t_oop, PhaseTransform *phase) {
     return false;
   }
   if (t_oop->is_ptr_to_boxed_value()) {
-    ciKlass* boxing_klass = t_oop->klass();
+    ciKlass* boxing_klass = t_oop->is_instptr()->instance_klass();
     if (is_CallStaticJava() && as_CallStaticJava()->is_boxing_method()) {
       // Skip unrelated boxing methods.
       Node* proj = proj_out_or_null(TypeFunc::Parms);
-      if ((proj == NULL) || (phase->type(proj)->is_instptr()->klass() != boxing_klass)) {
+      if ((proj == NULL) || (phase->type(proj)->is_instptr()->instance_klass() != boxing_klass)) {
         return false;
       }
     }
@@ -807,7 +807,7 @@ bool CallNode::may_modify(const TypeOopPtr *t_oop, PhaseTransform *phase) {
       if (proj != NULL) {
         const TypeInstPtr* inst_t = phase->type(proj)->isa_instptr();
         if ((inst_t != NULL) && (!inst_t->klass_is_exact() ||
-                                 (inst_t->klass() == boxing_klass))) {
+                                 (inst_t->instance_klass() == boxing_klass))) {
           return true;
         }
       }
@@ -815,7 +815,7 @@ bool CallNode::may_modify(const TypeOopPtr *t_oop, PhaseTransform *phase) {
       for (uint i = TypeFunc::Parms; i < d->cnt(); i++) {
         const TypeInstPtr* inst_t = d->field_at(i)->isa_instptr();
         if ((inst_t != NULL) && (!inst_t->klass_is_exact() ||
-                                 (inst_t->klass() == boxing_klass))) {
+                                 (inst_t->instance_klass() == boxing_klass))) {
           return true;
         }
       }
@@ -2273,7 +2273,7 @@ bool CallNode::may_modify_arraycopy_helper(const TypeOopPtr* dest_t, const TypeO
     return dest_t->instance_id() == t_oop->instance_id();
   }
 
-  if (dest_t->isa_instptr() && !dest_t->klass()->equals(phase->C->env()->Object_klass())) {
+  if (dest_t->isa_instptr() && !dest_t->is_instptr()->instance_klass()->equals(phase->C->env()->Object_klass())) {
     // clone
     if (t_oop->isa_aryptr()) {
       return false;
@@ -2281,7 +2281,7 @@ bool CallNode::may_modify_arraycopy_helper(const TypeOopPtr* dest_t, const TypeO
     if (!t_oop->isa_instptr()) {
       return true;
     }
-    if (dest_t->klass()->is_subtype_of(t_oop->klass()) || t_oop->klass()->is_subtype_of(dest_t->klass())) {
+    if (dest_t->maybe_java_subtype_of(t_oop) || t_oop->maybe_java_subtype_of(dest_t)) {
       return true;
     }
     // unrelated

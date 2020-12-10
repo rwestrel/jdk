@@ -1288,7 +1288,7 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
   }
 
   // Array pointers need some flattening
-  const TypeAryPtr *ta = tj->isa_aryptr();
+  const TypeAryPtr* ta = tj->isa_aryptr();
   if (ta && ta->is_stable()) {
     // Erase stability property for alias analysis.
     tj = ta = ta->cast_to_stable(false);
@@ -1297,7 +1297,10 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if ( offset != Type::OffsetBot &&
          offset > arrayOopDesc::length_offset_in_bytes() ) {
       offset = Type::OffsetBot; // Flatten constant access into array body only
-      tj = ta = TypeAryPtr::make(ptr, ta->ary(), ta->klass(), true, offset, ta->instance_id());
+      tj = ta = ta->
+              remove_speculative()->
+              cast_to_ptr_type(ptr)->
+              with_offset(offset);
     }
   } else if( ta && _AliasLevel >= 2 ) {
     // For arrays indexed by constant indices, we flatten the alias
@@ -1306,7 +1309,11 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if( offset != Type::OffsetBot ) {
       if( ta->const_oop() ) { // MethodData* or Method*
         offset = Type::OffsetBot;   // Flatten constant access into array body
-        tj = ta = TypeAryPtr::make(ptr,ta->const_oop(),ta->ary(),ta->klass(),false,offset);
+        tj = ta = ta->
+                remove_speculative()->
+                cast_to_ptr_type(ptr)->
+                cast_to_exactness(false)->
+                with_offset(offset);
       } else if( offset == arrayOopDesc::length_offset_in_bytes() ) {
         // range is OK as-is.
         tj = ta = TypeAryPtr::RANGE;
@@ -1320,13 +1327,21 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
         ptr = TypePtr::BotPTR;
       } else {                  // Random constant offset into array body
         offset = Type::OffsetBot;   // Flatten constant access into array body
-        tj = ta = TypeAryPtr::make(ptr,ta->ary(),ta->klass(),false,offset);
+        tj = ta = ta->
+                remove_speculative()->
+                cast_to_ptr_type(ptr)->
+                cast_to_exactness(false)->
+                with_offset(offset);
       }
     }
     // Arrays of fixed size alias with arrays of unknown size.
     if (ta->size() != TypeInt::POS) {
       const TypeAry *tary = TypeAry::make(ta->elem(), TypeInt::POS);
-      tj = ta = TypeAryPtr::make(ptr,ta->const_oop(),tary,ta->klass(),false,offset);
+      tj = ta = ta->
+              remove_speculative()->
+              cast_to_ptr_type(ptr)->
+              with_ary(tary)->
+              cast_to_exactness(false);
     }
     // Arrays of known objects become arrays of unknown objects.
     if (ta->elem()->isa_narrowoop() && ta->elem() != TypeNarrowOop::BOTTOM) {
@@ -1348,21 +1363,29 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     // Make sure the Bottom and NotNull variants alias the same.
     // Also, make sure exact and non-exact variants alias the same.
     if (ptr == TypePtr::NotNull || ta->klass_is_exact() || ta->speculative() != NULL) {
-      tj = ta = TypeAryPtr::make(TypePtr::BotPTR,ta->ary(),ta->klass(),false,offset);
+      tj = ta = ta->
+              remove_speculative()->
+              cast_to_ptr_type(TypePtr::BotPTR)->
+              cast_to_exactness(false)->
+              with_offset(offset);
     }
   }
 
   // Oop pointers need some flattening
   const TypeInstPtr *to = tj->isa_instptr();
   if( to && _AliasLevel >= 2 && to != TypeOopPtr::BOTTOM ) {
-    ciInstanceKlass *k = to->klass()->as_instance_klass();
+    ciInstanceKlass *ik = to->instance_klass();
     if( ptr == TypePtr::Constant ) {
-      if (to->klass() != ciEnv::current()->Class_klass() ||
-          offset < k->size_helper() * wordSize) {
+      if (ik != ciEnv::current()->Class_klass() ||
+          offset < ik->size_helper() * wordSize) {
         // No constant oop pointers (such as Strings); they alias with
         // unknown strings.
         assert(!is_known_inst, "not scalarizable allocation");
-        tj = to = TypeInstPtr::make(TypePtr::BotPTR,to->klass(),false,0,offset);
+        tj = to = to->
+                cast_to_instance_id(TypeOopPtr::InstanceBot)->
+                remove_speculative()->
+                cast_to_ptr_type(TypePtr::BotPTR)->
+                cast_to_exactness(false);
       }
     } else if( is_known_inst ) {
       tj = to; // Keep NotNull and klass_is_exact for instance type
@@ -1370,10 +1393,15 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       // During the 2nd round of IterGVN, NotNull castings are removed.
       // Make sure the Bottom and NotNull variants alias the same.
       // Also, make sure exact and non-exact variants alias the same.
-      tj = to = TypeInstPtr::make(TypePtr::BotPTR,to->klass(),false,0,offset);
+      tj = to = to->
+              remove_speculative()->
+              cast_to_instance_id(TypeOopPtr::InstanceBot)->
+              cast_to_ptr_type(TypePtr::BotPTR)->
+              cast_to_exactness(false);
     }
     if (to->speculative() != NULL) {
-      tj = to = TypeInstPtr::make(to->ptr(),to->klass(),to->klass_is_exact(),to->const_oop(),to->offset(), to->instance_id());
+      tj = to = to->
+              remove_speculative();
     }
     // Canonicalize the holder of this field
     if (offset >= 0 && offset < instanceOopDesc::base_offset_in_bytes()) {
@@ -1382,17 +1410,17 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       if (!is_known_inst) { // Do it only for non-instance types
         tj = to = TypeInstPtr::make(TypePtr::BotPTR, env()->Object_klass(), false, NULL, offset);
       }
-    } else if (offset < 0 || offset >= k->size_helper() * wordSize) {
+    } else if (offset < 0 || offset >= ik->size_helper() * wordSize) {
       // Static fields are in the space above the normal instance
       // fields in the java.lang.Class instance.
-      if (to->klass() != ciEnv::current()->Class_klass()) {
+      if (ik != ciEnv::current()->Class_klass()) {
         to = NULL;
         tj = TypeOopPtr::BOTTOM;
         offset = tj->offset();
       }
     } else {
-      ciInstanceKlass *canonical_holder = k->get_canonical_holder(offset);
-      if (!k->equals(canonical_holder) || tj->offset() != offset) {
+      ciInstanceKlass *canonical_holder = ik->get_canonical_holder(offset);
+      if (!ik->equals(canonical_holder) || tj->offset() != offset) {
         if( is_known_inst ) {
           tj = to = TypeInstPtr::make(to->ptr(), canonical_holder, true, NULL, offset, to->instance_id());
         } else {
@@ -1410,18 +1438,18 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     // inexact types must flatten to the same alias class so
     // use NotNull as the PTR.
     if ( offset == Type::OffsetBot || (offset >= 0 && (size_t)offset < sizeof(Klass)) ) {
-
-      tj = tk = TypeKlassPtr::make(TypePtr::NotNull,
-                                   TypeInstKlassPtr::OBJECT->klass(),
-                                   offset);
+      tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull,
+                                       env()->Object_klass(),
+                                       offset);
     }
 
-    ciKlass* klass = tk->klass();
-    if( klass->is_obj_array_klass() ) {
-      ciKlass* k = TypeAryPtr::OOPS->klass();
-      if( !k || !k->is_loaded() )                  // Only fails for some -Xcomp runs
-        k = TypeInstPtr::BOTTOM->klass();
-      tj = tk = TypeKlassPtr::make( TypePtr::NotNull, k, offset );
+    if (tk->isa_aryklassptr() && tk->is_aryklassptr()->elem()->isa_klassptr()) {
+      ciKlass* k = ciObjArrayKlass::make(env()->Object_klass());
+      if (!k || !k->is_loaded()) {                  // Only fails for some -Xcomp runs
+        tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull, env()->Object_klass(), offset);
+      } else {
+        tj = tk = TypeAryKlassPtr::make(TypePtr::NotNull, tk->is_aryklassptr()->elem(), k, offset);
+      }
     }
 
     // Check for precise loads from the primary supertype array and force them
@@ -1437,7 +1465,7 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
          offset < (int)(primary_supers_offset + Klass::primary_super_limit() * wordSize)) ||
         offset == (int)in_bytes(Klass::secondary_super_cache_offset())) {
       offset = in_bytes(Klass::secondary_super_cache_offset());
-      tj = tk = TypeKlassPtr::make( TypePtr::NotNull, tk->klass(), offset );
+      tj = tk = tk->with_offset(offset);
     }
   }
 
@@ -1534,7 +1562,7 @@ void Compile::AliasType::print_on(outputStream* st) {
   adr_type()->dump_on(st);
   const TypeOopPtr* tjp = adr_type()->isa_oopptr();
   if (field() != NULL && tjp) {
-    if (tjp->klass()  != field()->holder() ||
+    if (tjp->is_instptr()->instance_klass()  != field()->holder() ||
         tjp->offset() != field()->offset_in_bytes()) {
       st->print(" != ");
       field()->print();
@@ -1629,7 +1657,7 @@ Compile::AliasType* Compile::find_alias_type(const TypePtr* adr_type, bool no_cr
     if (flat == TypeAryPtr::RANGE)   alias_type(idx)->set_rewritable(false);
     if (flat->isa_instptr()) {
       if (flat->offset() == java_lang_Class::klass_offset()
-          && flat->is_instptr()->klass() == env()->Class_klass())
+          && flat->is_instptr()->instance_klass() == env()->Class_klass())
         alias_type(idx)->set_rewritable(false);
     }
     if (flat->isa_aryptr()) {
@@ -1663,13 +1691,13 @@ Compile::AliasType* Compile::find_alias_type(const TypePtr* adr_type, bool no_cr
     if (tinst && tinst->offset() >= instanceOopDesc::base_offset_in_bytes()) {
       ciField* field;
       if (tinst->const_oop() != NULL &&
-          tinst->klass() == ciEnv::current()->Class_klass() &&
-          tinst->offset() >= (tinst->klass()->as_instance_klass()->size_helper() * wordSize)) {
+          tinst->instance_klass() == ciEnv::current()->Class_klass() &&
+          tinst->offset() >= (tinst->instance_klass()->size_helper() * wordSize)) {
         // static field
         ciInstanceKlass* k = tinst->const_oop()->as_instance()->java_lang_Class_klass()->as_instance_klass();
         field = k->get_field_by_offset(tinst->offset(), true);
       } else {
-        ciInstanceKlass *k = tinst->klass()->as_instance_klass();
+        ciInstanceKlass *k = tinst->instance_klass();
         field = k->get_field_by_offset(tinst->offset(), false);
       }
       assert(field == NULL ||
@@ -4116,39 +4144,34 @@ Compile::TracePhase::~TracePhase() {
 // (1) subklass is already limited to a subtype of superklass => always ok
 // (2) subklass does not overlap with superklass => always fail
 // (3) superklass has NO subtypes and we can check with a simple compare.
-int Compile::static_subtype_check(ciKlass* superk, ciKlass* subk) {
+int Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr* subk) {
   if (StressReflectiveCode) {
     return SSC_full_test;       // Let caller generate the general case.
   }
 
-  if (superk == env()->Object_klass()) {
-    return SSC_always_true;     // (0) this test cannot fail
+  if (subk->is_java_subtype_of(superk)) {
+    return SSC_always_true;
   }
 
-  ciType* superelem = superk;
-  if (superelem->is_array_klass())
-    superelem = superelem->as_array_klass()->base_element_type();
-
-  if (!subk->is_interface()) {  // cannot trust static interface types yet
-    if (subk->is_subtype_of(superk)) {
-      return SSC_always_true;   // (1) false path dead; no dynamic test needed
-    }
-    if (!(superelem->is_klass() && superelem->as_klass()->is_interface()) &&
-        !superk->is_subtype_of(subk)) {
-      return SSC_always_false;
-    }
+  if (!subk->maybe_java_subtype_of(superk)) {
+    return SSC_always_false;
   }
 
-  // If casting to an instance klass, it must have no subtypes
-  if (superk->is_interface()) {
-    // Cannot trust interfaces yet.
-    // %%% S.B. superk->nof_implementors() == 1
-  } else if (superelem->is_instance_klass()) {
-    ciInstanceKlass* ik = superelem->as_instance_klass();
-    if (!ik->has_subklass() && !ik->is_interface()) {
+  const Type* superelem = superk;
+  if (superk->isa_aryklassptr()) {
+    int ignored;
+    superelem = superk->is_aryklassptr()->base_element_type(ignored);
+  }
+
+  if (superelem->isa_instklassptr()) {
+    ciInstanceKlass* ik = superelem->is_instklassptr()->instance_klass();
+    if (!ik->has_subklass()) {
       if (!ik->is_final()) {
         // Add a dependency if there is a chance of a later subclass.
         dependencies()->assert_leaf_type(ik);
+      }
+      if (!superk->maybe_java_subtype_of(subk)) {
+        return SSC_always_false;
       }
       return SSC_easy_test;     // (3) caller can do a simple ptr comparison
     }
@@ -4159,6 +4182,7 @@ int Compile::static_subtype_check(ciKlass* superk, ciKlass* subk) {
 
   return SSC_full_test;
 }
+
 
 Node* Compile::conv_I2X_index(PhaseGVN* phase, Node* idx, const TypeInt* sizetype, Node* ctrl) {
 #ifdef _LP64
