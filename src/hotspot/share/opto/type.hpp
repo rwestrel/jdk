@@ -1256,6 +1256,7 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+  const Type* meet_instptr_old(const Type* t) const;
   bool is_interface() const;
 };
 
@@ -1386,6 +1387,7 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+  const Type* meet_aryptr_old(const Type* t) const;
 };
 
 //------------------------------TypeMetadataPtr-------------------------------------
