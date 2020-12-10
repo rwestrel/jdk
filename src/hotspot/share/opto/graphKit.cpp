@@ -3182,6 +3182,17 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
   kill_dead_locals();           // Benefit all the uncommon traps
   const TypeKlassPtr *tk = _gvn.type(superklass)->is_klassptr();
   const Type *toop = tk->cast_to_exactness(false)->as_instance_type();
+  const Type* verif = TypeOopPtr::make_from_klass(tk->klass());
+  if (verif != toop) {
+    toop = tk->cast_to_exactness(false)->as_instance_type();
+  }
+#ifdef ASSERT
+  if (toop != verif) {
+    toop->dump();
+    verif->dump();
+  }
+#endif
+  assert(toop == verif, "");
 
   // Fast cutout:  Check the case that the cast is vacuously true.
   // This detects the common cases where the test will short-circuit
@@ -3497,6 +3508,7 @@ Node* GraphKit::get_layout_helper(Node* klass_node, jint& constant_value) {
     bool    xklass = inst_klass->klass_is_exact();
     if (xklass || inst_klass->isa_aryklassptr()) {
       jint lhelper;
+      // FIXME
       if (inst_klass->isa_aryklassptr()) {
         BasicType elem = inst_klass->as_instance_type()->isa_aryptr()->elem()->array_element_basic_type();
         if (is_reference_type(elem, true)) {
@@ -3506,6 +3518,7 @@ Node* GraphKit::get_layout_helper(Node* klass_node, jint& constant_value) {
       } else {
         lhelper = inst_klass->is_instklassptr()->exact_klass()->layout_helper();
       }
+      assert(lhelper == inst_klass->klass()->layout_helper(), "");
       if (lhelper != Klass::_lh_neutral_value) {
         constant_value = lhelper;
         return (Node*) NULL;

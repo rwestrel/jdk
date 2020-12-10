@@ -2636,6 +2636,7 @@ bool ConnectionGraph::split_AddP(Node *addp, Node *base) {
   // Do nothing for such AddP node and don't process its users since
   // this code branch will go away.
   //
+  assert((!t->is_known_instance() && !t->maybe_java_subtype_of(base_t)) == (!t->is_known_instance() &&!base_t->klass()->is_subtype_of(t->klass())) || (t->isa_instptr() && t->is_instptr()->is_interface()), "");
   if (!t->is_known_instance() &&
       !base_t->maybe_java_subtype_of(t)) {
      return false; // bail out
@@ -3321,6 +3322,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
         } else {
           tn_t = tn_type->isa_oopptr();
         }
+        assert((tn_t != NULL && tn_t->maybe_java_subtype_of(tinst)) == (tn_t != NULL && tinst->klass()->is_subtype_of(tn_t->klass())) || (tn_t->isa_instptr() && tn_t->is_instptr()->is_interface()), "");
         if (tn_t != NULL && tinst->maybe_java_subtype_of(tn_t)) {
           if (tn_type->isa_narrowoop()) {
             tn_type = tinst->make_narrowoop();

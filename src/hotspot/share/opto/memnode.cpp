@@ -2315,7 +2315,31 @@ const Type* LoadNode::klass_value_common(PhaseGVN* phase) const {
     if (!tinst->is_loaded())
       return _type;             // Bail out if not loaded
     if (offset == oopDesc::klass_offset_in_bytes()) {
-      return tinst->as_klass_type(true);
+      ik = tinst->klass()->as_instance_klass();
+      const Type* res1 = tinst->as_klass_type(true);
+      if (tinst->klass_is_exact()) {
+        const Type* res2 = TypeInstKlassPtr::make(ik);
+        assert(res1 == res2, "");
+        return res2;
+      }
+      // See if we can become precise: no subklasses and no interface
+      // (Note:  We need to support verified interfaces.)
+      if (!ik->is_interface() && !ik->has_subklass()) {
+        // Add a dependence; if any subclass added we need to recompile
+        if (!ik->is_final()) {
+          // %%% should use stronger assert_unique_concrete_subtype instead
+          phase->C->dependencies()->assert_leaf_type(ik);
+        }
+        // Return precise klass
+        const Type* res2 = TypeInstKlassPtr::make(ik);
+        assert(res1 == res2, "");
+        return res2;
+      }
+
+      // Return root of possible klass
+      const Type* res2 = TypeInstKlassPtr::make(TypePtr::NotNull, ik, 0/*offset*/);
+      assert(res1 == res2, "");
+      return res2;
     }
   }
 
@@ -2323,7 +2347,46 @@ const Type* LoadNode::klass_value_common(PhaseGVN* phase) const {
   const TypeAryPtr *tary = tp->isa_aryptr();
   if (tary != NULL && tary->elem() != Type::BOTTOM &&
       tary->offset() == oopDesc::klass_offset_in_bytes()) {
-    return tary->as_klass_type(true);
+    const TypeAryKlassPtr* res1 = tary->as_klass_type(true)->is_aryklassptr();
+    res1 = TypeAryKlassPtr::make(res1->ptr(),
+                                 res1->elem()->isa_klassptr() ? res1->elem()->is_klassptr()->cast_to_exactness(false) : res1->elem(),
+                                 res1->klass(),
+                                 res1->offset());
+    if (tary->klass_is_exact()) {
+      const Type* res2 = TypeAryKlassPtr::make(tary->klass());
+      assert(res1 == res2, "");
+      return res2;
+    }
+    const Type* res2 = NULL;
+    if (tary->klass() != NULL) {
+      ciArrayKlass* ak = tary->klass()->as_array_klass();
+      // If the klass is an object array, we defer the question to the
+      // array component klass.
+      if (ak->is_obj_array_klass()) {
+        assert(ak->is_loaded(), "");
+        ciKlass* base_k = ak->as_obj_array_klass()->base_element_klass();
+        if (base_k->is_loaded() && base_k->is_instance_klass()) {
+          ciInstanceKlass* ik = base_k->as_instance_klass();
+          // See if we can become precise: no subklasses and no interface
+          if (!ik->is_interface() && !ik->has_subklass()) {
+            // Add a dependence; if any subclass added we need to recompile
+            if (!ik->is_final()) {
+              phase->C->dependencies()->assert_leaf_type(ik);
+            }
+            // Return precise array klass
+            res2 = TypeAryKlassPtr::make(ak);
+          }
+        }
+        if (res2 == NULL) {
+          res2 = TypeAryKlassPtr::make(ak)->cast_to_ptr_type(TypePtr::NotNull);
+        }
+      } else {                  // Found a type-array?
+        assert(ak->is_type_array_klass(), "");
+        res2 = TypeAryKlassPtr::make(ak); // These are always precise
+      }
+    }
+    assert(res2 == NULL || res1 == res2, "");
+    return res1;
   }
 
   // Check for loading klass from an array klass

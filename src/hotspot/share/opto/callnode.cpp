@@ -2285,6 +2285,7 @@ bool CallNode::may_modify_arraycopy_helper(const TypeOopPtr* dest_t, const TypeO
     if (!t_oop->isa_instptr()) {
       return true;
     }
+    assert((dest_t->klass()->is_subtype_of(t_oop->klass()) || t_oop->klass()->is_subtype_of(dest_t->klass())) == (dest_t->maybe_java_subtype_of(t_oop) || t_oop->maybe_java_subtype_of(dest_t)), "");
     if (dest_t->maybe_java_subtype_of(t_oop) || t_oop->maybe_java_subtype_of(dest_t)) {
       return true;
     }

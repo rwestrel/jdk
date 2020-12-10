@@ -5247,6 +5247,7 @@ bool LibraryCallKit::inline_arraycopy() {
 
     const TypeKlassPtr* dest_klass_t = _gvn.type(dest_klass)->is_klassptr();
     const Type *toop = dest_klass_t->cast_to_exactness(false)->as_instance_type();
+    assert(toop == TypeOopPtr::make_from_klass(dest_klass_t->klass()), "");
     src = _gvn.transform(new CheckCastPPNode(control(), src, toop));
   }
 
