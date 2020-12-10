@@ -1030,6 +1030,7 @@ class TypeOopPtr : public TypePtr {
   friend class Compile;
   friend class SubTypeCheckNode;
   friend class CmpPNode;
+  friend class CallNode;
 
 protected:
   TypeOopPtr(TYPES t, PTR ptr, ciKlass* k, bool xk, ciObject* o, int offset, int instance_id,
@@ -1436,6 +1437,8 @@ class TypeKlassPtr : public TypePtr {
   friend class Compile;
   friend class SubTypeCheckNode;
   friend class CmpPNode;
+  friend class GraphKit;
+  friend class LibraryCallKit;
 protected:
   TypeKlassPtr(TYPES t, PTR ptr, ciKlass* klass, int offset);
 

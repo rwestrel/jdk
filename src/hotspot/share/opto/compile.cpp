@@ -1297,10 +1297,12 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if ( offset != Type::OffsetBot &&
          offset > arrayOopDesc::length_offset_in_bytes() ) {
       offset = Type::OffsetBot; // Flatten constant access into array body only
-      tj = ta = ta->
+      const TypeAryPtr* res = ta->
               remove_speculative()->
               cast_to_ptr_type(ptr)->
               with_offset(offset);
+      assert(res == TypeAryPtr::make(ptr, ta->ary(), ta->klass(), true, offset, ta->instance_id()), "");
+      tj = ta = res;
     }
   } else if( ta && _AliasLevel >= 2 ) {
     // For arrays indexed by constant indices, we flatten the alias
@@ -1309,11 +1311,13 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if( offset != Type::OffsetBot ) {
       if( ta->const_oop() ) { // MethodData* or Method*
         offset = Type::OffsetBot;   // Flatten constant access into array body
-        tj = ta = ta->
+        const TypeAryPtr* res = ta->
                 remove_speculative()->
                 cast_to_ptr_type(ptr)->
                 cast_to_exactness(false)->
                 with_offset(offset);
+        assert(res == TypeAryPtr::make(ptr,ta->const_oop(),ta->ary(),ta->klass(),false,offset), "");
+        tj = ta = res;
       } else if( offset == arrayOopDesc::length_offset_in_bytes() ) {
         // range is OK as-is.
         tj = ta = TypeAryPtr::RANGE;
@@ -1327,21 +1331,25 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
         ptr = TypePtr::BotPTR;
       } else {                  // Random constant offset into array body
         offset = Type::OffsetBot;   // Flatten constant access into array body
-        tj = ta = ta->
+        const TypeAryPtr* res = ta->
                 remove_speculative()->
                 cast_to_ptr_type(ptr)->
                 cast_to_exactness(false)->
                 with_offset(offset);
+        assert(res == TypeAryPtr::make(ptr,ta->ary(),ta->klass(),false,offset), "");
+        tj = ta = res;
       }
     }
     // Arrays of fixed size alias with arrays of unknown size.
     if (ta->size() != TypeInt::POS) {
       const TypeAry *tary = TypeAry::make(ta->elem(), TypeInt::POS);
-      tj = ta = ta->
+      const TypeAryPtr* res = ta->
               remove_speculative()->
               cast_to_ptr_type(ptr)->
               with_ary(tary)->
               cast_to_exactness(false);
+      assert(res == TypeAryPtr::make(ptr,ta->const_oop(),tary,ta->klass(),false,offset), "");
+      tj = ta = res;
     }
     // Arrays of known objects become arrays of unknown objects.
     if (ta->elem()->isa_narrowoop() && ta->elem() != TypeNarrowOop::BOTTOM) {
@@ -1363,11 +1371,13 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     // Make sure the Bottom and NotNull variants alias the same.
     // Also, make sure exact and non-exact variants alias the same.
     if (ptr == TypePtr::NotNull || ta->klass_is_exact() || ta->speculative() != NULL) {
-      tj = ta = ta->
+      const TypeAryPtr* res = ta->
               remove_speculative()->
               cast_to_ptr_type(TypePtr::BotPTR)->
               cast_to_exactness(false)->
               with_offset(offset);
+      assert(res == TypeAryPtr::make(TypePtr::BotPTR,ta->ary(),ta->klass(),false,offset), "");
+      tj = ta = res;
     }
   }
 
@@ -1381,11 +1391,13 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
         // No constant oop pointers (such as Strings); they alias with
         // unknown strings.
         assert(!is_known_inst, "not scalarizable allocation");
-        tj = to = to->
+        const TypeInstPtr* res = to->
                 cast_to_instance_id(TypeOopPtr::InstanceBot)->
                 remove_speculative()->
                 cast_to_ptr_type(TypePtr::BotPTR)->
                 cast_to_exactness(false);
+        assert(res == TypeInstPtr::make(TypePtr::BotPTR,to->klass(),false,NULL,offset), "");
+        tj = to = res;
       }
     } else if( is_known_inst ) {
       tj = to; // Keep NotNull and klass_is_exact for instance type
@@ -1393,15 +1405,20 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       // During the 2nd round of IterGVN, NotNull castings are removed.
       // Make sure the Bottom and NotNull variants alias the same.
       // Also, make sure exact and non-exact variants alias the same.
-      tj = to = to->
+      const TypeInstPtr* res = to->
               remove_speculative()->
               cast_to_instance_id(TypeOopPtr::InstanceBot)->
               cast_to_ptr_type(TypePtr::BotPTR)->
               cast_to_exactness(false);
+      const TypeInstPtr* expected = TypeInstPtr::make(TypePtr::BotPTR, to->klass(), false, NULL, offset);
+      assert(res == expected, "");
+      tj = to = res;
     }
     if (to->speculative() != NULL) {
-      tj = to = to->
+      const TypeInstPtr* res = to->
               remove_speculative();
+      assert(res == TypeInstPtr::make(to->ptr(),to->klass(),to->klass_is_exact(),to->const_oop(),to->offset(), to->instance_id()), "");
+      tj = to = res;
     }
     // Canonicalize the holder of this field
     if (offset >= 0 && offset < instanceOopDesc::base_offset_in_bytes()) {
@@ -1465,7 +1482,9 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
          offset < (int)(primary_supers_offset + Klass::primary_super_limit() * wordSize)) ||
         offset == (int)in_bytes(Klass::secondary_super_cache_offset())) {
       offset = in_bytes(Klass::secondary_super_cache_offset());
-      tj = tk = tk->with_offset(offset);
+      const TypeKlassPtr* res = tk->with_offset(offset);
+      assert(res == TypeKlassPtr::make( TypePtr::NotNull, tk->klass(), offset ), "");
+      tj = tk = res;
     }
   }
 
@@ -4145,15 +4164,19 @@ Compile::TracePhase::~TracePhase() {
 // (2) subklass does not overlap with superklass => always fail
 // (3) superklass has NO subtypes and we can check with a simple compare.
 int Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr* subk) {
+  int res = (superk->klass_is_exact() && !subk->klass_is_exact() && subk->klass() != NULL) ? static_subtype_check_old(superk, subk) : -1;
   if (StressReflectiveCode) {
+    assert(res == -1 || res == SSC_full_test, "");
     return SSC_full_test;       // Let caller generate the general case.
   }
 
   if (subk->is_java_subtype_of(superk)) {
+    assert(res == -1 || res == SSC_always_true, "");
     return SSC_always_true;
   }
 
   if (!subk->maybe_java_subtype_of(superk)) {
+    assert(res == -1 || res == SSC_always_false, "");
     return SSC_always_false;
   }
 
@@ -4171,7 +4194,68 @@ int Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr
         dependencies()->assert_leaf_type(ik);
       }
       if (!superk->maybe_java_subtype_of(subk)) {
+        assert(res == -1 || res == SSC_always_false, "");
         return SSC_always_false;
+      }
+      assert(res == -1 || res == SSC_easy_test, "");
+      return SSC_easy_test;     // (3) caller can do a simple ptr comparison
+    }
+  } else {
+    assert(res == -1 || res == SSC_easy_test, "");
+    // A primitive array type has no subtypes.
+    return SSC_easy_test;       // (3) caller can do a simple ptr comparison
+  }
+
+  assert(res == -1 || res == SSC_full_test, "");
+  return SSC_full_test;
+}
+
+
+int Compile::static_subtype_check_old(const TypeKlassPtr* superk_t, const TypeKlassPtr* subk_t) {
+  ciKlass* superk = superk_t->klass();
+  ciKlass* subk = subk_t->klass();
+  if (StressReflectiveCode) {
+    return SSC_full_test;       // Let caller generate the general case.
+  }
+
+  if (superk == env()->Object_klass()) {
+    return SSC_always_true;     // (0) this test cannot fail
+  }
+
+  ciType* superelem = superk;
+  ciType* subelem = subk;
+  int subdim = 0;
+  int superdim = 0;
+  if (superelem->is_array_klass()) {
+    superdim = superelem->as_array_klass()->dimension();
+    superelem = superelem->as_array_klass()->base_element_type();
+  }
+
+  if (subelem->is_array_klass()) {
+    subdim = subelem->as_array_klass()->dimension();
+    subelem = subelem->as_array_klass()->base_element_type();
+  }
+
+  if (!(subelem->is_klass() && subelem->as_klass()->is_interface()) || subdim > superdim || (superelem == env()->Object_klass() && subdim >= superdim) || (superelem->is_primitive_type() && subdim >= superdim)) {  // cannot trust static interface types yet
+    if (subk->is_subtype_of(superk)) {
+      return SSC_always_true;   // (1) false path dead; no dynamic test needed
+    }
+    if (!(superelem->is_klass() && superelem->as_klass()->is_interface() && superdim != subdim - 1) &&
+        !superk->is_subtype_of(subk)) {
+      return SSC_always_false;
+    }
+  }
+
+  // If casting to an instance klass, it must have no subtypes
+  if (superk->is_interface()) {
+    // Cannot trust interfaces yet.
+    // %%% S.B. superk->nof_implementors() == 1
+  } else if (superelem->is_instance_klass()) {
+    ciInstanceKlass* ik = superelem->as_instance_klass();
+    if (!ik->has_subklass() && !ik->is_interface()) {
+      if (!ik->is_final()) {
+        // Add a dependency if there is a chance of a later subclass.
+        dependencies()->assert_leaf_type(ik);
       }
       return SSC_easy_test;     // (3) caller can do a simple ptr comparison
     }
@@ -4182,7 +4266,6 @@ int Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr
 
   return SSC_full_test;
 }
-
 
 Node* Compile::conv_I2X_index(PhaseGVN* phase, Node* idx, const TypeInt* sizetype, Node* ctrl) {
 #ifdef _LP64
