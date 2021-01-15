@@ -3588,8 +3588,7 @@ bool PhaseIdealLoop::match_fill_loop(IdealLoopTree* lpt, Node*& store, Node*& st
         conv = value;
         value = value->in(1);
       }
-      if (value->Opcode() == Op_CastII &&
-          value->as_CastII()->has_range_check()) {
+      if (value->Opcode() == Op_CastII) {
         // Skip range check dependent CastII nodes
         cast = value;
         value = value->in(1);
@@ -3608,8 +3607,7 @@ bool PhaseIdealLoop::match_fill_loop(IdealLoopTree* lpt, Node*& store, Node*& st
     } else if (n->Opcode() == Op_ConvI2L && conv == NULL) {
       conv = n;
       n = n->in(1);
-      if (n->Opcode() == Op_CastII &&
-          n->as_CastII()->has_range_check()) {
+      if (n->Opcode() == Op_CastII) {
         // Skip range check dependent CastII nodes
         cast = n;
         n = n->in(1);

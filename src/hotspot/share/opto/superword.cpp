@@ -3894,8 +3894,7 @@ bool SWPointer::scaled_iv(Node* n) {
       return true;
     }
   } else if (opc == Op_ConvI2L) {
-    if (n->in(1)->Opcode() == Op_CastII &&
-        n->in(1)->as_CastII()->has_range_check()) {
+    if (n->in(1)->Opcode() == Op_CastII) {
       // Skip range check dependent CastII nodes
       n = n->in(1);
     }
@@ -3998,8 +3997,7 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
     // 'n' is loop invariant. Skip range check dependent CastII nodes before checking if 'n' is dominating the pre loop.
     if (opc == Op_ConvI2L) {
       n = n->in(1);
-      if (n->Opcode() == Op_CastII &&
-          n->as_CastII()->has_range_check()) {
+      if (n->Opcode() == Op_CastII) {
         // Skip range check dependent CastII nodes
         assert(!is_main_loop_member(n), "sanity");
         n = n->in(1);
