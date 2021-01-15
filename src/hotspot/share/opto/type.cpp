@@ -4983,6 +4983,7 @@ const Type* TypeAryPtr::meet_aryptr_old(const Type* t) const {
       return TypeAryPtr::make(ptr, NULL, tary, lazy_klass, xk, off, instance_id, speculative, depth);
     default: ShouldNotReachHere();
   }
+  return NULL;
 }
 
 
@@ -5068,8 +5069,12 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem, ciKlass* t
               (this_klass == tap_klass); // Only precise for identical arrays
       return result;
       //      return TypeAryPtr::make(ptr, NULL, tary, res_klass, xk, off, instance_id, speculative, depth);
-    default: ShouldNotReachHere();
+    default:  {
+      ShouldNotReachHere();
+      return result;
+    }
   }
+  return result;
 }
 
 
