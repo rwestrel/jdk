@@ -2646,7 +2646,7 @@ bool LibraryCallKit::klass_needs_init_guard(Node* kls) {
   if (klsptr == NULL) {
     return true;
   }
-  ciInstanceKlass* ik = klsptr->instance_klass();
+  ciInstanceKlass* ik = klsptr->exact_klass()->as_instance_klass();
   // don't need a guard for a klass that is already initialized
   return !ik->is_initialized();
 }

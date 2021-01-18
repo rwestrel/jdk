@@ -3303,10 +3303,12 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
   if (verif != toop) {
     toop = tk->cast_to_exactness(false)->as_instance_type();
   }
+#ifdef ASSERT
   if (toop != verif) {
     toop->dump();
     verif->dump();
   }
+#endif
   assert(toop == verif, "");
 
   // Fast cutout:  Check the case that the cast is vacuously true.

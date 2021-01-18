@@ -4337,7 +4337,7 @@ int TypeInstPtr::hash(void) const {
   return hash;
 }
 
-bool TypeInstPtr::is_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
+bool TypeInstPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
   if (!is_loaded() || !other->is_loaded()) {
     return false;
   }
@@ -4370,7 +4370,7 @@ bool TypeInstPtr::is_same_java_type_as(const TypeOopPtr* other) const {
   return _klass->equals(other->_klass);
 }
 
-bool TypeInstPtr::maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
+bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
   if (!is_loaded() || !other->is_loaded()) {
     return true;
   }
@@ -4379,7 +4379,7 @@ bool TypeInstPtr::maybe_subtype_java_of_helper(const TypeOopPtr* other, bool thi
     return !this_exact && (_klass->equals(ciEnv::current()->Object_klass()) || _klass->is_interface());
   }
 
-  if (_klass->is_interface() || other->klass()->is_interface()) {
+  if ((_klass->is_interface() && !this_exact) || (other->klass()->is_interface() /*&& !other_exact*/)) {
     return true;
   }
 
@@ -4668,7 +4668,7 @@ int TypeAryPtr::hash(void) const {
   return (intptr_t)_ary + TypeOopPtr::hash();
 }
 
-bool TypeAryPtr::is_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
+bool TypeAryPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
   if (other->klass() == ciEnv::current()->Object_klass()) {
     return true;
   }
@@ -4685,7 +4685,7 @@ bool TypeAryPtr::is_subtype_java_of_helper(const TypeOopPtr* other, bool this_ex
   assert(other->isa_aryptr(), "");
   const TypeAryPtr* other_ary = other->isa_aryptr();
   if (other_ary->elem()->make_oopptr() && elem()->make_oopptr()) {
-    return elem()->make_oopptr()->is_subtype_java_of_helper(other_ary->elem()->make_oopptr(), this_exact, other_exact);
+    return elem()->make_oopptr()->is_java_subtype_of_helper(other_ary->elem()->make_oopptr(), this_exact, other_exact);
   }
   if (!other_ary->elem()->make_oopptr() && !elem()->make_oopptr()) {
     return _klass->is_subtype_of(other->_klass);
@@ -4708,7 +4708,7 @@ bool TypeAryPtr::is_same_java_type_as(const TypeOopPtr* other) const {
   return false;
 }
 
-bool TypeAryPtr::maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
+bool TypeAryPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
   if (other->klass() == ciEnv::current()->Object_klass()) {
     return true;
   }
@@ -4727,7 +4727,8 @@ bool TypeAryPtr::maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this
 
   const TypeAryPtr* other_ary = other->isa_aryptr();
   if (other_ary->elem()->make_oopptr() && elem()->make_oopptr()) {
-    return elem()->make_oopptr()->maybe_java_subtype_of(other_ary->elem()->make_oopptr());
+    return elem()->make_oopptr()->maybe_java_subtype_of_helper(other_ary->elem()->make_oopptr(), this_exact,
+                                                               other_exact);
   }
   if (!other_ary->elem()->make_oopptr() && !elem()->make_oopptr()) {
     return _klass->is_subtype_of(other->_klass);
@@ -5940,7 +5941,7 @@ bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, b
     return !this_exact && (_klass->equals(ciEnv::current()->Object_klass()) || _klass->is_interface());
   }
 
-  if (_klass->is_interface() || other->klass()->is_interface()) {
+  if ((_klass->is_interface() && !this_exact) || (other->klass()->is_interface() /*&& !other_exact*/)) {
     return true;
   }
 
@@ -6354,7 +6355,7 @@ bool TypeAryKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, bo
 
   const TypeAryKlassPtr* other_ary = other->isa_aryklassptr();
   if (other_ary->_elem->isa_klassptr() && _elem->isa_klassptr()) {
-    return _elem->is_klassptr()->maybe_java_subtype_of(other_ary->_elem->is_klassptr());
+    return _elem->is_klassptr()->maybe_java_subtype_of_helper(other_ary->_elem->is_klassptr(), this_exact, other_exact);
   }
   if (!other_ary->_elem->isa_klassptr() && !_elem->isa_klassptr()) {
     return _klass->is_subtype_of(other->_klass);

@@ -1074,14 +1074,14 @@ protected:
 public:
 
   bool is_java_subtype_of(const TypeOopPtr* other) const {
-    return is_subtype_java_of_helper(other, klass_is_exact(), other->klass_is_exact());
+    return is_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
   virtual bool is_same_java_type_as(const TypeOopPtr* other) const { ShouldNotReachHere(); return false; }
   bool maybe_java_subtype_of(const TypeOopPtr* other) const {
-    return maybe_subtype_java_of_helper(other, klass_is_exact(), other->klass_is_exact());
+    return maybe_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
-  virtual bool is_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
-  virtual bool maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
+  virtual bool is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
+  virtual bool maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
   
   
   // Creates a type given a klass. Correctly handles multi-dimensional arrays
@@ -1185,8 +1185,8 @@ public:
   }
 
   bool is_same_java_type_as(const TypeOopPtr* other) const;
-  bool is_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
-  bool maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
+  bool is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
+  bool maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
 
   // Make a pointer to a constant oop.
   static const TypeInstPtr *make(ciObject* o) {
@@ -1304,8 +1304,8 @@ class TypeAryPtr : public TypeOopPtr {
 public:
 
   bool is_same_java_type_as(const TypeOopPtr* other) const;
-  bool is_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
-  bool maybe_subtype_java_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
+  bool is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
+  bool maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
 
   // returns base element type, an instance klass (and not interface) for object arrays
   const Type* base_element_type(int& dims) const;

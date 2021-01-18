@@ -910,7 +910,7 @@ void ConnectionGraph::add_call_node(CallNode* call) {
         es = PointsToNode::GlobalEscape;
       } else {
         const TypeInstKlassPtr* ikt = kt->is_instklassptr();
-        ciInstanceKlass* ik = ikt->instance_klass();
+        ciInstanceKlass* ik = ikt->klass_is_exact() ? ikt->exact_klass()->as_instance_klass() : ikt->instance_klass();
         if (ik->is_subclass_of(_compile->env()->Thread_klass()) ||
             ik->is_subclass_of(_compile->env()->Reference_klass()) ||
             !ik->can_be_instantiated() ||
