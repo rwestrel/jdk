@@ -4669,7 +4669,7 @@ int TypeAryPtr::hash(void) const {
 }
 
 bool TypeAryPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass()) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other_exact) {
     return true;
   }
 
@@ -6298,7 +6298,7 @@ const Type    *TypeAryKlassPtr::xmeet( const Type *t ) const {
 }
 
 bool TypeAryKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass()) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other_exact) {
     return true;
   }
 
