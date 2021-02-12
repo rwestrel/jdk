@@ -878,7 +878,9 @@ SymboltableDCmd::SymboltableDCmd(outputStream* output, bool heap) :
                                  DCmdWithParser(output, heap),
   _verbose("-verbose", "Dump the content of each symbol in the table",
            "BOOLEAN", false, "false") {
+#ifndef LEYDEN
   _dcmdparser.add_dcmd_option(&_verbose);
+#endif
 }
 
 void SymboltableDCmd::execute(DCmdSource source, TRAPS) {
@@ -888,12 +890,16 @@ void SymboltableDCmd::execute(DCmdSource source, TRAPS) {
 }
 
 int SymboltableDCmd::num_arguments() {
+#ifndef LEYDEN
   ResourceMark rm;
   SymboltableDCmd* dcmd = new SymboltableDCmd(NULL, false);
   if (dcmd != NULL) {
     DCmdMark mark(dcmd);
     return dcmd->_dcmdparser.num_arguments();
   } else {
+#endif
     return 0;
+#ifndef LEYDEN
   }
+#endif
 }

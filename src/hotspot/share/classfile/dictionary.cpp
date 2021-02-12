@@ -132,6 +132,7 @@ bool Dictionary::resize_if_needed() {
   return (desired_size != 0);
 }
 
+#ifndef LEYDEN
 bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   // Lock the pd_set list.  This lock cannot safepoint since the caller holds
   // a Dictionary entry, which can be moved if the Dictionary is resized.
@@ -186,7 +187,7 @@ void DictionaryEntry::add_protection_domain(Dictionary* dict, Handle protection_
     print_count(&ls);
   }
 }
-
+#endif
 //   Just the classes from defining class loaders
 void Dictionary::classes_do(void f(InstanceKlass*)) {
   for (int index = 0; index < table_size(); index++) {
@@ -307,7 +308,7 @@ InstanceKlass* Dictionary::find_class(unsigned int hash,
   return (entry != NULL) ? entry->instance_klass() : NULL;
 }
 
-
+#ifndef LEYDEN
 void Dictionary::add_protection_domain(int index, unsigned int hash,
                                        InstanceKlass* klass,
                                        Handle protection_domain,
@@ -387,6 +388,7 @@ void Dictionary::clean_cached_protection_domains() {
     }
   }
 }
+#endif
 
 oop SymbolPropertyEntry::method_type() const {
   return _method_type.resolve();
@@ -471,6 +473,7 @@ void SymbolPropertyTable::free_entry(SymbolPropertyEntry* entry) {
   Hashtable<Symbol*, mtSymbol>::free_entry(entry);
 }
 
+#ifndef LEYDEN
 void DictionaryEntry::verify_protection_domain_set() {
   MutexLocker ml(ProtectionDomainSet_lock, Mutex::_no_safepoint_check_flag);
   for (ProtectionDomainEntry* current = pd_set(); // accessed at a safepoint
@@ -490,6 +493,7 @@ void DictionaryEntry::print_count(outputStream *st) {
   }
   st->print_cr("pd set count = #%d", count);
 }
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -528,10 +532,13 @@ void DictionaryEntry::verify() {
   guarantee(e->is_instance_klass(),
                           "Verify of dictionary failed");
   e->verify();
+#ifndef LEYDEN
   verify_protection_domain_set();
+#endif
 }
 
 void Dictionary::verify() {
+#ifndef LEYDEN
   guarantee(number_of_entries() >= 0, "Verify of dictionary failed");
 
   ClassLoaderData* cld = loader_data();
@@ -546,4 +553,5 @@ void Dictionary::verify() {
   stringStream tempst;
   tempst.print("System Dictionary for %s class loader", cld->loader_name_and_id());
   verify_table<DictionaryEntry>(tempst.as_string());
+#endif
 }

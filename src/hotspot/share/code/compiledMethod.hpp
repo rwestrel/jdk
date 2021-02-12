@@ -304,14 +304,17 @@ public:
 protected:
   // Exception cache support
   // Note: _exception_cache may be read and cleaned concurrently.
+#ifndef LEYDEN
   ExceptionCache* exception_cache() const         { return _exception_cache; }
   ExceptionCache* exception_cache_acquire() const;
   void set_exception_cache(ExceptionCache *ec)    { _exception_cache = ec; }
-
+#endif
 public:
+#ifndef LEYDEN
   address handler_for_exception_and_pc(Handle exception, address pc);
   void add_handler_for_exception_and_pc(Handle exception, address pc, address handler);
   void clean_exception_cache();
+#endif
 
   void add_exception_cache_entry(ExceptionCache* new_entry);
   ExceptionCache* exception_cache_entry_for_exception(Handle exception);
@@ -340,7 +343,9 @@ public:
     return (addr >= code_begin() && addr < verified_entry_point());
   }
 
+#ifndef LEYDEN
   void preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f);
+#endif
 
   // implicit exceptions support
   address continuation_for_implicit_div0_exception(address pc) { return continuation_for_implicit_exception(pc, true); }
@@ -350,23 +355,28 @@ public:
 
   // Inline cache support for class unloading and nmethod unloading
  private:
+#ifndef LEYDEN
   bool cleanup_inline_caches_impl(bool unloading_occurred, bool clean_all);
-
+#endif
   address continuation_for_implicit_exception(address pc, bool for_div0_check);
 
  public:
+#ifndef LEYDEN
+
   // Serial version used by sweeper and whitebox test
   void cleanup_inline_caches(bool clean_all);
-
   virtual void clear_inline_caches();
   void clear_ic_callsites();
+#endif
 
   // Execute nmethod barrier code, as if entering through nmethod call.
   void run_nmethod_entry_barrier();
 
+#ifndef LEYDEN
   // Verify and count cached icholder relocations.
   int  verify_icholder_relocations();
   void verify_oop_relocations();
+#endif
 
   bool has_evol_metadata();
 
@@ -383,8 +393,10 @@ public:
   virtual CompiledStaticCall* compiledStaticCall_at(address addr) const = 0;
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const = 0;
 
+#ifndef LEYDEN
   Method* attached_method(address call_pc);
   Method* attached_method_before_pc(address pc);
+#endif
 
   virtual void metadata_do(MetadataClosure* f) = 0;
 
@@ -393,7 +405,9 @@ public:
   address oops_reloc_begin() const;
 
  private:
+#ifndef LEYDEN
   bool static clean_ic_if_metadata_is_dead(CompiledIC *ic);
+#endif
 
  public:
   // GC unloading support
@@ -401,7 +415,9 @@ public:
 
   virtual bool is_unloading() = 0;
 
+#ifndef LEYDEN
   bool unload_nmethod_caches(bool class_unloading_occurred);
+#endif
   virtual void do_unloading(bool unloading_occurred) = 0;
 
 private:

@@ -134,7 +134,7 @@ CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& la
   S390_ONLY(_ctable_offset = 0;) // avoid uninitialized fields
 }
 
-
+#ifndef LEYDEN
 // Creates a simple CodeBlob. Sets up the size of the different regions.
 RuntimeBlob::RuntimeBlob(const char* name, int header_size, int size, int frame_complete, int locs_size)
   : CodeBlob(name, compiler_none, CodeBlobLayout((address) this, size, header_size, locs_size, size), frame_complete, 0, NULL, false /* caller_must_gc_arguments */)
@@ -157,6 +157,7 @@ RuntimeBlob::RuntimeBlob(
 ) : CodeBlob(name, compiler_none, CodeBlobLayout((address) this, size, header_size, cb), cb, frame_complete, frame_size, oop_maps, caller_must_gc_arguments) {
   cb->copy_code_and_locs_to(this);
 }
+#endif
 
 void CodeBlob::flush() {
   FREE_C_HEAP_ARRAY(unsigned char, _oop_maps);
@@ -175,6 +176,7 @@ void CodeBlob::set_oop_maps(OopMapSet* p) {
 }
 
 
+#ifndef LEYDEN
 void RuntimeBlob::trace_new_stub(RuntimeBlob* stub, const char* name1, const char* name2) {
   // Do not hold the CodeCache lock during name formatting.
   assert(!CodeCache_lock->owned_by_self(), "release CodeCache before registering the stub");
@@ -207,25 +209,29 @@ void RuntimeBlob::trace_new_stub(RuntimeBlob* stub, const char* name1, const cha
   // Track memory usage statistic after releasing CodeCache_lock
   MemoryService::track_code_cache_memory_usage();
 }
-
+#endif
 const ImmutableOopMap* CodeBlob::oop_map_for_return_address(address return_address) {
   assert(_oop_maps != NULL, "nope");
   return _oop_maps->find_map_at_offset((intptr_t) return_address - (intptr_t) code_begin());
 }
 
 void CodeBlob::print_code() {
+#ifndef LEYDEN
   ResourceMark m;
   Disassembler::decode(this, tty);
+#endif
 }
 
 //----------------------------------------------------------------------------------------------------
 // Implementation of BufferBlob
 
 
+#ifndef LEYDEN
 BufferBlob::BufferBlob(const char* name, int size)
 : RuntimeBlob(name, sizeof(BufferBlob), size, CodeOffsets::frame_never_safe, /*locs_size:*/ 0)
 {}
 
+#ifndef LEYDEN
 BufferBlob* BufferBlob::create(const char* name, int buffer_size) {
   ThreadInVMfromUnknown __tiv;  // get to VM state in case we block on CodeCache_lock
 
@@ -244,12 +250,14 @@ BufferBlob* BufferBlob::create(const char* name, int buffer_size) {
 
   return blob;
 }
+#endif
 
 
 BufferBlob::BufferBlob(const char* name, int size, CodeBuffer* cb)
   : RuntimeBlob(name, cb, sizeof(BufferBlob), size, CodeOffsets::frame_never_safe, 0, NULL)
 {}
 
+#ifndef LEYDEN
 BufferBlob* BufferBlob::create(const char* name, CodeBuffer* cb) {
   ThreadInVMfromUnknown __tiv;  // get to VM state in case we block on CodeCache_lock
 
@@ -265,7 +273,9 @@ BufferBlob* BufferBlob::create(const char* name, CodeBuffer* cb) {
 
   return blob;
 }
+#endif
 
+#ifndef LEYDEN
 void* BufferBlob::operator new(size_t s, unsigned size) throw() {
   return CodeCache::allocate(size, CodeBlobType::NonNMethod);
 }
@@ -281,6 +291,7 @@ void BufferBlob::free(BufferBlob *blob) {
   // Track memory usage statistic after releasing CodeCache_lock
   MemoryService::track_code_cache_memory_usage();
 }
+#endif
 
 
 //----------------------------------------------------------------------------------------------------
@@ -580,7 +591,7 @@ SafepointBlob* SafepointBlob::create(
 
   return blob;
 }
-
+#endif
 
 //----------------------------------------------------------------------------------------------------
 // Verification and printing
@@ -597,6 +608,7 @@ void CodeBlob::print_value_on(outputStream* st) const {
 }
 
 void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const {
+#ifndef LEYDEN
   if (is_buffer_blob()) {
     // the interpreter is generated into a buffer blob
     InterpreterCodelet* i = Interpreter::codelet_containing(addr);
@@ -655,8 +667,10 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
   }
   st->print_cr(INTPTR_FORMAT " is at code_begin+%d in ", p2i(addr), (int)(addr - code_begin()));
   print_on(st);
+#endif
 }
 
+#ifndef LEYDEN
 void RuntimeBlob::verify() {
   ShouldNotReachHere();
 }
@@ -708,3 +722,4 @@ void SingletonBlob::print_value_on(outputStream* st) const {
 void DeoptimizationBlob::print_value_on(outputStream* st) const {
   st->print_cr("Deoptimization (frame not available)");
 }
+#endif

@@ -171,8 +171,10 @@ class Universe: AllStatic {
   static void initialize_basic_type_mirrors(TRAPS);
   static void fixup_mirrors(TRAPS);
 
+#ifndef LEYDEN
   static void reinitialize_vtable_of(Klass* k, TRAPS);
   static void reinitialize_vtables(TRAPS);
+#endif
   static void reinitialize_itables(TRAPS);
   static void compute_base_vtable_size();             // compute vtable size of class Object
 
@@ -263,7 +265,9 @@ class Universe: AllStatic {
   static address      the_null_sentinel_addr()        { return (address) &_the_null_sentinel;  }
 
   // Function to initialize these
+#ifndef LEYDEN
   static void initialize_known_methods(TRAPS);
+#endif
 
   static void create_preallocated_out_of_memory_errors(TRAPS);
 

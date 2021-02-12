@@ -106,6 +106,7 @@ void DefNewGeneration::FastEvacuateFollowersClosure::do_void() {
 }
 
 void CLDScanClosure::do_cld(ClassLoaderData* cld) {
+#ifndef LEYDEN
   NOT_PRODUCT(ResourceMark rm);
   log_develop_trace(gc, scavenge)("CLDScanClosure::do_cld " PTR_FORMAT ", %s, dirty: %s",
                                   p2i(cld),
@@ -125,6 +126,7 @@ void CLDScanClosure::do_cld(ClassLoaderData* cld) {
 
     _scavenge_closure->set_scanned_cld(NULL);
   }
+#endif
 }
 
 ScanWeakRefClosure::ScanWeakRefClosure(DefNewGeneration* g) :

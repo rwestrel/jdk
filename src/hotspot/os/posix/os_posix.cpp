@@ -905,6 +905,7 @@ size_t os::Posix::get_initial_stack_size(ThreadType thr_type, size_t req_stack_s
 
 #ifndef ZERO
 #ifndef ARM
+#ifndef LEYDEN
 static bool get_frame_at_stack_banging_point(JavaThread* thread, address pc, const void* ucVoid, frame* fr) {
   if (Interpreter::contains(pc)) {
     // interpreter performs stack banging after the fixed frame header has
@@ -940,11 +941,13 @@ static bool get_frame_at_stack_banging_point(JavaThread* thread, address pc, con
   assert(fr->is_java_frame(), "Safety check");
   return true;
 }
+#endif
 #endif // ARM
 
 // This return true if the signal handler should just continue, ie. return after calling this
 bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address pc,
                                       const void* ucVoid, address* stub) {
+#ifndef LEYDEN
   // stack overflow
   StackOverflow* overflow_state = thread->stack_overflow_state();
   if (overflow_state->in_stack_yellow_reserved_zone(addr)) {
@@ -1016,6 +1019,7 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
     tty->print_raw_cr("SIGSEGV happened inside stack but outside yellow and red zone.");
 #endif // AIX or BSD
   }
+#endif
   return false;
 }
 #endif // ZERO

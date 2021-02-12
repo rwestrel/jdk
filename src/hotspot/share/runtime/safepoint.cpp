@@ -499,7 +499,9 @@ void SafepointSynchronize::end() {
 
 bool SafepointSynchronize::is_cleanup_needed() {
   // Need a safepoint if some inline cache buffers is non-empty
+#ifndef LEYDEN
   if (!InlineCacheBuffer::is_empty()) return true;
+#endif
   if (StringTable::needs_rehashing()) return true;
   if (SymbolTable::needs_rehashing()) return true;
   return false;
@@ -553,6 +555,7 @@ public:
       }
     }
 
+#ifndef LEYDEN
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_UPDATE_INLINE_CACHES)) {
       Tracer t("updating inline caches");
       InlineCacheBuffer::update_inline_caches();
@@ -562,6 +565,7 @@ public:
       Tracer t("compilation policy safepoint handler");
       CompilationPolicy::do_safepoint_work();
     }
+#endif
 
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_SYMBOL_TABLE_REHASH)) {
       if (SymbolTable::needs_rehashing()) {
@@ -570,19 +574,21 @@ public:
       }
     }
 
+
+#ifndef LEYDEN
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_STRING_TABLE_REHASH)) {
       if (StringTable::needs_rehashing()) {
         Tracer t("rehashing string table");
         StringTable::rehash_table();
       }
     }
-
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_SYSTEM_DICTIONARY_RESIZE)) {
       if (Dictionary::does_any_dictionary_needs_resizing()) {
         Tracer t("resizing system dictionaries");
         ClassLoaderDataGraph::resize_dictionaries();
       }
     }
+#endif
 
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_REQUEST_OOPSTORAGE_CLEANUP)) {
       // Don't bother reporting event or time for this very short operation.
@@ -613,7 +619,9 @@ void SafepointSynchronize::do_cleanup_tasks() {
     cleanup.work(0);
   }
 
+#ifndef LEYDEN
   assert(InlineCacheBuffer::is_empty(), "should have cleaned up ICBuffer");
+#endif
 
   if (log_is_enabled(Debug, monitorinflation)) {
     // The VMThread calls do_final_audit_and_print_stats() which calls
@@ -896,6 +904,7 @@ void ThreadSafepointState::print_on(outputStream *st) const {
 
 // Process pending operation.
 void ThreadSafepointState::handle_polling_page_exception() {
+#ifndef LEYDEN
   JavaThread* self = thread();
   assert(self == Thread::current()->as_Java_thread(), "must be self");
 
@@ -990,6 +999,7 @@ void ThreadSafepointState::handle_polling_page_exception() {
       }
     }
   }
+#endif
 }
 
 

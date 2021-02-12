@@ -134,7 +134,9 @@ void MetaspaceUtils::print_metaspace_change(const metaspace::MetaspaceSizesSnaps
 // This will print out a basic metaspace usage report but
 // unlike print_report() is guaranteed not to lock or to walk the CLDG.
 void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
+#ifndef LEYDEN
   MetaspaceReporter::print_basic_report(out, scale);
+#endif
 }
 
 // Prints a report about the current metaspace state.
@@ -142,11 +144,13 @@ void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
 // Function will walk the CLDG and will lock the expand lock; if that is not
 // convenient, use print_basic_report() instead.
 void MetaspaceUtils::print_report(outputStream* out, size_t scale) {
+#ifndef LEYDEN
   const int flags =
       (int)MetaspaceReporter::Option::ShowLoaders |
       (int)MetaspaceReporter::Option::BreakDownByChunkType |
       (int)MetaspaceReporter::Option::ShowClasses;
   MetaspaceReporter::print_report(out, scale, flags);
+#endif
 }
 
 void MetaspaceUtils::print_on(outputStream* out) {
@@ -786,6 +790,7 @@ size_t Metaspace::max_allocation_word_size() {
   return metaspace::chunklevel::MAX_CHUNK_WORD_SIZE - max_overhead_words;
 }
 
+#ifndef LEYDEN
 MetaWord* Metaspace::allocate(ClassLoaderData* loader_data, size_t word_size,
                               MetaspaceObj::Type type, TRAPS) {
   assert(word_size <= Metaspace::max_allocation_word_size(),
@@ -891,6 +896,7 @@ void Metaspace::report_metadata_oome(ClassLoaderData* loader_data, size_t word_s
     THROW_OOP(Universe::out_of_memory_error_metaspace());
   }
 }
+#endif
 
 const char* Metaspace::metadata_type_name(Metaspace::MetadataType mdtype) {
   switch (mdtype) {

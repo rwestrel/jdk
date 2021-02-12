@@ -52,6 +52,7 @@ void RegisterMap::check_location_valid() {
 
 // Profiling/safepoint support
 
+#ifndef LEYDEN
 bool frame::safe_for_sender(JavaThread *thread) {
   address   sp = (address)_sp;
   address   fp = (address)_fp;
@@ -252,7 +253,6 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
 }
 
-
 void frame::patch_pc(Thread* thread, address pc) {
   assert(_cb == CodeCache::find_blob(pc), "unexpected pc");
   address* pc_addr = &(((address*) sp())[-1]);
@@ -278,6 +278,7 @@ void frame::patch_pc(Thread* thread, address pc) {
 bool frame::is_interpreted_frame() const  {
   return Interpreter::contains(pc());
 }
+#endif
 
 int frame::frame_size(RegisterMap* map) const {
   frame sender = this->sender(map);
@@ -292,7 +293,7 @@ intptr_t* frame::entry_frame_argument_at(int offset) const {
 }
 
 // sender_sp
-
+#ifndef LEYDEN
 intptr_t* frame::interpreter_frame_sender_sp() const {
   assert(is_interpreted_frame(), "interpreted frame expected");
   return (intptr_t*) at(interpreter_frame_sender_sp_offset);
@@ -326,7 +327,7 @@ void frame::interpreter_frame_set_monitor_end(BasicObjectLock* value) {
 void frame::interpreter_frame_set_last_sp(intptr_t* sp) {
     *((intptr_t**)addr_at(interpreter_frame_last_sp_offset)) = sp;
 }
-
+#endif
 frame frame::sender_for_entry_frame(RegisterMap* map) const {
   assert(map != NULL, "map must be set");
   // Java frame called from C; skip all C frames and return top C
@@ -419,6 +420,7 @@ void frame::update_map_with_saved_link(RegisterMap* map, intptr_t** link_addr) {
 
 //------------------------------------------------------------------------------
 // frame::sender_for_interpreter_frame
+#ifndef LEYDEN
 frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   // SP is the raw SP from the sender after adapter or interpreter
   // extension.
@@ -435,7 +437,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
   return frame(sender_sp, unextended_sp, link(), sender_pc());
 }
-
+#endif
 
 //------------------------------------------------------------------------------
 // frame::sender_for_compiled_frame
@@ -482,8 +484,10 @@ frame frame::sender_raw(RegisterMap* map) const {
   map->set_include_argument_oops(false);
 
   if (is_entry_frame())       return sender_for_entry_frame(map);
-  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+#ifndef LEYDEN
   assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
+  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+#endif
 
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
@@ -503,6 +507,7 @@ frame frame::sender(RegisterMap* map) const {
   return result;
 }
 
+#ifndef LEYDEN
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   // These are reasonable sanity checks
@@ -655,6 +660,7 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
   }
 }
 #endif // !PRODUCT
+#endif
 
 intptr_t *frame::initial_deoptimization_info() {
   // used to reset the saved FP

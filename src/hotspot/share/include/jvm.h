@@ -435,10 +435,11 @@ JVM_DefineClassWithSource(JNIEnv *env, const char *name, jobject loader,
  *  flags:   properties of the class
  *  classData: private static pre-initialized field; may be null
  */
+#ifndef LEYDEN
 JNIEXPORT jclass JNICALL
 JVM_LookupDefineClass(JNIEnv *env, jclass lookup, const char *name, const jbyte *buf,
                       jsize len, jobject pd, jboolean init, int flags, jobject classData);
-
+#endif
 /*
  * Module support funcions
  */
@@ -570,15 +571,20 @@ JVM_GetMethodTypeAnnotations(JNIEnv *env, jobject method);
  * New (JDK 1.4) reflection implementation
  */
 
+#ifndef LEYDEN
 JNIEXPORT jobjectArray JNICALL
 JVM_GetClassDeclaredMethods(JNIEnv *env, jclass ofClass, jboolean publicOnly);
+#endif
 
+#ifndef LEYDEN
 JNIEXPORT jobjectArray JNICALL
 JVM_GetClassDeclaredFields(JNIEnv *env, jclass ofClass, jboolean publicOnly);
+#endif
 
+#ifndef LEYDEN
 JNIEXPORT jobjectArray JNICALL
 JVM_GetClassDeclaredConstructors(JNIEnv *env, jclass ofClass, jboolean publicOnly);
-
+#endif
 
 /* Differs from JVM_GetClassModifiers in treatment of inner classes.
    This returns the access flags for the class as specified in the

@@ -24,7 +24,7 @@
 #
 
 # All valid JVM variants
-VALID_JVM_VARIANTS="server client minimal core zero custom"
+VALID_JVM_VARIANTS="server client minimal core zero custom leyden"
 
 ###############################################################################
 # Check if the specified JVM variant should be built. To be used in shell if

@@ -49,6 +49,7 @@ void referenceProcessor_init() {
 }
 
 void ReferenceProcessor::init_statics() {
+#ifndef LEYDEN
   // We need a monotonically non-decreasing time in ms but
   // os::javaTimeMillis() does not guarantee monotonicity.
   jlong now = os::javaTimeNanos() / NANOSECS_PER_MILLISEC;
@@ -67,9 +68,11 @@ void ReferenceProcessor::init_statics() {
   guarantee(RefDiscoveryPolicy == ReferenceBasedDiscovery ||
             RefDiscoveryPolicy == ReferentBasedDiscovery,
             "Unrecognized RefDiscoveryPolicy");
+#endif
 }
 
 void ReferenceProcessor::enable_discovery(bool check_no_refs) {
+#ifndef LEYDEN
 #ifdef ASSERT
   // Verify that we're not currently discovering refs
   assert(!_discovering_refs, "nested call?");
@@ -89,6 +92,7 @@ void ReferenceProcessor::enable_discovery(bool check_no_refs) {
 
   _soft_ref_timestamp_clock = java_lang_ref_SoftReference::clock();
   _discovering_refs = true;
+#endif
 }
 
 ReferenceProcessor::ReferenceProcessor(BoolObjectClosure* is_subject_to_discovery,
@@ -150,6 +154,7 @@ void ReferenceProcessor::weak_oops_do(OopClosure* f) {
 }
 
 void ReferenceProcessor::update_soft_ref_master_clock() {
+#ifndef LEYDEN
   // Update (advance) the soft ref master clock field. This must be done
   // after processing the soft ref list.
 
@@ -176,6 +181,7 @@ void ReferenceProcessor::update_soft_ref_master_clock() {
   }
   // Else leave clock stalled at its old value until time progresses
   // past clock value.
+#endif
 }
 
 size_t ReferenceProcessor::total_count(DiscoveredList lists[]) const {
@@ -199,7 +205,6 @@ ReferenceProcessorStats ReferenceProcessor::process_discovered_references(
   VoidClosure*                  complete_gc,
   AbstractRefProcTaskExecutor*  task_executor,
   ReferenceProcessorPhaseTimes* phase_times) {
-
   double start_time = os::elapsedTime();
 
   assert(!enqueuing_is_done(), "If here enqueuing should not be complete");
@@ -214,7 +219,9 @@ ReferenceProcessorStats ReferenceProcessor::process_discovered_references(
   // here so that we use the new value during processing of the
   // discovered soft refs.
 
+#ifndef LEYDEN
   _soft_ref_timestamp_clock = java_lang_ref_SoftReference::clock();
+#endif
 
   ReferenceProcessorStats stats(total_count(_discoveredSoftRefs),
                                 total_count(_discoveredWeakRefs),

@@ -235,6 +235,7 @@ void MemAllocator::Allocation::notify_allocation_jfr_sampler() {
 }
 
 void MemAllocator::Allocation::notify_allocation_dtrace_sampler() {
+#ifndef LEYDEN
   if (DTraceAllocProbes) {
     // support for Dtrace object alloc event (no-op most of the time)
     Klass* klass = obj()->klass();
@@ -243,6 +244,7 @@ void MemAllocator::Allocation::notify_allocation_dtrace_sampler() {
       SharedRuntime::dtrace_object_alloc(obj(), (int)word_size);
     }
   }
+#endif
 }
 
 void MemAllocator::Allocation::notify_allocation() {
@@ -422,6 +424,7 @@ oop ObjArrayAllocator::initialize(HeapWord* mem) const {
   return finish(mem);
 }
 
+#ifndef LEYDEN
 oop ClassAllocator::initialize(HeapWord* mem) const {
   // Set oop_size field before setting the _klass field because a
   // non-NULL _klass field indicates that the object is parsable by
@@ -431,3 +434,4 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   java_lang_Class::set_oop_size(mem, (int)_word_size);
   return finish(mem);
 }
+#endif

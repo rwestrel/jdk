@@ -121,12 +121,14 @@ class Method : public Metadata {
   Method(ConstMethod* xconst, AccessFlags access_flags);
  public:
 
+#ifndef LEYDEN
   static Method* allocate(ClassLoaderData* loader_data,
                           int byte_code_size,
                           AccessFlags access_flags,
                           InlineTableSizes* sizes,
                           ConstMethod::MethodType method_type,
                           TRAPS);
+#endif
 
   // CDS and vtbl checking can create an empty Method to get vtbl pointer.
   Method(){}
@@ -141,7 +143,9 @@ class Method : public Metadata {
   void set_constMethod(ConstMethod* xconst)    { _constMethod = xconst; }
 
 
+#ifndef LEYDEN
   static address make_adapters(const methodHandle& mh, TRAPS);
+#endif
   address from_compiled_entry() const;
   address from_compiled_entry_no_trampoline() const;
   address from_interpreted_entry() const;
@@ -431,7 +435,9 @@ class Method : public Metadata {
 
   static void build_interpreter_method_data(const methodHandle& method, TRAPS);
 
+#ifndef LEYDEN
   static MethodCounters* build_method_counters(Method* m, TRAPS);
+#endif
 
   int interpreter_invocation_count()            { return invocation_count();          }
 
@@ -745,9 +751,11 @@ public:
   bool is_method_handle_intrinsic() const;          // MethodHandles::is_signature_polymorphic_intrinsic(intrinsic_id)
   bool is_compiled_lambda_form() const;             // intrinsic_id() == vmIntrinsics::_compiledLambdaForm
   bool has_member_arg() const;                      // intrinsic_id() == vmIntrinsics::_linkToSpecial, etc.
+#ifndef LEYDEN
   static methodHandle make_method_handle_intrinsic(vmIntrinsicID iid, // _invokeBasic, _linkToVirtual
                                                    Symbol* signature, //anything at all
                                                    TRAPS);
+#endif
   static Klass* check_non_bcp_klass(Klass* klass);
 
   enum {
@@ -794,8 +802,10 @@ public:
   void set_is_prefixed_native()                     { _access_flags.set_is_prefixed_native(); }
 
   // Rewriting support
+#ifndef LEYDEN
   static methodHandle clone_with_new_data(const methodHandle& m, u_char* new_code, int new_code_length,
                                           u_char* new_compressed_linenumber_table, int new_compressed_linenumber_size, TRAPS);
+#endif
 
   // jmethodID handling
   // Because the useful life-span of a jmethodID cannot be determined,
@@ -951,12 +961,14 @@ public:
   void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason);
 
  public:
+#ifndef LEYDEN
   MethodCounters* get_method_counters(TRAPS) {
     if (_method_counters == NULL) {
       build_method_counters(this, CHECK_AND_CLEAR_NULL);
     }
     return _method_counters;
   }
+#endif
 
   bool   is_not_c1_compilable() const         { return access_flags().is_not_c1_compilable();  }
   void  set_not_c1_compilable()               {       _access_flags.set_not_c1_compilable();   }

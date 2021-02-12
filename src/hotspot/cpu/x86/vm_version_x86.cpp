@@ -1703,6 +1703,7 @@ void VM_Version::get_processor_features() {
 }
 
 void VM_Version::print_platform_virtualization_info(outputStream* st) {
+#ifndef LEYDEN
   VirtualizationType vrt = VM_Version::get_detected_virtualization();
   if (vrt == XenHVM) {
     st->print_cr("Xen hardware-assisted virtualization detected");
@@ -1716,6 +1717,7 @@ void VM_Version::print_platform_virtualization_info(outputStream* st) {
   } else if (vrt == HyperVRole) {
     st->print_cr("Hyper-V role detected");
   }
+#endif
 }
 
 bool VM_Version::use_biased_locking() {

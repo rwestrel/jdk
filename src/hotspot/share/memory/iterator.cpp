@@ -32,9 +32,11 @@
 
 DoNothingClosure do_nothing_cl;
 
+#ifndef LEYDEN
 void CLDToOopClosure::do_cld(ClassLoaderData* cld) {
   cld->oops_do(_oop_closure, _cld_claim);
 }
+#endif
 
 void ObjectToOopClosure::do_object(oop obj) {
   obj->oop_iterate(_cl);
@@ -59,15 +61,19 @@ void CodeBlobToOopClosure::do_code_blob(CodeBlob* cb) {
 }
 
 void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
+#ifndef LEYDEN
   nmethod* nm = cb->as_nmethod_or_null();
   if (nm != NULL && nm->oops_do_try_claim()) {
     do_nmethod(nm);
   }
+#endif
 }
 
 void CodeBlobToNMethodClosure::do_code_blob(CodeBlob* cb) {
+#ifndef LEYDEN
   nmethod* nm = cb->as_nmethod_or_null();
   if (nm != NULL) {
     _nm_cl->do_nmethod(nm);
   }
+#endif
 }

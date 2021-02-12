@@ -266,6 +266,7 @@ void jfieldIDWorkaround::verify_instance_jfieldID(Klass* k, jfieldID id) {
 DT_RETURN_MARK_DECL(DefineClass, jclass
                     , HOTSPOT_JNI_DEFINECLASS_RETURN(_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jclass, jni_DefineClass(JNIEnv *env, const char *name, jobject loaderRef,
                                   const jbyte *buf, jsize bufLen))
   HOTSPOT_JNI_DEFINECLASS_ENTRY(
@@ -295,7 +296,7 @@ JNI_ENTRY(jclass, jni_DefineClass(JNIEnv *env, const char *name, jobject loaderR
   cls = (jclass)JNIHandles::make_local(THREAD, k->java_mirror());
   return cls;
 JNI_END
-
+#endif
 
 
 DT_RETURN_MARK_DECL(FindClass, jclass
@@ -3119,7 +3120,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     jni_GetVersion,
 
+#ifndef LEYDEN
     jni_DefineClass,
+#else
+    NULL,
+#endif
     jni_FindClass,
 
     jni_FromReflectedMethod,

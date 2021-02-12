@@ -69,7 +69,9 @@ class MethodCounters : public Metadata {
  public:
   virtual bool is_methodCounters() const { return true; }
 
+#ifndef LEYDEN
   static MethodCounters* allocate(const methodHandle& mh, TRAPS);
+#endif
 
   void deallocate_contents(ClassLoaderData* loader_data) {}
 

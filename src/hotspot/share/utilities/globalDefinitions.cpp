@@ -99,14 +99,17 @@ void basic_types_init() {
   assert( 4 == sizeof( u4),        "wrong size for basic type");
   assert(wordSize == BytesPerWord, "should be the same since they're used interchangeably");
   assert(wordSize == HeapWordSize, "should be the same since they're also used interchangeably");
-
+#ifndef LEYDEN
   assert(signature_constants_sane(), "");
+#endif
 
   int num_type_chars = 0;
   for (int i = 0; i < 99; i++) {
     if (type2char((BasicType)i) != 0) {
       assert(char2type(type2char((BasicType)i)) == i, "proper inverses");
+#ifndef LEYDEN
       assert(Signature::basic_type(type2char((BasicType)i)) == i, "proper inverses");
+#endif
       num_type_chars++;
     }
   }

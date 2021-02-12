@@ -128,7 +128,6 @@ int Bytecode_invoke::size_of_parameters() const {
   return asc.size() + (has_receiver() ? 1 : 0);
 }
 
-
 Symbol* Bytecode_member_ref::klass() const {
   return constants()->klass_ref_at_noresolve(index());
 }

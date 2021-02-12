@@ -768,7 +768,9 @@ void defaultStream::finish_log() {
   xs->done("tty");
 
   // Other log forks are appended here, at the End of Time:
+#ifndef LEYDEN
   CompileLog::finish_log(xs->out());  // write compile logging, if any, now
+#endif
 
   xs->done("hotspot_log");
   xs->flush();
@@ -791,7 +793,9 @@ void defaultStream::finish_log_on_error(char *buf, int buflen) {
     xs->done_raw("tty");
 
     // Other log forks are appended here, at the End of Time:
+#ifndef LEYDEN
     CompileLog::finish_log_on_error(xs->out(), buf, buflen);  // write compile logging, if any, now
+#endif
 
     xs->done_raw("hotspot_log");
     xs->flush();

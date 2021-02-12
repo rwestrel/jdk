@@ -279,6 +279,7 @@ void Universe::check_alignment(uintx size, uintx alignment, const char* name) {
   }
 }
 
+#ifndef LEYDEN
 void initialize_basic_type_klass(Klass* k, TRAPS) {
   Klass* ok = vmClasses::Object_klass();
 #if INCLUDE_CDS
@@ -297,6 +298,7 @@ void initialize_basic_type_klass(Klass* k, TRAPS) {
   }
   k->append_to_sibling_list();
 }
+#endif
 
 void Universe::genesis(TRAPS) {
   ResourceMark rm(THREAD);
@@ -311,6 +313,7 @@ void Universe::genesis(TRAPS) {
       // determine base vtable size; without that we cannot create the array klasses
       compute_base_vtable_size();
 
+#ifndef LEYDEN
       if (!UseSharedSpaces) {
         for (int i = T_BOOLEAN; i < T_LONG+1; i++) {
           _typeArrayKlassObjs[i] = TypeArrayKlass::create_klass((BasicType)i, CHECK);
@@ -325,6 +328,7 @@ void Universe::genesis(TRAPS) {
         _the_empty_klass_array          = MetadataFactory::new_array<Klass*>(null_cld, 0, CHECK);
         _the_empty_instance_klass_array = MetadataFactory::new_array<InstanceKlass*>(null_cld, 0, CHECK);
       }
+#endif
     }
 
     vmSymbols::initialize(CHECK);
@@ -353,6 +357,7 @@ void Universe::genesis(TRAPS) {
       _the_array_interfaces_array->at_put(1, vmClasses::Serializable_klass());
     }
 
+#ifndef LEYDEN
     initialize_basic_type_klass(boolArrayKlassObj(), CHECK);
     initialize_basic_type_klass(charArrayKlassObj(), CHECK);
     initialize_basic_type_klass(floatArrayKlassObj(), CHECK);
@@ -361,6 +366,7 @@ void Universe::genesis(TRAPS) {
     initialize_basic_type_klass(shortArrayKlassObj(), CHECK);
     initialize_basic_type_klass(intArrayKlassObj(), CHECK);
     initialize_basic_type_klass(longArrayKlassObj(), CHECK);
+#endif
   } // end of core bootstrapping
 
   {
@@ -512,6 +518,7 @@ oop Universe::swap_reference_pending_list(oop list) {
 #undef assert_pll_locked
 #undef assert_pll_ownership
 
+#ifndef LEYDEN
 void Universe::reinitialize_vtable_of(Klass* ko, TRAPS) {
   // init vtable of k and all subclasses
   ko->vtable().initialize_vtable(false, CHECK);
@@ -523,7 +530,9 @@ void Universe::reinitialize_vtable_of(Klass* ko, TRAPS) {
     }
   }
 }
+#endif
 
+#ifndef LEYDEN
 void Universe::reinitialize_vtables(TRAPS) {
   // The vtables are initialized by starting at java.lang.Object and
   // initializing through the subclass links, so that the super
@@ -531,7 +540,7 @@ void Universe::reinitialize_vtables(TRAPS) {
   Klass* ok = vmClasses::Object_klass();
   Universe::reinitialize_vtable_of(ok, THREAD);
 }
-
+#endif
 
 void initialize_itable_for_klass(InstanceKlass* k, TRAPS) {
   k->itable().initialize_itable(false, CHECK);
@@ -875,6 +884,7 @@ void universe_oopstorage_init() {
   Universe::oopstorage_init();
 }
 
+#ifndef LEYDEN
 void initialize_known_method(LatestMethodCache* method_cache,
                              InstanceKlass* ik,
                              const char* method,
@@ -925,6 +935,7 @@ void Universe::initialize_known_methods(TRAPS) {
                           "doStackWalk",
                           vmSymbols::doStackWalk_signature(), false, CHECK);
 }
+#endif
 
 void universe2_init() {
   EXCEPTION_MARK;
@@ -942,7 +953,9 @@ bool universe_post_init() {
   EXCEPTION_MARK;
   if (!UseSharedSpaces) {
     ResourceMark rm;
+#ifndef LEYDEN
     Universe::reinitialize_vtables(CHECK_false);
+#endif
     Universe::reinitialize_itables(CHECK_false);
   }
 
@@ -976,18 +989,22 @@ bool universe_post_init() {
 
   // Virtual Machine Error for when we get into a situation we can't resolve
   k = vmClasses::VirtualMachineError_klass();
+#ifndef LEYDEN
   bool linked = InstanceKlass::cast(k)->link_class_or_fail(CHECK_false);
   if (!linked) {
      tty->print_cr("Unable to link/verify VirtualMachineError class");
      return false; // initialization failed
   }
+#endif
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_virtual_machine_error_instance = OopHandle(Universe::vm_global(), instance);
 
   Handle msg = java_lang_String::create_from_str("/ by zero", CHECK_false);
   java_lang_Throwable::set_message(Universe::arithmetic_exception_instance(), msg());
 
+#ifndef LEYDEN
   Universe::initialize_known_methods(CHECK_false);
+#endif
 
   // This needs to be done before the first scavenge/gc, since
   // it's an input to soft ref clearing policy.

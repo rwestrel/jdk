@@ -102,15 +102,18 @@ int compare_methods(Method** a, Method** b) {
 }
 
 void collect_profiled_methods(Method* m) {
+#ifndef LEYDEN
   Thread* thread = Thread::current();
   methodHandle mh(thread, m);
   if ((m->method_data() != NULL) &&
       (PrintMethodData || CompilerOracle::should_print(mh))) {
     collected_profiled_methods->push(m);
   }
+#endif
 }
 
 void print_method_profiling_data() {
+#ifndef LEYDEN
   if (ProfileInterpreter COMPILER1_PRESENT(|| C1UpdateMethodData) &&
      (PrintMethodData || CompilerOracle::should_print_methods())) {
     ResourceMark rm;
@@ -140,6 +143,7 @@ void print_method_profiling_data() {
       tty->print_cr("Total MDO size: %d bytes", total_size);
     }
   }
+#endif
 }
 
 
@@ -158,6 +162,7 @@ void collect_invoked_methods(Method* m) {
 
 
 
+#ifndef LEYDEN
 void print_method_invocation_histogram() {
   ResourceMark rm;
   collected_invoked_methods = new GrowableArray<Method*>(1024);
@@ -202,17 +207,21 @@ void print_bytecode_count() {
     tty->print_cr("[BytecodeCounter::counter_value = %d]", BytecodeCounter::counter_value());
   }
 }
-
+#endif
 
 // General statistics printing (profiling ...)
 void print_statistics() {
+#ifndef LEYDEN
   if (MemProfiling) {
     MemProfiler::disengage();
   }
+#endif
 
+#ifndef LEYDEN
   if (CITime) {
     CompileBroker::print_times();
   }
+#endif
 
 #ifdef COMPILER1
   if ((PrintC1Statistics || LogVMOutput || LogCompilation) && UseCompiler) {
@@ -258,21 +267,23 @@ void print_statistics() {
     AOTLoader::print_statistics();
   }
 
+#ifndef LEYDEN
   if (PrintNMethodStatistics) {
     nmethod::print_statistics();
-  }
-  if (CountCompiledCalls) {
-    print_method_invocation_histogram();
-  }
+    if (CountCompiledCalls) {
+      print_method_invocation_histogram();
+    }
 
-  print_method_profiling_data();
-
+    print_method_profiling_data();
+  }
   if (TimeOopMap) {
     GenerateOopMap::print_time();
   }
+#endif
   if (PrintSymbolTableSizeHistogram) {
     SymbolTable::print_histogram();
   }
+#ifndef LEYDEN
   if (CountBytecodes || TraceBytecodes || StopInterpreterAt) {
     BytecodeCounter::print();
   }
@@ -297,22 +308,27 @@ void print_statistics() {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
     CodeCache::print_internals();
   }
+#endif
 
+#ifndef LEYDEN
   if (PrintVtableStats) {
     klassVtable::print_statistics();
     klassItable::print_statistics();
-  }
-  if (VerifyOops && Verbose) {
-    tty->print_cr("+VerifyOops count: %d", StubRoutines::verify_oop_count());
-  }
+    if (VerifyOops && Verbose) {
+      tty->print_cr("+VerifyOops count: %d", StubRoutines::verify_oop_count());
+    }
 
-  print_bytecode_count();
+    print_bytecode_count();
+  }
+#endif
 
   if (PrintSystemDictionaryAtExit) {
+#ifndef LEYDEN
     ResourceMark rm;
     MutexLocker mcld(ClassLoaderDataGraph_lock);
     SystemDictionary::print();
     ClassLoaderDataGraph::print();
+#endif
   }
 
   if (LogTouchedMethods && PrintTouchedMethodsAtExit) {
@@ -446,8 +462,10 @@ void before_exit(JavaThread* thread) {
   }
 
   // shut down the StatSampler task
+#ifndef LEYDEN
   StatSampler::disengage();
   StatSampler::destroy();
+#endif
 
   // Stop concurrent GC threads
   Universe::heap()->stop();
@@ -461,18 +479,22 @@ void before_exit(JavaThread* thread) {
     if (log.is_trace()) {
       LogStream ls_trace(log.trace());
       MutexLocker mcld(ClassLoaderDataGraph_lock);
+#ifndef LEYDEN
       ClassLoaderDataGraph::print_on(&ls_trace);
+#endif
     }
   }
 
+
+#ifndef LEYDEN
   if (PrintBytecodeHistogram) {
     BytecodeHistogram::print();
   }
-
 #ifdef LINUX
   if (DumpPerfMapAtExit) {
     CodeCache::write_perf_map();
   }
+#endif
 #endif
 
   if (JvmtiExport::should_post_thread_life()) {
@@ -502,6 +524,7 @@ void before_exit(JavaThread* thread) {
     BeforeExit_lock->notify_all();
   }
 
+#ifndef LEYDEN
   if (VerifyStringTableAtExit) {
     size_t fail_cnt = StringTable::verify_and_compare_entries();
     if (fail_cnt != 0) {
@@ -509,7 +532,7 @@ void before_exit(JavaThread* thread) {
       guarantee(fail_cnt == 0, "unexpected StringTable verification failures");
     }
   }
-
+#endif
   #undef BEFORE_EXIT_NOT_RUN
   #undef BEFORE_EXIT_RUNNING
   #undef BEFORE_EXIT_DONE
@@ -655,6 +678,7 @@ void vm_exit_during_initialization() {
 }
 
 void vm_exit_during_initialization(Handle exception) {
+#ifndef LEYDEN
   tty->print_cr("Error occurred during initialization of VM");
   // If there are exceptions on this thread it must be cleared
   // first and here. Any future calls to EXCEPTION_MARK requires
@@ -669,6 +693,7 @@ void vm_exit_during_initialization(Handle exception) {
 
   // Failure during initialization, we don't want to dump core
   vm_abort(false);
+#endif
 }
 
 void vm_exit_during_initialization(Symbol* ex, const char* message) {

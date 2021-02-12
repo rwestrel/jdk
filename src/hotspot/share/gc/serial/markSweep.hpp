@@ -123,9 +123,13 @@ class MarkSweep : AllStatic {
   static FollowRootClosure    follow_root_closure;
   static MarkAndPushClosure   mark_and_push_closure;
   static FollowStackClosure   follow_stack_closure;
+#ifndef LEYDEN
   static CLDToOopClosure      follow_cld_closure;
+#endif
   static AdjustPointerClosure adjust_pointer_closure;
+#ifndef LEYDEN
   static CLDToOopClosure      adjust_cld_closure;
+#endif
 
   // Accessors
   static uint total_invocations() { return _total_invocations; }
@@ -148,7 +152,9 @@ class MarkSweep : AllStatic {
 
   static void follow_klass(Klass* klass);
 
+#ifndef LEYDEN
   static void follow_cld(ClassLoaderData* cld);
+#endif
 
   template <class T> static inline void adjust_pointer(T* p);
 
@@ -178,7 +184,9 @@ public:
 
   virtual bool do_metadata() { return true; }
   virtual void do_klass(Klass* k);
+#ifndef LEYDEN
   virtual void do_cld(ClassLoaderData* cld);
+#endif
 
   void set_ref_discoverer(ReferenceDiscoverer* rd) {
     set_ref_discoverer_internal(rd);

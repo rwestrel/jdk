@@ -252,7 +252,6 @@ static void print_array(outputStream *os, SignatureStream& ss) {
     os->print("[]");
   }
 }
-
 void Symbol::print_as_signature_external_return_type(outputStream *os) {
   for (SignatureStream ss(this); !ss.is_done(); ss.next()) {
     if (ss.at_return_type()) {

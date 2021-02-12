@@ -52,6 +52,7 @@ void InstanceMirrorKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
     Klass* klass = java_lang_Class::as_Klass_raw(obj);
     // We'll get NULL for primitive mirrors.
     if (klass != NULL) {
+#ifndef LEYDEN
       if (klass->class_loader_data() == NULL) {
         // This is a mirror that belongs to a shared class that has not be loaded yet.
         // It's only reachable via HeapShared::roots(). All of its fields should be zero
@@ -66,8 +67,11 @@ void InstanceMirrorKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
         // loader itself is handled.
         Devirtualizer::do_cld(closure, klass->class_loader_data());
       } else {
+#endif
         Devirtualizer::do_klass(closure, klass);
+#ifndef LEYDEN
       }
+#endif
     } else {
       // We would like to assert here (as below) that if klass has been NULL, then
       // this has been a mirror for a primitive type that we do not need to follow

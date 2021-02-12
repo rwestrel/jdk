@@ -57,7 +57,7 @@ class SharedRuntime: AllStatic {
                                          bool is_optimized, TRAPS);
 
   // Shared stub locations
-
+#ifndef LEYDEN
   static RuntimeStub*        _wrong_method_blob;
   static RuntimeStub*        _wrong_method_abstract_blob;
   static RuntimeStub*        _ic_miss_blob;
@@ -71,6 +71,7 @@ class SharedRuntime: AllStatic {
   static SafepointBlob*      _polling_page_vectors_safepoint_handler_blob;
   static SafepointBlob*      _polling_page_safepoint_handler_blob;
   static SafepointBlob*      _polling_page_return_handler_blob;
+#endif
 
 #ifdef COMPILER2
   static UncommonTrapBlob*   _uncommon_trap_blob;
@@ -83,11 +84,15 @@ class SharedRuntime: AllStatic {
 
  private:
   enum { POLL_AT_RETURN,  POLL_AT_LOOP, POLL_AT_VECTOR_LOOP };
+#ifndef LEYDEN
   static SafepointBlob* generate_handler_blob(address call_ptr, int poll_type);
   static RuntimeStub*   generate_resolve_blob(address destination, const char* name);
+#endif
 
  public:
+#ifndef LEYDEN
   static void generate_stubs(void);
+#endif
 
   // max bytes for each dtrace string parameter
   enum { max_dtrace_string_size = 256 };
@@ -214,6 +219,7 @@ class SharedRuntime: AllStatic {
   static frame look_for_reserved_stack_annotated_method(JavaThread* thread, frame fr);
 
   // Shared stub locations
+#ifndef LEYDEN
   static address get_poll_stub(address pc);
 
   static address get_ic_miss_stub() {
@@ -252,6 +258,7 @@ class SharedRuntime: AllStatic {
   static SafepointBlob* polling_page_return_handler_blob()     { return _polling_page_return_handler_blob; }
   static SafepointBlob* polling_page_safepoint_handler_blob()  { return _polling_page_safepoint_handler_blob; }
   static SafepointBlob* polling_page_vectors_safepoint_handler_blob()  { return _polling_page_vectors_safepoint_handler_blob; }
+#endif
 
   // Counters
 #ifndef PRODUCT
@@ -322,15 +329,17 @@ class SharedRuntime: AllStatic {
 
  private:
   // deopt blob
+#ifndef LEYDEN
   static void generate_deopt_blob(void);
-
   static bool handle_ic_miss_helper_internal(Handle receiver, CompiledMethod* caller_nm, const frame& caller_frame,
                                              methodHandle callee_method, Bytecodes::Code bc, CallInfo& call_info,
                                              bool& needs_ic_stub_refill, TRAPS);
 
- public:
-  static DeoptimizationBlob* deopt_blob(void)      { return _deopt_blob; }
+#endif
 
+ public:
+#ifndef LEYDEN
+  static DeoptimizationBlob* deopt_blob(void)      { return _deopt_blob; }
   // Resets a call-site in compiled code so it will get resolved again.
   static methodHandle reresolve_call_site(JavaThread *thread, TRAPS);
 
@@ -341,11 +350,15 @@ class SharedRuntime: AllStatic {
   // Find the method that called us.
   static methodHandle find_callee_method(JavaThread* thread, TRAPS);
 
+#endif
+
   static void monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThread* thread);
 
   static void monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* thread);
 
  private:
+#ifndef LEYDEN
+
   static Handle find_callee_info(JavaThread* thread,
                                  Bytecodes::Code& bc,
                                  CallInfo& callinfo, TRAPS);
@@ -353,8 +366,8 @@ class SharedRuntime: AllStatic {
                                         vframeStream& vfst,
                                         Bytecodes::Code& bc,
                                         CallInfo& callinfo, TRAPS);
-
   static Method* extract_attached_method(vframeStream& vfst);
+#endif
 
 #if defined(X86) && defined(COMPILER1)
   // For Object.hashCode, System.identityHashCode try to pull hashCode from object header if available.
@@ -419,6 +432,7 @@ class SharedRuntime: AllStatic {
   // pointer as needed. This means the i2c adapter code doesn't need any special
   // handshaking path with compiled code to keep the stack walking correct.
 
+#ifndef LEYDEN
   static AdapterHandlerEntry* generate_i2c2i_adapters(MacroAssembler *_masm,
                                                       int total_args_passed,
                                                       int max_arg,
@@ -431,7 +445,7 @@ class SharedRuntime: AllStatic {
                               int comp_args_on_stack,
                               const BasicType *sig_bt,
                               const VMRegPair *regs);
-
+#endif
   // OSR support
 
   // OSR_migration_begin will extract the jvm state from an interpreter
@@ -517,11 +531,12 @@ class SharedRuntime: AllStatic {
 
   static address handle_unsafe_access(JavaThread* thread, address next_pc);
 
+#ifndef LEYDEN
   static BufferBlob* make_native_invoker(address call_target,
                                          int shadow_space_bytes,
                                          const GrowableArray<VMReg>& input_registers,
                                          const GrowableArray<VMReg>& output_registers);
-
+#endif
 #ifndef PRODUCT
 
   // Collect and print inline cache miss statistics
@@ -686,6 +701,7 @@ class AdapterHandlerEntry : public BasicHashtableEntry<mtCode> {
   void print_adapter_on(outputStream* st) const;
 };
 
+#ifndef LEYDEN
 class AdapterHandlerLibrary: public AllStatic {
  private:
   static BufferBlob* _buffer; // the temporary code buffer in CodeCache
@@ -713,5 +729,5 @@ class AdapterHandlerLibrary: public AllStatic {
 #endif // PRODUCT
 
 };
-
+#endif
 #endif // SHARE_RUNTIME_SHAREDRUNTIME_HPP

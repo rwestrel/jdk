@@ -589,6 +589,7 @@ void decode_env::print_address(address adr) {
   }
 
   if (Universe::is_fully_initialized()) {
+#ifndef LEYDEN
     if (StubRoutines::contains(adr)) {
       StubCodeDesc* desc = StubCodeDesc::desc_for(adr);
       if (desc == NULL) {
@@ -606,6 +607,7 @@ void decode_env::print_address(address adr) {
       st->print("Stub::<unknown> " PTR_FORMAT, p2i(adr));
       return;
     }
+#endif
 
     BarrierSet* bs = BarrierSet::barrier_set();
     if (bs->is_a(BarrierSet::CardTableBarrierSet) &&

@@ -45,6 +45,7 @@ void LRUCurrentHeapPolicy::setup() {
 // the object the SoftReference points to.
 bool LRUCurrentHeapPolicy::should_clear_reference(oop p,
                                                   jlong timestamp_clock) {
+#ifndef LEYDEN
   jlong interval = timestamp_clock - java_lang_ref_SoftReference::timestamp(p);
   assert(interval >= 0, "Sanity check");
 
@@ -52,6 +53,7 @@ bool LRUCurrentHeapPolicy::should_clear_reference(oop p,
   if(interval <= _max_interval) {
     return false;
   }
+#endif
 
   return true;
 }
@@ -76,6 +78,7 @@ void LRUMaxHeapPolicy::setup() {
 // the object the SoftReference points to.
 bool LRUMaxHeapPolicy::should_clear_reference(oop p,
                                              jlong timestamp_clock) {
+#ifndef LEYDEN
   jlong interval = timestamp_clock - java_lang_ref_SoftReference::timestamp(p);
   assert(interval >= 0, "Sanity check");
 
@@ -83,6 +86,6 @@ bool LRUMaxHeapPolicy::should_clear_reference(oop p,
   if(interval <= _max_interval) {
     return false;
   }
-
+#endif
   return true;
 }

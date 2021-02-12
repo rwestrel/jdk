@@ -51,6 +51,7 @@ void DebugInfoWriteStream::write_metadata(Metadata* h) {
 }
 
 oop DebugInfoReadStream::read_oop() {
+#ifndef LEYDEN
   nmethod* nm = const_cast<CompiledMethod*>(code())->as_nmethod_or_null();
   oop o;
   if (nm != NULL) {
@@ -62,6 +63,9 @@ oop DebugInfoReadStream::read_oop() {
   }
   assert(oopDesc::is_oop_or_null(o), "oop only");
   return o;
+#else
+  return NULL;
+#endif
 }
 
 ScopeValue* DebugInfoReadStream::read_object_value(bool is_auto_box) {

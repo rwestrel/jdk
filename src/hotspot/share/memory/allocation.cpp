@@ -76,12 +76,14 @@ void  StackObj::operator delete(void* p)              { ShouldNotCallThis(); }
 void* StackObj::operator new [](size_t size)  throw() { ShouldNotCallThis(); return 0; }
 void  StackObj::operator delete [](void* p)           { ShouldNotCallThis(); }
 
+#ifndef LEYDEN
 void* MetaspaceObj::operator new(size_t size, ClassLoaderData* loader_data,
                                  size_t word_size,
                                  MetaspaceObj::Type type, TRAPS) throw() {
   // Klass has it's own operator new
   return Metaspace::allocate(loader_data, word_size, type, THREAD);
 }
+#endif
 
 bool MetaspaceObj::is_valid(const MetaspaceObj* p) {
   // Weed out obvious bogus values first without traversing metaspace

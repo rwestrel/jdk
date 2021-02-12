@@ -37,6 +37,7 @@
 const u2 ConstMethod::MAX_IDNUM   = 0xFFFE;
 const u2 ConstMethod::UNSET_IDNUM = 0xFFFF;
 
+#ifndef LEYDEN
 ConstMethod* ConstMethod::allocate(ClassLoaderData* loader_data,
                                    int byte_code_size,
                                    InlineTableSizes* sizes,
@@ -46,6 +47,7 @@ ConstMethod* ConstMethod::allocate(ClassLoaderData* loader_data,
   return new (loader_data, size, MetaspaceObj::ConstMethodType, THREAD) ConstMethod(
       byte_code_size, sizes, method_type, size);
 }
+#endif
 
 ConstMethod::ConstMethod(int byte_code_size,
                          InlineTableSizes* sizes,
@@ -72,11 +74,13 @@ ConstMethod::ConstMethod(int byte_code_size,
 }
 
 // Accessor that copies to metadata.
+#ifndef LEYDEN
 void ConstMethod::copy_stackmap_data(ClassLoaderData* loader_data,
                                      u1* sd, int length, TRAPS) {
   _stackmap_data = MetadataFactory::new_array<u1>(loader_data, length, CHECK);
   memcpy((void*)_stackmap_data->adr_at(0), (void*)sd, length);
 }
+#endif
 
 // Deallocate metadata fields associated with ConstMethod*
 void ConstMethod::deallocate_contents(ClassLoaderData* loader_data) {
@@ -370,6 +374,7 @@ AnnotationArray** ConstMethod::default_annotations_addr() const {
   return (AnnotationArray**)constMethod_end() - offset;
 }
 
+#ifndef LEYDEN
 Array<u1>* copy_annotations(ClassLoaderData* loader_data, AnnotationArray* from, TRAPS) {
   int length = from->length();
   Array<u1>* a = MetadataFactory::new_array<u1>(loader_data, length, 0, CHECK_NULL);
@@ -402,6 +407,7 @@ void ConstMethod::copy_annotations_from(ClassLoaderData* loader_data, ConstMetho
     set_default_annotations(a);
   }
 }
+#endif
 
 void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(ConstMethod): %p", this);

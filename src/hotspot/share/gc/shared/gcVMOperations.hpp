@@ -228,6 +228,7 @@ class VM_GenCollectFull: public VM_GC_Operation {
   virtual void doit();
 };
 
+#ifndef LEYDEN
 class VM_CollectForMetadataAllocation: public VM_GC_Operation {
  private:
   MetaWord*                _result;
@@ -249,6 +250,7 @@ class VM_CollectForMetadataAllocation: public VM_GC_Operation {
 
   bool initiate_concurrent_GC();
 };
+#endif
 
 class SvcGCMarker : public StackObj {
  private:

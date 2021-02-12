@@ -61,8 +61,10 @@ SerialOldTracer*        MarkSweep::_gc_tracer       = NULL;
 MarkSweep::FollowRootClosure  MarkSweep::follow_root_closure;
 
 MarkAndPushClosure MarkSweep::mark_and_push_closure;
+#ifndef LEYDEN
 CLDToOopClosure    MarkSweep::follow_cld_closure(&mark_and_push_closure, ClassLoaderData::_claim_strong);
 CLDToOopClosure    MarkSweep::adjust_cld_closure(&adjust_pointer_closure, ClassLoaderData::_claim_strong);
+#endif
 
 template <class T> inline void MarkSweep::KeepAliveClosure::do_oop_work(T* p) {
   mark_and_push(p);

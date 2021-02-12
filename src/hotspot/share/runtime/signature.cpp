@@ -378,7 +378,7 @@ Symbol* SignatureStream::find_symbol() {
   _previous_name = name;
   return name;
 }
-
+#ifndef LEYDEN
 Klass* SignatureStream::as_klass(Handle class_loader, Handle protection_domain,
                                  FailureMode failure_mode, TRAPS) {
   if (!is_reference()) {
@@ -420,6 +420,7 @@ oop SignatureStream::as_java_mirror(Handle class_loader, Handle protection_domai
   }
   return klass->java_mirror();
 }
+#endif
 
 void SignatureStream::skip_to_return_type() {
   while (!at_return_type()) {

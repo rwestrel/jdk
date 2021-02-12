@@ -42,7 +42,9 @@ class TypeArrayKlass : public ArrayKlass {
 
   // Constructor
   TypeArrayKlass(BasicType type, Symbol* name);
+#ifndef LEYDEN
   static TypeArrayKlass* allocate(ClassLoaderData* loader_data, BasicType type, Symbol* name, TRAPS);
+#endif
  public:
   TypeArrayKlass() {} // For dummy objects.
 
@@ -54,11 +56,13 @@ class TypeArrayKlass : public ArrayKlass {
   DEBUG_ONLY(bool is_typeArray_klass_slow() const  { return true; })
 
   // klass allocation
+#ifndef LEYDEN
   static TypeArrayKlass* create_klass(BasicType type, const char* name_str,
                                TRAPS);
   static TypeArrayKlass* create_klass(BasicType type, TRAPS) {
     return create_klass(type, external_name(type), THREAD);
   }
+#endif
 
   int oop_size(oop obj) const;
 
@@ -94,10 +98,12 @@ class TypeArrayKlass : public ArrayKlass {
 
  protected:
   // Find n'th dimensional array
+#ifndef LEYDEN
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
+#endif
 
  public:
   static TypeArrayKlass* cast(Klass* k) {

@@ -163,10 +163,12 @@ call_do_cld(void (Receiver::*)(ClassLoaderData*), void (Base::*)(ClassLoaderData
   closure->OopClosureType::do_cld(cld);
 }
 
+#ifndef LEYDEN
 template <typename OopClosureType>
 void Devirtualizer::do_cld(OopClosureType* closure, ClassLoaderData* cld) {
   call_do_cld(&OopClosureType::do_cld, &OopIterateClosure::do_cld, closure, cld);
 }
+#endif
 
 // Dispatch table implementation for *Klass::oop_oop_iterate
 //

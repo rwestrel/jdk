@@ -118,6 +118,7 @@ oop SystemDictionary::java_platform_loader() {
   return _java_platform_loader.resolve();
 }
 
+#ifndef LEYDEN
 void SystemDictionary::compute_java_loaders(TRAPS) {
   JavaValue result(T_OBJECT);
   InstanceKlass* class_loader_klass = vmClasses::ClassLoader_klass();
@@ -147,10 +148,12 @@ ClassLoaderData* SystemDictionary::register_loader(Handle class_loader, bool cre
                                       ClassLoaderDataGraph::find_or_create(class_loader);
   }
 }
+#endif
 
 // ----------------------------------------------------------------------------
 // Parallel class loading check
 
+#ifndef LEYDEN
 bool SystemDictionary::is_parallelCapable(Handle class_loader) {
   if (class_loader.is_null()) return true;
   if (AlwaysLockClassLoader) return false;
@@ -193,7 +196,7 @@ Handle SystemDictionary::compute_loader_lock_object(Thread* thread, Handle class
     return class_loader;
   }
 }
-
+#endif
 // ----------------------------------------------------------------------------
 // Resolving of classes
 
@@ -365,6 +368,9 @@ InstanceKlass* SystemDictionary::resolve_super_or_fail(Symbol* class_name,
                                                        Handle protection_domain,
                                                        bool is_superclass,
                                                        TRAPS) {
+#ifdef LEYDEN
+  return NULL;
+#else
   assert(!Signature::is_array(super_name), "invalid super class name");
 #if INCLUDE_CDS
   if (DumpSharedSpaces) {
@@ -453,8 +459,10 @@ InstanceKlass* SystemDictionary::resolve_super_or_fail(Symbol* class_name,
   }
 
   return superk;
+#endif
 }
 
+#ifndef LEYDEN
 void SystemDictionary::validate_protection_domain(InstanceKlass* klass,
                                                   Handle class_loader,
                                                   Handle protection_domain,
@@ -521,6 +529,7 @@ void SystemDictionary::validate_protection_domain(InstanceKlass* klass,
                                       protection_domain, THREAD);
   }
 }
+#endif
 
 // We only get here if this thread finds that another thread
 // has already claimed the placeholder token for the current operation,
@@ -546,6 +555,7 @@ void SystemDictionary::validate_protection_domain(InstanceKlass* klass,
 //
 // The notify allows applications that did an untimed wait() on
 // the classloader object lock to not hang.
+#ifndef LEYDEN
 void SystemDictionary::double_lock_wait(Thread* thread, Handle lockObject) {
   assert_lock_strong(SystemDictionary_lock);
 
@@ -562,6 +572,7 @@ void SystemDictionary::double_lock_wait(Thread* thread, Handle lockObject) {
   ObjectSynchronizer::reenter(lockObject, recursions, thread);
   SystemDictionary_lock->lock();
 }
+#endif
 
 // If the class in is in the placeholder table, class loading is in progress
 // For cases where the application changes threads to load classes, it
@@ -576,10 +587,10 @@ void SystemDictionary::double_lock_wait(Thread* thread, Handle lockObject) {
 // Returns non-null Klass* if other thread has completed load
 // and we are done,
 // If return null Klass* and no pending exception, the caller must load the class
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::handle_parallel_super_load(
     Symbol* name, Symbol* superclassname, Handle class_loader,
     Handle protection_domain, Handle lockObject, TRAPS) {
-
   ClassLoaderData* loader_data = class_loader_data(class_loader);
   Dictionary* dictionary = loader_data->dictionary();
   unsigned int name_hash = dictionary->compute_hash(name);
@@ -648,6 +659,7 @@ InstanceKlass* SystemDictionary::handle_parallel_super_load(
   }
   return NULL;
 }
+#endif
 
 void SystemDictionary::post_class_load_event(EventClassLoad* event, const InstanceKlass* k, const ClassLoaderData* init_cld) {
   assert(event != NULL, "invariant");
@@ -666,6 +678,7 @@ void SystemDictionary::post_class_load_event(EventClassLoad* event, const Instan
 // So be careful to not exit with a CHECK_ macro betweeen these calls.
 //
 // name must be in the form of "java/lang/Object" -- cannot be "Ljava/lang/Object;"
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
                                                                 Handle class_loader,
                                                                 Handle protection_domain,
@@ -903,6 +916,7 @@ InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
 
   return loaded_class;
 }
+#endif
 
 
 // This routine does not lock the system dictionary.
@@ -974,6 +988,7 @@ Klass* SystemDictionary::find_instance_or_array_klass(Symbol* class_name,
 // does not publish the classes via the SystemDictionary.
 // Handles Lookup.defineClass hidden, unsafe_DefineAnonymousClass
 // and redefineclasses. RedefinedClasses do not add to the class hierarchy.
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
                                               Handle class_loader,
                                               ClassFileStream* st,
@@ -1051,12 +1066,14 @@ InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
 
   return k;
 }
+#endif
 
 // Add a klass to the system from a stream (called by jni_DefineClass and
 // JVM_DefineClass).
 // Note: class_name can be NULL. In that case we do not know the name of
 // the class until we have parsed the stream.
 
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
                                                      Handle class_loader,
                                                      Handle protection_domain,
@@ -1122,6 +1139,7 @@ InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
 
   return k;
 }
+#endif
 
 #if INCLUDE_CDS
 // Load a class for boot loader from the shared spaces. This also
@@ -1528,6 +1546,7 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle 
   }
 }
 
+#ifndef LEYDEN
 static void post_class_define_event(InstanceKlass* k, const ClassLoaderData* def_cld) {
   EventClassDefine event;
   if (event.should_commit()) {
@@ -1536,7 +1555,9 @@ static void post_class_define_event(InstanceKlass* k, const ClassLoaderData* def
     event.commit();
   }
 }
+#endif
 
+#ifndef LEYDEN
 void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_loader, TRAPS) {
 
   ClassLoaderData* loader_data = k->class_loader_data();
@@ -1599,6 +1620,7 @@ void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_load
   }
   post_class_define_event(k, loader_data);
 }
+#endif
 
 // Support parallel classloading
 // All parallel class loaders, including bootstrap classloader
@@ -1620,6 +1642,7 @@ void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_load
 // placeholders()->find_and_add(PlaceholderTable::DEFINE_CLASS),
 // you need to find_and_remove it before returning.
 // So be careful to not exit with a CHECK_ macro between these calls.
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::find_or_define_helper(Symbol* class_name, Handle class_loader,
                                                        InstanceKlass* k, TRAPS) {
 
@@ -1685,9 +1708,11 @@ InstanceKlass* SystemDictionary::find_or_define_helper(Symbol* class_name, Handl
 
   return HAS_PENDING_EXCEPTION ? NULL : k;
 }
+#endif
 
 // If a class loader supports parallel classloading handle parallel define requests.
 // find_or_define_instance_class may return a different InstanceKlass
+#ifndef LEYDEN
 InstanceKlass* SystemDictionary::find_or_define_instance_class(Symbol* class_name, Handle class_loader,
                                                                InstanceKlass* k, TRAPS) {
   InstanceKlass* defined_k = find_or_define_helper(class_name, class_loader, k, THREAD);
@@ -1702,6 +1727,7 @@ InstanceKlass* SystemDictionary::find_or_define_instance_class(Symbol* class_nam
   }
   return defined_k;
 }
+#endif
 
 
 // ----------------------------------------------------------------------------
@@ -2141,6 +2167,7 @@ Symbol* SystemDictionary::check_signature_loaders(Symbol* signature,
   return NULL;
 }
 
+#ifndef LEYDEN
 Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
                                                        Symbol* signature,
                                                        TRAPS) {
@@ -2186,6 +2213,7 @@ Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
          "MH intrinsic invariant");
   return spe->method();
 }
+#endif
 
 // Helper for unpacking the return value from linkMethod and linkCallSite.
 static Method* unpack_method_and_appendix(Handle mname,
@@ -2428,6 +2456,7 @@ Handle SystemDictionary::find_field_handle_type(Symbol* signature,
 }
 
 // Ask Java code to find or construct a method handle constant.
+#ifndef LEYDEN
 Handle SystemDictionary::link_method_handle_constant(Klass* caller,
                                                      int ref_kind, //e.g., JVM_REF_invokeVirtual
                                                      Klass* callee,
@@ -2477,6 +2506,7 @@ Handle SystemDictionary::link_method_handle_constant(Klass* caller,
                          &args, CHECK_(empty));
   return Handle(THREAD, (oop) result.get_jobject());
 }
+#endif
 
 // Ask Java to run a bootstrap method, in order to create a dynamic call site
 // while linking an invokedynamic op, or compute a constant for Dynamic_info CP entry

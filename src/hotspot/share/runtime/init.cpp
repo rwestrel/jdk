@@ -109,42 +109,53 @@ void vm_init_globals() {
 
 
 jint init_globals() {
+#ifndef LEYDEN
   management_init();
   JvmtiExport::initialize_oop_storage();
   bytecodes_init();
   classLoader_init1();
   compilationPolicy_init();
   codeCache_init();
+#endif
   VM_Version_init();
+#ifndef LEYDEN
   stubRoutines_init1();
+#endif
   jint status = universe_init();  // dependent on codeCache_init and
                                   // stubRoutines_init1 and metaspace_init.
   if (status != JNI_OK)
     return status;
 
+#ifndef LEYDEN
   gc_barrier_stubs_init();  // depends on universe_init, must be before interpreter_init
   interpreter_init_stub();  // before methods get loaded
+#endif
   accessFlags_init();
   InterfaceSupport_init();
   VMRegImpl::set_regName(); // need this before generate_stubs (for printing oop maps).
+#ifndef LEYDEN
   SharedRuntime::generate_stubs();
+#endif
   universe2_init();  // dependent on codeCache_init and stubRoutines_init1
+#ifndef LEYDEN
   javaClasses_init();// must happen after vtable initialization, before referenceProcessor_init
   interpreter_init_code();  // after javaClasses_init and before any method gets linked
+#endif
   referenceProcessor_init();
   jni_handles_init();
 #if INCLUDE_VM_STRUCTS
   vmStructs_init();
 #endif // INCLUDE_VM_STRUCTS
 
+#ifndef LEYDEN
   vtableStubs_init();
   InlineCacheBuffer_init();
   compilerOracle_init();
-  dependencyContext_init();
-
   if (!compileBroker_init()) {
     return JNI_EINVAL;
   }
+  dependencyContext_init();
+#endif
 #if INCLUDE_JVMCI
   if (EnableJVMCI) {
     JVMCI::initialize_globals();
@@ -154,8 +165,10 @@ jint init_globals() {
   if (!universe_post_init()) {
     return JNI_ERR;
   }
+#ifndef LEYDEN
   stubRoutines_init2(); // note: StubRoutines need 2-phase init
   MethodHandles::generate_adapters();
+#endif
 
   // All the flags that get adjusted by VM_Version_init and os::init_2
   // have been set so dump the flags now.
@@ -175,7 +188,9 @@ void exit_globals() {
     SafepointTracing::statistics_exit_log();
     if (PrintStringTableStatistics) {
       SymbolTable::dump(tty);
+#ifndef LEYDEN
       StringTable::dump(tty);
+#endif
     }
     ostream_exit();
   }

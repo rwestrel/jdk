@@ -109,8 +109,9 @@ class ArrayKlass: public Klass {
   void array_klasses_do(void f(Klass* k, TRAPS), TRAPS);
 
   // Return a handle.
+#ifndef LEYDEN
   static void     complete_create_array_klass(ArrayKlass* k, Klass* super_klass, ModuleEntry* module, TRAPS);
-
+#endif
 
   // jvm support
   jint compute_modifier_flags(TRAPS) const;

@@ -32,6 +32,7 @@
 #include "oops/recordComponent.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+#ifndef LEYDEN
 RecordComponent* RecordComponent::allocate(ClassLoaderData* loader_data,
                                            u2 name_index, u2 descriptor_index,
                                            u2 attributes_count,
@@ -42,6 +43,7 @@ RecordComponent* RecordComponent::allocate(ClassLoaderData* loader_data,
          RecordComponent(name_index, descriptor_index, attributes_count,
                          generic_signature_index, annotations, type_annotations);
 }
+#endif
 
 void RecordComponent::deallocate_contents(ClassLoaderData* loader_data) {
   if (annotations() != NULL) {

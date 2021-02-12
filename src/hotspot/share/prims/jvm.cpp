@@ -106,6 +106,7 @@
 
 #include <errno.h>
 
+#ifndef LEYDEN
 /*
   NOTE about use of any ctor or function call that can trigger a safepoint/GC:
   such ctors and calls MUST NOT come between an oop declaration/init and its
@@ -293,7 +294,6 @@ JVM_ENTRY(void, JVM_ArrayCopy(JNIEnv *env, jclass ignored, jobject src, jint src
   // Do copy
   s->klass()->copy_array(s, src_pos, d, dst_pos, length, thread);
 JVM_END
-
 
 static void set_property(Handle props, const char* key, const char* value, TRAPS) {
   JavaValue r(T_OBJECT);
@@ -832,6 +832,7 @@ JVM_ENTRY(jclass, JVM_FindClassFromClass(JNIEnv *env, const char *name,
 JVM_END
 
 // common code for JVM_DefineClass() and JVM_DefineClassWithSource()
+#ifndef LEYDEN
 static jclass jvm_define_class_common(const char *name,
                                       jobject loader, const jbyte *buf,
                                       jsize len, jobject pd, const char *source,
@@ -872,6 +873,7 @@ static jclass jvm_define_class_common(const char *name,
 
   return (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
 }
+#endif
 
 enum {
   NESTMATE              = java_lang_invoke_MemberName::MN_NESTMATE_CLASS,
@@ -884,6 +886,7 @@ enum {
  * Define a class with the specified flags that indicates if it's a nestmate,
  * hidden, or strongly referenced from class loader.
  */
+#ifndef LEYDEN
 static jclass jvm_lookup_define_class(jclass lookup, const char *name,
                                       const jbyte *buf, jsize len, jobject pd,
                                       jboolean init, int flags, jobject classData, TRAPS) {
@@ -1005,10 +1008,13 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
 
   return (jclass) JNIHandles::make_local(THREAD, defined_k->java_mirror());
 }
+#endif
 
+#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_DefineClass(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsize len, jobject pd))
   return jvm_define_class_common(name, loader, buf, len, pd, NULL, THREAD);
 JVM_END
+#endif
 
 /*
  * Define a class with the specified lookup class.
@@ -1021,6 +1027,7 @@ JVM_END
  *  flags:   properties of the class
  *  classData: private static pre-initialized field
  */
+#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_LookupDefineClass(JNIEnv *env, jclass lookup, const char *name, const jbyte *buf,
           jsize len, jobject pd, jboolean initialize, int flags, jobject classData))
 
@@ -1032,11 +1039,14 @@ JVM_ENTRY(jclass, JVM_LookupDefineClass(JNIEnv *env, jclass lookup, const char *
 
   return jvm_lookup_define_class(lookup, name, buf, len, pd, initialize, flags, classData, THREAD);
 JVM_END
+#endif
 
+#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_DefineClassWithSource(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsize len, jobject pd, const char *source))
 
   return jvm_define_class_common(name, loader, buf, len, pd, source, THREAD);
 JVM_END
+#endif
 
 JVM_ENTRY(jclass, JVM_FindLoadedClass(JNIEnv *env, jobject loader, jstring name))
   ResourceMark rm(THREAD);
@@ -1659,6 +1669,7 @@ JVM_END
 
 // New (JDK 1.4) reflection implementation /////////////////////////////////////
 
+#ifndef LEYDEN
 JVM_ENTRY(jobjectArray, JVM_GetClassDeclaredFields(JNIEnv *env, jclass ofClass, jboolean publicOnly))
 {
   JvmtiVMObjectAllocEventCollector oam;
@@ -1707,6 +1718,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassDeclaredFields(JNIEnv *env, jclass ofClass, 
   return (jobjectArray) JNIHandles::make_local(THREAD, result());
 }
 JVM_END
+#endif
 
 // A class is a record if and only if it is final and a direct subclass of
 // java.lang.Record and has a Record attribute; otherwise, it is not a record.
@@ -1756,6 +1768,7 @@ JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
 }
 JVM_END
 
+#ifndef LEYDEN
 static bool select_method(const methodHandle& method, bool want_constructor) {
   if (want_constructor) {
     return (method->is_initializer() && !method->is_static());
@@ -1849,6 +1862,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassDeclaredConstructors(JNIEnv *env, jclass ofC
                                            vmClasses::reflect_Constructor_klass(), THREAD);
 }
 JVM_END
+#endif
 
 JVM_ENTRY(jint, JVM_GetClassAccessFlags(JNIEnv *env, jclass cls))
 {
@@ -1863,6 +1877,7 @@ JVM_ENTRY(jint, JVM_GetClassAccessFlags(JNIEnv *env, jclass cls))
 }
 JVM_END
 
+#ifndef LEYDEN
 JVM_ENTRY(jboolean, JVM_AreNestMates(JNIEnv *env, jclass current, jclass member))
 {
   Klass* c = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(current));
@@ -1874,6 +1889,7 @@ JVM_ENTRY(jboolean, JVM_AreNestMates(JNIEnv *env, jclass current, jclass member)
   return ck->has_nestmate_access_to(mk, THREAD);
 }
 JVM_END
+#endif
 
 JVM_ENTRY(jclass, JVM_GetNestHost(JNIEnv* env, jclass current))
 {
@@ -2754,7 +2770,7 @@ JVM_ENTRY(jboolean, JVM_IsSameClassPackage(JNIEnv *env, jclass class1, jclass cl
   Klass* klass2 = java_lang_Class::as_Klass(class2_mirror);
   return (jboolean) Reflection::is_same_class_package(klass1, klass2);
 JVM_END
-
+#endif
 // Printing support //////////////////////////////////////////////////
 extern "C" {
 
@@ -2823,7 +2839,7 @@ void jio_print(const char* s, size_t len) {
 }
 
 } // Extern C
-
+#ifndef LEYDEN
 // java.lang.Thread //////////////////////////////////////////////////////////////////////////////
 
 // In most of the JVM thread support functions we need to access the
@@ -3855,3 +3871,4 @@ JVM_END
 JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
   return os::get_signal_number(name);
 JVM_END
+#endif

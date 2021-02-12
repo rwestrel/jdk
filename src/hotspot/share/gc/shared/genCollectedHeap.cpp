@@ -204,7 +204,9 @@ void GenCollectedHeap::post_initialize() {
 
   MarkSweep::initialize();
 
+#ifndef LEYDEN
   ScavengableNMethods::initialize(&_is_scavengable);
+#endif
 }
 
 void GenCollectedHeap::ref_processing_init() {
@@ -463,7 +465,9 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
   FormatBuffer<> title("Collect gen: %s", gen->short_name());
   GCTraceTime(Trace, gc, phases) t1(title);
   TraceCollectorStats tcs(gen->counters());
+#ifndef LEYDEN
   TraceMemoryManagerStats tmms(gen->gc_manager(), gc_cause());
+#endif
 
   gen->stat_record()->invocations++;
   gen->stat_record()->accumulated_time.start();
@@ -480,6 +484,7 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
   }
   COMPILER2_OR_JVMCI_PRESENT(DerivedPointerTable::clear());
 
+#ifndef LEYDEN
   if (restore_marks_for_biased_locking) {
     // We perform this mark word preservation work lazily
     // because it's only at this point that we know whether we
@@ -487,6 +492,7 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
     // scavenge-only collections where it's unnecessary
     BiasedLocking::preserve_marks();
   }
+#endif
 
   // Do collection work
   {
@@ -610,7 +616,9 @@ void GenCollectedHeap::do_collection(bool           full,
       print_heap_change(pre_gc_values);
 
       // Track memory usage and detect low memory after GC finishes
+#ifndef LEYDEN
       MemoryService::track_memory_usage();
+#endif
 
       gc_epilogue(complete);
     }
@@ -659,22 +667,28 @@ void GenCollectedHeap::do_collection(bool           full,
     _young_gen->compute_new_size();
 
     // Delete metaspaces for unloaded class loaders and clean up loader_data graph
+#ifndef LEYDEN
     ClassLoaderDataGraph::purge(/*at_safepoint*/true);
     DEBUG_ONLY(MetaspaceUtils::verify();)
     // Resize the metaspace capacity after full collections
     MetaspaceGC::compute_new_size();
+#endif
     update_full_collections_completed();
 
     print_heap_change(pre_gc_values);
 
     // Track memory usage and detect low memory after GC finishes
+#ifndef LEYDEN
     MemoryService::track_memory_usage();
+#endif
 
     // Need to tell the epilogue code we are done with Full GC, regardless what was
     // the initial value for "complete" flag.
     gc_epilogue(true);
 
+#ifndef LEYDEN
     BiasedLocking::restore_marks();
+#endif
 
     print_heap_after_gc();
   }
@@ -686,15 +700,21 @@ bool GenCollectedHeap::should_do_full_collection(size_t size, bool full, bool is
 }
 
 void GenCollectedHeap::register_nmethod(nmethod* nm) {
+#ifndef LEYDEN
   ScavengableNMethods::register_nmethod(nm);
+#endif
 }
 
 void GenCollectedHeap::unregister_nmethod(nmethod* nm) {
+#ifndef LEYDEN
   ScavengableNMethods::unregister_nmethod(nm);
+#endif
 }
 
 void GenCollectedHeap::verify_nmethod(nmethod* nm) {
+#ifndef LEYDEN
   ScavengableNMethods::verify_nmethod(nm);
+#endif
 }
 
 void GenCollectedHeap::flush_nmethod(nmethod* nm) {
@@ -702,7 +722,9 @@ void GenCollectedHeap::flush_nmethod(nmethod* nm) {
 }
 
 void GenCollectedHeap::prune_scavengable_nmethods() {
+#ifndef LEYDEN
   ScavengableNMethods::prune_nmethods();
+#endif
 }
 
 HeapWord* GenCollectedHeap::satisfy_failed_allocation(size_t size, bool is_tlab) {
@@ -800,7 +822,9 @@ void GenCollectedHeap::process_roots(ScanningOption so,
   // General roots.
   assert(code_roots != NULL, "code root closure should always be set");
 
+#ifndef LEYDEN
   ClassLoaderDataGraph::roots_cld_do(strong_cld_closure, weak_cld_closure);
+#endif
 
   // Only process code roots from thread stacks if we aren't visiting the entire CodeCache anyway
   CodeBlobToOopClosure* roots_from_code_p = (so & SO_AllCodeCache) ? NULL : code_roots;
@@ -814,6 +838,7 @@ void GenCollectedHeap::process_roots(ScanningOption so,
 #endif
   OopStorageSet::strong_oops_do(strong_roots);
 
+#ifndef LEYDEN
   if (so & SO_ScavengeCodeCache) {
     assert(code_roots != NULL, "must supply closure for code cache");
 
@@ -827,10 +852,13 @@ void GenCollectedHeap::process_roots(ScanningOption so,
     // We scan the entire code cache, since CodeCache::do_unloading is not called.
     CodeCache::blobs_do(code_roots);
   }
+#endif
   // Verify that the code cache contents are not subject to
   // movement by a scavenging collection.
   DEBUG_ONLY(CodeBlobToOopClosure assert_code_is_non_scavengable(&assert_is_non_scavengable_closure, !CodeBlobToOopClosure::FixRelocations));
+#ifndef LEYDEN
   DEBUG_ONLY(ScavengableNMethods::asserted_non_scavengable_nmethods_do(&assert_code_is_non_scavengable));
+#endif
 }
 
 void GenCollectedHeap::full_process_roots(bool is_adjust_phase,
@@ -1218,7 +1246,9 @@ class GenGCPrologueClosure: public GenCollectedHeap::GenClosure {
 };
 
 void GenCollectedHeap::gc_prologue(bool full) {
+#ifndef LEYDEN
   assert(InlineCacheBuffer::is_empty(), "should have cleaned up ICBuffer");
+#endif
 
   // Fill TLAB's and such
   ensure_parsability(true);   // retire TLABs

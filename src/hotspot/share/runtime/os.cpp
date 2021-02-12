@@ -347,7 +347,7 @@ bool os::dll_locate_lib(char *buffer, size_t buflen,
 
 // sigexitnum_pd is a platform-specific special signal used for terminating the Signal thread.
 
-
+#ifndef LEYDEN
 static void signal_thread_entry(JavaThread* thread, TRAPS) {
   os::set_priority(thread, NearMaxPriority);
   while (true) {
@@ -414,6 +414,7 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
       }
       default: {
         // Dispatch the signal to java
+#ifndef LEYDEN
         HandleMark hm(THREAD);
         Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_misc_Signal(), THREAD);
         if (klass != NULL) {
@@ -447,10 +448,12 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
           }
           CLEAR_PENDING_EXCEPTION;
         }
+#endif
       }
     }
   }
 }
+#endif
 
 void os::init_before_ergo() {
   initialize_initial_active_processor_count();
@@ -467,6 +470,7 @@ void os::init_before_ergo() {
 
 void os::initialize_jdk_signal_support(TRAPS) {
   if (!ReduceSignalUsage) {
+#ifndef LEYDEN
     // Setup JavaThread for processing signals
     const char thread_name[] = "Signal Dispatcher";
     Handle string = java_lang_String::create_from_str(thread_name, CHECK);
@@ -511,6 +515,7 @@ void os::initialize_jdk_signal_support(TRAPS) {
     }
     // Handle ^BREAK
     os::signal(SIGBREAK, os::user_handler());
+#endif
   }
 }
 
@@ -1139,6 +1144,7 @@ bool os::is_readable_range(const void* from, const void* to) {
 // moved from debug.cpp (used to be find()) but still called from there
 // The verbose parameter is only set by the debug code in one case
 void os::print_location(outputStream* st, intptr_t x, bool verbose) {
+#ifndef LEYDEN
   address addr = (address)x;
   // Handle NULL first, so later checks don't need to protect against it.
   if (addr == NULL) {
@@ -1247,6 +1253,7 @@ void os::print_location(outputStream* st, intptr_t x, bool verbose) {
   }
 
   st->print_cr(INTPTR_FORMAT " is an unknown value", p2i(addr));
+#endif
 }
 
 // Looks like all platforms can use the same function to check if C
@@ -1456,6 +1463,7 @@ bool os::stack_shadow_pages_available(Thread *thread, const methodHandle& method
   // the handler for stack overflow.  'instanceof' in the stack overflow
   // handler or a println uses at least 8k stack of VM and native code
   // respectively.
+#ifndef LEYDEN
   const int framesize_in_bytes =
     Interpreter::size_top_interpreter_activation(method()) * wordSize;
 
@@ -1463,6 +1471,9 @@ bool os::stack_shadow_pages_available(Thread *thread, const methodHandle& method
                   (StackOverflow::stack_guard_zone_size() + StackOverflow::stack_shadow_zone_size());
 
   return sp > (limit + framesize_in_bytes);
+#else
+  return false;
+#endif
 }
 
 size_t os::page_size_for_region(size_t region_size, size_t min_pages, bool must_be_aligned) {

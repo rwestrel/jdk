@@ -159,7 +159,9 @@ class InstanceKlass: public Klass {
   };
 
  private:
+#ifndef LEYDEN
   static InstanceKlass* allocate_instance_klass(const ClassFileParser& parser, TRAPS);
+#endif
 
  protected:
   // If you add a new field that points to any metaspace object, you
@@ -411,7 +413,9 @@ class InstanceKlass: public Klass {
   // method ordering
   Array<int>* method_ordering() const     { return _method_ordering; }
   void set_method_ordering(Array<int>* m) { _method_ordering = m; }
+#ifndef LEYDEN
   void copy_method_ordering(const intArray* m, TRAPS);
+#endif
 
   // default_methods
   Array<Method*>* default_methods() const  { return _default_methods; }
@@ -420,7 +424,9 @@ class InstanceKlass: public Klass {
   // default method vtable_indices
   Array<int>* default_vtable_indices() const { return _default_vtable_indices; }
   void set_default_vtable_indices(Array<int>* v) { _default_vtable_indices = v; }
+#ifndef LEYDEN
   Array<int>* create_new_default_vtable_indices(int len, TRAPS);
+#endif
 
   // interfaces
   Array<InstanceKlass*>* local_interfaces() const          { return _local_interfaces; }
@@ -573,14 +579,18 @@ public:
   // initialization (virtuals from Klass)
   bool should_be_initialized() const;  // means that initialize should be called
   void initialize(TRAPS);
+#ifndef LEYDEN
   void link_class(TRAPS);
   bool link_class_or_fail(TRAPS); // returns false on failure
+#endif
   void rewrite_class(TRAPS);
   void link_methods(TRAPS);
   Method* class_initializer() const;
 
   // set the class to initialized if no static initializer is present
+#ifndef LEYDEN
   void eager_initialize(Thread *thread);
+#endif
 
   // reference type
   ReferenceType reference_type() const     { return (ReferenceType)_reference_type; }
@@ -1223,19 +1233,27 @@ public:
 private:
   void fence_and_clear_init_lock();
 
+#ifndef LEYDEN
   bool link_class_impl                           (TRAPS);
+#endif
   bool verify_code                               (TRAPS);
   void initialize_impl                           (TRAPS);
+#ifndef LEYDEN
   void initialize_super_interfaces               (TRAPS);
+#endif
+#ifndef LEYDEN
   void eager_initialize_impl                     ();
+#endif
   /* jni_id_for_impl for jfieldID only */
   JNIid* jni_id_for_impl                         (int offset);
 
   // Returns the array class for the n'th dimension
+#ifndef LEYDEN
   Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   Klass* array_klass_impl(bool or_null, TRAPS);
+#endif
 
   // find a local method (returns NULL if not found)
   Method* find_method_impl(const Symbol* name,

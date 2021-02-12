@@ -201,6 +201,7 @@ enum {
 
 bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                                              ucontext_t* uc, JavaThread* thread) {
+#ifndef LEYDEN
 
   /*
   NOTE: does not seem to work on linux.
@@ -253,7 +254,9 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
       // a fault inside compiled code, the interpreter, or a stub
 
       if (sig == SIGSEGV && SafepointMechanism::is_poll_address((address)info->si_addr)) {
+#ifndef LEYDEN
         stub = SharedRuntime::get_poll_stub(pc);
+#endif
       } else if (sig == SIGBUS /* && info->si_code == BUS_OBJERR */) {
         // BugId 4454115: A read from a MappedByteBuffer can fault
         // here if the underlying file has been truncated.
@@ -414,7 +417,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     os::Posix::ucontext_set_pc(uc, stub);
     return true;
   }
-
+#endif
   return false;
 }
 

@@ -45,7 +45,9 @@ class RelocatorListener : public StackObj {
 class Relocator : public ResourceObj {
  public:
   Relocator(const methodHandle& method, RelocatorListener* listener);
+#ifndef LEYDEN
   methodHandle insert_space_at(int bci, int space, u_char inst_buffer[], TRAPS);
+#endif
 
   // Callbacks from ChangeItem's
   bool handle_code_changes();
@@ -112,7 +114,9 @@ class Relocator : public ResourceObj {
   void adjust_exception_table(int bci, int delta);
   void adjust_line_no_table  (int bci, int delta);
   void adjust_local_var_table(int bci, int delta);
+#ifndef LEYDEN
   void adjust_stack_map_table(int bci, int delta);
+#endif
   int  get_orig_switch_pad   (int bci, bool is_lookup_switch);
   int  rc_instr_len          (int bci);
   bool expand_code_array     (int delta);

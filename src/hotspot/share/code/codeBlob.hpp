@@ -212,7 +212,10 @@ public:
   ImmutableOopMapSet* oop_maps() const           { return _oop_maps; }
   void set_oop_maps(OopMapSet* p);
   const ImmutableOopMap* oop_map_for_return_address(address return_address);
+
+#ifndef LEYDEN
   virtual void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f) = 0;
+#endif
 
   // Frame support. Sizes are in word units.
   int  frame_size() const                        { return _frame_size; }
@@ -340,7 +343,7 @@ public:
   address content_end() const { return _content_end; }
 };
 
-
+#ifndef LEYDEN
 class RuntimeBlob : public CodeBlob {
   friend class VMStructs;
  public:
@@ -398,13 +401,17 @@ class BufferBlob: public RuntimeBlob {
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
   // delete rather than an ordinary sized delete; see C++14 3.7.4.2/p2.
+#ifndef LEYDEN
   void operator delete(void* p);
   void* operator new(size_t s, unsigned size) throw();
+#endif
 
  public:
   // Creation
+#ifndef LEYDEN
   static BufferBlob* create(const char* name, int buffer_size);
   static BufferBlob* create(const char* name, CodeBuffer* cb);
+#endif
 
   static void free(BufferBlob* buf);
 
@@ -726,5 +733,6 @@ class SafepointBlob: public SingletonBlob {
   // Typing
   bool is_safepoint_stub() const                 { return true; }
 };
+#endif
 
 #endif // SHARE_CODE_CODEBLOB_HPP

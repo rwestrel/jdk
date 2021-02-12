@@ -647,6 +647,7 @@ int ThreadsList::find_index_of_JavaThread(JavaThread *target) {
 }
 
 JavaThread* ThreadsList::find_JavaThread_from_java_tid(jlong java_tid) const {
+#ifndef LEYDEN
   ThreadIdTable::lazy_initialize(this);
   JavaThread* thread = ThreadIdTable::find_thread_by_tid(java_tid);
   if (thread == NULL) {
@@ -670,6 +671,7 @@ JavaThread* ThreadsList::find_JavaThread_from_java_tid(jlong java_tid) const {
   } else if (!thread->is_exiting()) {
     return thread;
   }
+#endif
   return NULL;
 }
 

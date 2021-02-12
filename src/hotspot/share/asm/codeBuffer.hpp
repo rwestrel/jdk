@@ -242,11 +242,15 @@ class CodeSection {
   void initialize_shared_locs(relocInfo* buf, int length);
 
   // Manage labels and their addresses.
+#ifndef LEYDEN
   address target(Label& L, address branch_pc);
+#endif
 
   // Emit a relocation.
+#ifndef LEYDEN
   void relocate(address at, RelocationHolder const& rspec, int format = 0);
   void relocate(address at,    relocInfo::relocType rtype, int format = 0, jint method_index = 0);
+#endif
 
   // alignment requirement for starting offset
   // Requirements are that the instruction area and the
@@ -470,17 +474,23 @@ class CodeBuffer: public StackObj {
   csize_t copy_relocations_to(CodeBlob* blob) const;
 
   // copies combined code to the blob (assumes relocs are already in there)
+#ifndef LEYDEN
   void copy_code_to(CodeBlob* blob);
+#endif
 
   // moves code sections to new buffer (assumes relocs are already in there)
+#ifndef LEYDEN
   void relocate_code_to(CodeBuffer* cb) const;
+#endif
 
   // set up a model of the final layout of my contents
   void compute_final_layout(CodeBuffer* dest) const;
 
   // Expand the given section so at least 'amount' is remaining.
   // Creates a new, larger BufferBlob, and rewrites the code & relocs.
+#ifndef LEYDEN
   void expand(CodeSection* which_cs, csize_t amount);
+#endif
 
   // Helper for expand.
   csize_t figure_expanded_capacities(CodeSection* which_cs, csize_t amount, csize_t* new_capacity);
@@ -507,10 +517,12 @@ class CodeBuffer: public StackObj {
   // (4) code buffer allocating codeBlob memory for code & relocation
   // info.  The name must be something informative and code_size must
   // include both code and stubs sizes.
+#ifndef LEYDEN
   CodeBuffer(const char* name, csize_t code_size, csize_t locs_size) {
     initialize_misc(name);
     initialize(code_size, locs_size);
   }
+#endif
 
   ~CodeBuffer();
 
@@ -518,7 +530,9 @@ class CodeBuffer: public StackObj {
   // constructor 4 is equivalent to calling constructor 3 and then
   // calling this method.  It's been factored out for convenience of
   // construction.
+#ifndef LEYDEN
   void initialize(csize_t code_size, csize_t locs_size);
+#endif
 
   CodeSection* consts() { return &_consts; }
   CodeSection* insts() { return &_insts; }
@@ -563,9 +577,11 @@ class CodeBuffer: public StackObj {
   const char* name() const                  { return _name; }
   void set_name(const char* name)           { _name = name; }
   CodeBuffer* before_expand() const         { return _before_expand; }
+#ifndef LEYDEN
   BufferBlob* blob() const                  { return _blob; }
   void    set_blob(BufferBlob* blob);
   void   free_blob();                       // Free the blob, if we own one.
+#endif
 
   // Properties relative to the insts section:
   address       insts_begin() const      { return _insts.start();      }
@@ -594,7 +610,9 @@ class CodeBuffer: public StackObj {
   bool insts_contains2(address pc) const { return _insts.contains2(pc); }
 
   // Record any extra oops required to keep embedded metadata alive
+#ifndef LEYDEN
   void finalize_oop_references(const methodHandle& method);
+#endif
 
   // Allocated size in all sections, when aligned and concatenated
   // (this is the eventual state of the content in its final
@@ -647,22 +665,26 @@ class CodeBuffer: public StackObj {
 #endif
 
   // Code generation
+#ifndef LEYDEN
   void relocate(address at, RelocationHolder const& rspec, int format = 0) {
     _insts.relocate(at, rspec, format);
   }
   void relocate(address at,    relocInfo::relocType rtype, int format = 0) {
     _insts.relocate(at, rtype, format);
   }
+#endif
 
   // Management of overflow storage for binding of Labels.
   GrowableArray<int>* create_patch_overflow();
 
   // NMethod generation
+#ifndef LEYDEN
   void copy_code_and_locs_to(CodeBlob* blob) {
     assert(blob != NULL, "sane");
     copy_relocations_to(blob);
     copy_code_to(blob);
   }
+#endif
   void copy_values_to(nmethod* nm) {
     if (!oop_recorder()->is_unused()) {
       oop_recorder()->copy_values_to(nm);
@@ -697,9 +719,11 @@ class CodeBuffer: public StackObj {
 
 };
 
+#ifndef LEYDEN
 inline bool CodeSection::maybe_expand_to_ensure_remaining(csize_t amount) {
   if (remaining() < amount) { _outer->expand(this, amount); return true; }
   return false;
 }
+#endif
 
 #endif // SHARE_ASM_CODEBUFFER_HPP

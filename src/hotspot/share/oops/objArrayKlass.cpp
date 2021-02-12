@@ -45,6 +45,7 @@
 #include "runtime/mutexLocker.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 ObjArrayKlass* ObjArrayKlass::allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, TRAPS) {
   assert(ObjArrayKlass::header_size() <= InstanceKlass::header_size(),
       "array klasses must be same size as InstanceKlass");
@@ -135,6 +136,8 @@ ObjArrayKlass* ObjArrayKlass::allocate_objArray_klass(ClassLoaderData* loader_da
 
   return oak;
 }
+#endif
+
 
 ObjArrayKlass::ObjArrayKlass(int n, Klass* element_klass, Symbol* name) : ArrayKlass(name, ID) {
   set_dimension(n);
@@ -310,6 +313,7 @@ void ObjArrayKlass::copy_array(arrayOop s, int src_pos, arrayOop d,
 }
 
 
+#ifndef LEYDEN
 Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 
   assert(dimension() <= n, "check order of chain");
@@ -352,6 +356,7 @@ Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* ObjArrayKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, dimension() +  1, THREAD);
 }
+#endif
 
 bool ObjArrayKlass::can_be_primary_super_slow() const {
   if (!bottom_klass()->can_be_primary_super())

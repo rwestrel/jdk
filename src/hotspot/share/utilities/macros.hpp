@@ -352,6 +352,11 @@
 #define COMPILER1_OR_COMPILER2_PRESENT(code)
 #endif
 
+#if defined(COMPILER1) || defined(COMPILER2) || INCLUDE_JVMCI
+#define HAS_COMPILER 1
+#else
+#define HAS_COMPILER 0
+#endif
 
 // PRODUCT variant
 #ifdef PRODUCT

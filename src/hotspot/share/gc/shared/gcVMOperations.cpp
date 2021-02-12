@@ -126,7 +126,9 @@ bool VM_GC_Operation::doit_prologue() {
 void VM_GC_Operation::doit_epilogue() {
   // Clean up old interpreter OopMap entries that were replaced
   // during the GC thread root traversal.
+#ifndef LEYDEN
   OopMapCache::cleanup_old_entries();
+#endif
   if (Universe::has_reference_pending_list()) {
     Heap_lock->notify_all();
   }
@@ -190,6 +192,7 @@ void VM_GenCollectFull::doit() {
   gch->do_full_collection(gch->must_clear_all_soft_refs(), _max_generation);
 }
 
+#ifndef LEYDEN
 VM_CollectForMetadataAllocation::VM_CollectForMetadataAllocation(ClassLoaderData* loader_data,
                                                                  size_t size,
                                                                  Metaspace::MetadataType mdtype,
@@ -284,6 +287,7 @@ void VM_CollectForMetadataAllocation::doit() {
     set_gc_locked();
   }
 }
+#endif
 
 VM_CollectForAllocation::VM_CollectForAllocation(size_t word_size, uint gc_count_before, GCCause::Cause cause)
     : VM_GC_Operation(gc_count_before, cause), _word_size(word_size), _result(NULL) {

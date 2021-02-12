@@ -63,7 +63,9 @@ class klassVtable {
   // searching; all methods return -1 if not found
   int index_of_miranda(Symbol* name, Symbol* signature);
 
+#ifndef LEYDEN
   void initialize_vtable(bool checkconstraints, TRAPS);   // initialize vtable of a new klass
+#endif
 
   // computes vtable length (in words) and the number of miranda methods
   static void compute_vtable_size_and_num_mirandas(int* vtable_length,

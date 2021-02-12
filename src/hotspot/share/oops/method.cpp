@@ -79,6 +79,7 @@
 
 // Implementation of Method
 
+#ifndef LEYDEN
 Method* Method::allocate(ClassLoaderData* loader_data,
                          int byte_code_size,
                          AccessFlags access_flags,
@@ -95,7 +96,9 @@ Method* Method::allocate(ClassLoaderData* loader_data,
   int size = Method::size(access_flags.is_native());
   return new (loader_data, size, MetaspaceObj::MethodType, THREAD) Method(cm, access_flags);
 }
+#endif
 
+#ifndef LEYDEN
 Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
   NoSafepointVerifier no_safepoint;
   set_constMethod(xconst);
@@ -165,6 +168,7 @@ address Method::get_c2i_no_clinit_check_entry() {
   assert(adapter() != NULL, "must have");
   return adapter()->get_c2i_no_clinit_check_entry();
 }
+#endif
 
 char* Method::name_and_sig_as_C_string() const {
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature());
@@ -263,6 +267,7 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
   return -1;
 }
 
+#ifndef LEYDEN
 void Method::mask_for(int bci, InterpreterOopMap* mask) {
   methodHandle h_this(Thread::current(), this);
   // Only GC uses the OopMapCache during thread stack root scanning
@@ -274,6 +279,7 @@ void Method::mask_for(int bci, InterpreterOopMap* mask) {
   }
   return;
 }
+#endif
 
 
 int Method::bci_from(address bcp) const {
@@ -391,6 +397,7 @@ void Method::set_itable_index(int index) {
   assert(valid_itable_index(), "");
 }
 
+#ifndef LEYDEN
 // The RegisterNatives call being attempted tried to register with a method that
 // is not native.  Ask JVM TI what prefixes have been specified.  Then check
 // to see if the native method is now wrapped with the prefixes.  See the
@@ -516,9 +523,10 @@ void Method::print_invocation_count() {
   }
 #endif
 }
-
+#endif
 // Build a MethodData* object to hold information about this method
 // collected in the interpreter.
+#ifndef LEYDEN
 void Method::build_interpreter_method_data(const methodHandle& method, TRAPS) {
   // Do not profile the method if metaspace has hit an OOM previously
   // allocating profiling data. Callers clear pending exception so don't
@@ -549,7 +557,9 @@ void Method::build_interpreter_method_data(const methodHandle& method, TRAPS) {
     }
   }
 }
+#endif
 
+#ifndef LEYDEN
 MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
   // Do not profile the method if metaspace has hit an OOM previously
   if (ClassLoaderDataGraph::has_metaspace_oom()) {
@@ -573,6 +583,7 @@ MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
 
   return mh->method_counters();
 }
+#endif
 
 bool Method::init_method_counters(MethodCounters* counters) {
   // Try to install a pointer to MethodCounters, return true on success.
@@ -587,6 +598,7 @@ int Method::extra_stack_words() {
 // Derive size of parameters, return type, and fingerprint,
 // all in one pass, which is run at load time.
 // We need the first two, and might as well grab the third.
+#ifndef LEYDEN
 void Method::compute_from_signature(Symbol* sig) {
   // At this point, since we are scanning the signature,
   // we might as well compute the whole fingerprint.
@@ -595,6 +607,7 @@ void Method::compute_from_signature(Symbol* sig) {
   constMethod()->set_result_type(fp.return_type());
   constMethod()->set_fingerprint(fp.fingerprint());
 }
+#endif
 
 bool Method::is_empty_method() const {
   return  code_size() == 1
@@ -644,6 +657,7 @@ bool Method::is_vanilla_constructor() const {
 }
 
 
+#ifndef LEYDEN
 bool Method::compute_has_loops_flag() {
   BytecodeStream bcs(methodHandle(Thread::current(), this));
   Bytecodes::Code bc;
@@ -711,6 +725,7 @@ bool Method::compute_has_loops_flag() {
   _access_flags.set_loops_flag_init();
   return _access_flags.has_loops();
 }
+#endif
 
 bool Method::is_final_method(AccessFlags class_access_flags) const {
   // or "does_not_require_vtable_entry"
@@ -885,6 +900,7 @@ int Method::line_number_from_bci(int bci) const {
 }
 
 
+#ifndef LEYDEN
 bool Method::is_klass_loaded_by_klass_index(int klass_index) const {
   if( constants()->tag_at(klass_index).is_unresolved_klass() ) {
     Thread *thread = Thread::current();
@@ -906,8 +922,9 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   }
   return is_klass_loaded_by_klass_index(klass_index);
 }
+#endif
 
-
+#ifndef LEYDEN
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
   assert(!is_method_handle_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
@@ -954,7 +971,7 @@ void Method::clear_native_function() {
     !native_bind_event_is_interesting);
   this->unlink_code();
 }
-
+#endif
 
 void Method::set_signature_handler(address handler) {
   address* signature_handler =  signature_handler_addr();
@@ -962,6 +979,7 @@ void Method::set_signature_handler(address handler) {
 }
 
 
+#ifndef LEYDEN
 void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason) {
   assert(reason != NULL, "must provide a reason");
   if (PrintCompilation && report) {
@@ -1098,6 +1116,7 @@ void Method::unlink_code() {
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock, Mutex::_no_safepoint_check_flag);
   clear_code();
 }
+#endif
 
 #if INCLUDE_CDS
 // Called by class data sharing to remove any entry points (which are not shared)
@@ -1198,6 +1217,7 @@ void Method::unlink_method() {
 
 // Called when the method_holder is getting linked. Setup entrypoints so the method
 // is ready to be called from interpreter, compiler, and vtables.
+#ifndef LEYDEN
 void Method::link_method(const methodHandle& h_method, TRAPS) {
   // If the code cache is full, we may reenter this function for the
   // leftover methods that weren't linked.
@@ -1239,12 +1259,16 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // called from the vtable.  We need adapters on such methods that get loaded
   // later.  Ditto for mega-morphic itable calls.  If this proves to be a
   // problem we'll make these lazily later.
+#ifndef LEYDEN
   (void) make_adapters(h_method, CHECK);
+#endif
 
   // ONLY USE the h_method now as make_adapter may have blocked
 
 }
+#endif
 
+#ifndef LEYDEN
 address Method::make_adapters(const methodHandle& mh, TRAPS) {
   // Adapters for compiled code are made eagerly here.  They are fairly
   // small (generally < 100 bytes) and quick to make (and cached and shared)
@@ -1270,7 +1294,6 @@ address Method::make_adapters(const methodHandle& mh, TRAPS) {
   }
   return adapter->get_c2i_entry();
 }
-
 void Method::restore_unshareable_info(TRAPS) {
   assert(is_method() && is_valid_method(this), "ensure C++ vtable is restored");
 
@@ -1291,6 +1314,9 @@ address Method::from_compiled_entry_no_trampoline() const {
   }
 }
 
+#endif
+
+#ifndef LEYDEN
 // The verified_code_entry() must be called when a invoke is resolved
 // on this method.
 
@@ -1340,7 +1366,7 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   if (!mh->is_method_handle_intrinsic())
     mh->_from_interpreted_entry = mh->get_i2c_entry();
 }
-
+#endif
 
 bool Method::is_overridden_in(Klass* k) const {
   InstanceKlass* ik = InstanceKlass::cast(k);
@@ -1431,6 +1457,7 @@ bool Method::has_member_arg() const {
 }
 
 // Make an instance of a signature-polymorphic internal MH primitive.
+#ifndef LEYDEN
 methodHandle Method::make_method_handle_intrinsic(vmIntrinsics::ID iid,
                                                          Symbol* signature,
                                                          TRAPS) {
@@ -1504,6 +1531,7 @@ methodHandle Method::make_method_handle_intrinsic(vmIntrinsics::ID iid,
 
   return m;
 }
+#endif
 
 Klass* Method::check_non_bcp_klass(Klass* klass) {
   if (klass != NULL && klass->class_loader() != NULL) {
@@ -1515,6 +1543,7 @@ Klass* Method::check_non_bcp_klass(Klass* klass) {
 }
 
 
+#ifndef LEYDEN
 methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code, int new_code_length,
                                                 u_char* new_compressed_linenumber_table, int new_compressed_linenumber_size, TRAPS) {
   // Code below does not work for native methods - they should never get rewritten anyway
@@ -1621,7 +1650,9 @@ methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code
   newcm->copy_annotations_from(loader_data, cm, CHECK_(methodHandle()));
   return newm;
 }
+#endif
 
+#ifndef LEYDEN
 vmSymbolID Method::klass_id_for_intrinsics(const Klass* holder) {
   // if loader is not the default loader (i.e., != NULL), we can't know the intrinsics
   // because we are not loading from core libraries
@@ -1636,7 +1667,9 @@ vmSymbolID Method::klass_id_for_intrinsics(const Klass* holder) {
   Symbol* klass_name = ik->name();
   return vmSymbols::find_sid(klass_name);
 }
+#endif
 
+#ifndef LEYDEN
 void Method::init_intrinsic_id() {
   assert(_intrinsic_id == static_cast<int>(vmIntrinsics::_none), "do this just once");
   const uintptr_t max_id_uint = right_n_bits((int)(sizeof(_intrinsic_id) * BitsPerByte));
@@ -1708,7 +1741,6 @@ void Method::init_intrinsic_id() {
     return;
   }
 }
-
 bool Method::load_signature_classes(const methodHandle& m, TRAPS) {
   if (!THREAD->can_call_java()) {
     // There is nothing useful this routine can do from within the Compile thread.
@@ -1752,8 +1784,11 @@ bool Method::has_unloaded_classes_in_signature(const methodHandle& m, TRAPS) {
   return false;
 }
 
+#endif
+
 // Exposed so field engineers can debug VM
 void Method::print_short_name(outputStream* st) {
+#ifndef LEYDEN
   ResourceMark rm;
 #ifdef PRODUCT
   st->print(" %s::", method_holder()->external_name());
@@ -1764,6 +1799,7 @@ void Method::print_short_name(outputStream* st) {
   if (WizardMode) signature()->print_symbol_on(st);
   else if (MethodHandles::is_signature_polymorphic(intrinsic_id()))
     MethodHandles::print_as_basic_type_signature_on(st, signature());
+#endif
 }
 
 // Comparer for sorting an object array containing
@@ -1799,6 +1835,7 @@ void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_compa
 // Non-product code unless JVM/TI needs it
 
 #if !defined(PRODUCT) || INCLUDE_JVMTI
+#ifndef LEYDEN
 class SignatureTypePrinter : public SignatureTypeNames {
  private:
   outputStream* _st;
@@ -1839,9 +1876,11 @@ void Method::print_name(outputStream* st) {
     st->print(")");
   }
 }
+#endif
 #endif // !PRODUCT || INCLUDE_JVMTI
 
 
+#ifndef LEYDEN
 void Method::print_codes_on(outputStream* st) const {
   print_codes_on(0, code_size(), st);
 }
@@ -1855,6 +1894,7 @@ void Method::print_codes_on(int from, int to, outputStream* st) const {
   BytecodeTracer::set_closure(BytecodeTracer::std_closure());
   while (s.next() >= 0) BytecodeTracer::trace(mh, s.bcp(), st);
 }
+#endif
 
 CompressedLineNumberReadStream::CompressedLineNumberReadStream(u_char* buffer) : CompressedReadStream(buffer) {
   _bci = 0;
@@ -2289,6 +2329,7 @@ Method* Method::checked_resolve_jmethod_id(jmethodID mid) {
   return o;
 };
 
+#ifndef LEYDEN
 void Method::set_on_stack(const bool value) {
   // Set both the method itself and its constant pool.  The constant pool
   // on stack means some method referring to it is also on the stack.
@@ -2302,6 +2343,7 @@ void Method::set_on_stack(const bool value) {
   assert(!value || !is_old() || is_obsolete() || is_running_emcp(),
          "emcp methods cannot run after emcp bit is cleared");
 }
+#endif
 
 // Called when the class loader is unloaded to make all methods weak.
 void Method::clear_jmethod_ids(ClassLoaderData* loader_data) {
@@ -2342,6 +2384,7 @@ void Method::print_jmethod_ids(const ClassLoaderData* loader_data, outputStream*
 #ifndef PRODUCT
 
 void Method::print_on(outputStream* st) const {
+#ifndef LEYDEN
   ResourceMark rm;
   assert(is_method(), "must be method");
   st->print_cr("%s", internal_name());
@@ -2420,6 +2463,7 @@ void Method::print_on(outputStream* st) const {
     st->print_cr(" - native function:   " INTPTR_FORMAT, p2i(native_function()));
     st->print_cr(" - signature handler: " INTPTR_FORMAT, p2i(signature_handler()));
   }
+#endif
 }
 
 void Method::print_linkage_flags(outputStream* st) {

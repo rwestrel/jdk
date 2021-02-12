@@ -341,11 +341,13 @@ class MetaspaceObj {
     }
   }
 
+#ifndef LEYDEN
   void* operator new(size_t size, ClassLoaderData* loader_data,
                      size_t word_size,
                      Type type, Thread* thread) throw();
                      // can't use TRAPS from this header file.
   void operator delete(void* p) { ShouldNotCallThis(); }
+#endif
 
   // Declare a *static* method with the same signature in any subclass of MetaspaceObj
   // that should be read-only by default. See symbol.hpp for an example. This function

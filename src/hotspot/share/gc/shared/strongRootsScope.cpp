@@ -29,11 +29,15 @@
 #include "runtime/thread.hpp"
 
 MarkScope::MarkScope() {
+#ifndef LEYDEN
   nmethod::oops_do_marking_prologue();
+#endif
 }
 
 MarkScope::~MarkScope() {
+#ifndef LEYDEN
   nmethod::oops_do_marking_epilogue();
+#endif
 }
 
 StrongRootsScope::StrongRootsScope(uint n_threads) : _n_threads(n_threads) {

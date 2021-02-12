@@ -97,7 +97,9 @@ class frame {
   // is deoptimization. It likely no one else should ever use it.
   address raw_pc() const;
 
+#ifndef LEYDEN
   void set_pc( address   newpc );
+#endif
 
   intptr_t* sp() const           { return _sp; }
   void set_sp( intptr_t* newsp ) { _sp = newsp; }
@@ -130,7 +132,9 @@ class frame {
   bool is_interpreted_frame()    const;
   bool is_java_frame()           const;
   bool is_entry_frame()          const;             // Java frame called from C?
+#ifndef LEYDEN
   bool is_stub_frame()           const;
+#endif
   bool is_ignored_frame()        const;
   bool is_native_frame()         const;
   bool is_runtime_frame()        const;
@@ -368,7 +372,10 @@ class frame {
 
   // Oops-do's
   void oops_compiled_arguments_do(Symbol* signature, bool has_receiver, bool has_appendix, const RegisterMap* reg_map, OopClosure* f) const;
+
+#ifndef LEYDEN
   void oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache = true) const;
+#endif
 
  private:
   void oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const;

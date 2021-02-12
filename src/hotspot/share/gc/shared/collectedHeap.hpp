@@ -351,9 +351,11 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // the context of the vm thread.
   virtual void collect_as_vm_thread(GCCause::Cause cause);
 
+#ifndef LEYDEN
   virtual MetaWord* satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,
                                                        size_t size,
                                                        Metaspace::MetadataType mdtype);
+#endif
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
   // that it should answer "false" for the concurrent part of a concurrent

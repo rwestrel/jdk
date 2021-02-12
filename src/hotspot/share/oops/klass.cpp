@@ -55,11 +55,13 @@
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/stack.inline.hpp"
 
+#ifndef LEYDEN
 void Klass::set_java_mirror(Handle m) {
   assert(!m.is_null(), "New mirror should never be null.");
   assert(_java_mirror.is_empty(), "should only be used to initialize mirror");
   _java_mirror = class_loader_data()->add_handle(m);
 }
+#endif
 
 oop Klass::java_mirror_no_keepalive() const {
   return _java_mirror.peek();
@@ -195,9 +197,11 @@ Method* Klass::uncached_lookup_method(const Symbol* name, const Symbol* signatur
   return NULL;
 }
 
+#ifndef LEYDEN
 void* Klass::operator new(size_t size, ClassLoaderData* loader_data, size_t word_size, TRAPS) throw() {
   return Metaspace::allocate(loader_data, word_size, MetaspaceObj::ClassType, THREAD);
 }
+#endif
 
 // "Normal" instantiation is preceeded by a MetaspaceObj allocation
 // which zeros out memory - calloc equivalent.
@@ -241,6 +245,7 @@ bool Klass::can_be_primary_super_slow() const {
     return true;
 }
 
+#ifndef LEYDEN
 void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interfaces, TRAPS) {
   if (k == NULL) {
     set_super(NULL);
@@ -353,6 +358,7 @@ void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interf
     set_secondary_supers(s2);
   }
 }
+#endif
 
 GrowableArray<Klass*>* Klass::compute_secondary_supers(int num_extra_slots,
                                                        Array<InstanceKlass*>* transitive_interfaces) {
@@ -470,6 +476,7 @@ void Klass::clean_subklass() {
   }
 }
 
+#ifndef LEYDEN
 void Klass::clean_weak_klass_links(bool unloading_occurred, bool clean_alive_klasses) {
   if (!ClassUnloading || !unloading_occurred) {
     return;
@@ -511,6 +518,7 @@ void Klass::clean_weak_klass_links(bool unloading_occurred, bool clean_alive_kla
     }
   }
 }
+#endif
 
 void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   if (log_is_enabled(Trace, cds)) {
@@ -563,6 +571,7 @@ void Klass::remove_java_mirror() {
   clear_java_mirror_handle();
 }
 
+#ifndef LEYDEN
 void Klass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS) {
   assert(is_klass(), "ensure C++ vtable is restored");
   assert(is_shared(), "must be set");
@@ -625,6 +634,7 @@ void Klass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protec
     java_lang_Class::create_mirror(this, loader, module_handle, protection_domain, Handle(), CHECK);
   }
 }
+#endif
 
 #if INCLUDE_CDS_JAVA_HEAP
 oop Klass::archived_java_mirror() {
@@ -849,7 +859,11 @@ bool Klass::is_valid(Klass* k) {
   if (!Metaspace::contains(k)) return false;
 
   if (!Symbol::is_valid(k->name())) return false;
+#ifndef LEYDEN
   return ClassLoaderDataGraph::is_valid(k->class_loader_data());
+#else
+  return NULL;
+#endif
 }
 
 Method* Klass::method_at_vtable(int index)  {
@@ -881,6 +895,7 @@ bool Klass::verify_vtable_index(int i) {
 //   <fully-qualified-external-class-name1> and <fully-qualified-external-class-name2>
 //                      are in module <module-name>[@<version>]
 //                      of loader <loader-name_and_id>[, parent loader <parent-loader-name_and_id>]
+#ifndef LEYDEN
 const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_parent_loader) const {
   assert(module() == class2->module(), "classes do not have the same module");
   const char* class1_name = external_name();
@@ -904,6 +919,7 @@ const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_p
 
   return joint_description;
 }
+#endif
 
 // Caller needs ResourceMark
 // class_in_module_of_loader provides a standard way to include
@@ -912,6 +928,7 @@ const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_p
 // Format:
 //   <fully-qualified-external-class-name> is in module <module-name>[@<version>]
 //                                         of loader <loader-name_and_id>[, parent loader <parent-loader-name_and_id>]
+#ifndef LEYDEN
 const char* Klass::class_in_module_of_loader(bool use_are, bool include_parent_loader) const {
   // 1. fully qualified external name of class
   const char* klass_name = external_name();
@@ -1003,3 +1020,4 @@ const char* Klass::class_in_module_of_loader(bool use_are, bool include_parent_l
 
   return class_description;
 }
+#endif

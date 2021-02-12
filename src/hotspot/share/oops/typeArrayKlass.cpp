@@ -42,6 +42,7 @@
 #include "runtime/handles.inline.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 TypeArrayKlass* TypeArrayKlass::create_klass(BasicType type,
                                       const char* name_str, TRAPS) {
   Symbol* sym = NULL;
@@ -65,7 +66,9 @@ TypeArrayKlass* TypeArrayKlass::create_klass(BasicType type,
 
   return ak;
 }
+#endif
 
+#ifndef LEYDEN
 TypeArrayKlass* TypeArrayKlass::allocate(ClassLoaderData* loader_data, BasicType type, Symbol* name, TRAPS) {
   assert(TypeArrayKlass::header_size() <= InstanceKlass::header_size(),
       "array klasses must be same size as InstanceKlass");
@@ -74,6 +77,7 @@ TypeArrayKlass* TypeArrayKlass::allocate(ClassLoaderData* loader_data, BasicType
 
   return new (loader_data, size, THREAD) TypeArrayKlass(type, name);
 }
+#endif
 
 TypeArrayKlass::TypeArrayKlass(BasicType type, Symbol* name) : ArrayKlass(name, ID) {
   set_layout_helper(array_layout_helper(type));
@@ -171,6 +175,7 @@ void TypeArrayKlass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos
 }
 
 // create a klass of array holding typeArrays
+#ifndef LEYDEN
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
   int dim = dimension();
   assert(dim <= n, "check order of chain");
@@ -210,6 +215,7 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, dimension() +  1, THREAD);
 }
+#endif
 
 int TypeArrayKlass::oop_size(oop obj) const {
   assert(obj->is_typeArray(),"must be a type array");

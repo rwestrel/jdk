@@ -46,7 +46,9 @@ class ObjArrayKlass : public ArrayKlass {
 
   // Constructor
   ObjArrayKlass(int n, Klass* element_klass, Symbol* name);
+#ifndef LEYDEN
   static ObjArrayKlass* allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, TRAPS);
+#endif
  public:
   // For dummy objects
   ObjArrayKlass() {}
@@ -74,8 +76,11 @@ class ObjArrayKlass : public ArrayKlass {
   int oop_size(oop obj) const;
 
   // Allocation
+#ifndef LEYDEN
   static ObjArrayKlass* allocate_objArray_klass(ClassLoaderData* loader_data,
                                                 int n, Klass* element_klass, TRAPS);
+
+#endif
 
   objArrayOop allocate(int length, TRAPS);
   oop multi_allocate(int rank, jint* sizes, TRAPS);
@@ -95,11 +100,13 @@ class ObjArrayKlass : public ArrayKlass {
                arrayOop d, size_t dst_offset,
                int length, TRAPS);
  protected:
+#ifndef LEYDEN
   // Returns the ObjArrayKlass for n'th dimension.
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type.
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
+#endif
 
  public:
 

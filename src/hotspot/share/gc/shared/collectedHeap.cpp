@@ -294,6 +294,7 @@ void CollectedHeap::collect_as_vm_thread(GCCause::Cause cause) {
   }
 }
 
+#ifndef LEYDEN
 MetaWord* CollectedHeap::satisfy_failed_metadata_allocation(ClassLoaderData* loader_data,
                                                             size_t word_size,
                                                             Metaspace::MetadataType mdtype) {
@@ -367,6 +368,7 @@ MetaWord* CollectedHeap::satisfy_failed_metadata_allocation(ClassLoaderData* loa
     }
   } while (true);  // Until a GC is done
 }
+#endif
 
 MemoryUsage CollectedHeap::memory_usage() {
   return MemoryUsage(InitialHeapSize, used(), capacity(), max_capacity());

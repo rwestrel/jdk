@@ -683,6 +683,7 @@ oop MethodHandles::field_signature_type_or_null(Symbol* s) {
 // An unresolved member name is a mere symbolic reference.
 // Resolving it plants a vmtarget/vmindex in it,
 // which refers directly to JVM internals.
+#ifndef LEYDEN
 Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup_mode,
                                          bool speculative_resolve, TRAPS) {
   Handle empty;
@@ -850,6 +851,7 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
 
   return empty;
 }
+#endif
 
 // Conversely, a member name which is only initialized from JVM internals
 // may have null defc, name, and type fields.
@@ -1204,6 +1206,7 @@ JVM_ENTRY(void, MHN_expand_Mem(JNIEnv *env, jobject igcls, jobject mname_jh)) {
 JVM_END
 
 // void resolve(MemberName self, Class<?> caller)
+#ifndef LEYDEN
 JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh,
     jint lookup_mode, jboolean speculative_resolve)) {
   if (mname_jh == NULL) { THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "mname is null"); }
@@ -1270,7 +1273,7 @@ JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh,
   return JNIHandles::make_local(THREAD, resolved());
 }
 JVM_END
-
+#endif
 static jlong find_member_field_offset(oop mname, bool must_be_static, TRAPS) {
   if (mname == NULL ||
       java_lang_invoke_MemberName::clazz(mname) == NULL) {
@@ -1544,7 +1547,9 @@ JVM_END
 static JNINativeMethod MHN_methods[] = {
   {CC "init",                      CC "(" MEM "" OBJ ")V",                   FN_PTR(MHN_init_Mem)},
   {CC "expand",                    CC "(" MEM ")V",                          FN_PTR(MHN_expand_Mem)},
+#ifndef LEYDEN
   {CC "resolve",                   CC "(" MEM "" CLS "IZ)" MEM,              FN_PTR(MHN_resolve_Mem)},
+#endif
   //  static native int getNamedCon(int which, Object[] name)
   {CC "getNamedCon",               CC "(I[" OBJ ")I",                        FN_PTR(MHN_getNamedCon)},
   //  static native int getMembers(Class<?> defc, String matchName, String matchSig,

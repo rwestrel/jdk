@@ -52,11 +52,13 @@ protected:
  private:
   NONCOPYABLE(Array);
 
+#ifndef LEYDEN
   void* operator new(size_t size, ClassLoaderData* loader_data, int length, TRAPS) throw() {
     size_t word_size = Array::size(length);
     return (void*) Metaspace::allocate(loader_data, word_size,
                                        MetaspaceObj::array_type(sizeof(T)), THREAD);
   }
+#endif
 
   static size_t byte_sizeof(int length, size_t elm_byte_size) {
     return sizeof(Array<T>) + MAX2(length - 1, 0) * elm_byte_size;

@@ -101,7 +101,9 @@ class OopIterateClosure : public OopClosure {
 
   virtual bool do_metadata() = 0;
   virtual void do_klass(Klass* k) = 0;
+#ifndef LEYDEN
   virtual void do_cld(ClassLoaderData* cld) = 0;
+#endif
 };
 
 // An OopIterateClosure that can be used when there's no need to visit the Metadata.
@@ -130,6 +132,7 @@ class MetadataClosure : public Closure {
 };
 
 
+#ifndef LEYDEN
 class CLDToOopClosure : public CLDClosure {
   OopClosure*       _oop_closure;
   int               _cld_claim;
@@ -148,6 +151,7 @@ class ClaimingCLDToOopClosure : public CLDToOopClosure {
 public:
   ClaimingCLDToOopClosure(OopClosure* cl) : CLDToOopClosure(cl, claim) {}
 };
+#endif
 
 class ClaimMetadataVisitingOopIterateClosure : public OopIterateClosure {
  protected:
@@ -366,7 +370,9 @@ class Devirtualizer {
  public:
   template <typename OopClosureType, typename T> static void do_oop(OopClosureType* closure, T* p);
   template <typename OopClosureType>             static void do_klass(OopClosureType* closure, Klass* k);
+#ifndef LEYDEN
   template <typename OopClosureType>             static void do_cld(OopClosureType* closure, ClassLoaderData* cld);
+#endif
   template <typename OopClosureType>             static bool do_metadata(OopClosureType* closure);
 };
 

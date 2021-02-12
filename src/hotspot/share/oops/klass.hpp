@@ -189,7 +189,9 @@ protected:
   Klass(KlassID id);
   Klass() : _id(KlassID(-1)) { assert(DumpSharedSpaces || UseSharedSpaces, "only for cds"); }
 
+#ifndef LEYDEN
   void* operator new(size_t size, ClassLoaderData* loader_data, size_t word_size, TRAPS) throw();
+#endif
 
  public:
   int id() { return _id; }
@@ -208,7 +210,9 @@ protected:
   void set_super(Klass* k)           { _super = k; }
 
   // initializes _super link, _primary_supers & _secondary_supers arrays
+#ifndef LEYDEN
   void initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interfaces, TRAPS);
+#endif
 
   // klass-specific helper for initializing _secondary_supers
   virtual GrowableArray<Klass*>* compute_secondary_supers(int num_extra_slots,

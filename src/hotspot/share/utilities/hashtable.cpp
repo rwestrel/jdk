@@ -301,10 +301,12 @@ template <class T> void BasicHashtable<F>::verify_table(const char* table_name) 
 #endif // PRODUCT
 
 // Explicitly instantiate these types
+#ifndef LEYDEN
 template class Hashtable<nmethod*, mtGC>;
 template class HashtableEntry<nmethod*, mtGC>;
 template class BasicHashtable<mtGC>;
 template class Hashtable<ConstantPool*, mtClass>;
+#endif
 template class Hashtable<Symbol*, mtSymbol>;
 template class Hashtable<Klass*, mtClass>;
 template class Hashtable<InstanceKlass*, mtClass>;
@@ -327,8 +329,10 @@ template class BasicHashtable<mtCompiler>;
 template class BasicHashtable<mtTracing>;
 template class BasicHashtable<mtServiceability>;
 
+#ifndef LEYDEN
 template void BasicHashtable<mtClass>::verify_table<DictionaryEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<ModuleEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<PackageEntry>(char const*);
 template void BasicHashtable<mtClass>::verify_table<ProtectionDomainCacheEntry>(char const*);
 template void BasicHashtable<mtClass>::verify_table<PlaceholderEntry>(char const*);
+#endif

@@ -125,18 +125,22 @@ class SystemDictionary : AllStatic {
   // Parse new stream. This won't update the dictionary or class
   // hierarchy, simply parse the stream. Used by JVMTI RedefineClasses
   // and by Unsafe_DefineAnonymousClass and jvm_lookup_define_class.
+#ifndef LEYDEN
   static InstanceKlass* parse_stream(Symbol* class_name,
                                      Handle class_loader,
                                      ClassFileStream* st,
                                      const ClassLoadInfo& cl_info,
                                      TRAPS);
+#endif
 
   // Resolve from stream (called by jni_DefineClass and JVM_DefineClass)
+#ifndef LEYDEN
   static InstanceKlass* resolve_from_stream(Symbol* class_name,
                                             Handle class_loader,
                                             Handle protection_domain,
                                             ClassFileStream* st,
                                             TRAPS);
+#endif
 
   // Lookup an already loaded class. If not found NULL is returned.
   static Klass* find(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS);
@@ -232,9 +236,11 @@ public:
                                             TRAPS);
   // for a given signature, find the internal MethodHandle method (linkTo* or invokeBasic)
   // (does not ask Java, since this is a low-level intrinsic defined by the JVM)
+#ifndef LEYDEN
   static Method* find_method_handle_intrinsic(vmIntrinsicID iid,
                                               Symbol* signature,
                                               TRAPS);
+#endif
 
   // compute java_mirror (java.lang.Class instance) for a type ("I", "[[B", "LFoo;", etc.)
   // Either the accessing_klass or the CL/PD can be non-null, but not both.
@@ -265,12 +271,14 @@ public:
                                           TRAPS);
 
   // ask Java to compute a java.lang.invoke.MethodHandle object for a given CP entry
+#ifndef LEYDEN
   static Handle    link_method_handle_constant(Klass* caller,
                                                int ref_kind, //e.g., JVM_REF_invokeVirtual
                                                Klass* callee,
                                                Symbol* name,
                                                Symbol* signature,
                                                TRAPS);
+#endif
 
   // ask Java to compute a constant by invoking a BSM given a Dynamic_info CP entry
   static void      invoke_bootstrap_method(BootstrapInfo& bootstrap_specifier, TRAPS);
@@ -347,10 +355,12 @@ private:
   // after waiting, but before reentering SystemDictionary_lock
   // to preserve lock order semantics.
   static void double_lock_wait(Thread* thread, Handle lockObject);
+#ifndef LEYDEN
   static void define_instance_class(InstanceKlass* k, Handle class_loader, TRAPS);
   static InstanceKlass* find_or_define_helper(Symbol* class_name,
                                               Handle class_loader,
                                               InstanceKlass* k, TRAPS);
+#endif
   static InstanceKlass* load_instance_class(Symbol* class_name, Handle class_loader, TRAPS);
   static bool is_parallelDefine(Handle class_loader);
   static Handle compute_loader_lock_object(Thread* thread, Handle class_loader);

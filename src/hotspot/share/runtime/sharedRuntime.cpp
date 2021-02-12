@@ -82,6 +82,7 @@
 #endif
 
 // Shared stub locations
+#ifndef LEYDEN
 RuntimeStub*        SharedRuntime::_wrong_method_blob;
 RuntimeStub*        SharedRuntime::_wrong_method_abstract_blob;
 RuntimeStub*        SharedRuntime::_ic_miss_blob;
@@ -94,13 +95,14 @@ DeoptimizationBlob* SharedRuntime::_deopt_blob;
 SafepointBlob*      SharedRuntime::_polling_page_vectors_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_return_handler_blob;
-
+#endif
 #ifdef COMPILER2
 UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #endif // COMPILER2
 
 
 //----------------------------generate_stubs-----------------------------------
+#ifndef LEYDEN
 void SharedRuntime::generate_stubs() {
   _wrong_method_blob                   = generate_resolve_blob(CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method),          "wrong_method_stub");
   _wrong_method_abstract_blob          = generate_resolve_blob(CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method_abstract), "wrong_method_abstract_stub");
@@ -126,7 +128,7 @@ void SharedRuntime::generate_stubs() {
   generate_uncommon_trap_blob();
 #endif // COMPILER2
 }
-
+#endif
 #include <math.h>
 
 // Implementation of SharedRuntime
@@ -456,6 +458,9 @@ JRT_END
 // previous frame depending on the return address.
 
 address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* thread, address return_address) {
+#ifdef LEYDEN
+  return NULL;
+#else
   // Note: This is called when we have unwound the frame of the callee that did
   // throw an exception. So far, no check has been performed by the StackWatermarkSet.
   // Notably, the stack is not walkable at this point, and hence the check must
@@ -496,7 +501,9 @@ address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* thre
       assert(guard_pages_enabled, "stack banging in deopt blob may cause crash");
       // The deferred StackWatermarkSet::after_unwind check will be performed in
       // Deoptimization::fetch_unroll_info (with exec_mode == Unpack_exception)
+#ifndef LEYDEN
       return SharedRuntime::deopt_blob()->unpack_with_exception();
+#endif
     } else {
       // The deferred StackWatermarkSet::after_unwind check will be performed in
       // * OptoRuntime::rethrow_C for C2 code
@@ -531,6 +538,7 @@ address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* thre
 
   ShouldNotReachHere();
   return NULL;
+#endif
 }
 
 
@@ -539,6 +547,7 @@ JRT_LEAF(address, SharedRuntime::exception_handler_for_return_address(JavaThread
 JRT_END
 
 
+#ifndef LEYDEN
 address SharedRuntime::get_poll_stub(address pc) {
   address stub;
   // Look up the code blob
@@ -580,8 +589,9 @@ address SharedRuntime::get_poll_stub(address pc) {
                        (intptr_t)pc, (intptr_t)stub);
   return stub;
 }
+#endif
 
-
+#ifndef LEYDEN
 oop SharedRuntime::retrieve_receiver( Symbol* sig, frame caller ) {
   assert(caller.is_interpreted_frame(), "");
   int args_size = ArgumentSizeComputer(sig).size() + 1;
@@ -590,6 +600,7 @@ oop SharedRuntime::retrieve_receiver( Symbol* sig, frame caller ) {
   assert(Universe::heap()->is_in(result) && oopDesc::is_oop(result), "receiver must be an oop");
   return result;
 }
+#endif
 
 
 void SharedRuntime::throw_and_post_jvmti_exception(JavaThread *thread, Handle h_exception) {
@@ -736,6 +747,7 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 #endif
 
+#ifndef LEYDEN
   if (t == NULL) {
     ttyLocker ttyl;
     tty->print_cr("MISSING EXCEPTION HANDLER for pc " INTPTR_FORMAT " and handler bci %d", p2i(ret_pc), handler_bci);
@@ -748,6 +760,7 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
     guarantee(false, "missing exception handler");
     return NULL;
   }
+#endif
 
   return nm->code_begin() + t->pco();
 }
@@ -785,6 +798,7 @@ JRT_ENTRY(void, SharedRuntime::throw_delayed_StackOverflowError(JavaThread* thre
 JRT_END
 
 void SharedRuntime::throw_StackOverflowError_common(JavaThread* thread, bool delayed) {
+#ifndef LEYDEN
   // We avoid using the normal exception construction in this case because
   // it performs an upcall to Java, and we're already out of stack space.
   Thread* THREAD = thread;
@@ -801,12 +815,14 @@ void SharedRuntime::throw_StackOverflowError_common(JavaThread* thread, bool del
   // Increment counter for hs_err file reporting
   Atomic::inc(&Exceptions::_stack_overflow_errors);
   throw_and_post_jvmti_exception(thread, exception);
+#endif
 }
 
 address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
                                                            address pc,
                                                            ImplicitExceptionKind exception_kind)
 {
+#ifndef LEYDEN
   address target_pc = NULL;
 
   if (Interpreter::contains(pc)) {
@@ -851,7 +867,11 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
             // Instead of throwing the abstract method error here directly, we re-resolve
             // and will throw the AbstractMethodError during resolve. As a result, we'll
             // get a more detailed error message.
+#ifndef LEYDEN
             return SharedRuntime::get_handle_wrong_method_stub();
+#else
+            return NULL;
+#endif
           } else {
             Events::log_exception(thread, "NullPointerException at vtable entry " INTPTR_FORMAT, p2i(pc));
             // Assert that the signal comes from the expected location in stub code.
@@ -946,6 +966,7 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
   }
 
   ShouldNotReachHere();
+#endif
   return NULL;
 }
 
@@ -986,6 +1007,7 @@ JRT_ENTRY_NO_ASYNC(void, SharedRuntime::register_finalizer(JavaThread* thread, o
 JRT_END
 
 
+#ifndef LEYDEN
 jlong SharedRuntime::get_java_tid(Thread* thread) {
   if (thread != NULL) {
     if (thread->is_Java_thread()) {
@@ -1042,12 +1064,13 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
       (char *) sig->bytes(), sig->utf8_length());
   return 0;
 JRT_END
-
+#endif
 
 // Finds receiver, CallInfo (i.e. receiver method), and calling bytecode)
 // for a call current in progress, i.e., arguments has been pushed on stack
 // put callee has not been invoked yet.  Used by: resolve virtual/static,
 // vtable updates, etc.  Caller frame must be compiled.
+#ifndef LEYDEN
 Handle SharedRuntime::find_callee_info(JavaThread* thread, Bytecodes::Code& bc, CallInfo& callinfo, TRAPS) {
   ResourceMark rm(THREAD);
 
@@ -1865,6 +1888,7 @@ methodHandle SharedRuntime::reresolve_call_site(JavaThread *thread, TRAPS) {
 
   return callee_method;
 }
+#endif
 
 address SharedRuntime::handle_unsafe_access(JavaThread* thread, address next_pc) {
   // The faulting unsafe accesses should be changed to throw the error
@@ -1885,6 +1909,7 @@ address SharedRuntime::handle_unsafe_access(JavaThread* thread, address next_pc)
 void SharedRuntime::check_member_name_argument_is_last_argument(const methodHandle& method,
                                                                 const BasicType* sig_bt,
                                                                 const VMRegPair* regs) {
+#ifndef LEYDEN
   ResourceMark rm;
   const int total_args_passed = method->size_of_parameters();
   const VMRegPair*    regs_with_member_name = regs;
@@ -1902,10 +1927,12 @@ void SharedRuntime::check_member_name_argument_is_last_argument(const methodHand
     assert(a->value() == b->value(), "register allocation mismatch: a=" INTX_FORMAT ", b=" INTX_FORMAT, a->value(), b->value());
   }
   assert(regs_with_member_name[member_arg_pos].first()->is_valid(), "bad member arg");
+#endif
 }
 #endif
 
 bool SharedRuntime::should_fixup_call_destination(address destination, address entry_point, address caller_pc, Method* moop, CodeBlob* cb) {
+#ifndef LEYDEN
   if (destination != entry_point) {
     CodeBlob* callee = CodeCache::find_blob(destination);
     // callee == cb seems weird. It means calling interpreter thru stub.
@@ -1933,6 +1960,7 @@ bool SharedRuntime::should_fixup_call_destination(address destination, address e
       tty->print_cr(" to " INTPTR_FORMAT, p2i(entry_point));
     }
   }
+#endif
   return false;
 }
 
@@ -1942,6 +1970,7 @@ bool SharedRuntime::should_fixup_call_destination(address destination, address e
 // where we went int -> i2c -> c2i and so the caller could in fact be
 // interpreted. If the caller is compiled we attempt to patch the caller
 // so he no longer calls into the interpreter.
+#ifndef LEYDEN
 JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address caller_pc))
   Method* moop(method);
 
@@ -2012,7 +2041,7 @@ JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
     }
   }
 JRT_END
-
+#endif
 
 // same as JVM_Arraycopy, but called directly from compiled code
 JRT_ENTRY(void, SharedRuntime::slow_arraycopy_C(oopDesc* src,  jint src_pos,
@@ -2042,7 +2071,9 @@ JRT_END
 // must use a ResourceMark in order to correctly free the result.
 char* SharedRuntime::generate_class_cast_message(
     JavaThread* thread, Klass* caster_klass) {
-
+#ifdef LEYDEN
+  return NULL;
+#else
   // Get target class name from the checkcast instruction
   vframeStream vfst(thread, true);
   assert(!vfst.at_end(), "Java frame must exist");
@@ -2055,6 +2086,7 @@ char* SharedRuntime::generate_class_cast_message(
     target_klass_name = cpool->klass_name_at(cc.index());
   }
   return generate_class_cast_message(caster_klass, target_klass, target_klass_name);
+#endif
 }
 
 
@@ -2062,6 +2094,9 @@ char* SharedRuntime::generate_class_cast_message(
 // must use a ResourceMark in order to correctly free the result.
 char* SharedRuntime::generate_class_cast_message(
     Klass* caster_klass, Klass* target_klass, Symbol* target_klass_name) {
+#ifdef LEYDEN
+  return NULL;
+#else
   const char* caster_name = caster_klass->external_name();
 
   assert(target_klass != NULL || target_klass_name != NULL, "one must be provided");
@@ -2100,13 +2135,16 @@ char* SharedRuntime::generate_class_cast_message(
                  );
   }
   return message;
-}
+#endif
+  }
+
 
 JRT_LEAF(void, SharedRuntime::reguard_yellow_pages())
   (void) JavaThread::current()->stack_overflow_state()->reguard_stack();
 JRT_END
 
 void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThread* thread) {
+#ifndef LEYDEN
   if (!SafepointSynchronize::is_synchronizing()) {
     // Only try quick_enter() if we're not trying to reach a safepoint
     // so that the calling thread reaches the safepoint more quickly.
@@ -2124,6 +2162,7 @@ void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThre
   ObjectSynchronizer::enter(h_obj, lock, CHECK);
   assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
   JRT_BLOCK_END
+#endif
 }
 
 // Handles the uncommon case in locking, i.e., contention or an inflated lock.
@@ -2151,6 +2190,7 @@ JRT_LEAF(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLo
   SharedRuntime::monitor_exit_helper(obj, lock, thread);
 JRT_END
 
+#ifndef LEYDEN
 #ifndef PRODUCT
 
 void SharedRuntime::print_statistics() {
@@ -2193,7 +2233,9 @@ void SharedRuntime::print_statistics() {
   if (_find_handler_ctr) tty->print_cr("%5d find exception handler", _find_handler_ctr);
   if (_rethrow_ctr) tty->print_cr("%5d rethrow handler", _rethrow_ctr);
 
+#ifndef LEYDEN
   AdapterHandlerLibrary::print_statistics();
+#endif
 
   if (xtty != NULL)  xtty->tail("statistics");
 }
@@ -2297,6 +2339,7 @@ void SharedRuntime::print_call_statistics(int comp_total) {
 
   MethodArityHistogram h;
 }
+#endif
 #endif
 
 
@@ -2586,6 +2629,7 @@ class AdapterHandlerTableIterator : public StackObj {
 
 // ---------------------------------------------------------------------------
 // Implementation of AdapterHandlerLibrary
+#ifndef LEYDEN
 AdapterHandlerTable* AdapterHandlerLibrary::_adapters = NULL;
 AdapterHandlerEntry* AdapterHandlerLibrary::_abstract_method_handler = NULL;
 const int AdapterHandlerLibrary_size = 16*K;
@@ -2946,6 +2990,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     nm->post_compiled_method_load_event();
   }
 }
+#endif
 
 // -------------------------------------------------------------------------
 // Java-Java calling convention
@@ -2955,14 +3000,19 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
 // For a given signature, return the VMReg for parameter 0.
 VMReg SharedRuntime::name_for_receiver() {
   VMRegPair regs;
+#ifndef LEYDEN
   BasicType sig_bt = T_OBJECT;
   (void) java_calling_convention(&sig_bt, &regs, 1);
   // Return argument 0 register.  In the LP64 build pointers
   // take 2 registers, but the VM wants only the 'main' name.
+#endif
   return regs.first();
 }
 
 VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, bool has_appendix, int* arg_size) {
+#ifdef LEYDEN
+  return NULL;
+#else
   // This method is returning a data structure allocating as a
   // ResourceObject, so do not put any ResourceMarks in here.
 
@@ -3011,6 +3061,7 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
   // results
   *arg_size = cnt;
   return regs;
+#endif
 }
 
 // OSR Migration Code
@@ -3027,6 +3078,7 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
 //
 // All of this is done NOT at any Safepoint, nor is any safepoint or GC allowed.
 
+#ifndef LEYDEN
 JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   // During OSR migration, we unwind the interpreted frame and replace it with a compiled
   // frame. The stack watermark code below ensures that the interpreted frame is processed
@@ -3096,10 +3148,13 @@ JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   return buf;
 JRT_END
 
+
 JRT_LEAF(void, SharedRuntime::OSR_migration_end( intptr_t* buf) )
   FREE_C_HEAP_ARRAY(intptr_t, buf);
 JRT_END
+#endif
 
+#ifndef LEYDEN
 bool AdapterHandlerLibrary::contains(const CodeBlob* b) {
   AdapterHandlerTableIterator iter(_adapters);
   while (iter.has_next()) {
@@ -3146,6 +3201,7 @@ void AdapterHandlerLibrary::print_statistics() {
 }
 
 #endif /* PRODUCT */
+#endif
 
 JRT_LEAF(void, SharedRuntime::enable_stack_reserved_zone(JavaThread* thread))
   StackOverflow* overflow_state = thread->stack_overflow_state();
@@ -3156,6 +3212,7 @@ JRT_END
 frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* thread, frame fr) {
   ResourceMark rm(thread);
   frame activation;
+#ifndef LEYDEN
   CompiledMethod* nm = NULL;
   int count = 1;
 
@@ -3201,6 +3258,7 @@ frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* thread
       fr = fr.java_sender();
     }
   }
+#endif
   return activation;
 }
 

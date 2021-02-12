@@ -123,8 +123,10 @@ public:
   // The largest possible single allocation
   static size_t max_allocation_word_size();
 
+#ifndef LEYDEN
   static MetaWord* allocate(ClassLoaderData* loader_data, size_t word_size,
                             MetaspaceObj::Type type, TRAPS);
+#endif
 
   static bool contains(const void* ptr);
   static bool contains_non_shared(const void* ptr);

@@ -234,11 +234,13 @@ private:
               int size);
 public:
 
+#ifndef LEYDEN
   static ConstMethod* allocate(ClassLoaderData* loader_data,
                                int byte_code_size,
                                InlineTableSizes* sizes,
                                MethodType mt,
                                TRAPS);
+#endif
 
   // Inlined tables
   void set_inlined_tables_length(InlineTableSizes* sizes);
@@ -282,7 +284,9 @@ public:
   // stackmap table data
   Array<u1>* stackmap_data() const { return _stackmap_data; }
   void set_stackmap_data(Array<u1>* sd) { _stackmap_data = sd; }
+#ifndef LEYDEN
   void copy_stackmap_data(ClassLoaderData* loader_data, u1* sd, int length, TRAPS);
+#endif
   bool has_stackmap_table() const { return _stackmap_data != NULL; }
 
   // adapter
@@ -469,7 +473,9 @@ public:
   }
 
   // Copy annotations from other ConstMethod
+#ifndef LEYDEN
   void copy_annotations_from(ClassLoaderData* loader_data, ConstMethod* cm, TRAPS);
+#endif
 
   // byte codes
   void    set_code(address code) {

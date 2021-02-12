@@ -90,9 +90,12 @@ CodeBuffer::CodeBuffer(CodeBlob* blob) {
   // Provide code buffer with meaningful name
   initialize_misc(blob->name());
   initialize(blob->content_begin(), blob->content_size());
+#ifndef LEYDEN
   debug_only(verify_section_allocation();)
+#endif
 }
 
+#ifndef LEYDEN
 void CodeBuffer::initialize(csize_t code_size, csize_t locs_size) {
   // Compute maximal alignment.
   int align = _insts.alignment();
@@ -119,21 +122,25 @@ void CodeBuffer::initialize(csize_t code_size, csize_t locs_size) {
 
   debug_only(verify_section_allocation();)
 }
-
+#endif
 
 CodeBuffer::~CodeBuffer() {
+#ifndef LEYDEN
   verify_section_allocation();
+#endif
 
   // If we allocate our code buffer from the CodeCache
   // via a BufferBlob, and it's not permanent, then
   // free the BufferBlob.
   // The rest of the memory will be freed when the ResourceObj
   // is released.
+#ifndef LEYDEN
   for (CodeBuffer* cb = this; cb != NULL; cb = cb->before_expand()) {
     // Previous incarnations of this buffer are held live, so that internal
     // addresses constructed before expansions will not be confused.
     cb->free_blob();
   }
+#endif
 
   // free any overflow storage
   delete _overflow_arena;
@@ -176,6 +183,7 @@ void CodeBuffer::initialize_section_size(CodeSection* cs, csize_t size) {
   if (_insts.has_locs())  cs->initialize_locs(1);
 }
 
+#ifndef LEYDEN
 void CodeBuffer::set_blob(BufferBlob* blob) {
   _blob = blob;
   if (blob != NULL) {
@@ -203,6 +211,7 @@ void CodeBuffer::free_blob() {
     set_blob(NULL);
   }
 }
+#endif
 
 const char* CodeBuffer::code_section_name(int n) {
 #ifdef PRODUCT
@@ -260,6 +269,7 @@ GrowableArray<int>* CodeBuffer::create_patch_overflow() {
 // Helper function for managing labels and their target addresses.
 // Returns a sensible address, and if it is not the label's final
 // address, notes the dependency (at 'branch_pc') on the label.
+#ifndef LEYDEN
 address CodeSection::target(Label& L, address branch_pc) {
   if (L.is_bound()) {
     int loc = L.loc();
@@ -282,7 +292,9 @@ address CodeSection::target(Label& L, address branch_pc) {
     return branch_pc;
   }
 }
+#endif
 
+#ifndef LEYDEN
 void CodeSection::relocate(address at, relocInfo::relocType rtype, int format, jint method_index) {
   RelocationHolder rh;
   switch (rtype) {
@@ -369,6 +381,7 @@ void CodeSection::relocate(address at, RelocationHolder const& spec, int format)
   // If it has data, insert the prefix, as (data_prefix_tag | data1), data2.
   end->initialize(this, reloc);
 }
+#endif
 
 void CodeSection::initialize_locs(int locs_capacity) {
   assert(_locs_start == NULL, "only one locs init step, please");
@@ -494,10 +507,13 @@ void CodeBuffer::compute_final_layout(CodeBuffer* dest) const {
 
   // Done calculating sections; did it come out to the right end?
   assert(buf_offset == total_content_size(), "sanity");
+#ifndef LEYDEN
   debug_only(dest->verify_section_allocation();)
+#endif
 }
 
 // Append an oop reference that keeps the class alive.
+#ifndef LEYDEN
 static void append_oop_references(GrowableArray<oop>* oops, Klass* k) {
   oop cl = k->klass_holder();
   if (cl != NULL && !oops->contains(cl)) {
@@ -572,7 +588,7 @@ void CodeBuffer::finalize_oop_references(const methodHandle& mh) {
     oop_recorder()->find_index((jobject)thread->handle_area()->allocate_handle(oops.at(i)));
   }
 }
-
+#endif
 
 
 csize_t CodeBuffer::total_offset_of(const CodeSection* cs) const {
@@ -696,6 +712,7 @@ csize_t CodeBuffer::copy_relocations_to(CodeBlob* dest) const {
   return buf_offset;
 }
 
+#ifndef LEYDEN
 void CodeBuffer::copy_code_to(CodeBlob* dest_blob) {
 #ifndef PRODUCT
   if (PrintNMethods && (WizardMode || Verbose)) {
@@ -722,12 +739,14 @@ void CodeBuffer::copy_code_to(CodeBlob* dest_blob) {
   // Flush generated code
   ICache::invalidate_range(dest_blob->code_begin(), dest_blob->code_size());
 }
+#endif
 
 // Move all my code into another code buffer.  Consult applicable
 // relocs to repair embedded addresses.  The layout in the destination
 // CodeBuffer is different to the source CodeBuffer: the destination
 // CodeBuffer gets the final layout (consts, insts, stubs in order of
 // ascending address).
+#ifndef LEYDEN
 void CodeBuffer::relocate_code_to(CodeBuffer* dest) const {
   address dest_end = dest->_total_start + dest->_total_size;
   address dest_filled = NULL;
@@ -788,7 +807,7 @@ void CodeBuffer::relocate_code_to(CodeBuffer* dest) const {
 
   }
 }
-
+#endif
 csize_t CodeBuffer::figure_expanded_capacities(CodeSection* which_cs,
                                                csize_t amount,
                                                csize_t* new_capacity) {
@@ -836,6 +855,7 @@ csize_t CodeBuffer::figure_expanded_capacities(CodeSection* which_cs,
   return new_total_cap;
 }
 
+#ifndef LEYDEN
 void CodeBuffer::expand(CodeSection* which_cs, csize_t amount) {
 #ifndef PRODUCT
   if (PrintNMethods && (WizardMode || Verbose)) {
@@ -927,7 +947,9 @@ void CodeBuffer::expand(CodeSection* which_cs, csize_t amount) {
   }
 #endif //PRODUCT
 }
+#endif
 
+#ifndef LEYDEN
 void CodeBuffer::take_over_code_from(CodeBuffer* cb) {
   // Must already have disposed of the old blob somehow.
   assert(blob() == NULL, "must be empty");
@@ -943,7 +965,9 @@ void CodeBuffer::take_over_code_from(CodeBuffer* cb) {
   // Make sure the old cb won't try to use it or free it.
   DEBUG_ONLY(cb->_blob = (BufferBlob*)badAddress);
 }
+#endif
 
+#ifndef LEYDEN
 void CodeBuffer::verify_section_allocation() {
   address tstart = _total_start;
   if (tstart == badAddress)  return;  // smashed by set_blob(NULL)
@@ -971,6 +995,7 @@ void CodeBuffer::verify_section_allocation() {
     guarantee(sect->end() <= sect->limit(), "sanity");
   }
 }
+#endif
 
 void CodeBuffer::log_section_sizes(const char* name) {
   if (xtty != NULL) {
@@ -1174,12 +1199,15 @@ const char* CodeStrings::add_string(const char * string) {
 }
 
 void CodeBuffer::decode() {
+#ifndef LEYDEN
   ttyLocker ttyl;
   Disassembler::decode(decode_begin(), insts_end(), tty NOT_PRODUCT(COMMA &strings()));
   _decode_begin = insts_end();
+#endif
 }
 
 void CodeSection::print(const char* name) {
+#ifndef LEYDEN
   csize_t locs_size = locs_end() - locs_start();
   tty->print_cr(" %7s.code = " PTR_FORMAT " : " PTR_FORMAT " : " PTR_FORMAT " (%d of %d)",
                 name, p2i(start()), p2i(end()), p2i(limit()), size(), capacity());
@@ -1189,6 +1217,7 @@ void CodeSection::print(const char* name) {
     RelocIterator iter(this);
     iter.print();
   }
+#endif
 }
 
 void CodeBuffer::print() {

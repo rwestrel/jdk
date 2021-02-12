@@ -52,12 +52,14 @@ class RecordComponent: public MetaspaceObj {
                     _generic_signature_index(generic_signature_index) { }
 
     // Allocate instance of this class
-    static RecordComponent* allocate(ClassLoaderData* loader_data,
+#ifndef LEYDEN
+  static RecordComponent* allocate(ClassLoaderData* loader_data,
                                      u2 name_index, u2 descriptor_index,
                                      u2 attributes_count,
                                      u2 generic_signature_index,
                                      AnnotationArray* annotations,
                                      AnnotationArray* type_annotations, TRAPS);
+#endif
 
     void deallocate_contents(ClassLoaderData* loader_data);
 

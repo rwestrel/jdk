@@ -1388,9 +1388,11 @@ void os::shutdown() {
 void os::abort(bool dump_core, void* siginfo, const void* context) {
   os::shutdown();
   if (dump_core) {
+#ifndef LEYDEN
     if (DumpPrivateMappingsInCore) {
       ClassLoader::close_jrt_image();
     }
+#endif
     ::abort(); // dump core
   }
 
@@ -2027,7 +2029,9 @@ void os::print_os_info(outputStream* st) {
     st->cr();
   }
 
+#ifndef LEYDEN
   VM_Version::print_platform_virtualization_info(st);
+#endif
 
   os::Linux::print_steal_info(st);
 }
@@ -4734,6 +4738,7 @@ bool os::bind_to_processor(uint processor_id) {
 // debug support
 
 bool os::find(address addr, outputStream* st) {
+#ifndef LEYDEN
   Dl_info dlinfo;
   memset(&dlinfo, 0, sizeof(dlinfo));
   if (dladdr(addr, &dlinfo) != 0) {
@@ -4770,6 +4775,7 @@ bool os::find(address addr, outputStream* st) {
     }
     return true;
   }
+#endif
   return false;
 }
 

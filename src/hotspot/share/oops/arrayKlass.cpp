@@ -101,6 +101,7 @@ ArrayKlass::ArrayKlass(Symbol* name, KlassID id) :
 
 // Initialization of vtables and mirror object is done separatly from base_create_array_klass,
 // since a GC can happen. At this point all instance variables of the ArrayKlass must be setup.
+#ifndef LEYDEN
 void ArrayKlass::complete_create_array_klass(ArrayKlass* k, Klass* super_klass, ModuleEntry* module_entry, TRAPS) {
   k->initialize_supers(super_klass, NULL, CHECK);
   k->vtable().initialize_vtable(false, CHECK);
@@ -113,6 +114,7 @@ void ArrayKlass::complete_create_array_klass(ArrayKlass* k, Klass* super_klass, 
   oop module = (module_entry != NULL) ? module_entry->module() : (oop)NULL;
   java_lang_Class::create_mirror(k, Handle(THREAD, k->class_loader()), Handle(THREAD, module), Handle(), Handle(), CHECK);
 }
+#endif
 
 GrowableArray<Klass*>* ArrayKlass::compute_secondary_supers(int num_extra_slots,
                                                             Array<InstanceKlass*>* transitive_interfaces) {
@@ -176,6 +178,7 @@ void ArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push((Klass**)&_lower_dimension);
 }
 
+#ifndef LEYDEN
 void ArrayKlass::remove_unshareable_info() {
   Klass::remove_unshareable_info();
   if (_higher_dimension != NULL) {
@@ -183,6 +186,7 @@ void ArrayKlass::remove_unshareable_info() {
     ak->remove_unshareable_info();
   }
 }
+#endif
 
 void ArrayKlass::remove_java_mirror() {
   Klass::remove_java_mirror();
@@ -192,6 +196,7 @@ void ArrayKlass::remove_java_mirror() {
   }
 }
 
+#ifndef LEYDEN
 void ArrayKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS) {
   assert(loader_data == ClassLoaderData::the_null_class_loader_data(), "array classes belong to null loader");
   Klass::restore_unshareable_info(loader_data, protection_domain, CHECK);
@@ -202,6 +207,7 @@ void ArrayKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handle p
     ak->restore_unshareable_info(loader_data, protection_domain, CHECK);
   }
 }
+#endif
 
 // Printing
 

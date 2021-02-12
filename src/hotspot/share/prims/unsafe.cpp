@@ -776,6 +776,7 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineClass0(JNIEnv *env, jobject unsafe, jstring na
 // not just a literal string.  For such ldc instructions, the verifier uses the
 // type Object instead of String, if the loaded constant is not in fact a String.
 
+#ifndef LEYDEN
 static InstanceKlass*
 Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
                                  jclass host_class, jbyteArray data, jobjectArray cp_patches_jh,
@@ -872,7 +873,9 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
 
   return InstanceKlass::cast(anonk);
 }
+#endif
 
+#ifndef LEYDEN
 UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass0(JNIEnv *env, jobject unsafe, jclass host_class, jbyteArray data, jobjectArray cp_patches_jh)) {
   ResourceMark rm(THREAD);
 
@@ -898,7 +901,7 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass0(JNIEnv *env, jobject unsafe, j
 
   return (jclass) res_jh;
 } UNSAFE_END
-
+#endif
 
 
 UNSAFE_ENTRY(void, Unsafe_ThrowException(JNIEnv *env, jobject unsafe, jthrowable thr)) {
@@ -1120,8 +1123,11 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "writebackPostSync0", CC "()V",                  FN_PTR(Unsafe_WriteBackPostSync0)},
     {CC "setMemory0",         CC "(" OBJ "JJB)V",        FN_PTR(Unsafe_SetMemory0)},
 
+#ifndef LEYDEN
     {CC "defineAnonymousClass0", CC "(" DAC_Args ")" CLS, FN_PTR(Unsafe_DefineAnonymousClass0)},
-
+#else
+    {CC "defineAnonymousClass0", CC "(" DAC_Args ")" CLS, NULL},
+#endif
     {CC "shouldBeInitialized0", CC "(" CLS ")Z",         FN_PTR(Unsafe_ShouldBeInitialized0)},
 
     {CC "loadFence",          CC "()V",                  FN_PTR(Unsafe_LoadFence)},

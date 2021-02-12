@@ -270,8 +270,9 @@ class StubRoutines: AllStatic {
   static void    initialize1();                            // must happen before universe::genesis
   static void    initialize2();                            // must happen after  universe::genesis
 
-  static bool is_stub_code(address addr)                   { return contains(addr); }
+#ifndef LEYDEN
 
+  static bool is_stub_code(address addr)                   { return contains(addr); }
   static bool contains(address addr) {
     return
       (_code1 != NULL && _code1->blob_contains(addr)) ||
@@ -280,6 +281,7 @@ class StubRoutines: AllStatic {
 
   static RuntimeBlob* code1() { return _code1; }
   static RuntimeBlob* code2() { return _code2; }
+#endif
 
   // Debugging
   static jint    verify_oop_count()                        { return _verify_oop_count; }

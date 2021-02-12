@@ -299,6 +299,7 @@ JVM_FEATURES_core := @JVM_FEATURES_core@
 JVM_FEATURES_minimal := @JVM_FEATURES_minimal@
 JVM_FEATURES_zero := @JVM_FEATURES_zero@
 JVM_FEATURES_custom := @JVM_FEATURES_custom@
+JVM_FEATURES_leyden := @JVM_FEATURES_leyden@
 
 # Used for make-time verifications
 VALID_JVM_FEATURES := @VALID_JVM_FEATURES@

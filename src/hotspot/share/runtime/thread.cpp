@@ -507,8 +507,10 @@ void Thread::start(Thread* thread) {
     // Can not set it after the thread started because we do not know the
     // exact thread state at that time. It could be in MONITOR_WAIT or
     // in SLEEPING or some other state.
+#ifndef LEYDEN
     java_lang_Thread::set_thread_status(thread->as_Java_thread()->threadObj(),
                                         JavaThreadStatus::RUNNABLE);
+#endif
   }
   os::start_thread(thread);
 }
@@ -528,10 +530,12 @@ public:
 };
 
 void Thread::send_async_exception(oop java_thread, oop java_throwable) {
+#ifndef LEYDEN
   Handle throwable(Thread::current(), java_throwable);
   JavaThread* target = java_lang_Thread::thread(java_thread);
   InstallAsyncExceptionClosure vm_stop(throwable);
   Handshake::execute(&vm_stop, target);
+#endif
 }
 
 
@@ -843,14 +847,19 @@ bool Thread::set_as_starting_thread() {
   return os::create_main_thread(this->as_Java_thread());
 }
 
+#ifndef LEYDEN
 static void initialize_class(Symbol* class_name, TRAPS) {
   Klass* klass = SystemDictionary::resolve_or_fail(class_name, true, CHECK);
   InstanceKlass::cast(klass)->initialize(CHECK);
 }
-
+#endif
 
 // Creates the initial ThreadGroup
+#ifndef LEYDEN
 static Handle create_initial_thread_group(TRAPS) {
+#ifdef LEYDEN
+  return Handle();
+#else
   Handle system_instance = JavaCalls::construct_new_instance(
                             vmClasses::ThreadGroup_klass(),
                             vmSymbols::void_method_signature(),
@@ -865,11 +874,15 @@ static Handle create_initial_thread_group(TRAPS) {
                             string,
                             CHECK_NH);
   return main_instance;
+#endif
 }
+#endif
 
 // Creates the initial Thread, and sets it to running.
+#ifndef LEYDEN
 static void create_initial_thread(Handle thread_group, JavaThread* thread,
                                  TRAPS) {
+#ifndef LEYDEN
   InstanceKlass* ik = vmClasses::Thread_klass();
   assert(ik->is_initialized(), "must be");
   instanceHandle thread_oop = ik->allocate_instance_handle(CHECK);
@@ -896,8 +909,9 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
   // been started and running.
   java_lang_Thread::set_thread_status(thread_oop(),
                                       JavaThreadStatus::RUNNABLE);
+#endif
 }
-
+#endif
 char java_version[64] = "";
 char java_runtime_name[128] = "";
 char java_runtime_version[128] = "";
@@ -905,7 +919,9 @@ char java_runtime_vendor_version[128] = "";
 char java_runtime_vendor_vm_bug_url[128] = "";
 
 // extract the JRE version string from java.lang.VersionProps.java_version
+#ifndef LEYDEN
 static const char* get_java_version(TRAPS) {
+#ifndef LEYDEN
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
   fieldDescriptor fd;
@@ -922,12 +938,18 @@ static const char* get_java_version(TRAPS) {
                                                         sizeof(java_version));
     return name;
   } else {
+#endif
     return NULL;
+#ifndef LEYDEN
   }
+#endif
 }
+#endif
 
 // extract the JRE name from java.lang.VersionProps.java_runtime_name
+#ifndef LEYDEN
 static const char* get_java_runtime_name(TRAPS) {
+#ifndef LEYDEN
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
   fieldDescriptor fd;
@@ -944,12 +966,18 @@ static const char* get_java_runtime_name(TRAPS) {
                                                         sizeof(java_runtime_name));
     return name;
   } else {
+#endif
     return NULL;
+#ifndef LEYDEN
   }
+#endif
 }
+#endif
 
 // extract the JRE version from java.lang.VersionProps.java_runtime_version
+#ifndef LEYDEN
 static const char* get_java_runtime_version(TRAPS) {
+#ifndef LEYDEN
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
   fieldDescriptor fd;
@@ -966,12 +994,18 @@ static const char* get_java_runtime_version(TRAPS) {
                                                         sizeof(java_runtime_version));
     return name;
   } else {
+#endif
     return NULL;
+#ifndef LEYDEN
   }
+#endif
 }
+#endif
 
 // extract the JRE vendor version from java.lang.VersionProps.VENDOR_VERSION
+#ifndef LEYDEN
 static const char* get_java_runtime_vendor_version(TRAPS) {
+#ifndef LEYDEN
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
   fieldDescriptor fd;
@@ -988,12 +1022,18 @@ static const char* get_java_runtime_vendor_version(TRAPS) {
                                                         sizeof(java_runtime_vendor_version));
     return name;
   } else {
+#endif
     return NULL;
+#ifndef LEYDEN
   }
+#endif
 }
+#endif
 
 // extract the JRE vendor VM bug URL from java.lang.VersionProps.VENDOR_URL_VM_BUG
+#ifndef LEYDEN
 static const char* get_java_runtime_vendor_vm_bug_url(TRAPS) {
+#ifndef LEYDEN
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
   fieldDescriptor fd;
@@ -1010,13 +1050,18 @@ static const char* get_java_runtime_vendor_vm_bug_url(TRAPS) {
                                                         sizeof(java_runtime_vendor_vm_bug_url));
     return name;
   } else {
+#endif
     return NULL;
+#ifndef LEYDEN
   }
+#endif
 }
+#endif
 
 // General purpose hook into Java code, run once when the VM is initialized.
 // The Java library method itself may be changed independently from the VM.
 static void call_postVMInitHook(TRAPS) {
+#ifndef LEYDEN
   Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_vm_PostVMInitHook(), THREAD);
   if (klass != NULL) {
     JavaValue result(T_VOID);
@@ -1024,6 +1069,7 @@ static void call_postVMInitHook(TRAPS) {
                            vmSymbols::void_method_signature(),
                            CHECK);
   }
+#endif
 }
 
 // Initialized by VMThread at vm_global_init
@@ -1045,6 +1091,7 @@ OopStorage* JavaThread::thread_oop_storage() {
 
 void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name,
                                     bool daemon, TRAPS) {
+#ifndef LEYDEN
   assert(thread_group.not_null(), "thread group should be specified");
   assert(threadObj() == NULL, "should only create Java thread object once");
 
@@ -1103,6 +1150,7 @@ void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name
                           vmSymbols::thread_void_signature(),
                           threadObj,          // Arg 1
                           THREAD);
+#endif
 }
 
 // List of all NonJavaThreads and safe iteration over that list.
@@ -1564,7 +1612,11 @@ JavaThread::JavaThread() :
   _jvmti_thread_state(nullptr),
   _interp_only_mode(0),
   _should_post_on_exceptions_flag(JNI_FALSE),
+#ifdef LEYDEN
+  _thread_stat(NULL),
+#else
   _thread_stat(new ThreadStatistics()),
+#endif
 
   _parker(),
   _cached_monitor_info(nullptr),
@@ -1574,7 +1626,9 @@ JavaThread::JavaThread() :
   _SleepEvent(ParkEvent::Allocate(this))
 {
 
+#ifndef LEYDEN
   set_jni_functions(jni_functions());
+#endif
 
 #if INCLUDE_JVMCI
   assert(_jvmci._implicit_exception_pc == nullptr, "must be");
@@ -1624,6 +1678,9 @@ void JavaThread::interrupt() {
 
 
 bool JavaThread::is_interrupted(bool clear_interrupted) {
+#ifdef LEYDEN
+  return false;
+#else
   debug_only(check_for_dangling_thread_pointer(this);)
 
   if (_threadObj.peek() == NULL) {
@@ -1659,6 +1716,7 @@ bool JavaThread::is_interrupted(bool clear_interrupted) {
   }
 
   return interrupted;
+#endif
 }
 
 void JavaThread::block_if_vm_exited() {
@@ -1675,8 +1733,10 @@ void JavaThread::block_if_vm_exited() {
 
 
 // Remove this ifdef when C1 is ported to the compiler interface.
+#ifndef LEYDEN
 static void compiler_thread_entry(JavaThread* thread, TRAPS);
 static void sweeper_thread_entry(JavaThread* thread, TRAPS);
+#endif
 
 JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) : JavaThread() {
   _jni_attach_state = _not_attaching_via_jni;
@@ -1684,8 +1744,12 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) : JavaThread
   // Create the native thread itself.
   // %note runtime_23
   os::ThreadType thr_type = os::java_thread;
+#ifdef LEYDEN
+  thr_type = os::java_thread;
+#else
   thr_type = entry_point == &compiler_thread_entry ? os::compiler_thread :
                                                      os::java_thread;
+#endif
   os::create_thread(this, thr_type, stack_sz);
   // The _osthread may be NULL here because we ran out of memory (too many threads active).
   // We need to throw and OutOfMemoryError - however we cannot do this here because the caller
@@ -1702,7 +1766,9 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) : JavaThread
 JavaThread::~JavaThread() {
 
   // Ask ServiceThread to release the threadObj OopHandle
+#ifndef LEYDEN
   ServiceThread::add_oop_handle_release(_threadObj);
+#endif
 
   // Return the sleep event to the free list
   ParkEvent::Release(_SleepEvent);
@@ -1712,10 +1778,12 @@ JavaThread::~JavaThread() {
   vframeArray* old_array = vframe_array_last();
 
   if (old_array != NULL) {
+#ifndef LEYDEN
     Deoptimization::UnrollBlock* old_info = old_array->unroll_block();
     old_array->set_unroll_block(NULL);
     delete old_info;
     delete old_array;
+#endif
   }
 
   JvmtiDeferredUpdates* updates = deferred_updates();
@@ -1788,6 +1856,7 @@ void JavaThread::run() {
 }
 
 void JavaThread::thread_main_inner() {
+#ifndef LEYDEN
   assert(JavaThread::current() == this, "sanity check");
   assert(_threadObj.peek() != NULL, "just checking");
 
@@ -1807,6 +1876,7 @@ void JavaThread::thread_main_inner() {
   DTRACE_THREAD_PROBE(stop, this);
 
   // Cleanup is handled in post_run()
+#endif
 }
 
 // Shared teardown for all JavaThreads
@@ -1819,6 +1889,7 @@ void JavaThread::post_run() {
 }
 
 static void ensure_join(JavaThread* thread) {
+#ifndef LEYDEN
   // We do not need to grab the Threads_lock, since we are operating on ourself.
   Handle threadObj(thread, thread->threadObj());
   assert(threadObj.not_null(), "java thread object must exist");
@@ -1833,10 +1904,15 @@ static void ensure_join(JavaThread* thread) {
   lock.notify_all(thread);
   // Ignore pending exception (ThreadDeath), since we are exiting anyway
   thread->clear_pending_exception();
+#endif
 }
 
 static bool is_daemon(oop threadObj) {
+#ifdef LEYDEN
+  return false;
+#else
   return (threadObj != NULL && java_lang_Thread::is_daemon(threadObj));
+#endif
 }
 
 // For any new cleanup additions, please check to see if they need to be applied to
@@ -1860,6 +1936,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
   assert(threadObj.not_null(), "Java thread object should be created");
 
   if (!destroy_vm) {
+#ifndef LEYDEN
     if (uncaught_exception.not_null()) {
       EXCEPTION_MARK;
       // Call method Thread.dispatchUncaughtException().
@@ -1881,10 +1958,12 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
         CLEAR_PENDING_EXCEPTION;
       }
     }
+#endif
 
     // Call Thread.exit(). We try 3 times in case we got another Thread.stop during
     // the execution of the method. If that is not enough, then we don't really care. Thread.stop
     // is deprecated anyhow.
+#ifndef LEYDEN
     if (!is_Compiler_thread()) {
       int count = 3;
       while (java_lang_Thread::threadGroup(threadObj()) != NULL && (count-- > 0)) {
@@ -1899,6 +1978,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
         CLEAR_PENDING_EXCEPTION;
       }
     }
+#endif
     // notify JVMTI
     if (JvmtiExport::should_post_thread_life()) {
       JvmtiExport::post_thread_end(this);
@@ -1912,7 +1992,9 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
         MutexLocker ml(SR_lock(), Mutex::_no_safepoint_check_flag);
         if (!is_external_suspend()) {
           set_terminated(_thread_exiting);
+#ifndef LEYDEN
           ThreadService::current_thread_exiting(this, is_daemon(threadObj()));
+#endif
           break;
         }
         // Implied else:
@@ -2225,6 +2307,7 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
 }
 
 void JavaThread::send_thread_stop(oop java_throwable)  {
+#ifndef LEYDEN
   ResourceMark rm;
   assert(is_handshake_safe_for(Thread::current()),
          "should be self or handshakee");
@@ -2269,6 +2352,7 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   // Interrupt thread so it will wake up from a potential wait()/sleep()/park()
   java_lang_Thread::set_interrupted(threadObj(), true);
   this->interrupt();
+#endif
 }
 
 // External suspension mechanism.
@@ -2547,6 +2631,7 @@ void JavaThread::java_resume() {
 #ifndef PRODUCT
 // Deoptimization
 // Function for testing deoptimization
+#ifndef LEYDEN
 void JavaThread::deoptimize() {
   StackFrameStream fst(this, false /* update */, true /* process_frames */);
   bool deopt = false;           // Dump stack only if a deopt actually happens.
@@ -2594,9 +2679,11 @@ void JavaThread::deoptimize() {
     trace_frames();
   }
 }
+#endif
 
 
 // Make zombies
+#ifndef LEYDEN
 void JavaThread::make_zombies() {
   for (StackFrameStream fst(this, true /* update */, true /* process_frames */); !fst.is_done(); fst.next()) {
     if (fst.current()->can_be_deoptimized()) {
@@ -2606,9 +2693,11 @@ void JavaThread::make_zombies() {
     }
   }
 }
+#endif
 #endif // PRODUCT
 
 
+#ifndef LEYDEN
 void JavaThread::deoptimize_marked_methods() {
   if (!has_last_Java_frame()) return;
   StackFrameStream fst(this, false /* update */, true /* process_frames */);
@@ -2618,6 +2707,7 @@ void JavaThread::deoptimize_marked_methods() {
     }
   }
 }
+#endif
 
 void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   // Verify that the deferred card marks have been flushed.
@@ -2703,6 +2793,7 @@ void JavaThread::metadata_do(MetadataClosure* f) {
     for (StackFrameStream fst(this, true /* update */, true /* process_frames */); !fst.is_done(); fst.next()) {
       fst.current()->metadata_do(f);
     }
+#ifndef LEYDEN
   } else if (is_Compiler_thread()) {
     // need to walk ciMetadata in current compile tasks to keep alive.
     CompilerThread* ct = (CompilerThread*)this;
@@ -2713,6 +2804,7 @@ void JavaThread::metadata_do(MetadataClosure* f) {
     if (task != NULL) {
       task->metadata_do(f);
     }
+#endif
   }
 }
 
@@ -2742,6 +2834,7 @@ void JavaThread::print_thread_state_on(outputStream *st) const {
 
 // Called by Threads::print() for VM_PrintThreads operation
 void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
+#ifndef LEYDEN
   st->print_raw("\"");
   st->print_raw(get_thread_name());
   st->print_raw("\" ");
@@ -2770,6 +2863,7 @@ void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
     }
     st->cr();
   }
+#endif
 }
 
 void JavaThread::print() const { print_on(tty); }
@@ -2781,6 +2875,7 @@ void JavaThread::print_name_on_error(outputStream* st, char *buf, int buflen) co
 // Called by fatal error handler. The difference between this and
 // JavaThread::print() is that we can't grab lock or allocate memory.
 void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
+#ifndef LEYDEN
   st->print("JavaThread \"%s\"", get_thread_name_string(buf, buflen));
   oop thread_obj = threadObj();
   if (thread_obj != NULL) {
@@ -2797,6 +2892,7 @@ void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
 
   ThreadsSMRSupport::print_info_on(this, st);
   return;
+#endif
 }
 
 
@@ -2846,6 +2942,9 @@ const char* JavaThread::get_thread_name() const {
 // Returns a non-NULL representation of this thread's name, or a suitable
 // descriptive string if there is no set name
 const char* JavaThread::get_thread_name_string(char* buf, int buflen) const {
+#ifdef LEYDEN
+  return NULL;
+#else
   const char* name_str;
   oop thread_obj = threadObj();
   if (thread_obj != NULL) {
@@ -2866,10 +2965,11 @@ const char* JavaThread::get_thread_name_string(char* buf, int buflen) const {
   }
   assert(name_str != NULL, "unexpected NULL thread name");
   return name_str;
+#endif
 }
 
 void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
-
+#ifndef LEYDEN
   assert(Threads_lock->owner() == Thread::current(), "must have threads lock");
   assert(NoPriority <= prio && prio <= MaxPriority, "sanity check");
   // Link Java Thread object <-> C++ Thread
@@ -2906,19 +3006,23 @@ void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
   // added to the Threads list for if a GC happens, then the java_thread oop
   // will not be visited by GC.
   Threads::add(this);
+#endif
 }
 
 oop JavaThread::current_park_blocker() {
+#ifndef LEYDEN
   // Support for JSR-166 locks
   oop thread_oop = threadObj();
   if (thread_oop != NULL) {
     return java_lang_Thread::park_blocker(thread_oop);
   }
+#endif
   return NULL;
 }
 
 
 void JavaThread::print_stack_on(outputStream* st) {
+#ifndef LEYDEN
   if (!has_last_Java_frame()) return;
 
   Thread* current_thread = Thread::current();
@@ -2945,6 +3049,7 @@ void JavaThread::print_stack_on(outputStream* st) {
     count++;
     if (MaxJavaStackTraceDepth > 0 && MaxJavaStackTraceDepth == count) return;
   }
+#endif
 }
 
 
@@ -3138,6 +3243,7 @@ bool JavaThread::sleep(jlong millis) {
   }
 }
 
+#ifndef LEYDEN
 static void compiler_thread_entry(JavaThread* thread, TRAPS) {
   assert(thread->is_Compiler_thread(), "must be compiler thread");
   CompileBroker::compiler_thread_loop();
@@ -3201,7 +3307,7 @@ void CodeCacheSweeperThread::nmethods_do(CodeBlobClosure* cf) {
     cf->do_code_blob(_scanned_compiled_method);
   }
 }
-
+#endif
 
 // ======= Threads ========
 
@@ -3302,13 +3408,14 @@ void Threads::possibly_parallel_threads_do(bool is_par, ThreadClosure* tc) {
 //     System.initPhase1 initializes the system properties, the static
 //     fields in, out, and err. Set up java signal handlers, OS-specific
 //     system settings, and thread group of the main thread.
+#ifndef LEYDEN
 static void call_initPhase1(TRAPS) {
   Klass* klass = vmClasses::System_klass();
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result, klass, vmSymbols::initPhase1_name(),
                                          vmSymbols::void_method_signature(), CHECK);
 }
-
+#endif
 // Phase 2. Module system initialization
 //     This will initialize the module system.  Only java.base classes
 //     can be loaded until phase 2 completes.
@@ -3323,6 +3430,7 @@ static void call_initPhase1(TRAPS) {
 static void call_initPhase2(TRAPS) {
   TraceTime timer("Initialize module system", TRACETIME_LOG(Info, startuptime));
 
+#ifndef LEYDEN
   Klass* klass = vmClasses::System_klass();
 
   JavaValue result(T_INT);
@@ -3334,7 +3442,7 @@ static void call_initPhase2(TRAPS) {
   if (result.get_jint() != JNI_OK) {
     vm_exit_during_initialization(); // no message or exception
   }
-
+#endif
   universe_post_module_init();
 }
 
@@ -3345,13 +3453,16 @@ static void call_initPhase2(TRAPS) {
 //     and system class loader may be a custom class loaded from -Xbootclasspath/a,
 //     other modules or the application's classpath.
 static void call_initPhase3(TRAPS) {
+#ifndef LEYDEN
   Klass* klass = vmClasses::System_klass();
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result, klass, vmSymbols::initPhase3_name(),
                                          vmSymbols::void_method_signature(), CHECK);
+#endif
 }
 
 void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
+#ifndef LEYDEN
   TraceTime timer("Initialize java.lang classes", TRACETIME_LOG(Info, startuptime));
 
   if (EagerXrunInit && Arguments::init_libraries_at_startup()) {
@@ -3411,15 +3522,18 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
 
   // Eager box cache initialization only if AOT is on and any library is loaded.
   AOTLoader::initialize_box_caches(CHECK);
+#endif
 }
 
 void Threads::initialize_jsr292_core_classes(TRAPS) {
+#ifndef LEYDEN
   TraceTime timer("Initialize java.lang.invoke classes", TRACETIME_LOG(Info, startuptime));
 
   initialize_class(vmSymbols::java_lang_invoke_MethodHandle(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_ResolvedMethodName(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_MemberName(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_MethodHandleNatives(), CHECK);
+#endif
 }
 
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
@@ -3457,7 +3571,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   Arguments::init_version_specific_system_properties();
 
   // Make sure to initialize log configuration *before* parsing arguments
+#ifndef LEYDEN
   LogConfiguration::initialize(create_vm_timer.begin_time());
+#endif
 
   // Parse arguments
   // Note: this internally calls os::init_container_support()
@@ -3633,16 +3749,19 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
+#ifndef LEYDEN
   quicken_jni_functions();
-
   // No more stub generation allowed after that point.
   StubCodeDesc::freeze();
+#endif
 
   // Set flag that basic initialization has completed. Used by exceptions and various
   // debug stuff, that does not work until all basic classes have been initialized.
   set_init_completed();
 
+#ifndef LEYDEN
   LogConfiguration::post_initialize();
+#endif
   Metaspace::post_initialize();
 
   HOTSPOT_VM_INIT_END();
@@ -3675,11 +3794,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Start the service thread
   // The service thread enqueues JVMTI deferred events and does various hashtable
   // and other cleanups.  Needs to start before the compilers start posting events.
+#ifndef LEYDEN
   ServiceThread::initialize();
+#endif
 
   // Start the monitor deflation thread:
+#ifndef LEYDEN
   MonitorDeflationThread::initialize();
-
+#endif
   // initialize compiler(s)
 #if defined(COMPILER1) || COMPILER2_OR_JVMCI
 #if INCLUDE_JVMCI
@@ -3727,7 +3849,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   call_initPhase3(CHECK_JNI_ERR);
 
   // cache the system and platform class loaders
+#ifndef LEYDEN
   SystemDictionary::compute_java_loaders(CHECK_JNI_ERR);
+#endif
 
 #if INCLUDE_CDS
   // capture the module path info from the ModuleEntryTable
@@ -3764,11 +3888,15 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 #endif // INCLUDE_MANAGEMENT
 
+#ifndef LEYDEN
   if (MemProfiling)                   MemProfiler::engage();
   StatSampler::engage();
+#endif
   if (CheckJNICalls)                  JniPeriodicChecker::engage();
 
+#ifndef LEYDEN
   BiasedLocking::init();
+#endif
 
 #if INCLUDE_RTM_OPT
   RTMLockingCounters::init();
@@ -3925,6 +4053,7 @@ void Threads::convert_vm_init_libraries_to_agents() {
 // Invokes Agent_OnLoad
 // Called very early -- before JavaThreads exist
 void Threads::create_vm_init_agents() {
+#ifndef LEYDEN
   extern struct JavaVM_ main_vm;
   AgentLibrary* agent;
 
@@ -3956,6 +4085,7 @@ void Threads::create_vm_init_agents() {
   }
 
   JvmtiExport::enter_primordial_phase();
+#endif
 }
 
 extern "C" {
@@ -3963,6 +4093,7 @@ extern "C" {
 }
 
 void Threads::shutdown_vm_agents() {
+#ifndef LEYDEN
   // Send any Agent_OnUnload notifications
   const char *on_unload_symbols[] = AGENT_ONUNLOAD_SYMBOLS;
   size_t num_symbol_entries = ARRAY_SIZE(on_unload_symbols);
@@ -3984,11 +4115,13 @@ void Threads::shutdown_vm_agents() {
       (*unload_entry)(&main_vm);
     }
   }
+#endif
 }
 
 // Called for after the VM is initialized for -Xrun libraries which have not been converted to agent libraries
 // Invokes JVM_OnLoad
 void Threads::create_vm_init_libraries() {
+#ifndef LEYDEN
   extern struct JavaVM_ main_vm;
   AgentLibrary* agent;
 
@@ -4008,11 +4141,13 @@ void Threads::create_vm_init_libraries() {
       vm_exit_during_initialization("Could not find JVM_OnLoad function in -Xrun library", agent->name());
     }
   }
+#endif
 }
 
 
 // Last thread running calls java.lang.Shutdown.shutdown()
 void JavaThread::invoke_shutdown_hooks() {
+#ifndef LEYDEN
   HandleMark hm(this);
 
   // Link all classes for dynamic CDS dumping before vm exit.
@@ -4046,6 +4181,7 @@ void JavaThread::invoke_shutdown_hooks() {
                            THREAD);
   }
   CLEAR_PENDING_EXCEPTION;
+#endif
 }
 
 // Threads::destroy_vm() is normally called from jni_DestroyJavaVM() when
@@ -4174,7 +4310,9 @@ bool Threads::destroy_vm() {
   }
 #endif
 
+#ifndef LEYDEN
   LogConfiguration::finalize();
+#endif
 
   return true;
 }
@@ -4217,7 +4355,9 @@ void Threads::add(JavaThread* p, bool force_daemon) {
     daemon = false;
   }
 
+#ifndef LEYDEN
   ThreadService::add_thread(p, daemon);
+#endif
 
   // Maintain fast thread list
   ThreadsSMRSupport::add_thread(p);
@@ -4258,7 +4398,9 @@ void Threads::remove(JavaThread* p, bool is_daemon) {
         ml.notify_all();
       }
     }
+#ifndef LEYDEN
     ThreadService::remove_thread(p, is_daemon);
+#endif
 
     // Make sure that safepoint code disregard this thread. This is needed since
     // the thread might mess around with locks after this point. This can cause it
@@ -4563,6 +4705,7 @@ void Threads::print_on_error(outputStream* st, Thread* current, char* buf,
 }
 
 void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, bool short_form) {
+#ifndef LEYDEN
   ALL_JAVA_THREADS(thread) {
     if (thread->is_Compiler_thread()) {
       CompilerThread* ct = (CompilerThread*) thread;
@@ -4579,6 +4722,7 @@ void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, b
       }
     }
   }
+#endif
 }
 
 

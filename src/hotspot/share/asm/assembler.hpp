@@ -220,7 +220,9 @@ class AbstractAssembler : public ResourceObj  {
  protected:
   // This routine is called with a label is used for an address.
   // Labels and displacements truck in offsets, but target must return a PC.
+#ifndef LEYDEN
   address target(Label& L)             { return code_section()->target(L, pc()); }
+#endif
 
   bool is8bit(int x) const             { return -0x80 <= x && x < 0x80; }
   bool isByte(int x) const             { return 0 <= x && x < 0x100; }
@@ -338,6 +340,7 @@ class AbstractAssembler : public ResourceObj  {
   void    clear_inst_mark()       {        code_section()->clear_mark(); }
 
   // Constants in code
+#ifndef LEYDEN
   void relocate(RelocationHolder const& rspec, int format = 0) {
     assert(!pd_check_instruction_mark()
         || inst_mark() == NULL || inst_mark() == code_section()->end(),
@@ -347,6 +350,7 @@ class AbstractAssembler : public ResourceObj  {
   void relocate(   relocInfo::relocType rtype, int format = 0) {
     code_section()->relocate(code_section()->end(), rtype, format);
   }
+#endif
 
   static int code_fill_byte();         // used to pad out odd-sized code buffers
 
@@ -419,6 +423,7 @@ class AbstractAssembler : public ResourceObj  {
     }
     return ptr;
   }
+#ifndef LEYDEN
   address address_constant(address c, RelocationHolder const& rspec) {
     CodeSection* c1 = _code_section;
     address ptr = start_a_const(sizeof(c), sizeof(c));
@@ -429,7 +434,7 @@ class AbstractAssembler : public ResourceObj  {
     }
     return ptr;
   }
-
+#endif
   // Bang stack to trigger StackOverflowError at a safe location
   // implementation delegates to machine-specific bang_stack_with_offset
   void generate_stack_overflow_check( int frame_size_in_bytes );

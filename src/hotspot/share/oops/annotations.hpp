@@ -57,7 +57,9 @@ class Annotations: public MetaspaceObj {
 
  public:
   // Allocate instance of this class
+#ifndef LEYDEN
   static Annotations* allocate(ClassLoaderData* loader_data, TRAPS);
+#endif
 
   static void free_contents(ClassLoaderData* loader_data, Array<AnnotationArray*>* p);
   void deallocate_contents(ClassLoaderData* loader_data);

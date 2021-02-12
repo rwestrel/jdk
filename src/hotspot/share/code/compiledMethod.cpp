@@ -119,7 +119,7 @@ void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
 }
 
 //-----------------------------------------------------------------------------
-
+#ifndef LEYDEN
 ExceptionCache* CompiledMethod::exception_cache_acquire() const {
   return Atomic::load_acquire(&_exception_cache);
 }
@@ -252,7 +252,7 @@ ExceptionCache* CompiledMethod::exception_cache_entry_for_exception(Handle excep
   }
   return NULL;
 }
-
+#endif
 //-------------end of code for ExceptionCache--------------
 
 bool CompiledMethod::is_at_poll_return(address pc) {
@@ -275,6 +275,7 @@ bool CompiledMethod::is_at_poll_or_poll_return(address pc) {
   return false;
 }
 
+#ifndef LEYDEN
 void CompiledMethod::verify_oop_relocations() {
   // Ensure sure that the code matches the current oop values
   RelocIterator iter(this, NULL, NULL);
@@ -287,6 +288,7 @@ void CompiledMethod::verify_oop_relocations() {
     }
   }
 }
+#endif
 
 
 ScopeDesc* CompiledMethod::scope_desc_at(address pc) {
@@ -331,6 +333,7 @@ address CompiledMethod::oops_reloc_begin() const {
   return low_boundary;
 }
 
+#ifndef LEYDEN
 int CompiledMethod::verify_icholder_relocations() {
   ResourceMark rm;
   int count = 0;
@@ -352,9 +355,11 @@ int CompiledMethod::verify_icholder_relocations() {
 
   return count;
 }
+#endif
 
 // Method that knows how to preserve outgoing arguments at call. This method must be
 // called with a frame corresponding to a Java invoke
+#ifndef LEYDEN
 void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f) {
   if (method() != NULL && !method()->is_native()) {
     address pc = fr.pc();
@@ -377,7 +382,9 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
     fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
   }
 }
+#endif
 
+#ifndef LEYDEN
 Method* CompiledMethod::attached_method(address call_instr) {
   assert(code_contains(call_instr), "not part of the nmethod");
   RelocIterator iter(this, call_instr, call_instr + 1);
@@ -401,7 +408,6 @@ Method* CompiledMethod::attached_method_before_pc(address pc) {
   }
   return NULL; // not a call
 }
-
 void CompiledMethod::clear_inline_caches() {
   assert(SafepointSynchronize::is_at_safepoint(), "cleaning of IC's only allowed at safepoint");
   if (is_zombie()) {
@@ -428,6 +434,9 @@ void CompiledMethod::clear_ic_callsites() {
   }
 }
 
+#endif
+
+#ifndef LEYDEN
 #ifdef ASSERT
 // Check class_loader is alive for this bit of metadata.
 class CheckClass : public MetadataClosure {
@@ -554,6 +563,7 @@ static bool clean_if_nmethod_is_unloaded(CompiledStaticCall *csc, CompiledMethod
 // nmethods are unloaded.  Return postponed=true in the parallel case for
 // inline caches found that point to nmethods that are not yet visited during
 // the do_unloading walk.
+#ifndef LEYDEN
 bool CompiledMethod::unload_nmethod_caches(bool unloading_occurred) {
   ResourceMark rm;
 
@@ -573,6 +583,8 @@ bool CompiledMethod::unload_nmethod_caches(bool unloading_occurred) {
 #endif
   return true;
 }
+#endif
+#endif
 
 void CompiledMethod::run_nmethod_entry_barrier() {
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
@@ -588,7 +600,7 @@ void CompiledMethod::run_nmethod_entry_barrier() {
     }
   }
 }
-
+#ifndef LEYDEN
 void CompiledMethod::cleanup_inline_caches(bool clean_all) {
   for (;;) {
     ICRefillVerifier ic_refill_verifier;
@@ -694,12 +706,14 @@ bool CompiledMethod::cleanup_inline_caches_impl(bool unloading_occurred, bool cl
 
   return true;
 }
+#endif
 
 address CompiledMethod::continuation_for_implicit_exception(address pc, bool for_div0_check) {
   // Exception happened outside inline-cache check code => we are inside
   // an active nmethod => use cpc to determine a return address
   int exception_offset = pc - code_begin();
   int cont_offset = ImplicitExceptionTable(this).continuation_offset( exception_offset );
+#ifndef LEYDEN
 #ifdef ASSERT
   if (cont_offset == 0) {
     Thread* thread = Thread::current();
@@ -713,6 +727,7 @@ address CompiledMethod::continuation_for_implicit_exception(address pc, bool for
     print_code();
     print_pcs();
   }
+#endif
 #endif
   if (cont_offset == 0) {
     // Let the normal error handling report the exception
@@ -764,3 +779,4 @@ bool CompiledMethod::has_evol_metadata() {
   }
   return check_evol.has_evol_dependency();
 }
+

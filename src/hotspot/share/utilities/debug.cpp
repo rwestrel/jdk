@@ -372,6 +372,7 @@ void report_java_out_of_memory(const char* message) {
   }
 }
 
+#ifndef LEYDEN
 // ------ helper functions for debugging go here ------------
 
 // All debug entries should be wrapped with a stack allocated
@@ -712,6 +713,7 @@ extern "C" void pns2() { // print native stack
 }
 
 #endif // !PRODUCT
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Test multiple STATIC_ASSERT forms in various scopes.

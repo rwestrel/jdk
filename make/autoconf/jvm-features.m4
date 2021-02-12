@@ -46,7 +46,7 @@ m4_define(jvm_features_valid, m4_normalize( \
     \
     aot cds compiler1 compiler2 dtrace epsilongc g1gc graal jfr jni-check \
     jvmci jvmti link-time-opt management minimal nmt opt-size parallelgc \
-    serialgc services shenandoahgc static-build vm-structs zero zgc \
+    serialgc services shenandoahgc static-build vm-structs zero zgc leyden \
 ))
 
 # Deprecated JVM features (these are ignored, but with a warning)
@@ -483,11 +483,11 @@ AC_DEFUN([JVM_FEATURES_PREPARE_VARIANT],
 
   # Check which features should be off by default for this JVM variant.
   if test "x$variant" = "xclient"; then
-    JVM_FEATURES_VARIANT_FILTER="aot compiler2 graal jvmci link-time-opt opt-size"
+    JVM_FEATURES_VARIANT_FILTER="aot compiler2 graal jvmci link-time-opt opt-size leyden"
   elif test "x$variant" = "xminimal"; then
     JVM_FEATURES_VARIANT_FILTER="aot cds compiler2 dtrace epsilongc g1gc \
         graal jfr jni-check jvmci jvmti management nmt parallelgc services \
-        shenandoahgc vm-structs zgc"
+        shenandoahgc vm-structs zgc leyden"
     if test "x$OPENJDK_TARGET_CPU" = xarm ; then
       JVM_FEATURES_VARIANT_FILTER="$JVM_FEATURES_VARIANT_FILTER opt-size"
     else
@@ -497,11 +497,15 @@ AC_DEFUN([JVM_FEATURES_PREPARE_VARIANT],
     fi
   elif test "x$variant" = "xcore"; then
     JVM_FEATURES_VARIANT_FILTER="aot compiler1 compiler2 graal jvmci \
-        link-time-opt opt-size"
+        link-time-opt opt-size leyden"
   elif test "x$variant" = "xzero"; then
-    JVM_FEATURES_VARIANT_FILTER="jfr link-time-opt opt-size"
+    JVM_FEATURES_VARIANT_FILTER="jfr link-time-opt opt-size leyden"
+  elif test "x$variant" = "xleyden"; then
+    JVM_FEATURES_VARIANT_FILTER="aot cds compiler2 dtrace epsilongc g1gc \
+        graal jfr jni-check jvmci jvmti management nmt parallelgc services \
+        shenandoahgc vm-structs zgc compiler1 link-time-opt opt-size"
   else
-    JVM_FEATURES_VARIANT_FILTER="link-time-opt opt-size"
+    JVM_FEATURES_VARIANT_FILTER="link-time-opt opt-size leyden"
   fi
 ])
 
@@ -667,6 +671,7 @@ AC_DEFUN_ONCE([JVM_FEATURES_SETUP],
   AC_SUBST(JVM_FEATURES_core)
   AC_SUBST(JVM_FEATURES_zero)
   AC_SUBST(JVM_FEATURES_custom)
+  AC_SUBST(JVM_FEATURES_leyden)
 
   AC_SUBST(ENABLE_AOT)
   AC_SUBST(INCLUDE_GRAAL)

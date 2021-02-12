@@ -34,9 +34,11 @@
 #include "utilities/ostream.hpp"
 
 // Allocate annotations in metadata area
+#ifndef LEYDEN
 Annotations* Annotations::allocate(ClassLoaderData* loader_data, TRAPS) {
   return new (loader_data, size(), MetaspaceObj::AnnotationsType, THREAD) Annotations();
 }
+#endif
 
 // helper
 void Annotations::free_contents(ClassLoaderData* loader_data, Array<AnnotationArray*>* p) {
