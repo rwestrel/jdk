@@ -46,6 +46,8 @@ void VoidClosure::do_void() {
   ShouldNotCallThis();
 }
 
+#ifndef LEYDEN
+
 void CodeBlobToOopClosure::do_nmethod(nmethod* nm) {
   nm->oops_do(_cl);
   if (_fix_relocations) {
@@ -53,11 +55,15 @@ void CodeBlobToOopClosure::do_nmethod(nmethod* nm) {
   }
 }
 
+#endif
+
 void CodeBlobToOopClosure::do_code_blob(CodeBlob* cb) {
+#ifndef LEYDEN
   nmethod* nm = cb->as_nmethod_or_null();
   if (nm != NULL) {
     do_nmethod(nm);
   }
+#endif
 }
 
 void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {

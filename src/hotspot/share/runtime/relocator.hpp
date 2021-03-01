@@ -29,6 +29,7 @@
 #include "oops/method.hpp"
 #include "utilities/bytes.hpp"
 
+#ifndef LEYDEN
 // This code has been converted from the 1.1E java virtual machine
 // Thanks to the JavaTopics group for using the code
 
@@ -128,5 +129,7 @@ class Relocator : public ResourceObj {
       _listener->relocated(bci, delta, new_code_length);
   }
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_RELOCATOR_HPP

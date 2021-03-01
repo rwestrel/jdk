@@ -28,6 +28,8 @@
 #include "oops/constantPool.hpp"
 #include "oops/instanceKlass.hpp"
 
+#ifndef LEYDEN
+
 // BootstrapInfo provides condensed information from the constant pool
 // necessary to invoke a bootstrap method.
 class BootstrapInfo : public StackObj {
@@ -116,5 +118,7 @@ class BootstrapInfo : public StackObj {
   void print() { print_msg_on(tty); }
   void print_msg_on(outputStream* st, const char* msg = NULL);
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_BOOTSTRAPINFO_HPP

@@ -29,6 +29,7 @@
 #include "interpreter/linkResolver.hpp"
 #include "oops/compiledICHolder.hpp"
 #include "runtime/safepointVerifiers.hpp"
+#ifndef LEYDEN
 
 //-----------------------------------------------------------------------------
 // The CompiledIC represents a compiled inline cache.
@@ -452,5 +453,6 @@ private:
   virtual address resolve_call_stub() const;
   virtual const char* name() const { return "CompiledDirectStaticCall"; }
 };
-
+#endif
 #endif // SHARE_CODE_COMPILEDIC_HPP
+

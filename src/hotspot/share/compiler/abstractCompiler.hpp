@@ -29,6 +29,8 @@
 #include "compiler/compilerDefinitions.hpp"
 #include "compiler/compilerDirectives.hpp"
 
+#ifndef LEYDEN
+
 typedef void (*initializer)(void);
 
 // Per-compiler statistics
@@ -172,5 +174,7 @@ class AbstractCompiler : public CHeapObj<mtCompiler> {
 
   CompilerStatistics* stats() { return &_stats; }
 };
+
+#endif
 
 #endif // SHARE_COMPILER_ABSTRACTCOMPILER_HPP

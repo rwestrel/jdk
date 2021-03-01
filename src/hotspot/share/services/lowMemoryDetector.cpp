@@ -319,12 +319,14 @@ void SensorInfo::trigger(int count, TRAPS) {
        args.push_oop(usage_h);
     }
 
+#ifndef LEYDEN
     JavaCalls::call_virtual(&result,
                         sensorKlass,
                         vmSymbols::trigger_name(),
                         trigger_method_signature,
                         &args,
                         THREAD);
+#endif
 
     if (HAS_PENDING_EXCEPTION) {
        // We just clear the OOM pending exception that we might have encountered
@@ -366,12 +368,14 @@ void SensorInfo::clear(int count, TRAPS) {
     JavaValue result(T_VOID);
     JavaCallArguments args(sensor);
     args.push_int((int) count);
+#ifndef LEYDEN
     JavaCalls::call_virtual(&result,
                             sensorKlass,
                             vmSymbols::clear_name(),
                             vmSymbols::int_void_signature(),
                             &args,
                             CHECK);
+#endif
   }
 }
 

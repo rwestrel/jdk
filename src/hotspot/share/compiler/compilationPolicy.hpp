@@ -30,6 +30,8 @@
 #include "oops/methodData.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+#ifndef LEYDEN
+
 class CompileTask;
 class CompileQueue;
 /*
@@ -272,5 +274,7 @@ public:
   // Return highest level possible
   static CompLevel highest_compile_level();
 };
+
+#endif
 
 #endif // SHARE_COMPILER_COMPILATIONPOLICY_HPP

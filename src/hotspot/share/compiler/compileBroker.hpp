@@ -32,6 +32,8 @@
 #include "runtime/atomic.hpp"
 #include "runtime/perfDataTypes.hpp"
 #include "utilities/stack.hpp"
+
+#ifndef LEYDEN
 #if INCLUDE_JVMCI
 #include "jvmci/jvmciCompiler.hpp"
 #endif
@@ -423,5 +425,7 @@ public:
   static void print_info(outputStream *out);
   static void print_heapinfo(outputStream *out, const char* function, size_t granularity);
 };
+
+#endif
 
 #endif // SHARE_COMPILER_COMPILEBROKER_HPP

@@ -32,6 +32,8 @@
 #include "oops/typeArrayOop.hpp"
 #include "utilities/accessFlags.hpp"
 
+#ifndef LEYDEN
+
 class Annotations;
 template <typename T>
 class Array;
@@ -604,5 +606,7 @@ class ClassFileParser {
 #endif
 
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_CLASSFILEPARSER_HPP

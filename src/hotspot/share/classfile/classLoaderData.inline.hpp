@@ -32,6 +32,7 @@
 #include "oops/oopHandle.inline.hpp"
 #include "oops/weakHandle.inline.hpp"
 
+#ifndef LEYDEN
 inline oop ClassLoaderData::class_loader() const {
   assert(!_unloading, "This oop is not available to unloading class loader data");
   assert(_holder.is_null() || holder_no_keepalive() != NULL , "This class loader data holder must be alive");
@@ -55,4 +56,5 @@ inline ClassLoaderData* ClassLoaderData::class_loader_data(oop loader) {
   return loader_data;
 }
 
+#endif
 #endif // SHARE_CLASSFILE_CLASSLOADERDATA_INLINE_HPP

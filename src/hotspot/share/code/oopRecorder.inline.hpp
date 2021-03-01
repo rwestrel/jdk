@@ -28,6 +28,8 @@
 #include "code/oopRecorder.hpp"
 #include "memory/universe.hpp"
 
+#ifndef LEYDEN
+
 template <class T>
 bool ValueRecorder<T>::is_real(T h) {
   return h != NULL && h != (T)Universe::non_oop_word();
@@ -40,5 +42,7 @@ bool OopRecorder::is_real(jobject h) {
 bool OopRecorder::is_real(Metadata* h) {
   return _metadata.is_real(h);
 }
+
+#endif
 
 #endif // SHARE_CODE_OOPRECORDER_INLINE_HPP

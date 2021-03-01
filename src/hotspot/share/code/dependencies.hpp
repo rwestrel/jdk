@@ -52,6 +52,8 @@
 // indexing between classes and nmethods to make dependency
 // checking reasonably efficient.
 
+#ifndef LEYDEN
+
 class ciEnv;
 class nmethod;
 class OopRecorder;
@@ -805,5 +807,7 @@ class CallSiteDepChange : public DepChange {
   oop call_site()     const { return _call_site();     }
   oop method_handle() const { return _method_handle(); }
 };
+
+#endif
 
 #endif // SHARE_CODE_DEPENDENCIES_HPP

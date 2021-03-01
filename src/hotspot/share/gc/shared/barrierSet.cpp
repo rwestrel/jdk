@@ -51,9 +51,11 @@ void BarrierSet::set_barrier_set(BarrierSet* barrier_set) {
 
 // Called from init.cpp
 void gc_barrier_stubs_init() {
+#ifndef LEYDEN
   BarrierSet* bs = BarrierSet::barrier_set();
 #ifndef ZERO
   BarrierSetAssembler* bs_assembler = bs->barrier_set_assembler();
   bs_assembler->barrier_stubs_init();
+#endif
 #endif
 }

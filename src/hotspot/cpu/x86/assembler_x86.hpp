@@ -28,6 +28,8 @@
 #include "asm/register.hpp"
 #include "utilities/powerOfTwo.hpp"
 
+#ifndef LEYDEN
+
 class BiasedLockingCounters;
 
 // Contains all the definitions needed for x86 assembly code generation.
@@ -55,7 +57,7 @@ class Argument {
 #endif // _LP64
   };
 };
-
+#endif
 
 #ifdef _LP64
 // Symbolically name the register arguments used by the c calling convention.
@@ -145,6 +147,7 @@ REGISTER_DECLARATION(Register, r15_thread, r15); // callee-saved
 #define rscratch2 noreg
 
 #endif // _LP64
+#ifndef LEYDEN
 
 // JSR 292
 // On x86, the SP does not have to be saved when invoking method handle intrinsics
@@ -451,11 +454,15 @@ const int FPUStateSizeInWords = NOT_LP64(27) LP64_ONLY(2688 / wordSize);
 // The Intel x86/Amd64 Assembler: Pure assembler doing NO optimizations on the instruction
 // level (e.g. mov rax, 0 is not translated into xor rax, rax!); i.e., what you write
 // is what you get. The Assembler is generating code into a CodeBuffer.
-
+#endif
 class Assembler : public AbstractAssembler  {
+#ifndef LEYDEN
+
   friend class AbstractAssembler; // for the non-virtual hack
   friend class LIR_Assembler; // as_Address()
   friend class StubGenerator;
+
+#endif
 
  public:
   enum Condition {                     // The x86 condition codes used for conditional jumps/moves.
@@ -647,6 +654,8 @@ class Assembler : public AbstractAssembler  {
     D = 2,
     Q = 3
   };
+
+#ifndef LEYDEN
 
   //---<  calculate length of instruction  >---
   // As instruction size can't be found out easily on x86/x64,
@@ -2487,9 +2496,9 @@ private:
   void andps(XMMRegister dst, Address src);
   void xorpd(XMMRegister dst, Address src);
   void xorps(XMMRegister dst, Address src);
-
+#endif
 };
-
+#ifndef LEYDEN
 // The Intel x86/Amd64 Assembler attributes: All fields enclosed here are to guide encoding level decisions.
 // Specific set functions are for specialized use, else defaults or whatever was supplied to object construction
 // are applied.
@@ -2591,5 +2600,5 @@ public:
   }
 
 };
-
+#endif
 #endif // CPU_X86_ASSEMBLER_X86_HPP

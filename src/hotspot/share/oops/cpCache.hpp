@@ -34,6 +34,8 @@
 #include "utilities/constantTag.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
+
 class PSPromotionManager;
 
 // The ConstantPoolCache is not a cache! It is the resolution table that the
@@ -518,5 +520,7 @@ class ConstantPoolCache: public MetaspaceObj {
   // Verify
   void verify_on(outputStream* st);
 };
+
+#endif
 
 #endif // SHARE_OOPS_CPCACHE_HPP

@@ -155,17 +155,29 @@ class Method : public Metadata {
   void set_access_flags(AccessFlags flags)       { _access_flags = flags; }
 
   // name
+#ifndef LEYDEN
+
   Symbol* name() const                           { return constants()->symbol_at(name_index()); }
+
+#endif
   int name_index() const                         { return constMethod()->name_index();         }
   void set_name_index(int index)                 { constMethod()->set_name_index(index);       }
 
   // signature
+#ifndef LEYDEN
+
   Symbol* signature() const                      { return constants()->symbol_at(signature_index()); }
+
+#endif
   int signature_index() const                    { return constMethod()->signature_index();         }
   void set_signature_index(int index)            { constMethod()->set_signature_index(index);       }
 
   // generics support
+#ifndef LEYDEN
+
   Symbol* generic_signature() const              { int idx = generic_signature_index(); return ((idx != 0) ? constants()->symbol_at(idx) : (Symbol*)NULL); }
+
+#endif
   int generic_signature_index() const            { return constMethod()->generic_signature_index(); }
   void set_generic_signature_index(int index)    { constMethod()->set_generic_signature_index(index); }
 
@@ -206,12 +218,15 @@ class Method : public Metadata {
   static const char* external_name(                  Klass* klass, Symbol* method_name, Symbol* signature);
   static void  print_external_name(outputStream *os, Klass* klass, Symbol* method_name, Symbol* signature);
 
+#ifndef LEYDEN
+
   Bytecodes::Code java_code_at(int bci) const {
     return Bytecodes::java_code_at(this, bcp_from(bci));
   }
   Bytecodes::Code code_at(int bci) const {
     return Bytecodes::code_at(this, bcp_from(bci));
   }
+
 
   // JVMTI breakpoints
 #if !INCLUDE_JVMTI
@@ -259,6 +274,7 @@ class Method : public Metadata {
     }
   }
 #endif // !INCLUDE_JVMTI
+#endif
 
   // index into InstanceKlass methods() array
   // note: also used by jfr
@@ -592,7 +608,11 @@ public:
                        { return constMethod()->compressed_linenumber_table(); }
 
   // method holder (the Klass* holding this method)
+#ifndef LEYDEN
+
   InstanceKlass* method_holder() const         { return constants()->pool_holder(); }
+
+#endif
 
   Symbol* klass_name() const;                    // returns the name of the method holder
   BasicType result_type() const                  { return constMethod()->result_type(); }
@@ -849,7 +869,11 @@ public:
   // (see AsyncGetCallTrace support for Forte Analyzer) and this
   // needs to be async-safe. No allocation should be done and
   // so handles are not used to avoid deadlock.
+#ifndef LEYDEN
+
   jmethodID find_jmethod_id_or_null()               { return method_holder()->jmethod_id_or_null(this); }
+
+#endif
 
   // Support for inlining of intrinsic methods
   vmIntrinsicID intrinsic_id() const          { return (vmIntrinsicID) _intrinsic_id;           }
@@ -926,6 +950,8 @@ public:
   bool is_overpass() const { return method_type() == ConstMethod::OVERPASS; }
 
   // On-stack replacement support
+#ifndef LEYDEN
+
   bool has_osr_nmethod(int level, bool match_level) {
    return method_holder()->lookup_osr_nmethod(this, InvocationEntryBci, level, match_level) != NULL;
   }
@@ -938,6 +964,8 @@ public:
     return method_holder()->lookup_osr_nmethod(this, bci, level, match_level);
   }
 
+#endif
+
   // Find if klass for method is loaded
   bool is_klass_loaded_by_klass_index(int klass_index) const;
   bool is_klass_loaded(int refinfo_index, bool must_be_resolved = false) const;
@@ -945,6 +973,8 @@ public:
   // Indicates whether compilation failed earlier for this method, or
   // whether it is not compilable for another reason like having a
   // breakpoint set in it.
+#ifndef LEYDEN
+
   bool  is_not_compilable(int comp_level = CompLevel_any) const;
   void set_not_compilable(const char* reason, int comp_level = CompLevel_all, bool report = true);
   void set_not_compilable_quietly(const char* reason, int comp_level = CompLevel_all) {
@@ -957,8 +987,14 @@ public:
   }
   bool is_always_compilable() const;
 
+#endif
+
  private:
+#ifndef LEYDEN
+
   void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason);
+
+#endif
 
  public:
 #ifndef LEYDEN
@@ -1013,6 +1049,8 @@ public:
 
   void release_C_heap_structures();
 
+#ifndef LEYDEN
+
   Method* get_new_method() const {
     InstanceKlass* holder = method_holder();
     Method* new_method = holder->method_with_idnum(orig_method_idnum());
@@ -1021,6 +1059,8 @@ public:
     assert(this != new_method, "sanity check");
     return new_method;
   }
+
+#endif
 
   // Printing
 #ifndef PRODUCT

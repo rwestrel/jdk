@@ -34,6 +34,7 @@
 #include "runtime/thread.hpp"
 #include "runtime/vmThread.hpp"
 
+#ifndef LEYDEN
 // This file contains the platform-independent parts
 // of the abstract interpreter and the abstract interpreter generator.
 
@@ -299,5 +300,7 @@ class AbstractInterpreterGenerator: public StackObj {
  public:
   AbstractInterpreterGenerator(StubQueue* _code);
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_ABSTRACTINTERPRETER_HPP

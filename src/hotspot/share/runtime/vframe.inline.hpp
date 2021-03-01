@@ -67,9 +67,11 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
 }
 
 inline bool vframeStreamCommon::fill_in_compiled_inlined_sender() {
+#ifndef LEYDEN
   if (_sender_decode_offset == DebugInformationRecorder::serialized_null) {
     return false;
   }
+#endif
   fill_from_compiled_frame(_sender_decode_offset);
   ++_vframe_id;
   return true;
@@ -81,7 +83,10 @@ inline void vframeStreamCommon::fill_from_compiled_frame(int decode_offset) {
   _decode_offset = decode_offset;
 
   // Range check to detect ridiculous offsets.
-  if (decode_offset == DebugInformationRecorder::serialized_null ||
+  if (
+#ifndef LEYDEN
+decode_offset == DebugInformationRecorder::serialized_null ||
+#endif
       decode_offset < 0 ||
       decode_offset >= nm()->scopes_data_size()) {
     // 6379830 AsyncGetCallTrace sometimes feeds us wild frames.
@@ -122,8 +127,10 @@ inline void vframeStreamCommon::fill_from_compiled_frame(int decode_offset) {
 // since the pc might not be exact due to the _last_native_pc trick.
 inline void vframeStreamCommon::fill_from_compiled_native_frame() {
   _mode = compiled_mode;
+#ifndef LEYDEN
   _sender_decode_offset = DebugInformationRecorder::serialized_null;
   _decode_offset = DebugInformationRecorder::serialized_null;
+#endif
   _vframe_id = 0;
   _method = nm()->method();
   _bci = 0;
@@ -189,7 +196,9 @@ inline bool vframeStreamCommon::fill_from_frame() {
 
           return true;
         }
+#ifndef LEYDEN
         decode_offset = DebugInformationRecorder::serialized_null;
+#endif
       } else {
         decode_offset = pc_desc->scope_decode_offset();
       }

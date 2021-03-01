@@ -33,6 +33,7 @@
 #include "runtime/thread.hpp"
 #include "utilities/growableArray.hpp"
 
+
 // Classes used for serializing debugging information.
 // These abstractions are introducted to provide symmetric
 // read and write operations.
@@ -74,7 +75,11 @@ class ScopeValue: public ResourceObj {
   }
 
   // Serialization of debugging information
+#ifndef LEYDEN
+
   virtual void write_on(DebugInfoWriteStream* stream) = 0;
+
+#endif
   static ScopeValue* read_from(DebugInfoReadStream* stream);
 };
 
@@ -257,7 +262,12 @@ class ConstantOopReadValue: public ScopeValue {
 
   // Serialization of debugging information
   ConstantOopReadValue(DebugInfoReadStream* stream);
+
+#ifndef LEYDEN
+
   void write_on(DebugInfoWriteStream* stream);
+
+#endif
 
   // Printing
   void print_on(outputStream* st) const;
@@ -281,7 +291,12 @@ class MonitorValue: public ResourceObj {
 
   // Serialization of debugging information
   MonitorValue(DebugInfoReadStream* stream);
+
+#ifndef LEYDEN
+
   void write_on(DebugInfoWriteStream* stream);
+
+#endif
 
   // Printing
   void print_on(outputStream* st) const;
@@ -319,6 +334,8 @@ class DebugInfoReadStream : public CompressedReadStream {
 // DebugInfoWriteStream specializes CompressedWriteStream for
 // writing debugging information. Used by ScopeDescRecorder.
 
+#ifndef LEYDEN
+
 class DebugInfoWriteStream : public CompressedWriteStream {
  private:
   DebugInformationRecorder* _recorder;
@@ -330,5 +347,7 @@ class DebugInfoWriteStream : public CompressedWriteStream {
 
   void write_metadata(Metadata* m);
 };
+
+#endif
 
 #endif // SHARE_CODE_DEBUGINFO_HPP

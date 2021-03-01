@@ -391,12 +391,15 @@ void xmlStream::method(Method* method) {
   print_raw(" method='");
   method_text(method);
   print("' bytes='%d'", method->code_size());
+#ifndef LEYDEN
   print(" count='%d'", method->invocation_count());
   int bec = method->backedge_count();
   if (bec != 0)  print(" backedge_count='%d'", bec);
+#endif
   print(" iicount='%d'", method->interpreter_invocation_count());
   int throwouts = method->interpreter_throwout_count();
   if (throwouts != 0)  print(" throwouts='%d'", throwouts);
+#ifndef LEYDEN
   MethodData* mdo = method->method_data();
   if (mdo != NULL) {
     uint cnt;
@@ -411,17 +414,24 @@ void xmlStream::method(Method* method) {
     cnt = mdo->overflow_recompile_count();
     if (cnt != 0)  print(" overflow_recompiles='%d'", cnt);
   }
+#endif
 }
 
 void xmlStream::method_text(Method* method) {
+#ifndef LEYDEN
   ResourceMark rm;
   assert_if_no_error(inside_attrs(), "printing attributes");
   if (method == NULL)  return;
+#ifndef LEYDEN
   text()->print("%s", method->method_holder()->external_name());
+#endif
   print_raw(" ");  // " " is easier for tools to parse than "::"
   method->name()->print_symbol_on(text());
   print_raw(" ");  // separator
+#ifndef LEYDEN
   method->signature()->print_symbol_on(text());
+#endif
+#endif
 }
 
 

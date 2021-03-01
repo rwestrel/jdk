@@ -200,9 +200,15 @@ void Universe::basic_type_classes_do(KlassClosure *closure) {
   }
 }
 
+#ifndef LEYDEN
+
 void LatestMethodCache::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_klass);
 }
+
+#endif
+
+#ifndef LEYDEN
 
 void Universe::metaspace_pointers_do(MetaspaceClosure* it) {
   for (int i = 0; i < T_LONG+1; i++) {
@@ -223,6 +229,8 @@ void Universe::metaspace_pointers_do(MetaspaceClosure* it) {
   _throw_no_such_method_error_cache->metaspace_pointers_do(it);
   _do_stack_walk_cache->metaspace_pointers_do(it);
 }
+
+#endif
 
 // Serialize metadata and pointers to primitive type mirrors in and out of CDS archive
 void Universe::serialize(SerializeClosure* f) {
@@ -308,12 +316,12 @@ void Universe::genesis(TRAPS) {
 
     { MutexLocker mc(THREAD, Compile_lock);
 
+#ifndef LEYDEN
       java_lang_Class::allocate_fixup_lists();
 
       // determine base vtable size; without that we cannot create the array klasses
       compute_base_vtable_size();
 
-#ifndef LEYDEN
       if (!UseSharedSpaces) {
         for (int i = T_BOOLEAN; i < T_LONG+1; i++) {
           _typeArrayKlassObjs[i] = TypeArrayKlass::create_klass((BasicType)i, CHECK);
@@ -331,8 +339,9 @@ void Universe::genesis(TRAPS) {
 #endif
     }
 
-    vmSymbols::initialize(CHECK);
 
+#ifndef LEYDEN
+    vmSymbols::initialize(CHECK);
     SystemDictionary::initialize(CHECK);
 
     // Create string constants
@@ -340,7 +349,7 @@ void Universe::genesis(TRAPS) {
     _the_null_string = OopHandle(vm_global(), s);
     s = StringTable::intern("-2147483648", CHECK);
     _the_min_jint_string = OopHandle(vm_global(), s);
-
+#endif
 
 #if INCLUDE_CDS
     if (UseSharedSpaces) {
@@ -369,11 +378,12 @@ void Universe::genesis(TRAPS) {
 #endif
   } // end of core bootstrapping
 
+#ifndef LEYDEN
   {
     Handle tns = java_lang_String::create_from_str("<null_sentinel>", CHECK);
     _the_null_sentinel = OopHandle(vm_global(), tns());
   }
-
+#endif
   // Create a handle for reference_pending_list
   _reference_pending_list = OopHandle(vm_global(), NULL);
 
@@ -450,6 +460,7 @@ void Universe::initialize_basic_type_mirrors(TRAPS) {
     } else
       // _mirror[T_INT} could be NULL if archived heap is not mapped.
 #endif
+#ifndef LEYDEN
     {
       for (int i = T_BOOLEAN; i < T_VOID+1; i++) {
         BasicType bt = (BasicType)i;
@@ -459,8 +470,10 @@ void Universe::initialize_basic_type_mirrors(TRAPS) {
         }
       }
     }
+#endif
 }
 
+#ifndef LEYDEN
 void Universe::fixup_mirrors(TRAPS) {
   // Bootstrap problem: all classes gets a mirror (java.lang.Class instance) assigned eagerly,
   // but we cannot do that for classes created before java.lang.Class is loaded. Here we simply
@@ -485,6 +498,7 @@ void Universe::fixup_mirrors(TRAPS) {
   delete java_lang_Class::fixup_mirror_list();
   java_lang_Class::set_fixup_mirror_list(NULL);
 }
+#endif
 
 #define assert_pll_locked(test) \
   assert(Heap_lock->test(), "Reference pending list access requires lock")
@@ -540,8 +554,6 @@ void Universe::reinitialize_vtables(TRAPS) {
   Klass* ok = vmClasses::Object_klass();
   Universe::reinitialize_vtable_of(ok, THREAD);
 }
-#endif
-
 void initialize_itable_for_klass(InstanceKlass* k, TRAPS) {
   k->itable().initialize_itable(false, CHECK);
 }
@@ -551,6 +563,8 @@ void Universe::reinitialize_itables(TRAPS) {
   MutexLocker mcld(THREAD, ClassLoaderDataGraph_lock);
   ClassLoaderDataGraph::dictionary_classes_do(initialize_itable_for_klass, CHECK);
 }
+#endif
+
 
 
 bool Universe::on_page_boundary(void* addr) {
@@ -614,6 +628,7 @@ bool Universe::should_fill_in_stack_trace(Handle throwable) {
 
 
 oop Universe::gen_out_of_memory_error(oop default_err) {
+#ifndef LEYDEN
   // generate an out of memory error:
   // - if there is a preallocated error and stack traces are available
   //   (j.l.Throwable is initialized), then return the preallocated
@@ -650,10 +665,14 @@ oop Universe::gen_out_of_memory_error(oop default_err) {
     java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(exc);
     return exc();
   }
+#else
+  return NULL;
+#endif
 }
 
 // Setup preallocated OutOfMemoryError errors
 void Universe::create_preallocated_out_of_memory_errors(TRAPS) {
+#ifndef LEYDEN
   InstanceKlass* ik = vmClasses::OutOfMemoryError_klass();
   objArrayOop oa = oopFactory::new_objArray(ik, _oom_count, CHECK);
   objArrayHandle oom_array(THREAD, oa);
@@ -701,6 +720,7 @@ void Universe::create_preallocated_out_of_memory_errors(TRAPS) {
     preallocated_oom_array->obj_at_put(i, err_h());
   }
   _preallocated_out_of_memory_error_avail_count = (jint)len;
+#endif
 }
 
 intptr_t Universe::_non_oop_bits = 0;
@@ -766,7 +786,9 @@ jint universe_init() {
 
   // Create memory for metadata.  Must be after initializing heap for
   // DumpSharedSpaces.
+#ifndef LEYDEN
   ClassLoaderData::init_null_class_loader_data();
+#endif
 
   // We have a heap so create the Method* caches before
   // Metaspace::initialize_shared_spaces() tries to populate them.
@@ -788,8 +810,10 @@ jint universe_init() {
   } else
 #endif
   {
+#ifndef LEYDEN
     SymbolTable::create_table();
     StringTable::create_table();
+#endif
   }
 
 #if INCLUDE_CDS
@@ -802,8 +826,9 @@ jint universe_init() {
     Universe::initialize_verify_flags();
   }
 
+#ifndef LEYDEN
   ResolvedMethodTable::create_table();
-
+#endif
   return JNI_OK;
 }
 
@@ -955,8 +980,8 @@ bool universe_post_init() {
     ResourceMark rm;
 #ifndef LEYDEN
     Universe::reinitialize_vtables(CHECK_false);
-#endif
     Universe::reinitialize_itables(CHECK_false);
+#endif
   }
 
   HandleMark hm(THREAD);
@@ -971,7 +996,9 @@ bool universe_post_init() {
   oop instance;
   // Setup preallocated cause message for delayed StackOverflowError
   if (StackReservedPages > 0) {
+#ifndef LEYDEN
     instance = java_lang_String::create_oop_from_str("Delayed StackOverflowError due to ReservedStackAccess annotated method", CHECK_false);
+#endif
     Universe::_delayed_stack_overflow_error_message = OopHandle(Universe::vm_global(), instance);
   }
 
@@ -999,8 +1026,10 @@ bool universe_post_init() {
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_virtual_machine_error_instance = OopHandle(Universe::vm_global(), instance);
 
+#ifndef LEYDEN
   Handle msg = java_lang_String::create_from_str("/ by zero", CHECK_false);
   java_lang_Throwable::set_message(Universe::arithmetic_exception_instance(), msg());
+#endif
 
 #ifndef LEYDEN
   Universe::initialize_known_methods(CHECK_false);
@@ -1016,9 +1045,11 @@ bool universe_post_init() {
   // ("weak") refs processing infrastructure initialization
   Universe::heap()->post_initialize();
 
+#ifndef LEYDEN
   MemoryService::add_metaspace_memory_pools();
-
   MemoryService::set_universe_heap(Universe::heap());
+#endif
+
 #if INCLUDE_CDS
   MetaspaceShared::post_initialize(CHECK_false);
 #endif
@@ -1027,7 +1058,9 @@ bool universe_post_init() {
 
 
 void Universe::compute_base_vtable_size() {
+#ifndef LEYDEN
   _base_vtable_size = ClassLoader::compute_Object_vtable();
+#endif
 }
 
 void Universe::print_on(outputStream* st) {
@@ -1093,6 +1126,7 @@ bool Universe::should_verify_subset(uint subset) {
 }
 
 void Universe::verify(VerifyOption option, const char* prefix) {
+#ifndef LEYDEN
   // The use of _verify_in_progress is a temporary work around for
   // 6320749.  Don't bother with a creating a class to set and clear
   // it since it is only used in this method and the control flow is
@@ -1161,6 +1195,7 @@ void Universe::verify(VerifyOption option, const char* prefix) {
   }
 
   _verify_in_progress = false;
+#endif
 }
 
 

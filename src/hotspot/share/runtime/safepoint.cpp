@@ -565,7 +565,6 @@ public:
       Tracer t("compilation policy safepoint handler");
       CompilationPolicy::do_safepoint_work();
     }
-#endif
 
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_SYMBOL_TABLE_REHASH)) {
       if (SymbolTable::needs_rehashing()) {
@@ -575,7 +574,6 @@ public:
     }
 
 
-#ifndef LEYDEN
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_STRING_TABLE_REHASH)) {
       if (StringTable::needs_rehashing()) {
         Tracer t("rehashing string table");

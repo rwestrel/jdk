@@ -33,6 +33,7 @@
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+#ifndef LEYDEN
 
 template <typename T, class OopClosureType>
 void InstanceMirrorKlass::oop_oop_iterate_statics(oop obj, OopClosureType* closure) {
@@ -136,5 +137,6 @@ void InstanceMirrorKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closu
 
   oop_oop_iterate_statics_bounded<T>(obj, closure, mr);
 }
-
+#endif
 #endif // SHARE_OOPS_INSTANCEMIRRORKLASS_INLINE_HPP
+

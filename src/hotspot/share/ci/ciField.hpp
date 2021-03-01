@@ -31,6 +31,8 @@
 #include "ci/ciInstance.hpp"
 #include "ci/ciUtilities.hpp"
 
+#ifndef LEYDEN
+
 // ciField
 //
 // This class represents the result of a field lookup in the VM.
@@ -186,5 +188,7 @@ public:
   void print();
   void print_name_on(outputStream* st);
 };
+
+#endif
 
 #endif // SHARE_CI_CIFIELD_HPP

@@ -28,6 +28,8 @@
 #include "oops/fieldStreams.hpp"
 #include "runtime/thread.inline.hpp"
 
+#ifndef LEYDEN
+
 FieldStreamBase::FieldStreamBase(Array<u2>* fields, ConstantPool* constants, int start, int limit) : _fields(fields),
          _constants(constantPoolHandle(Thread::current(), constants)), _index(start) {
   _index = start;
@@ -50,5 +52,7 @@ FieldStreamBase::FieldStreamBase(InstanceKlass* klass) : _fields(klass->fields()
   init_generic_signature_start_slot();
   assert(klass == field_holder(), "");
 }
+
+#endif
 
 #endif // SHARE_OOPS_FIELDSTREAMS_INLINE_HPP

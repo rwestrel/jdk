@@ -86,7 +86,11 @@ inline void name##Handle::remove() {                                   \
 name##Handle::~name##Handle () { remove(); }                           \
 
 DEF_METADATA_HANDLE_FN_NOINLINE(method, Method)
+
+#ifndef LEYDEN
 DEF_METADATA_HANDLE_FN_NOINLINE(constantPool, ConstantPool)
+
+#endif
 
 
 static uintx chunk_oops_do(OopClosure* f, Chunk* chunk, char* chunk_top) {

@@ -41,6 +41,8 @@ Annotations* Annotations::allocate(ClassLoaderData* loader_data, TRAPS) {
 #endif
 
 // helper
+#ifndef LEYDEN
+
 void Annotations::free_contents(ClassLoaderData* loader_data, Array<AnnotationArray*>* p) {
   if (p != NULL) {
     for (int i = 0; i < p->length(); i++) {
@@ -62,6 +64,8 @@ void Annotations::deallocate_contents(ClassLoaderData* loader_data) {
   free_contents(loader_data, fields_type_annotations());
 }
 
+#endif
+
 // Copy annotations to JVM call or reflection to the java heap.
 // The alternative to creating this array and adding to Java heap pressure
 // is to have a hashtable of the already created typeArrayOops
@@ -78,6 +82,8 @@ typeArrayOop Annotations::make_java_array(AnnotationArray* annotations, TRAPS) {
   }
 }
 
+#ifndef LEYDEN
+
 void Annotations::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(Annotations): %p", this);
   it->push(&_class_annotations);
@@ -85,6 +91,8 @@ void Annotations::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_class_type_annotations);
   it->push(&_fields_type_annotations); // FIXME: need a test case where _fields_type_annotations != NULL
 }
+
+#endif
 
 void Annotations::print_value_on(outputStream* st) const {
   st->print("Annotations(" INTPTR_FORMAT ")", p2i(this));

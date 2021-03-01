@@ -34,6 +34,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 // This file contains platform-independent assembler declarations.
 
 class MacroAssembler;
@@ -202,11 +203,13 @@ class RegisterOrConstant {
   bool is_register() const { return _r != noreg; }
   bool is_constant() const { return _r == noreg; }
 };
-
+#endif
 // The Abstract Assembler: Pure assembler doing NO optimizations on the
 // instruction level; i.e., what you write is what you get.
 // The Assembler is generating code into a CodeBuffer.
 class AbstractAssembler : public ResourceObj  {
+#ifndef LEYDEN
+
   friend class Label;
 
  protected:
@@ -450,8 +453,11 @@ class AbstractAssembler : public ResourceObj  {
    */
   void pd_patch_instruction(address branch, address target, const char* file, int line);
 
+#endif
+
 };
 
 #include CPU_HEADER(assembler)
+
 
 #endif // SHARE_ASM_ASSEMBLER_HPP

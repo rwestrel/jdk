@@ -39,6 +39,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
+#ifndef LEYDEN
 #define UNNAMED_MODULE "unnamed module"
 #define UNNAMED_MODULE_LEN 14
 #define JAVAPKG "java"
@@ -298,5 +299,8 @@ public:
                              Array<ModuleEntry*>* archived_modules);
 #endif
 };
+#else
+#define JAVA_BASE_NAME "java.base"
+#endif
 
 #endif // SHARE_CLASSFILE_MODULEENTRY_HPP

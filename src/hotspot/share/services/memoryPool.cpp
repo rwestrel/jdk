@@ -89,7 +89,11 @@ instanceOop MemoryPool::get_memory_pool_instance(TRAPS) {
     // Extra pool instances will just be gc'ed.
     InstanceKlass* ik = Management::sun_management_ManagementFactoryHelper_klass(CHECK_NULL);
 
+#ifndef LEYDEN
     Handle pool_name = java_lang_String::create_from_str(_name, CHECK_NULL);
+#else
+    Handle pool_name;
+#endif
     jlong usage_threshold_value = (_usage_threshold->is_high_threshold_supported() ? 0 : -1L);
     jlong gc_usage_threshold_value = (_gc_usage_threshold->is_high_threshold_supported() ? 0 : -1L);
 
@@ -104,12 +108,14 @@ instanceOop MemoryPool::get_memory_pool_instance(TRAPS) {
     args.push_long(usage_threshold_value);    // Argument 3
     args.push_long(gc_usage_threshold_value); // Argument 4
 
+#ifndef LEYDEN
     JavaCalls::call_static(&result,
                            ik,
                            method_name,
                            signature,
                            &args,
                            CHECK_NULL);
+#endif
 
     instanceOop p = (instanceOop) result.get_jobject();
     instanceHandle pool(THREAD, p);

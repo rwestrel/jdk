@@ -49,12 +49,16 @@ class SharedRuntime: AllStatic {
   friend class VMStructs;
 
  private:
+#ifndef LEYDEN
+
   static bool resolve_sub_helper_internal(methodHandle callee_method, const frame& caller_frame,
                                           CompiledMethod* caller_nm, bool is_virtual, bool is_optimized,
                                           Handle receiver, CallInfo& call_info, Bytecodes::Code invoke_code, TRAPS);
   static methodHandle resolve_sub_helper(JavaThread *thread,
                                          bool is_virtual,
                                          bool is_optimized, TRAPS);
+
+#endif
 
   // Shared stub locations
 #ifndef LEYDEN

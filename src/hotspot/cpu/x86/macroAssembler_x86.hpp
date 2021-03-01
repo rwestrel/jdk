@@ -30,6 +30,7 @@
 #include "runtime/rtmLocking.hpp"
 #include "runtime/vm_version.hpp"
 
+#ifndef LEYDEN
 // MacroAssembler extends Assembler by frequently used macros.
 //
 // Instructions for which a 'better' code sequence exists depending
@@ -1878,5 +1879,7 @@ class SkipIfEqual {
    SkipIfEqual(MacroAssembler*, const bool* flag_addr, bool value);
    ~SkipIfEqual();
 };
+
+#endif
 
 #endif // CPU_X86_MACROASSEMBLER_X86_HPP

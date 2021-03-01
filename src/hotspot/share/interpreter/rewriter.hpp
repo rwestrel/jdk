@@ -28,6 +28,7 @@
 #include "memory/allocation.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 // The Rewriter adds caches to the constant pool and rewrites bytecode indices
 // pointing into the constant pool for better interpreter performance.
 
@@ -205,5 +206,7 @@ class Rewriter: public StackObj {
   // Driver routine:
   static void rewrite(InstanceKlass* klass, TRAPS);
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_REWRITER_HPP

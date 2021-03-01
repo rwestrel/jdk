@@ -427,14 +427,18 @@ class JavaThreadStatusChanger : public StackObj {
     _java_thread  = java_thread;
     _is_alive = is_alive(java_thread);
     if (is_alive()) {
+#ifndef LEYDEN
       _old_state = java_lang_Thread::get_thread_status(_java_thread->threadObj());
+#endif
     }
   }
 
  public:
   static void set_thread_status(JavaThread* java_thread,
                                 JavaThreadStatus state) {
+#ifndef LEYDEN
     java_lang_Thread::set_thread_status(java_thread->threadObj(), state);
+#endif
   }
 
   void set_thread_status(JavaThreadStatus state) {

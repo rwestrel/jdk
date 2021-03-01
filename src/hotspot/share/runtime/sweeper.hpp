@@ -30,6 +30,8 @@ class WhiteBox;
 #include "code/codeCache.hpp"
 #include "utilities/ticks.hpp"
 
+#ifndef LEYDEN
+
 class CodeBlobClosure;
 
 // An NmethodSweeper is an incremental cleaner for:
@@ -122,5 +124,7 @@ class NMethodSweeper : public AllStatic {
   static void print(outputStream* out);   // Printing/debugging
   static void print() { print(tty); }
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_SWEEPER_HPP

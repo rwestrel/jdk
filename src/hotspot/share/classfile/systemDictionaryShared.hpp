@@ -31,6 +31,7 @@
 #include "oops/klass.hpp"
 #include "oops/oopHandle.hpp"
 
+#ifndef LEYDEN
 
 /*===============================================================================
 
@@ -355,5 +356,6 @@ public:
   static void update_archived_mirror_native_pointers() NOT_CDS_RETURN;
 #endif
 };
-
+#endif
 #endif // SHARE_CLASSFILE_SYSTEMDICTIONARYSHARED_HPP
+

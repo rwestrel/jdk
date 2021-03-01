@@ -168,6 +168,7 @@ int deoptimizeAllCounter = 0;
 int zombieAllCounter = 0;
 
 void InterfaceSupport::zombieAll() {
+#ifndef LEYDEN
   // This method is called by all threads when a thread make
   // transition to VM state (for example, runtime calls).
   // Divide number of calls by number of threads to avoid
@@ -179,9 +180,11 @@ void InterfaceSupport::zombieAll() {
     VMThread::execute(&op);
   }
   zombieAllCounter++;
+#endif
 }
 
 void InterfaceSupport::deoptimizeAll() {
+#ifndef LEYDEN
   // This method is called by all threads when a thread make
   // transition to VM state (for example, runtime calls).
   // Divide number of calls by number of threads to avoid
@@ -198,6 +201,7 @@ void InterfaceSupport::deoptimizeAll() {
     }
   }
   deoptimizeAllCounter++;
+#endif
 }
 
 

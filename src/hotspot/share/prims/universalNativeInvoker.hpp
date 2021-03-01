@@ -27,6 +27,8 @@
 #include "runtime/stubCodeGenerator.hpp"
 #include "prims/foreign_globals.hpp"
 
+#ifndef LEYDEN
+
 class ProgrammableInvoker: AllStatic {
 private:
   static constexpr CodeBuffer::csize_t native_invoker_size = 1024;
@@ -46,5 +48,7 @@ public:
   static void invoke_native(Stub stub, address buff, JavaThread* thread);
   static address generate_adapter(jobject abi, jobject layout);
 };
+
+#endif
 
 #endif // SHARE_VM_PRIMS_UNIVERSALNATIVEINVOKER_HPP

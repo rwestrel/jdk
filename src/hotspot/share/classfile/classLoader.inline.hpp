@@ -29,6 +29,7 @@
 #include "runtime/atomic.hpp"
 #include "runtime/arguments.hpp"
 
+#ifndef LEYDEN
 // Next entry in class path
 inline ClassPathEntry* ClassPathEntry::next() const { return Atomic::load_acquire(&_next); }
 
@@ -103,4 +104,6 @@ inline int ClassLoader::num_app_classpath_entries() {
 
 #endif // INCLUDE_CDS
 
+#endif
 #endif // SHARE_CLASSFILE_CLASSLOADER_INLINE_HPP
+

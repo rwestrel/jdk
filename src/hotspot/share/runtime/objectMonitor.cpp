@@ -1503,6 +1503,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   // check for a pending interrupt
   if (interruptible && jt->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
     // post monitor waited event.  Note that this is past-tense, we are done waiting.
+#ifndef LEYDEN
     if (JvmtiExport::should_post_monitor_waited()) {
       // Note: 'false' parameter is passed here because the
       // wait was not timed out due to thread interrupt.
@@ -1519,6 +1520,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     if (event.should_commit()) {
       post_monitor_wait_event(&event, this, 0, millis, false);
     }
+#endif
     THROW(vmSymbols::java_lang_InterruptedException());
     return;
   }
@@ -1635,6 +1637,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     // (Don't cache naked oops over safepoints, of course).
 
     // post monitor waited event. Note that this is past-tense, we are done waiting.
+#ifndef LEYDEN
     if (JvmtiExport::should_post_monitor_waited()) {
       JvmtiExport::post_monitor_waited(jt, this, ret == OS_TIMEOUT);
 
@@ -1657,6 +1660,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
         node._event->unpark();
       }
     }
+#endif
 
     if (event.should_commit()) {
       post_monitor_wait_event(&event, this, node._notifier_tid, millis, ret == OS_TIMEOUT);
@@ -1689,8 +1693,10 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   jt->set_current_waiting_monitor(NULL);
 
   guarantee(_recursions == 0, "invariant");
+#ifndef LEYDEN
   _recursions = save      // restore the old recursion count
                 + JvmtiDeferredUpdates::get_and_reset_relock_count_after_wait(jt); //  increased by the deferred relock count
+#endif
   _waiters--;             // decrement the number of waiters
 
   // Verify a few postconditions

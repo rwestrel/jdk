@@ -65,9 +65,11 @@ vframe::vframe(const frame* fr, JavaThread* thread)
 
 vframe* vframe::new_vframe(const frame* f, const RegisterMap* reg_map, JavaThread* thread) {
   // Interpreter frame
+#ifndef LEYDEN
   if (f->is_interpreted_frame()) {
     return new interpretedVFrame(f, reg_map, thread);
   }
+#endif
 
   // Compiled frame
   CodeBlob* cb = f->cb();
@@ -159,6 +161,7 @@ GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
 }
 
 void javaVFrame::print_locked_object_class_name(outputStream* st, Handle obj, const char* lock_state) {
+#ifndef LEYDEN
   if (obj.not_null()) {
     st->print("\t- %s <" INTPTR_FORMAT "> ", lock_state, p2i(obj()));
     if (obj->klass() == vmClasses::Class_klass()) {
@@ -168,9 +171,11 @@ void javaVFrame::print_locked_object_class_name(outputStream* st, Handle obj, co
       st->print_cr("(a %s)", k->external_name());
     }
   }
+#endif
 }
 
 void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
+#ifndef LEYDEN
   Thread* THREAD = Thread::current();
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
@@ -263,25 +268,38 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
       }
     }
   }
+#endif
 }
 
 // ------------- interpretedVFrame --------------
 
+#ifndef LEYDEN
 u_char* interpretedVFrame::bcp() const {
+#ifndef LEYDEN
   return fr().interpreter_frame_bcp();
+#else
+  return NULL;
+#endif
 }
 
 void interpretedVFrame::set_bcp(u_char* bcp) {
+#ifndef LEYDEN
   fr().interpreter_frame_set_bcp(bcp);
+#endif
 }
 
 intptr_t* interpretedVFrame::locals_addr_at(int offset) const {
+#ifndef LEYDEN
   assert(fr().is_interpreted_frame(), "frame should be an interpreted frame");
   return fr().interpreter_frame_local_at(offset);
+#else
+  return NULL;
+#endif
 }
 
 
 GrowableArray<MonitorInfo*>* interpretedVFrame::monitors() const {
+#ifndef LEYDEN
   GrowableArray<MonitorInfo*>* result = new GrowableArray<MonitorInfo*>(5);
   for (BasicObjectLock* current = (fr().previous_monitor_in_interpreter_frame(fr().interpreter_frame_monitor_begin()));
        current >= fr().interpreter_frame_monitor_end();
@@ -289,16 +307,28 @@ GrowableArray<MonitorInfo*>* interpretedVFrame::monitors() const {
     result->push(new MonitorInfo(current->obj(), current->lock(), false, false));
   }
   return result;
+#else
+  return NULL;
+#endif
 }
 
 int interpretedVFrame::bci() const {
+#ifndef LEYDEN
   return method()->bci_from(bcp());
+#else
+  return NULL;
+#endif
 }
 
 Method* interpretedVFrame::method() const {
+#ifndef LEYDEN
   return fr().interpreter_frame_method();
+#else
+  return NULL;
+#endif
 }
 
+#ifndef LEYDEN
 static StackValue* create_stack_value_from_oop_map(const InterpreterOopMap& oop_mask,
                                                    int index,
                                                    const intptr_t* const addr) {
@@ -372,9 +402,13 @@ static void stack_expressions(StackValueCollection* result,
     result->add(sv);
   }
 }
-
+#endif
 StackValueCollection* interpretedVFrame::locals() const {
+#ifndef LEYDEN
   return stack_data(false);
+#else
+  return NULL;
+#endif
 }
 
 StackValueCollection* interpretedVFrame::expressions() const {
@@ -450,6 +484,7 @@ void interpretedVFrame::set_locals(StackValueCollection* values) const {
     }
   }
 }
+#endif
 
 // ------------- cChunk --------------
 
@@ -500,6 +535,8 @@ vframeStream::vframeStream(JavaThread* thread, frame top_frame,
 // Step back n frames, skip any pseudo frames in between.
 // This function is used in Class.forName, Class.newInstance, Method.Invoke,
 // AccessController.doPrivileged.
+#ifndef LEYDEN
+
 void vframeStreamCommon::security_get_caller_frame(int depth) {
   assert(depth >= 0, "invalid depth: %d", depth);
   for (int n = 0; !at_end(); security_next()) {
@@ -516,6 +553,7 @@ void vframeStreamCommon::security_get_caller_frame(int depth) {
 }
 
 
+
 void vframeStreamCommon::security_next() {
   if (method()->is_prefixed_native()) {
     skip_prefixed_method_and_wrappers();  // calls next()
@@ -523,6 +561,7 @@ void vframeStreamCommon::security_next() {
     next();
   }
 }
+
 
 
 void vframeStreamCommon::skip_prefixed_method_and_wrappers() {
@@ -570,6 +609,8 @@ void vframeStreamCommon::skip_reflection_related_frames() {
     next();
   }
 }
+
+#endif
 
 javaVFrame* vframeStreamCommon::asJavaVFrame() {
   javaVFrame* result = NULL;
@@ -627,14 +668,19 @@ void entryVFrame::print() {
 
 // ------------- javaVFrame --------------
 
+#ifndef LEYDEN
+
 static void print_stack_values(const char* title, StackValueCollection* values) {
   if (values->is_empty()) return;
   tty->print_cr("\t%s:", title);
   values->print();
 }
 
+#endif
+
 
 void javaVFrame::print() {
+#ifndef LEYDEN
   Thread* current_thread = Thread::current();
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
@@ -675,10 +721,12 @@ void javaVFrame::print() {
     monitor->lock()->print_on(tty, monitor->owner());
     tty->cr();
   }
+#endif
 }
 
 
 void javaVFrame::print_value() const {
+#ifndef LEYDEN
   Method*    m = method();
   InstanceKlass*     k = m->method_holder();
   tty->print_cr("frame( sp=" INTPTR_FORMAT ", unextended_sp=" INTPTR_FORMAT ", fp=" INTPTR_FORMAT ", pc=" INTPTR_FORMAT ")",
@@ -704,6 +752,7 @@ void javaVFrame::print_value() const {
     if (size > 4*K) warning("SUSPICIOUSLY LARGE FRAME (%d)", size);
 #endif
   }
+#endif
 }
 
 

@@ -30,6 +30,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 // GC root for walking class loader data created
 
 class ClassLoaderDataGraph : public AllStatic {
@@ -161,5 +162,7 @@ class ClassLoaderDataGraphKlassIteratorAtomic : public StackObj {
  private:
   static Klass* next_klass_in_cldg(Klass* klass);
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_CLASSLOADERDATAGRAPH_HPP

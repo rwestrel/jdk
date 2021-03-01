@@ -142,6 +142,8 @@
 #endif //  ndef DTRACE_ENABLED
 
 
+#ifndef LEYDEN
+
 static inline bool is_class_loader(const Symbol* class_name,
                                    const ClassFileParser& parser) {
   assert(class_name != NULL, "invariant");
@@ -160,6 +162,8 @@ static inline bool is_class_loader(const Symbol* class_name,
   }
   return false;
 }
+
+#endif
 
 // private: called to verify that k is a static member of this nest.
 // We know that k is an instance class in the same package and hence the
@@ -878,10 +882,12 @@ void InstanceKlass::initialize(TRAPS) {
 #endif
 
 
+#ifndef LEYDEN
 bool InstanceKlass::verify_code(TRAPS) {
   // 1) Verify the bytecodes
   return Verifier::verify(this, should_verify_class(), THREAD);
 }
+#endif
 
 #ifndef LEYDEN
 void InstanceKlass::link_class(TRAPS) {
@@ -1268,11 +1274,15 @@ Klass* InstanceKlass::implementor() const {
   } else {
     // This load races with inserts, and therefore needs acquire.
     Klass* kls = Atomic::load_acquire(k);
+#ifndef LEYDEN
     if (kls != NULL && !kls->is_loader_alive()) {
       return NULL;  // don't return unloaded class
     } else {
       return kls;
     }
+#else
+return kls;
+#endif
   }
 }
 
@@ -1509,6 +1519,8 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, TRAPS) {
 
 static int call_class_initializer_counter = 0;   // for debugging
 
+#ifndef LEYDEN
+
 Method* InstanceKlass::class_initializer() const {
   Method* clinit = find_method(
       vmSymbols::class_initializer_name(), vmSymbols::void_method_signature());
@@ -1517,6 +1529,8 @@ Method* InstanceKlass::class_initializer() const {
   }
   return NULL;
 }
+
+#endif
 
 #ifndef LEYDEN
 
@@ -1746,6 +1760,7 @@ void InstanceKlass::array_klasses_do(void f(Klass* k)) {
     array_klasses()->array_klasses_do(f);
 }
 
+#ifndef LEYDEN
 #ifdef ASSERT
 static int linear_search(const Array<Method*>* methods,
                          const Symbol* name,
@@ -1926,6 +1941,10 @@ static bool method_matches(const Method* m,
     (!skipping_private || !m->is_private()));
 }
 
+#endif
+
+#ifndef LEYDEN
+
 // Used directly for default_methods to find the index into the
 // default_vtable_indices, and indirectly by find_method
 // find_method_index looks in the local methods array to return the index
@@ -1990,6 +2009,10 @@ int InstanceKlass::find_method_index(const Array<Method*>* methods,
   return -1;
 }
 
+#endif
+
+#ifndef LEYDEN
+
 int InstanceKlass::find_method_by_name(const Symbol* name, int* end) const {
   return find_method_by_name(methods(), name, end);
 }
@@ -2032,6 +2055,7 @@ Method* InstanceKlass::uncached_lookup_method(const Symbol* name,
   }
   return NULL;
 }
+#endif
 
 #ifdef ASSERT
 // search through class hierarchy and return true if this class or
@@ -2050,6 +2074,8 @@ bool InstanceKlass::has_redefined_this_or_super() const {
 
 // lookup a method in the default methods list then in all transitive interfaces
 // Do NOT return private or static methods
+#ifndef LEYDEN
+
 Method* InstanceKlass::lookup_method_in_ordered_interfaces(Symbol* name,
                                                          Symbol* signature) const {
   Method* m = NULL;
@@ -2082,6 +2108,8 @@ Method* InstanceKlass::lookup_method_in_all_interfaces(Symbol* name,
   }
   return NULL;
 }
+
+#endif
 
 /* jni_id_for_impl for jfieldIds only */
 JNIid* InstanceKlass::jni_id_for_impl(int offset) {
@@ -2133,6 +2161,8 @@ void InstanceKlass::set_enclosing_method_indices(u2 class_index,
       index + enclosing_method_method_index_offset, method_index);
   }
 }
+
+#ifndef LEYDEN
 
 // Lookup or create a jmethodID.
 // This code is called by the VMThread and JavaThreads so the
@@ -2348,6 +2378,8 @@ jmethodID InstanceKlass::jmethod_id_or_null(Method* method) {
   }
   return id;
 }
+
+#endif
 
 inline DependencyContext InstanceKlass::dependencies() {
   DependencyContext dep_context(&_dep_context, &_dep_context_last_cleaned);
@@ -3005,6 +3037,8 @@ void InstanceKlass::set_classpath_index(s2 path_index, TRAPS) {
 
 // different versions of is_same_class_package
 
+#ifndef LEYDEN
+
 bool InstanceKlass::is_same_class_package(const Klass* class2) const {
   oop classloader1 = this->class_loader();
   PackageEntry* classpkg1 = this->package();
@@ -3033,6 +3067,8 @@ bool InstanceKlass::is_same_class_package(const Klass* class2) const {
 
   return false;
 }
+
+#endif
 
 #ifndef LEYDEN
 // return true if this class and other_class are in the same package. Classloader
@@ -3983,6 +4019,8 @@ void JNIid::deallocate(JNIid* current) {
 }
 
 
+#ifndef LEYDEN
+
 void JNIid::verify(Klass* holder) {
   int first_field_offset  = InstanceMirrorKlass::offset_of_static_fields();
   int end_field_offset;
@@ -4000,6 +4038,8 @@ void JNIid::verify(Klass* holder) {
     current = current->next();
   }
 }
+
+#endif
 
 void InstanceKlass::set_init_state(ClassState state) {
 #ifdef ASSERT
@@ -4292,6 +4332,8 @@ Method* InstanceKlass::method_with_orig_idnum(int idnum) {
 }
 
 
+#ifndef LEYDEN
+
 Method* InstanceKlass::method_with_orig_idnum(int idnum, int version) {
   InstanceKlass* holder = get_klass_version(version);
   if (holder == NULL) {
@@ -4300,6 +4342,8 @@ Method* InstanceKlass::method_with_orig_idnum(int idnum, int version) {
   Method* method = holder->method_with_orig_idnum(idnum);
   return method;
 }
+
+#endif
 
 #if INCLUDE_JVMTI
 JvmtiCachedClassFileData* InstanceKlass::get_cached_class_file() {

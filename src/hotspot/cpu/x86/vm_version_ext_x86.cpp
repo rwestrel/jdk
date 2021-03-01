@@ -102,6 +102,8 @@ extern "C" {
 
 static getCPUIDBrandString_stub_t getCPUIDBrandString_stub = NULL;
 
+#ifndef LEYDEN
+
 class VM_Version_Ext_StubGenerator: public StubCodeGenerator {
  public:
 
@@ -250,6 +252,8 @@ class VM_Version_Ext_StubGenerator: public StubCodeGenerator {
   };
 };
 
+#endif
+
 
 // VM_Version_Ext statics
 const size_t VM_Version_Ext::VENDOR_LENGTH = 13;
@@ -264,6 +268,7 @@ int VM_Version_Ext::_no_of_cores = 0;
 int VM_Version_Ext::_no_of_packages = 0;
 
 void VM_Version_Ext::initialize(void) {
+#ifndef LEYDEN
   ResourceMark rm;
 
   cpuid_brand_string_stub_blob = BufferBlob::create("getCPUIDBrandString_stub", cpuid_brand_string_stub_size);
@@ -274,6 +279,7 @@ void VM_Version_Ext::initialize(void) {
   VM_Version_Ext_StubGenerator g(&c);
   getCPUIDBrandString_stub = CAST_TO_FN_PTR(getCPUIDBrandString_stub_t,
                                    g.generate_getCPUIDBrandString());
+#endif
 }
 
 const char* VM_Version_Ext::cpu_model_description(void) {

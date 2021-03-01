@@ -40,7 +40,11 @@
 #include CPU_HEADER_INLINE(frame)
 
 inline bool frame::is_entry_frame() const {
+#ifndef LEYDEN
   return StubRoutines::returns_to_call_stub(pc());
+#else
+  return false;
+#endif
 }
 
 #ifndef LEYDEN

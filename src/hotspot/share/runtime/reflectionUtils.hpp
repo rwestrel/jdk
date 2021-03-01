@@ -35,6 +35,7 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 // A KlassStream is an abstract stream for streaming over self, superclasses
 // and (super)interfaces. Streaming is done in reverse order (subclasses first,
 // interfaces last).
@@ -231,5 +232,7 @@ class FilteredFieldStream : public FieldStream {
     }
   }
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_REFLECTIONUTILS_HPP

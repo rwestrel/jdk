@@ -39,8 +39,11 @@ enum CompilerType {
   compiler_number_of_types
 };
 
+#ifndef LEYDEN
 extern const char* compilertype2name_tab[compiler_number_of_types];     // Map CompilerType to its name
 inline const char* compilertype2name(CompilerType t) { return (uint)t < compiler_number_of_types ? compilertype2name_tab[t] : NULL; }
+
+#endif
 
 // Handy constants for deciding which compiler mode to use.
 enum MethodCompilation {
@@ -53,6 +56,7 @@ enum MethodCompilation {
   InvalidFrameStateBci = -6
 };
 
+#ifndef LEYDEN
 // Enumeration to distinguish tiers of compilation
 enum CompLevel {
   CompLevel_any               = -2,
@@ -100,7 +104,7 @@ inline bool is_c2_compile(int comp_level) {
 inline bool is_compile(int comp_level) {
   return is_c1_compile(comp_level) || is_c2_compile(comp_level);
 }
-
+#endif
 
 // States of Restricted Transactional Memory usage.
 enum RTMState {
@@ -117,6 +121,7 @@ enum RTMState {
 #else
 #define RTM_OPT_ONLY(code)
 #endif
+#ifndef LEYDEN
 
 class CompilerConfig : public AllStatic {
 public:
@@ -248,5 +253,7 @@ private:
   static void set_jvmci_specific_flags();
   static void set_legacy_emulation_flags();
 };
+
+#endif
 
 #endif // SHARE_COMPILER_COMPILERDEFINITIONS_HPP

@@ -516,7 +516,11 @@ protected:
   // pointer has been "peeked" and then must be kept alive before it may
   // be used safely.  All uses of klass_holder need to apply the appropriate barriers,
   // except during GC.
+#ifndef LEYDEN
+
   oop klass_holder() const { return class_loader_data()->holder_phantom(); }
+
+#endif
 
  protected:
   virtual Klass* array_klass_impl(bool or_null, int rank, TRAPS);
@@ -639,8 +643,13 @@ protected:
   void set_is_shared()                  { _access_flags.set_is_shared_class(); }
   bool is_hidden() const                { return access_flags().is_hidden_class(); }
   void set_is_hidden()                  { _access_flags.set_is_hidden_class(); }
+
+#ifndef LEYDEN
+
   bool is_non_strong_hidden() const     { return access_flags().is_hidden_class() &&
                                           class_loader_data()->has_class_mirror_holder(); }
+
+#endif
   bool is_value_based()                 { return _access_flags.is_value_based_class(); }
   void set_is_value_based()             { _access_flags.set_is_value_based_class(); }
 
@@ -679,7 +688,11 @@ protected:
   // Iff the class loader (or mirror for unsafe anonymous classes) is alive the
   // Klass is considered alive. This is safe to call before the CLD is marked as
   // unloading, and hence during concurrent class unloading.
+#ifndef LEYDEN
+
   bool is_loader_alive() const { return class_loader_data()->is_alive(); }
+
+#endif
 
   void clean_subklass();
 

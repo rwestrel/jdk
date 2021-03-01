@@ -29,6 +29,8 @@
 #include "oops/fieldInfo.hpp"
 #include "runtime/fieldDescriptor.hpp"
 
+#ifndef LEYDEN
+
 // The is the base class for iteration over the fields array
 // describing the declared fields in the class.  Several subclasses
 // are provided depending on the kind of iteration required.  The
@@ -218,5 +220,7 @@ class AllFieldStream : public FieldStreamBase {
   AllFieldStream(Array<u2>* fields, ConstantPool* constants): FieldStreamBase(fields, constants) {}
   AllFieldStream(InstanceKlass* k):      FieldStreamBase(k->fields(), k->constants()) {}
 };
+
+#endif
 
 #endif // SHARE_OOPS_FIELDSTREAMS_HPP

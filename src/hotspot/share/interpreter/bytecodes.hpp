@@ -30,6 +30,8 @@
 // Bytecodes specifies all bytecodes used in the VM and
 // provides utility functions to get bytecode attributes.
 
+#ifndef LEYDEN
+
 class Method;
 
 // NOTE: replicated in SA in vm/agent/sun/jvm/hotspot/interpreter/Bytecodes.java
@@ -433,5 +435,7 @@ class Bytecodes: AllStatic {
   // Initialization
   static void        initialize     ();
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_BYTECODES_HPP

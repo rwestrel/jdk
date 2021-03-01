@@ -32,6 +32,8 @@
 // methodComparator provides an interface for determining if methods of
 // different versions of classes are equivalent or switchable
 
+#ifndef LEYDEN
+
 class MethodComparator {
  private:
   static BytecodeStream *_s_old, *_s_new;
@@ -51,5 +53,7 @@ class MethodComparator {
   static bool methods_EMCP(Method* old_method, Method* new_method);
 
 };
+
+#endif
 
 #endif // SHARE_PRIMS_METHODCOMPARATOR_HPP

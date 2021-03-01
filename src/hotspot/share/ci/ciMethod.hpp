@@ -36,6 +36,8 @@
 #include "runtime/handles.hpp"
 #include "utilities/bitMap.hpp"
 
+#ifndef LEYDEN
+
 class ciMethodBlocks;
 class MethodLiveness;
 class Arena;
@@ -372,5 +374,7 @@ class ciMethod : public ciMetadata {
 
   static bool is_consistent_info(ciMethod* declared_method, ciMethod* resolved_method);
 };
+
+#endif
 
 #endif // SHARE_CI_CIMETHOD_HPP

@@ -29,6 +29,7 @@
 #include "runtime/vm_version.hpp"
 
 void VM_Version_init() {
+#ifndef LEYDEN
   VM_Version::initialize();
 
   if (log_is_enabled(Info, os, cpu)) {
@@ -37,4 +38,5 @@ void VM_Version_init() {
     LogStream ls(Log(os, cpu)::info());
     os::print_cpu_info(&ls, buf, sizeof(buf));
   }
+#endif
 }

@@ -28,6 +28,7 @@
 #include "interpreter/abstractInterpreter.hpp"
 #include "interpreter/templateTable.hpp"
 
+#ifndef LEYDEN
 // This file contains the platform-independent parts
 // of the template interpreter and the template interpreter generator.
 
@@ -197,5 +198,6 @@ class TemplateInterpreter: public AbstractInterpreter {
 };
 
 #endif // !ZERO
+#endif
 
 #endif // SHARE_INTERPRETER_TEMPLATEINTERPRETER_HPP

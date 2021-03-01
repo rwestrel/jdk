@@ -34,6 +34,8 @@
 #include "runtime/safepointMechanism.hpp"
 
 
+#ifndef LEYDEN
+
 void Relocation::pd_set_data_value(address x, intptr_t o, bool verify_only) {
 #ifdef AMD64
   x += o;
@@ -85,6 +87,8 @@ void Relocation::pd_set_data_value(address x, intptr_t o, bool verify_only) {
 #endif // AMD64
 }
 
+#endif
+
 
 address Relocation::pd_call_destination(address orig_addr) {
   intptr_t adj = 0;
@@ -108,6 +112,8 @@ address Relocation::pd_call_destination(address orig_addr) {
   }
 }
 
+
+#ifndef LEYDEN
 
 void Relocation::pd_set_call_destination(address x) {
   NativeInstruction* ni = nativeInstruction_at(addr());
@@ -137,6 +143,8 @@ void Relocation::pd_set_call_destination(address x) {
     ShouldNotReachHere();
   }
 }
+
+#endif
 
 
 address* Relocation::pd_address_in_code() {

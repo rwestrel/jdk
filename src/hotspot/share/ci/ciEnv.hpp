@@ -35,6 +35,8 @@
 #include "oops/methodData.hpp"
 #include "runtime/thread.hpp"
 
+#ifndef LEYDEN
+
 class CompileTask;
 
 // ciEnv
@@ -466,5 +468,7 @@ public:
   void dump_replay_data_unsafe(outputStream* out);
   void dump_compile_data(outputStream* out);
 };
+
+#endif
 
 #endif // SHARE_CI_CIENV_HPP

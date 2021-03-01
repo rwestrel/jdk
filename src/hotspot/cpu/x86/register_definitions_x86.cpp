@@ -140,4 +140,6 @@ REGISTER_DEFINITION(KRegister, k6);
 REGISTER_DEFINITION(KRegister, k7);
 
 // JSR 292
+#ifndef LEYDEN
 REGISTER_DEFINITION(Register, rbp_mh_SP_save);
+#endif

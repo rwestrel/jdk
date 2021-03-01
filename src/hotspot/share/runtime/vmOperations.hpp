@@ -257,6 +257,8 @@ class VM_DeoptimizeFrame: public VM_Operation {
 };
 
 #ifndef PRODUCT
+#ifndef LEYDEN
+
 class VM_DeoptimizeAll: public VM_Operation {
  private:
   Klass* _dependee;
@@ -268,6 +270,7 @@ class VM_DeoptimizeAll: public VM_Operation {
 };
 
 
+
 class VM_ZombieAll: public VM_Operation {
  public:
   VM_ZombieAll() {}
@@ -275,6 +278,7 @@ class VM_ZombieAll: public VM_Operation {
   void doit();
   bool allow_nested_vm_operations() const        { return true; }
 };
+#endif
 #endif // PRODUCT
 
 class VM_PrintThreads: public VM_Operation {

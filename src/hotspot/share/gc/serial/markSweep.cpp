@@ -77,7 +77,9 @@ void MarkSweep::push_objarray(oop obj, size_t index) {
 }
 
 inline void MarkSweep::follow_array(objArrayOop array) {
+#ifndef LEYDEN
   MarkSweep::follow_klass(array->klass());
+#endif
   // Don't push empty arrays to avoid unnecessary work.
   if (array->length() > 0) {
     MarkSweep::push_objarray(array, 0);

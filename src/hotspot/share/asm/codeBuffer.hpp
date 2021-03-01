@@ -403,9 +403,11 @@ class CodeBuffer: public StackObj {
   address      _total_start;    // first address of combined memory buffer
   csize_t      _total_size;     // size in bytes of combined memory buffer
 
+#ifndef LEYDEN
   OopRecorder* _oop_recorder;
 
   OopRecorder  _default_oop_recorder;  // override with initialize_oop_recorder
+#endif
   Arena*       _overflow_arena;
 
   address      _last_insn;      // used to merge consecutive memory barriers, loads or stores.
@@ -427,7 +429,9 @@ class CodeBuffer: public StackObj {
     _name            = name;
     _before_expand   = NULL;
     _blob            = NULL;
+#ifndef LEYDEN
     _oop_recorder    = NULL;
+#endif
     _overflow_arena  = NULL;
     _last_insn       = NULL;
 #if INCLUDE_AOT
@@ -458,7 +462,9 @@ class CodeBuffer: public StackObj {
     _insts.initialize(code_start, code_size);
     assert(!_stubs.is_allocated(),  "no garbage here");
     assert(!_consts.is_allocated(), "no garbage here");
+#ifndef LEYDEN
     _oop_recorder = &_default_oop_recorder;
+#endif
   }
 
   void initialize_section_size(CodeSection* cs, csize_t size);
@@ -628,6 +634,8 @@ class CodeBuffer: public StackObj {
 
   csize_t copy_relocations_to(address buf, csize_t buf_limit, bool only_inst) const;
 
+#ifndef LEYDEN
+
   // allocated size of any and all recorded oops
   csize_t total_oop_size() const {
     OopRecorder* recorder = oop_recorder();
@@ -640,15 +648,21 @@ class CodeBuffer: public StackObj {
     return (recorder == NULL)? 0: recorder->metadata_size();
   }
 
+#endif
+
   // Configuration functions, called immediately after the CB is constructed.
   // The section sizes are subtracted from the original insts section.
   // Note:  Call them in reverse section order, because each steals from insts.
   void initialize_consts_size(csize_t size)            { initialize_section_size(&_consts,  size); }
   void initialize_stubs_size(csize_t size)             { initialize_section_size(&_stubs,   size); }
   // Override default oop recorder.
+#ifndef LEYDEN
+
   void initialize_oop_recorder(OopRecorder* r);
 
   OopRecorder* oop_recorder() const { return _oop_recorder; }
+
+#endif
 
   address last_insn() const { return _last_insn; }
   void set_last_insn(address a) { _last_insn = a; }
@@ -684,12 +698,13 @@ class CodeBuffer: public StackObj {
     copy_relocations_to(blob);
     copy_code_to(blob);
   }
-#endif
+
   void copy_values_to(nmethod* nm) {
     if (!oop_recorder()->is_unused()) {
       oop_recorder()->copy_values_to(nm);
     }
   }
+#endif
 
   void block_comment(intptr_t offset, const char * comment) PRODUCT_RETURN;
   const char* code_string(const char* str) PRODUCT_RETURN_(return NULL;);

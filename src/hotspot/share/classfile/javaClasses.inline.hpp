@@ -31,6 +31,7 @@
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 
+#ifndef LEYDEN
 void java_lang_String::set_coder(oop string, jbyte coder) {
   string->byte_field_put(_coder_offset, coder);
 }
@@ -305,5 +306,6 @@ inline Symbol* Backtrace::get_source_file_name(InstanceKlass* holder, int versio
     return holder->source_file_name();
   }
 }
-
+#endif
 #endif // SHARE_CLASSFILE_JAVACLASSES_INLINE_HPP
+

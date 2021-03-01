@@ -72,9 +72,11 @@ void ObjArrayKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
   assert (obj->is_array(), "obj must be array");
   objArrayOop a = objArrayOop(obj);
 
+#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, obj->klass());
   }
+#endif
 
   oop_oop_iterate_elements<T>(a, closure);
 }
@@ -90,9 +92,11 @@ void ObjArrayKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, Me
   assert(obj->is_array(), "obj must be array");
   objArrayOop a  = objArrayOop(obj);
 
+#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, a->klass());
   }
+#endif
 
   oop_oop_iterate_elements_bounded<T>(a, closure, mr.start(), mr.end());
 }

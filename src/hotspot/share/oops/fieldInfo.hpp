@@ -30,6 +30,8 @@
 #include "oops/typeArrayOop.hpp"
 #include "utilities/vmEnums.hpp"
 
+#ifndef LEYDEN
+
 // This class represents the field information contained in the fields
 // array of an InstanceKlass.  Currently it's laid on top an array of
 // Java shorts but in the future it could simply be used as a real
@@ -170,5 +172,7 @@ class FieldInfo {
     return Symbol::vm_symbol_at(static_cast<vmSymbolID>(symbol_index));
   }
 };
+
+#endif
 
 #endif // SHARE_OOPS_FIELDINFO_HPP

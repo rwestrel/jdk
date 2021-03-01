@@ -31,6 +31,7 @@
 #include "memory/allocation.hpp"
 #include "utilities/xmlstream.hpp"
 
+#ifndef LEYDEN
 JVMCI_ONLY(class JVMCICompileState;)
 
 // CompileTask
@@ -223,5 +224,7 @@ public:
   }
   static void print_inlining_ul(ciMethod* method, int inline_level, int bci, const char* msg = NULL);
 };
+
+#endif
 
 #endif // SHARE_COMPILER_COMPILETASK_HPP

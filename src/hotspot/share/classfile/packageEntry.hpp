@@ -36,6 +36,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
+#ifndef LEYDEN
 template <class T> class Array;
 class MetaspaceClosure;
 
@@ -313,5 +314,6 @@ public:
   void load_archived_entries(Array<PackageEntry*>* archived_packages);
 #endif
 };
-
+#endif
 #endif // SHARE_CLASSFILE_PACKAGEENTRY_HPP
+

@@ -116,10 +116,12 @@ static void crash_handler(int sig, siginfo_t* info, void* ucVoid) {
   }
 
   // Needed to make it possible to call SafeFetch.. APIs in error handling.
+#ifndef LEYDEN
   if (uc && pc && StubRoutines::is_safefetch_fault(pc)) {
     os::Posix::ucontext_set_pc(uc, StubRoutines::continuation_for_safefetch_fault(pc));
     return;
   }
+#endif
 
   // Needed because asserts may happen in error handling too.
 #ifdef CAN_SHOW_REGISTERS_ON_ASSERT

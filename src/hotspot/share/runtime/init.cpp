@@ -187,8 +187,8 @@ void exit_globals() {
     perfMemory_exit();
     SafepointTracing::statistics_exit_log();
     if (PrintStringTableStatistics) {
-      SymbolTable::dump(tty);
 #ifndef LEYDEN
+      SymbolTable::dump(tty);
       StringTable::dump(tty);
 #endif
     }

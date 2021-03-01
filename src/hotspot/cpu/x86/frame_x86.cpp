@@ -286,11 +286,16 @@ int frame::frame_size(RegisterMap* map) const {
 }
 
 intptr_t* frame::entry_frame_argument_at(int offset) const {
+#ifndef LEYDEN
   // convert offset to index to deal with tsi
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
   // Entry frame's arguments are always in relation to unextended_sp()
   return &unextended_sp()[index];
+#else
+  return NULL;
+#endif
 }
+
 
 // sender_sp
 #ifndef LEYDEN

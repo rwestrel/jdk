@@ -33,6 +33,8 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/resourceHash.hpp"
 
+#ifndef LEYDEN
+
 // The verifier class
 class Verifier : AllStatic {
  public:
@@ -514,5 +516,7 @@ inline int ClassVerifier::change_sig_to_verificationType(
       return 1;
   }
 }
+
+#endif
 
 #endif // SHARE_CLASSFILE_VERIFIER_HPP

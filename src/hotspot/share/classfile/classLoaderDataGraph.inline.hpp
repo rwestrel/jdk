@@ -30,6 +30,7 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
 
+#ifndef LEYDEN
 inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
   guarantee(loader() != NULL && oopDesc::is_oop(loader()), "Loader must be oop");
   // Gets the class loader data out of the java/lang/ClassLoader object, if non-null
@@ -78,5 +79,6 @@ bool ClassLoaderDataGraph::should_clean_metaspaces_and_reset() {
   _safepoint_cleanup_needed = false;  // reset
   return do_cleaning;
 }
-
+#endif
 #endif // SHARE_CLASSFILE_CLASSLOADERDATAGRAPH_INLINE_HPP
+

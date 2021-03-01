@@ -29,6 +29,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/signature.hpp"
 
+#ifndef LEYDEN
 // All fieldDescriptor inline functions that (directly or indirectly) use "_cp()" or "_cp->"
 // must be put in this file, as they require runtime/handles.inline.hpp.
 
@@ -80,5 +81,7 @@ inline void fieldDescriptor::set_has_initialized_final_update(const bool value) 
 inline BasicType fieldDescriptor::field_type() const {
   return Signature::basic_type(signature());
 }
+
+#endif
 
 #endif // SHARE_RUNTIME_FIELDDESCRIPTOR_INLINE_HPP

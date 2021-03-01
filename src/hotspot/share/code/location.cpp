@@ -60,9 +60,13 @@ Location::Location(DebugInfoReadStream* stream) {
 }
 
 
+#ifndef LEYDEN
+
 void Location::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(_value);
 }
+
+#endif
 
 
 // Valid argument to Location::new_stk_loc()?

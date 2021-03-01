@@ -91,9 +91,11 @@ inline DefNewScanClosure::DefNewScanClosure(DefNewGeneration* g) :
 
 template <class T>
 void DefNewScanClosure::barrier(T* p) {
+#ifndef LEYDEN
   if (_scanned_cld != NULL && !_scanned_cld->has_modified_oops()) {
     _scanned_cld->record_modified_oops();
   }
+#endif
 }
 
 #endif // INCLUDE_SERIALGC

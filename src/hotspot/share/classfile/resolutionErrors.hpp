@@ -28,6 +28,8 @@
 #include "oops/constantPool.hpp"
 #include "utilities/hashtable.hpp"
 
+#ifndef LEYDEN
+
 class ResolutionErrorEntry;
 
 // ResolutionError objects are used to record errors encountered during
@@ -124,5 +126,7 @@ class ResolutionErrorEntry : public HashtableEntry<ConstantPool*, mtClass> {
     return (ResolutionErrorEntry**)HashtableEntry<ConstantPool*, mtClass>::next_addr();
   }
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_RESOLUTIONERRORS_HPP

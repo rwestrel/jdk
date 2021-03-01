@@ -442,13 +442,22 @@ class InstanceKlass: public Klass {
 
  private:
   friend class fieldDescriptor;
+
+#ifndef LEYDEN
+
   FieldInfo* field(int index) const { return FieldInfo::from_field_array(_fields, index); }
 
+#endif
+
  public:
+#ifndef LEYDEN
+
   int     field_offset      (int index) const { return field(index)->offset(); }
   int     field_access_flags(int index) const { return field(index)->access_flags(); }
   Symbol* field_name        (int index) const { return field(index)->name(constants()); }
   Symbol* field_signature   (int index) const { return field(index)->signature(constants()); }
+
+#endif
 
   // Number of Java declared fields
   int java_fields_count() const           { return (int)_java_fields_count; }
@@ -723,15 +732,23 @@ public:
   }
 
   // source file name
+#ifndef LEYDEN
+
   Symbol* source_file_name() const               { return _constants->source_file_name(); }
   u2 source_file_name_index() const              { return _constants->source_file_name_index(); }
   void set_source_file_name_index(u2 sourcefile_index) { _constants->set_source_file_name_index(sourcefile_index); }
 
+#endif
+
   // minor and major version numbers of class file
+#ifndef LEYDEN
+
   u2 minor_version() const                 { return _constants->minor_version(); }
   void set_minor_version(u2 minor_version) { _constants->set_minor_version(minor_version); }
   u2 major_version() const                 { return _constants->major_version(); }
   void set_major_version(u2 major_version) { _constants->set_major_version(major_version); }
+
+#endif
 
   // source debug extension
   const char* source_debug_extension() const { return _source_debug_extension; }
@@ -782,6 +799,8 @@ public:
   InstanceKlass* previous_versions() const { return NULL; }
 #endif
 
+#ifndef LEYDEN
+
   InstanceKlass* get_klass_version(int version) {
     for (InstanceKlass* ik = this; ik != NULL; ik = ik->previous_versions()) {
       if (ik->constants()->version() == version) {
@@ -790,6 +809,8 @@ public:
     }
     return NULL;
   }
+
+#endif
 
   bool has_been_redefined() const {
     return (_misc_flags & _misc_has_been_redefined) != 0;
@@ -921,9 +942,13 @@ public:
   void set_initial_method_idnum(u2 value)             { _idnum_allocated_count = value; }
 
   // generics support
+#ifndef LEYDEN
+
   Symbol* generic_signature() const                   { return _constants->generic_signature(); }
   u2 generic_signature_index() const                  { return _constants->generic_signature_index(); }
   void set_generic_signature_index(u2 sig_index)      { _constants->set_generic_signature_index(sig_index); }
+
+#endif
 
   u2 enclosing_method_data(int offset) const;
   u2 enclosing_method_class_index() const {
@@ -1146,7 +1171,11 @@ public:
 
   // The constant pool is on stack if any of the methods are executing or
   // referenced by handles.
+#ifndef LEYDEN
+
   bool on_stack() const { return _constants->on_stack(); }
+
+#endif
 
   // callbacks for actions during class unloading
   static void unload_class(InstanceKlass* ik);

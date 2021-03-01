@@ -33,6 +33,7 @@
 #include "oops/instanceKlass.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "runtime/mutexLocker.hpp"
+#ifndef LEYDEN
 
 // The CodeCache implements the code cache for various pieces of generated
 // code, e.g., compiled java methods, runtime stubs, transition frames, etc.
@@ -419,4 +420,5 @@ typedef CodeBlobIterator<CompiledMethod, CompiledMethodFilter> CompiledMethodIte
 typedef CodeBlobIterator<nmethod, NMethodFilter> NMethodIterator;
 typedef CodeBlobIterator<CodeBlob, AllCodeBlobsFilter> AllCodeBlobsIterator;
 
+#endif
 #endif // SHARE_CODE_CODECACHE_HPP

@@ -739,6 +739,7 @@ ThreadsListHandle::~ThreadsListHandle() {
 // to the converted JavaThread * and true is returned. On error,
 // returns false.
 //
+#ifndef LEYDEN
 bool ThreadsListHandle::cv_internal_thread_to_JavaThread(jobject jthread,
                                                          JavaThread ** jt_pp,
                                                          oop * thread_oop_p) {
@@ -781,6 +782,7 @@ bool ThreadsListHandle::cv_internal_thread_to_JavaThread(jobject jthread,
   *jt_pp = java_thread;
   return true;
 }
+#endif
 
 void ThreadsSMRSupport::add_thread(JavaThread *thread){
   ThreadsList *new_list = ThreadsList::add_thread(get_java_thread_list(), thread);

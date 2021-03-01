@@ -29,6 +29,8 @@
 #include "oops/oopHandle.inline.hpp"
 #include "runtime/atomic.hpp"
 
+#ifndef LEYDEN
+
 inline int ConstantPoolCacheEntry::indices_ord() const { return Atomic::load_acquire(&_indices); }
 
 inline Bytecodes::Code ConstantPoolCacheEntry::bytecode_1() const {
@@ -98,5 +100,7 @@ inline ConstantPoolCache::ConstantPoolCache(int length,
 }
 
 inline oop ConstantPoolCache::resolved_references() { return _resolved_references.resolve(); }
+
+#endif
 
 #endif // SHARE_OOPS_CPCACHE_INLINE_HPP

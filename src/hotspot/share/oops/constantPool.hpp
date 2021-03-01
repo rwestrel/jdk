@@ -37,6 +37,7 @@
 #include "utilities/bytes.hpp"
 #include "utilities/constantTag.hpp"
 
+#ifndef LEYDEN
 // A ConstantPool is an array containing class constants as described in the
 // class file.
 //
@@ -1050,5 +1051,6 @@ class SymbolHashMap: public CHeapObj<mtSymbol> {
 
   ~SymbolHashMap();
 }; // End SymbolHashMap class
+#endif
 
 #endif // SHARE_OOPS_CONSTANTPOOL_HPP

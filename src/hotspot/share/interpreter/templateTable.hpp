@@ -30,6 +30,7 @@
 #include "runtime/frame.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 #ifndef ZERO
 // All the necessary definitions used for (bytecode) template generation. Instead of
 // spreading the implementation functionality for each bytecode in the interpreter
@@ -350,5 +351,6 @@ class TemplateTable: AllStatic {
 
 };
 #endif /* !ZERO */
+#endif
 
 #endif // SHARE_INTERPRETER_TEMPLATETABLE_HPP

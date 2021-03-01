@@ -31,6 +31,8 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
+
 // ciSignature
 //
 // This class represents the signature of a method.
@@ -68,5 +70,7 @@ public:
   void print_signature();
   void print();
 };
+
+#endif
 
 #endif // SHARE_CI_CISIGNATURE_HPP

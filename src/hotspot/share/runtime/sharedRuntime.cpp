@@ -645,6 +645,8 @@ void SharedRuntime::throw_and_post_jvmti_exception(JavaThread *thread, Symbol* n
 // and tags. Since obsolete methods are never compiled, we don't have
 // to modify the compilers to generate calls to this function.
 //
+#ifndef LEYDEN
+
 JRT_LEAF(int, SharedRuntime::rc_trace_method_entry(
     JavaThread* thread, Method* method))
   if (method->is_obsolete()) {
@@ -656,6 +658,8 @@ JRT_LEAF(int, SharedRuntime::rc_trace_method_entry(
   }
   return 0;
 JRT_END
+
+#endif
 
 // ret_pc points into caller; we are returning caller's exception handler
 // for given exception
@@ -678,8 +682,12 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 #endif // INCLUDE_JVMCI
 
+#ifndef LEYDEN
   nmethod* nm = cm->as_nmethod();
   ScopeDesc* sd = nm->scope_desc_at(ret_pc);
+#else
+  ScopeDesc* sd = NULL;
+#endif
   // determine handler bci, if any
   EXCEPTION_MARK;
 
@@ -726,8 +734,13 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 
   // found handling method => lookup exception handler
+#ifndef LEYDEN
   int catch_pco = ret_pc - nm->code_begin();
+#else
+  int catch_pco = 0;
+#endif
 
+#ifndef LEYDEN
   ExceptionHandlerTable table(nm);
   HandlerTableEntry *t = table.entry_for(catch_pco, handler_bci, scope_depth);
   if (t == NULL && (nm->is_compiled_by_c1() || handler_bci != -1)) {
@@ -739,6 +752,7 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
     // the bytecodes.
     t = table.entry_for(catch_pco, -1, 0);
   }
+#endif
 
 #ifdef COMPILER1
   if (t == NULL && nm->is_compiled_by_c1()) {
@@ -762,7 +776,11 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 #endif
 
+#ifndef LEYDEN
   return nm->code_begin() + t->pco();
+#else
+  return 0;
+#endif
 }
 
 JRT_ENTRY(void, SharedRuntime::throw_AbstractMethodError(JavaThread* thread))
@@ -1007,17 +1025,19 @@ JRT_ENTRY_NO_ASYNC(void, SharedRuntime::register_finalizer(JavaThread* thread, o
 JRT_END
 
 
-#ifndef LEYDEN
 jlong SharedRuntime::get_java_tid(Thread* thread) {
+#ifndef LEYDEN
   if (thread != NULL) {
     if (thread->is_Java_thread()) {
       oop obj = thread->as_Java_thread()->threadObj();
       return (obj == NULL) ? 0 : java_lang_Thread::thread_id(obj);
     }
   }
+#endif
   return 0;
 }
 
+#ifndef LEYDEN
 /**
  * This function ought to be a void function, but cannot be because
  * it gets turned into a tail-call on sparc, which runs into dtrace bug

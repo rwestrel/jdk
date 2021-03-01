@@ -1786,6 +1786,7 @@ JavaThread::~JavaThread() {
 #endif
   }
 
+#ifndef LEYDEN
   JvmtiDeferredUpdates* updates = deferred_updates();
   if (updates != NULL) {
     // This can only happen if thread is destroyed before deoptimization occurs.
@@ -1794,7 +1795,7 @@ JavaThread::~JavaThread() {
     delete updates;
     set_deferred_updates(NULL);
   }
-
+#endif
   // All Java related clean up happens in exit
   ThreadSafepointState::destroy(this);
   if (_thread_stat != NULL) delete _thread_stat;
@@ -1845,10 +1846,12 @@ void JavaThread::run() {
   // been completed.
   set_active_handles(JNIHandleBlock::allocate_block());
 
+#ifndef LEYDEN
   if (JvmtiExport::should_post_thread_life()) {
     JvmtiExport::post_thread_start(this);
 
   }
+#endif
 
   // We call another function to do the rest so we are sure that the stack addresses used
   // from there will be lower than the stack base just computed.
@@ -1980,9 +1983,11 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     }
 #endif
     // notify JVMTI
+#ifndef LEYDEN
     if (JvmtiExport::should_post_thread_life()) {
       JvmtiExport::post_thread_end(this);
     }
+#endif
 
     // We have notified the agents that we are exiting, before we go on,
     // we must check for a pending external suspend request and honor it
@@ -2076,9 +2081,11 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     tlab().retire();
   }
 
+#ifndef LEYDEN
   if (JvmtiEnv::environments_might_exist()) {
     JvmtiExport::cleanup_thread(this);
   }
+#endif
 
   // We need to cache the thread name for logging purposes below as once
   // we have called on_thread_detach this thread must not access any oops.
@@ -2729,12 +2736,14 @@ void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   assert(vframe_array_head() == NULL, "deopt in progress at a safepoint!");
   // If we have deferred set_locals there might be oops waiting to be
   // written
+#ifndef LEYDEN
   GrowableArray<jvmtiDeferredLocalVariableSet*>* list = JvmtiDeferredUpdates::deferred_locals(this);
   if (list != NULL) {
     for (int i = 0; i < list->length(); i++) {
       list->at(i)->oops_do(f);
     }
   }
+#endif
 
   // Traverse instance variables at the end since the GC may be moving things
   // around using this function
@@ -3178,6 +3187,8 @@ javaVFrame* JavaThread::last_java_vframe(RegisterMap *reg_map) {
 }
 
 
+#ifndef LEYDEN
+
 Klass* JavaThread::security_get_caller_class(int depth) {
   vframeStream vfst(this);
   vfst.security_get_caller_frame(depth);
@@ -3186,6 +3197,8 @@ Klass* JavaThread::security_get_caller_class(int depth) {
   }
   return NULL;
 }
+
+#endif
 
 // java.lang.Thread.sleep support
 // Returns true if sleep time elapsed as expected, and false
@@ -3698,7 +3711,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Any JVMTI raw monitors entered in onload will transition into
   // real raw monitor. VM is setup enough here for raw monitor enter.
+#ifndef LEYDEN
   JvmtiExport::transition_pending_onload_raw_monitors();
+#endif
 
   // Create the VMThread
   { TraceTime timer("Start VMThread", TRACETIME_LOG(Info, startuptime));
@@ -3742,11 +3757,12 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Always call even when there are not JVMTI environments yet, since environments
   // may be attached late and JVMTI must track phases of VM execution
+#ifndef LEYDEN
   JvmtiExport::enter_early_start_phase();
 
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
-
+#endif
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
 #ifndef LEYDEN
@@ -3840,10 +3856,12 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Always call even when there are not JVMTI environments yet, since environments
   // may be attached late and JVMTI must track phases of VM execution
+#ifndef LEYDEN
   JvmtiExport::enter_start_phase();
 
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_vm_start();
+#endif
 
   // Final system initialization including security manager and system class loader
   call_initPhase3(CHECK_JNI_ERR);
@@ -3867,13 +3885,16 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Always call even when there are not JVMTI environments yet, since environments
   // may be attached late and JVMTI must track phases of VM execution
+#ifndef LEYDEN
   JvmtiExport::enter_live_phase();
-
+#endif
   // Make perfmemory accessible
   PerfMemory::set_accessible(true);
 
   // Notify JVMTI agents that VM initialization is complete - nop if no agents.
+#ifndef LEYDEN
   JvmtiExport::post_vm_initialized();
+#endif
 
   JFR_ONLY(Jfr::on_create_vm_3();)
 

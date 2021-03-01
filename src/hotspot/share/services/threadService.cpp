@@ -310,6 +310,8 @@ void ThreadService::remove_thread_dump(ThreadDumpResult* dump) {
 // Dump stack trace of threads specified in the given threads array.
 // Returns StackTraceElement[][] each element is the stack trace of a thread in
 // the corresponding entry in the given threads array
+#ifndef LEYDEN
+
 Handle ThreadService::dump_stack_traces(GrowableArray<instanceHandle>* threads,
                                         int num_threads,
                                         TRAPS) {
@@ -351,6 +353,8 @@ Handle ThreadService::dump_stack_traces(GrowableArray<instanceHandle>* threads,
   return result_obj;
 }
 
+#endif
+
 void ThreadService::reset_contention_count_stat(JavaThread* thread) {
   ThreadStatistics* stat = thread->get_thread_stat();
   if (stat != NULL) {
@@ -367,6 +371,8 @@ void ThreadService::reset_contention_time_stat(JavaThread* thread) {
 
 // Find deadlocks involving raw monitors, object monitors and concurrent locks
 // if concurrent_locks is true.
+#ifndef LEYDEN
+
 DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, bool concurrent_locks) {
   assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint");
 
@@ -455,10 +461,12 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
       } else {
         if (concurrent_locks) {
           if (waitingToLockBlocker->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
+#ifndef LEYDEN
             oop threadObj = java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(waitingToLockBlocker);
             // This JavaThread (if there is one) is protected by the
             // ThreadsListSetter in VM_FindDeadlocks::doit().
             currentThread = threadObj != NULL ? java_lang_Thread::thread(threadObj) : NULL;
+#endif
           } else {
             currentThread = NULL;
           }
@@ -505,6 +513,8 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
   delete cycle;
   return deadlocks;
 }
+
+#endif
 
 ThreadDumpResult::ThreadDumpResult() : _num_threads(0), _num_snapshots(0), _snapshots(NULL), _last(NULL), _next(NULL), _setter() {
 
@@ -572,7 +582,9 @@ ThreadsList* ThreadDumpResult::t_list() {
 StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _method = jvf->method();
   _bci = jvf->bci();
+#ifndef LEYDEN
   _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
+#endif
   _locked_monitors = NULL;
   if (with_lock_info) {
     Thread* current_thread = Thread::current();
@@ -606,6 +618,7 @@ void StackFrameInfo::metadata_do(void f(Metadata*)) {
 }
 
 void StackFrameInfo::print_on(outputStream* st) const {
+#ifndef LEYDEN
   ResourceMark rm;
   java_lang_Throwable::print_stack_element(st, method(), bci());
   int len = (_locked_monitors != NULL ? _locked_monitors->length() : 0);
@@ -613,6 +626,7 @@ void StackFrameInfo::print_on(outputStream* st) const {
     oop o = _locked_monitors->at(i).resolve();
     st->print_cr("\t- locked <" INTPTR_FORMAT "> (a %s)", p2i(o), o->klass()->external_name());
   }
+#endif
 
 }
 
@@ -717,6 +731,8 @@ bool ThreadStackTrace::is_owned_monitor_on_stack(oop object) {
   return found;
 }
 
+#ifndef LEYDEN
+
 Handle ThreadStackTrace::allocate_fill_stack_trace_element_array(TRAPS) {
   InstanceKlass* ik = vmClasses::StackTraceElement_klass();
   assert(ik != NULL, "must be loaded in 1.4+");
@@ -733,6 +749,8 @@ Handle ThreadStackTrace::allocate_fill_stack_trace_element_array(TRAPS) {
   return backtrace;
 }
 
+#endif
+
 void ThreadStackTrace::add_stack_frame(javaVFrame* jvf) {
   StackFrameInfo* frame = new StackFrameInfo(jvf, _with_locked_monitors);
   _frames->append(frame);
@@ -746,6 +764,8 @@ void ThreadStackTrace::metadata_do(void f(Metadata*)) {
   }
 }
 
+
+#ifndef LEYDEN
 
 ConcurrentLocksDump::~ConcurrentLocksDump() {
   if (_retain_map_on_free) {
@@ -852,6 +872,8 @@ void ThreadConcurrentLocks::add_lock(instanceOop o) {
   _owned_locks->append(OopHandle(_thread_service_storage, o));
 }
 
+#endif
+
 ThreadStatistics::ThreadStatistics() {
   _contended_enter_count = 0;
   _monitor_wait_count = 0;
@@ -876,7 +898,9 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   _sleep_ticks = stat->sleep_ticks();
   _sleep_count = stat->sleep_count();
 
+#ifndef LEYDEN
   _thread_status = java_lang_Thread::get_thread_status(threadObj);
+#endif
   _is_ext_suspended = thread->is_being_ext_suspended();
   _is_in_native = (thread->thread_state() == _thread_in_native);
 
@@ -912,6 +936,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   }
 
   // Support for JSR-166 locks
+#ifndef LEYDEN
   if (_thread_status == JavaThreadStatus::PARKED || _thread_status == JavaThreadStatus::PARKED_TIMED) {
     blocker_object = thread->current_park_blocker();
     if (blocker_object != NULL && blocker_object->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
@@ -925,6 +950,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   if (blocker_object_owner != NULL) {
     _blocker_object_owner = OopHandle(_thread_service_storage, blocker_object_owner);
   }
+#endif
 }
 
 oop ThreadSnapshot::blocker_object() const           { return _blocker_object.resolve(); }
@@ -936,7 +962,9 @@ ThreadSnapshot::~ThreadSnapshot() {
   _threadObj.release(_thread_service_storage);
 
   delete _stack_trace;
+#ifndef LEYDEN
   delete _concurrent_locks;
+#endif
 }
 
 void ThreadSnapshot::dump_stack_at_safepoint(int max_depth, bool with_locked_monitors) {
@@ -951,6 +979,8 @@ void ThreadSnapshot::metadata_do(void f(Metadata*)) {
   }
 }
 
+
+#ifndef LEYDEN
 
 DeadlockCycle::DeadlockCycle() {
   _is_deadlock = false;
@@ -1047,9 +1077,12 @@ void DeadlockCycle::print_on_with(ThreadsList * t_list, outputStream* st) const 
   JavaMonitorsInStackTrace = oldJavaMonitorsInStackTrace;
 }
 
+#endif
+
 ThreadsListEnumerator::ThreadsListEnumerator(Thread* cur_thread,
                                              bool include_jvmti_agent_threads,
                                              bool include_jni_attaching_threads) {
+#ifndef LEYDEN
   assert(cur_thread == Thread::current(), "Check current thread");
 
   int init_size = ThreadService::get_live_thread_count();
@@ -1080,4 +1113,5 @@ ThreadsListEnumerator::ThreadsListEnumerator(Thread* cur_thread,
     instanceHandle h(cur_thread, (instanceOop) jt->threadObj());
     _threads_array->append(h);
   }
+#endif
 }

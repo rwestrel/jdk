@@ -52,9 +52,13 @@
 #include "c1/c1_Runtime1.hpp"
 #endif
 
+#ifndef LEYDEN
+
 const char* CodeBlob::compiler_name() const {
   return compilertype2name(_type);
 }
+
+#endif
 
 unsigned int CodeBlob::align_code_offset(int offset) {
   // align the size to CodeEntryAlignment
@@ -64,6 +68,8 @@ unsigned int CodeBlob::align_code_offset(int offset) {
 
 
 // This must be consistent with the CodeBlob constructor's layout actions.
+#ifndef LEYDEN
+
 unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
   unsigned int size = header_size;
   size += align_up(cb->total_relocation_size(), oopSize);
@@ -74,6 +80,8 @@ unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
   size += align_up(cb->total_metadata_size(), oopSize);
   return size;
 }
+
+#endif
 
 CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments) :
   _type(type),

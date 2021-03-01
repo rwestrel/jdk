@@ -395,11 +395,15 @@ void ObjArrayKlass::initialize(TRAPS) {
   bottom_klass()->initialize(THREAD);  // dispatches to either InstanceKlass or TypeArrayKlass
 }
 
+#ifndef LEYDEN
+
 void ObjArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   ArrayKlass::metaspace_pointers_do(it);
   it->push(&_element_klass);
   it->push(&_bottom_klass);
 }
+
+#endif
 
 // JVM support
 

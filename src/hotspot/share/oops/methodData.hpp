@@ -32,6 +32,7 @@
 #include "runtime/atomic.hpp"
 #include "utilities/align.hpp"
 #include "utilities/copy.hpp"
+#ifndef LEYDEN
 
 class BytecodeStream;
 
@@ -2474,5 +2475,6 @@ public:
   void clean_weak_method_links();
   Mutex* extra_data_lock() { return &_extra_data_lock; }
 };
-
+#endif
 #endif // SHARE_OOPS_METHODDATA_HPP
+

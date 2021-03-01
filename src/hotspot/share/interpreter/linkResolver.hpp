@@ -28,6 +28,7 @@
 #include "interpreter/bootstrapInfo.hpp"
 #include "oops/method.hpp"
 
+#ifndef LEYDEN
 // All the necessary definitions for run-time link resolution.
 
 // CallInfo provides all the information gathered for a particular
@@ -351,4 +352,6 @@ class LinkResolver: AllStatic {
                                           const methodHandle& selected_method,
                                           Klass *recv_klass, TRAPS);
 };
+
+#endif
 #endif // SHARE_INTERPRETER_LINKRESOLVER_HPP

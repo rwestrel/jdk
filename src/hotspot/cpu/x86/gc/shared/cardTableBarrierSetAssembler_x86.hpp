@@ -28,6 +28,8 @@
 #include "asm/macroAssembler.hpp"
 #include "gc/shared/modRefBarrierSetAssembler.hpp"
 
+#ifndef LEYDEN
+
 class CardTableBarrierSetAssembler: public ModRefBarrierSetAssembler {
 protected:
   void store_check(MacroAssembler* masm, Register obj, Address dst);
@@ -37,5 +39,7 @@ protected:
   virtual void oop_store_at(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
                             Address dst, Register val, Register tmp1, Register tmp2);
 };
+
+#endif
 
 #endif // CPU_X86_GC_SHARED_CARDTABLEBARRIERSETASSEMBLER_X86_HPP

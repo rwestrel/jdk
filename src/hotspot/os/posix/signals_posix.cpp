@@ -561,6 +561,7 @@ int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
 
   if (!signal_was_handled) {
     // Handle SafeFetch access.
+#ifndef LEYDEN
 #ifndef ZERO
     if (uc != NULL) {
       address pc = os::Posix::ucontext_get_pc(uc);
@@ -578,6 +579,7 @@ int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
       }
     }
 #endif // ZERO
+#endif
   }
 
   // Ignore SIGPIPE and SIGXFSZ (4229104, 6499219).

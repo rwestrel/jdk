@@ -95,11 +95,15 @@
 
 GrowableArray<Method*>* collected_profiled_methods;
 
+#ifndef LEYDEN
+
 int compare_methods(Method** a, Method** b) {
   // %%% there can be 32-bit overflow here
   return ((*b)->invocation_count() + (*b)->compiled_invocation_count())
        - ((*a)->invocation_count() + (*a)->compiled_invocation_count());
 }
+
+#endif
 
 void collect_profiled_methods(Method* m) {
 #ifndef LEYDEN
@@ -151,6 +155,7 @@ void print_method_profiling_data() {
 
 // Statistics printing (method invocation histogram)
 
+#ifndef LEYDEN
 GrowableArray<Method*>* collected_invoked_methods;
 
 void collect_invoked_methods(Method* m) {
@@ -158,6 +163,8 @@ void collect_invoked_methods(Method* m) {
     collected_invoked_methods->push(m);
   }
 }
+
+#endif
 
 
 
@@ -279,11 +286,9 @@ void print_statistics() {
   if (TimeOopMap) {
     GenerateOopMap::print_time();
   }
-#endif
   if (PrintSymbolTableSizeHistogram) {
     SymbolTable::print_histogram();
   }
-#ifndef LEYDEN
   if (CountBytecodes || TraceBytecodes || StopInterpreterAt) {
     BytecodeCounter::print();
   }
@@ -331,13 +336,17 @@ void print_statistics() {
 #endif
   }
 
+#ifndef LEYDEN
   if (LogTouchedMethods && PrintTouchedMethodsAtExit) {
     Method::print_touched_methods(tty);
   }
+#endif
 
+#ifndef LEYDEN
   if (PrintBiasedLockingStatistics) {
     BiasedLocking::print_counters();
   }
+#endif
 
   // Native memory tracking data
   if (PrintNMTStatistics) {

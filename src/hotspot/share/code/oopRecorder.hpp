@@ -28,6 +28,7 @@
 #include "runtime/handles.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 // Recording and retrieval of either oop relocations or metadata in compiled code.
 
 class CodeBlob;
@@ -248,6 +249,8 @@ class OopRecorder : public ResourceObj {
   }
 #endif
 };
+
+#endif
 
 
 #endif // SHARE_CODE_OOPRECORDER_HPP

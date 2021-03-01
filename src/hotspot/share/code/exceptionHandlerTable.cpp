@@ -230,9 +230,13 @@ ImplicitExceptionTable::ImplicitExceptionTable(const CompiledMethod* nm) {
   assert(size_in_bytes() <= nm->nul_chk_table_size(), "size of space allocated in nmethod incorrect");
 }
 
+#ifndef LEYDEN
+
 void ImplicitExceptionTable::copy_to( nmethod* nm ) {
   copy_bytes_to(nm->nul_chk_table_begin(), nm->nul_chk_table_size());
 }
+
+#endif
 
 void ImplicitExceptionTable::copy_bytes_to(address addr, int size) {
   assert(size_in_bytes() <= size, "size of space allocated in nmethod incorrect");
@@ -250,6 +254,8 @@ void ImplicitExceptionTable::copy_bytes_to(address addr, int size) {
   }
 }
 
+#ifndef LEYDEN
+
 void ImplicitExceptionTable::verify(nmethod *nm) const {
   for (uint i = 0; i < len(); i++) {
      if ((*adr(i) > (unsigned int)nm->insts_size()) ||
@@ -257,3 +263,5 @@ void ImplicitExceptionTable::verify(nmethod *nm) const {
        fatal("Invalid offset in ImplicitExceptionTable at " PTR_FORMAT, p2i(_data));
   }
 }
+
+#endif

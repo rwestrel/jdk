@@ -49,6 +49,7 @@
 
 // ------------- compiledVFrame --------------
 
+#ifndef LEYDEN
 StackValueCollection* compiledVFrame::locals() const {
   // Natives has no scope
   if (scope() == NULL) return new StackValueCollection(0);
@@ -282,7 +283,7 @@ GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
 
   return result;
 }
-
+#endif
 
 compiledVFrame::compiledVFrame(const frame* fr, const RegisterMap* reg_map, JavaThread* thread, CompiledMethod* nm)
 : javaVFrame(fr, reg_map, thread) {
@@ -319,11 +320,15 @@ bool compiledVFrame::is_top() const {
 
 
 CompiledMethod* compiledVFrame::code() const {
+#ifndef LEYDEN
   return CodeCache::find_compiled(_fr.pc());
+#else
+  return NULL;
+#endif
 }
 
-
 Method* compiledVFrame::method() const {
+#ifndef LEYDEN
   if (scope() == NULL) {
     // native nmethods have no scope the method is implied
     nmethod* nm = code()->as_nmethod();
@@ -331,8 +336,10 @@ Method* compiledVFrame::method() const {
     return nm->method();
   }
   return scope()->method();
+#else
+  return NULL;
+#endif
 }
-
 
 int compiledVFrame::bci() const {
   int raw = raw_bci();
@@ -343,8 +350,10 @@ int compiledVFrame::bci() const {
 int compiledVFrame::raw_bci() const {
   if (scope() == NULL) {
     // native nmethods have no scope the method/bci is implied
+#ifndef LEYDEN
     nmethod* nm = code()->as_nmethod();
     assert(nm->is_native_method(), "must be native");
+#endif
     return 0;
   }
   return scope()->bci();
@@ -353,8 +362,10 @@ int compiledVFrame::raw_bci() const {
 bool compiledVFrame::should_reexecute() const {
   if (scope() == NULL) {
     // native nmethods have no scope the method/bci is implied
+#ifndef LEYDEN
     nmethod* nm = code()->as_nmethod();
     assert(nm->is_native_method(), "must be native");
+#endif
     return false;
   }
   return scope()->should_reexecute();
@@ -363,7 +374,9 @@ bool compiledVFrame::should_reexecute() const {
 bool compiledVFrame::has_ea_local_in_scope() const {
   if (scope() == NULL) {
     // native nmethod, all objs escape
+#ifndef LEYDEN
     assert(code()->as_nmethod()->is_native_method(), "must be native");
+#endif
     return false;
   }
   return (scope()->objects() != NULL) || scope()->has_ea_local_in_scope();
@@ -372,7 +385,9 @@ bool compiledVFrame::has_ea_local_in_scope() const {
 bool compiledVFrame::arg_escape() const {
   if (scope() == NULL) {
     // native nmethod, all objs escape
+#ifndef LEYDEN
     assert(code()->as_nmethod()->is_native_method(), "must be native");
+#endif
     return false;
   }
   return scope()->arg_escape();
@@ -382,8 +397,10 @@ vframe* compiledVFrame::sender() const {
   const frame f = fr();
   if (scope() == NULL) {
     // native nmethods have no scope the method/bci is implied
+#ifndef LEYDEN
     nmethod* nm = code()->as_nmethod();
     assert(nm->is_native_method(), "must be native");
+#endif
     return vframe::sender();
   } else {
     return scope()->is_top()

@@ -33,6 +33,7 @@
 #include "utilities/hashtable.hpp"
 #include "utilities/resourceHash.hpp"
 
+#ifndef LEYDEN
 class CHeapBitMap;
 class DumpAllocStats;
 class FileMapInfo;
@@ -287,5 +288,6 @@ public:
   void update_method_trampolines();
 
 };
-
+#endif
 #endif // SHARE_MEMORY_ARCHIVEBUILDER_HPP
+

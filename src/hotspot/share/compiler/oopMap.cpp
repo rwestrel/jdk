@@ -221,6 +221,7 @@ static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map) {
   const ImmutableOopMapSet* maps = cb->oop_maps();
   const ImmutableOopMap* map = cb->oop_map_for_return_address(fr->pc());
   map->print();
+#ifndef LEYDEN
   if( cb->is_nmethod() ) {
     nmethod* nm = (nmethod*)cb;
     // native wrappers have no scope data, it is implied
@@ -231,6 +232,7 @@ static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map) {
       tty->print("bci: %d ",scope->bci());
     }
   }
+#endif
   tty->cr();
   fr->print_on(tty);
   tty->print("     ");

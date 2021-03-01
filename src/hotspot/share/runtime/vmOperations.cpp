@@ -86,6 +86,7 @@ void VM_Operation::print_on_error(outputStream* st) const {
   }
 }
 
+#ifndef LEYDEN
 void VM_ClearICs::doit() {
   if (_preserve_static_stubs) {
     CodeCache::cleanup_inline_caches();
@@ -153,7 +154,7 @@ void VM_DeoptimizeAll::doit() {
 void VM_ZombieAll::doit() {
   calling_thread()->as_Java_thread()->make_zombies();
 }
-
+#endif
 #endif // !PRODUCT
 
 bool VM_PrintThreads::doit_prologue() {
@@ -179,9 +180,15 @@ void VM_PrintJNI::doit() {
   JNIHandles::print_on(_out);
 }
 
+#ifndef LEYDEN
+
 void VM_PrintMetadata::doit() {
   metaspace::MetaspaceReporter::print_report(_out, _scale, _flags);
 }
+
+#endif
+
+#ifndef LEYDEN
 
 VM_FindDeadlocks::~VM_FindDeadlocks() {
   if (_deadlocks != NULL) {
@@ -219,6 +226,7 @@ void VM_FindDeadlocks::doit() {
     }
   }
 }
+
 
 VM_ThreadDump::VM_ThreadDump(ThreadDumpResult* result,
                              int max_depth,
@@ -337,6 +345,7 @@ void VM_ThreadDump::snapshot_thread(JavaThread* java_thread, ThreadConcurrentLoc
   snapshot->dump_stack_at_safepoint(_max_depth, _with_locked_monitors);
   snapshot->set_concurrent_locks(tcl);
 }
+#endif
 
 volatile bool VM_Exit::_vm_exited = false;
 Thread * volatile VM_Exit::_shutdown_thread = NULL;
@@ -438,7 +447,9 @@ void VM_Exit::doit() {
     Universe::verify();
   }
 
+#ifndef LEYDEN
   CompileBroker::set_should_block();
+#endif
 
   // Wait for a short period for threads in native to block. Any thread
   // still executing native code after the wait will be stopped at
@@ -462,7 +473,9 @@ void VM_Exit::doit() {
   // cleans up outputStream resources and PerfMemory resources.
   exit_globals();
 
+#ifndef LEYDEN
   LogConfiguration::finalize();
+#endif
 
   // Check for exit hook
   exit_hook_t exit_hook = Arguments::exit_hook();
@@ -487,9 +500,13 @@ void VM_Exit::wait_if_vm_exited() {
   }
 }
 
+#ifndef LEYDEN
+
 void VM_PrintCompileQueue::doit() {
   CompileBroker::print_compile_queues(_out);
 }
+
+#endif
 
 #if INCLUDE_SERVICES
 void VM_PrintClassHierarchy::doit() {

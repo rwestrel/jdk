@@ -30,6 +30,7 @@
 #include "runtime/os.hpp"
 #include "runtime/safepointMechanism.hpp"
 
+#if 1 //ndef LEYDEN
 // We have interfaces for the following instructions:
 // - NativeInstruction
 // - - NativeCall
@@ -732,5 +733,7 @@ inline bool NativeInstruction::is_mov_literal64() {
   return false;
 #endif // AMD64
 }
+
+#endif
 
 #endif // CPU_X86_NATIVEINST_X86_HPP

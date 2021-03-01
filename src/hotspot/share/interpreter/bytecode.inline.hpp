@@ -28,6 +28,10 @@
 #include "interpreter/bytecode.hpp"
 #include "oops/cpCache.inline.hpp"
 
+#ifndef LEYDEN
+
 inline bool Bytecode_invoke::has_appendix() { return cpcache_entry()->has_appendix(); }
+
+#endif
 
 #endif // SHARE_INTERPRETER_BYTECODE_INLINE_HPP

@@ -32,6 +32,7 @@
 #include "runtime/os.hpp"
 #include "utilities/vmEnums.hpp"
 
+#ifndef LEYDEN
 class RecordComponent;
 
 // Interface for manipulating the basic Java classes.
@@ -1775,4 +1776,6 @@ class JavaClasses : AllStatic {
 #undef DECLARE_INJECTED_FIELD_ENUM
 
 #undef CHECK_INIT
+#endif
 #endif // SHARE_CLASSFILE_JAVACLASSES_HPP
+

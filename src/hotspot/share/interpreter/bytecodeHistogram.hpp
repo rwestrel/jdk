@@ -28,6 +28,7 @@
 #include "interpreter/bytecodes.hpp"
 #include "memory/allocation.hpp"
 
+#ifndef LEYDEN
 // BytecodeCounter counts the number of bytecodes executed
 
 class BytecodeCounter: AllStatic {
@@ -94,5 +95,7 @@ class BytecodePairHistogram: AllStatic {
   // Profile printing
   static void print(float cutoff = 0.01F)   PRODUCT_RETURN;   // cutoff in percent
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_BYTECODEHISTOGRAM_HPP

@@ -116,11 +116,13 @@ void relocInfo::change_reloc_info_for_address(RelocIterator *itr, address pc, re
 void RelocIterator::initialize(CompiledMethod* nm, address begin, address limit) {
   initialize_misc();
 
+#ifndef LEYDEN
   if (nm == NULL && begin != NULL) {
     // allow nmethod to be deduced from beginning address
     CodeBlob* cb = CodeCache::find_blob(begin);
     nm = (cb != NULL) ? cb->as_compiled_method_or_null() : NULL;
   }
+#endif
   guarantee(nm != NULL, "must be able to deduce nmethod from other arguments");
 
   _code    = nm;
@@ -344,6 +346,8 @@ void Relocation::normalize_address(address& addr, const CodeSection* dest, bool 
 }
 
 
+#ifndef LEYDEN
+
 void CallRelocation::set_destination(address x) {
   pd_set_call_destination(x);
 }
@@ -357,6 +361,8 @@ void CallRelocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer
   // Reassert the callee address, this time in the new copy of the code.
   pd_set_call_destination(callee);
 }
+
+#endif
 
 
 //// pack/unpack methods
@@ -528,6 +534,8 @@ void section_word_Relocation::unpack_data() {
 }
 
 //// miscellaneous methods
+#ifndef LEYDEN
+
 oop* oop_Relocation::oop_addr() {
   int n = _oop_index;
   if (n == 0) {
@@ -539,6 +547,10 @@ oop* oop_Relocation::oop_addr() {
   }
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 oop oop_Relocation::oop_value() {
   oop v = *oop_addr();
@@ -546,6 +558,8 @@ oop oop_Relocation::oop_value() {
   if (v == Universe::non_oop_word())  v = NULL;
   return v;
 }
+
+#endif
 
 
 void oop_Relocation::fix_oop_relocation() {
@@ -564,6 +578,8 @@ void oop_Relocation::verify_oop_relocation() {
 }
 
 // meta data versions
+#ifndef LEYDEN
+
 Metadata** metadata_Relocation::metadata_addr() {
   int n = _metadata_index;
   if (n == 0) {
@@ -572,17 +588,25 @@ Metadata** metadata_Relocation::metadata_addr() {
     } else {
     // metadata is stored in table at nmethod::metadatas_begin
     return code()->metadata_addr_at(n);
-    }
   }
+}
 
+#endif
+
+
+#ifndef LEYDEN
 
 Metadata* metadata_Relocation::metadata_value() {
   Metadata* v = *metadata_addr();
   // clean inline caches store a special pseudo-null
   if (v == (Metadata*)Universe::non_oop_word())  v = NULL;
   return v;
-  }
+}
 
+#endif
+
+
+#ifndef LEYDEN
 
 void metadata_Relocation::fix_metadata_relocation() {
   if (!metadata_is_immediate()) {
@@ -590,6 +614,8 @@ void metadata_Relocation::fix_metadata_relocation() {
     pd_fix_value(value());
   }
 }
+
+#endif
 
 address virtual_call_Relocation::cached_value() {
   assert(_cached_value != NULL && _cached_value < addr(), "must precede ic_call");
@@ -605,6 +631,8 @@ Method* virtual_call_Relocation::method_value() {
   return (Method*)m;
 }
 
+#ifndef LEYDEN
+
 bool virtual_call_Relocation::clear_inline_cache() {
   // No stubs for ICs
   // Clean IC
@@ -612,6 +640,8 @@ bool virtual_call_Relocation::clear_inline_cache() {
   CompiledIC* icache = CompiledIC_at(this);
   return icache->set_to_clean();
 }
+
+#endif
 
 
 void opt_virtual_call_Relocation::pack_data_to(CodeSection* dest) {
@@ -633,11 +663,17 @@ Method* opt_virtual_call_Relocation::method_value() {
   return (Method*)m;
 }
 
+#ifndef LEYDEN
+
 template<typename CompiledICorStaticCall>
 static bool set_to_clean_no_ic_refill(CompiledICorStaticCall* ic) {
   guarantee(ic->set_to_clean(), "Should not need transition stubs");
   return true;
 }
+
+#endif
+
+#ifndef LEYDEN
 
 bool opt_virtual_call_Relocation::clear_inline_cache() {
   // No stubs for ICs
@@ -646,6 +682,8 @@ bool opt_virtual_call_Relocation::clear_inline_cache() {
   CompiledIC* icache = CompiledIC_at(this);
   return set_to_clean_no_ic_refill(icache);
 }
+
+#endif
 
 address opt_virtual_call_Relocation::static_stub(bool is_aot) {
   // search for the static stub who points back to this static call
@@ -681,11 +719,15 @@ void static_call_Relocation::unpack_data() {
   _method_index = unpack_1_int();
 }
 
+#ifndef LEYDEN
+
 bool static_call_Relocation::clear_inline_cache() {
   // Safe call site info
   CompiledStaticCall* handler = this->code()->compiledStaticCall_at(this);
   return set_to_clean_no_ic_refill(handler);
 }
+
+#endif
 
 
 address static_call_Relocation::static_stub(bool is_aot) {
@@ -702,6 +744,8 @@ address static_call_Relocation::static_stub(bool is_aot) {
   }
   return NULL;
 }
+
+#ifndef LEYDEN
 
 // Finds the trampoline address for a call. If no trampoline stub is
 // found NULL is returned which can be handled by the caller.
@@ -723,6 +767,10 @@ address trampoline_stub_Relocation::get_trampoline_for(address call, nmethod* co
   return NULL;
 }
 
+#endif
+
+#ifndef LEYDEN
+
 bool static_stub_Relocation::clear_inline_cache() {
   // Call stub is only used when calling the interpreted code.
   // It does not really need to be cleared, except that we want to clean out the methodoop.
@@ -730,6 +778,10 @@ bool static_stub_Relocation::clear_inline_cache() {
   return true;
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void external_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) {
   if (_target != NULL) {
@@ -744,6 +796,10 @@ void external_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, 
   postcond(dest->section_index_of(target()) == CodeBuffer::SECT_NONE);
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 address external_word_Relocation::target() {
   address target = _target;
@@ -753,6 +809,10 @@ address external_word_Relocation::target() {
   return target;
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void internal_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) {
   address target = _target;
@@ -762,6 +822,10 @@ void internal_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, 
   set_value(target);
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 address internal_word_Relocation::target() {
   address target = _target;
@@ -775,10 +839,14 @@ address internal_word_Relocation::target() {
   return target;
 }
 
+#endif
+
 //---------------------------------------------------------------------------------
 // Non-product code
 
 #ifndef PRODUCT
+
+#ifndef LEYDEN
 
 static const char* reloc_type_string(relocInfo::relocType t) {
   switch (t) {
@@ -798,6 +866,10 @@ static const char* reloc_type_string(relocInfo::relocType t) {
   }
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void RelocIterator::print_current() {
   if (!has_current()) {
@@ -915,6 +987,10 @@ void RelocIterator::print_current() {
   tty->cr();
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void RelocIterator::print() {
   RelocIterator save_this = (*this);
@@ -943,7 +1019,10 @@ void RelocIterator::print() {
   (*this) = save_this;
 }
 
+#endif
+
 // For the debugger:
+#ifndef LEYDEN
 extern "C"
 void print_blob_locs(nmethod* nm) {
   nm->print();
@@ -955,4 +1034,5 @@ void print_buf_locs(CodeBuffer* cb) {
   FlagSetting fs(PrintRelocations, true);
   cb->print();
 }
+#endif
 #endif // !PRODUCT

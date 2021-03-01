@@ -47,7 +47,9 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _fp = fp;
   _pc = pc;
   assert(pc != NULL, "no pc?");
+#ifndef LEYDEN
   _cb = CodeCache::find_blob(pc);
+#endif
   adjust_unextended_sp();
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
@@ -69,7 +71,9 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _fp = fp;
   _pc = pc;
   assert(pc != NULL, "no pc?");
+#ifndef LEYDEN
   _cb = CodeCache::find_blob(pc);
+#endif
   adjust_unextended_sp();
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
@@ -105,7 +109,9 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   // UPDATE: this constructor is only used by trace_method_handle_stub() now.
   // assert(_pc != NULL, "no pc?");
 
+#ifndef LEYDEN
   _cb = CodeCache::find_blob(_pc);
+#endif
   adjust_unextended_sp();
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);

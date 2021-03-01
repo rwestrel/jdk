@@ -32,6 +32,8 @@
 #include "runtime/signature.hpp"
 #include "utilities/bitMap.hpp"
 
+#ifndef LEYDEN
+
 // Forward definition
 class GenerateOopMap;
 class BasicBlock;
@@ -561,5 +563,7 @@ class GeneratePairingInfo: public GenerateOopMap {
 
   // Call compute_map(CHECK) to generate info.
 };
+
+#endif
 
 #endif // SHARE_OOPS_GENERATEOOPMAP_HPP

@@ -176,9 +176,13 @@ bool frame::is_deoptimized_frame() const {
 }
 
 bool frame::is_native_frame() const {
+#ifndef LEYDEN
   return (_cb != NULL &&
           _cb->is_nmethod() &&
           ((nmethod*)_cb)->is_native_method());
+#else
+  return false;
+#endif
 }
 
 bool frame::is_java_frame() const {
@@ -1039,15 +1043,20 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 
 
 BasicLock* frame::get_native_monitor() {
+#ifndef LEYDEN
   nmethod* nm = (nmethod*)_cb;
   assert(_cb != NULL && _cb->is_nmethod() && nm->method()->is_native(),
          "Should not call this unless it's a native nmethod");
   int byte_offset = in_bytes(nm->native_basic_lock_sp_offset());
   assert(byte_offset >= 0, "should not see invalid offset");
   return (BasicLock*) &sp()[byte_offset / wordSize];
+#else
+  return NULL;
+#endif
 }
 
 oop frame::get_native_receiver() {
+#ifndef LEYDEN
   nmethod* nm = (nmethod*)_cb;
   assert(_cb != NULL && _cb->is_nmethod() && nm->method()->is_native(),
          "Should not call this unless it's a native nmethod");
@@ -1056,9 +1065,13 @@ oop frame::get_native_receiver() {
   oop owner = ((oop*) sp())[byte_offset / wordSize];
   assert( Universe::heap()->is_in(owner), "bad receiver" );
   return owner;
+#else
+  return NULL;
+#endif
 }
 
 void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
+#ifndef LEYDEN
   assert(map != NULL, "map must be set");
   if (map->include_argument_oops()) {
     // must collect argument oops, as nobody else is doing it
@@ -1070,6 +1083,7 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   // Traverse the Handle Block saved in the entry frame
 #ifndef LEYDEN
   entry_frame_call_wrapper()->oops_do(f);
+#endif
 #endif
 }
 

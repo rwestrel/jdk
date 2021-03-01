@@ -62,7 +62,9 @@ void MetaspaceTracer::send_allocation_failure_event(ClassLoaderData *cld,
   E event;
   if (event.should_commit()) {
     event.set_classLoader(cld);
+#ifndef LEYDEN
     event.set_hiddenClassLoader(cld->has_class_mirror_holder());
+#endif
     event.set_size(word_size * BytesPerWord);
     event.set_metadataType((u1) mdtype);
     event.set_metaspaceObjectType((u1) objtype);

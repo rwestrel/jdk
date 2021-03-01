@@ -210,9 +210,11 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_oop_maps_bounded(oop obj, OopCl
 
 template <typename T, class OopClosureType>
 ALWAYSINLINE void InstanceKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
+#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
+#endif
 
   oop_oop_iterate_oop_maps<T>(obj, closure);
 }
@@ -227,11 +229,13 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_reverse(oop obj, OopClosureType
 
 template <typename T, class OopClosureType>
 ALWAYSINLINE void InstanceKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
+#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     if (mr.contains(obj)) {
       Devirtualizer::do_klass(closure, this);
     }
   }
+#endif
 
   oop_oop_iterate_oop_maps_bounded<T>(obj, closure, mr);
 }

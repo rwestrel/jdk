@@ -89,6 +89,7 @@ static size_t ceil_log2(size_t val) {
 // Lazily creates the table and populates it with the given
 // thread list
 void ThreadIdTable::lazy_initialize(const ThreadsList *threads) {
+#ifndef LEYDEN
   if (!_is_initialized) {
     {
       // There is no obvious benefits in allowing the thread table
@@ -114,6 +115,7 @@ void ThreadIdTable::lazy_initialize(const ThreadsList *threads) {
       }
     }
   }
+#endif
 }
 
 void ThreadIdTable::create_table(size_t size) {

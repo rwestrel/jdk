@@ -322,6 +322,8 @@ class ResultTypeFinder: public SignatureIterator {
 };
 
 
+#ifndef LEYDEN
+
 // Fingerprinter computes a unique ID for a given method. The ID
 // is a bitvector characterizing the methods signature (incl. the receiver).
 class Fingerprinter: public SignatureIterator {
@@ -364,8 +366,12 @@ class Fingerprinter: public SignatureIterator {
   }
 };
 
+#endif
+
 
 // Specialized SignatureIterator: Used for native call purposes
+
+#ifndef LEYDEN
 
 class NativeSignatureIterator: public SignatureIterator {
  private:
@@ -455,6 +461,8 @@ class NativeSignatureIterator: public SignatureIterator {
     do_parameters_on(this);
   }
 };
+
+#endif
 
 
 // This is the core parsing logic for iterating over signatures.

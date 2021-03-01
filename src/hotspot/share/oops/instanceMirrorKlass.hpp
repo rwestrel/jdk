@@ -29,6 +29,7 @@
 #include "oops/instanceKlass.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/macros.hpp"
+#ifndef LEYDEN
 
 class ClassFileParser;
 
@@ -122,5 +123,6 @@ class InstanceMirrorKlass: public InstanceKlass {
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_statics_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 };
-
+#endif
 #endif // SHARE_OOPS_INSTANCEMIRRORKLASS_HPP
+

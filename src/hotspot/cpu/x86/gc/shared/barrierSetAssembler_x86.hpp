@@ -29,6 +29,8 @@
 #include "memory/allocation.hpp"
 #include "oops/access.hpp"
 
+#ifndef LEYDEN
+
 class InterpreterMacroAssembler;
 
 class BarrierSetAssembler: public CHeapObj<mtGC> {
@@ -87,5 +89,7 @@ public:
   virtual void nmethod_entry_barrier(MacroAssembler* masm);
   virtual void c2i_entry_barrier(MacroAssembler* masm);
 };
+
+#endif
 
 #endif // CPU_X86_GC_SHARED_BARRIERSETASSEMBLER_X86_HPP

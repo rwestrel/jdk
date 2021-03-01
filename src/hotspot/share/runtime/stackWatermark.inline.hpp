@@ -44,6 +44,7 @@ inline bool StackWatermark::has_barrier(const frame& f) {
     return true;
   }
   if (f.is_compiled_frame()) {
+#ifndef LEYDEN
     nmethod* nm = f.cb()->as_nmethod();
     if (nm->is_compiled_by_c1() || nm->is_compiled_by_c2()) {
       return true;
@@ -51,6 +52,7 @@ inline bool StackWatermark::has_barrier(const frame& f) {
     if (nm->is_native_method()) {
       return true;
     }
+#endif
   }
   return false;
 }

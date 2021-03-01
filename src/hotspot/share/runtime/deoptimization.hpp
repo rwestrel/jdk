@@ -29,6 +29,8 @@
 #include "memory/allocation.hpp"
 #include "runtime/frame.hpp"
 
+#ifndef LEYDEN
+
 class ProfileData;
 class vframeArray;
 class MonitorInfo;
@@ -485,5 +487,7 @@ public:
   ~DeoptimizationMarker() { _is_active = false; }
   static bool is_active() { return _is_active; }
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_DEOPTIMIZATION_HPP

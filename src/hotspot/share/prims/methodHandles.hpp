@@ -34,6 +34,7 @@
 #include "runtime/stubCodeGenerator.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 #ifdef ZERO
 # include "entry_zero.hpp"
 # include "interpreter/interpreter.hpp"
@@ -204,5 +205,7 @@ public:
 
   void generate();
 };
+
+#endif
 
 #endif // SHARE_PRIMS_METHODHANDLES_HPP

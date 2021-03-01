@@ -29,6 +29,7 @@
 #include "runtime/stubCodeGenerator.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 // Interface for updating the instruction cache.  Whenever the VM modifies
 // code, part of the processor instruction cache potentially has to be flushed.
 
@@ -119,5 +120,7 @@ class ICacheStubGenerator : public StubCodeGenerator {
 
   void generate_icache_flush(ICache::flush_icache_stub_t* flush_icache_stub);
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_ICACHE_HPP

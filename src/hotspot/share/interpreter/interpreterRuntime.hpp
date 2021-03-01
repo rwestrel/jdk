@@ -33,6 +33,8 @@
 #include "runtime/thread.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
+
 class CodeBuffer;
 
 // The InterpreterRuntime is called by the interpreter for everything
@@ -182,5 +184,7 @@ class SignatureHandlerLibrary: public AllStatic {
   static void add(const methodHandle& method);
   static void add(uint64_t fingerprint, address handler);
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_INTERPRETERRUNTIME_HPP

@@ -27,6 +27,7 @@
 
 #include "code/compiledMethod.hpp"
 
+#ifndef LEYDEN
 class DepChange;
 class DirectiveSet;
 class DebugInformationRecorder;
@@ -804,5 +805,5 @@ class nmethodLocker : public StackObj {
     lock(_nm, zombie_ok);
   }
 };
-
+#endif
 #endif // SHARE_CODE_NMETHOD_HPP

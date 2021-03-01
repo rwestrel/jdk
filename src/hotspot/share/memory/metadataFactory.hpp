@@ -31,6 +31,7 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+#ifndef LEYDEN
 class MetadataFactory : AllStatic {
  public:
   template <typename T>
@@ -73,5 +74,6 @@ class MetadataFactory : AllStatic {
     }
   }
 };
-
+#endif
 #endif // SHARE_MEMORY_METADATAFACTORY_HPP
+

@@ -30,6 +30,7 @@
 #include "oops/method.hpp"
 #include "runtime/frame.hpp"
 
+#ifndef LEYDEN
 // This file specializes the assember with interpreter-specific macros
 
 typedef ByteSize (*OffsetFunction)(uint);
@@ -312,5 +313,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void profile_parameters_type(Register mdp, Register tmp1, Register tmp2);
 
 };
+
+#endif
 
 #endif // CPU_X86_INTERP_MASM_X86_HPP

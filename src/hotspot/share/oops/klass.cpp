@@ -91,9 +91,11 @@ void Klass::set_name(Symbol* n) {
   _name = n;
   if (_name != NULL) _name->increment_refcount();
 
+#ifndef LEYDEN
   if (Arguments::is_dumping_archive() && is_instance_klass()) {
     SystemDictionaryShared::init_dumptime_info(InstanceKlass::cast(this));
   }
+#endif
 }
 
 bool Klass::is_subclass_of(const Klass* k) const {
@@ -387,6 +389,7 @@ Klass* Klass::subklass(bool log) const {
        // create _next_sibling edges to dead data.
        chain = Atomic::load(&chain->_next_sibling))
   {
+#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
@@ -395,6 +398,9 @@ Klass* Klass::subklass(bool log) const {
         log_trace(class, unload)("unlinking class (subclass): %s", chain->external_name());
       }
     }
+#else
+return chain;
+#endif
   }
   return NULL;
 }
@@ -407,6 +413,7 @@ Klass* Klass::next_sibling(bool log) const {
        chain = Atomic::load(&chain->_next_sibling)) {
     // Only return alive klass, there may be stale klass
     // in this chain if cleaned concurrently.
+#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
@@ -415,6 +422,9 @@ Klass* Klass::next_sibling(bool log) const {
         log_trace(class, unload)("unlinking class (sibling): %s", chain->external_name());
       }
     }
+#else
+    return chain;
+#endif
   }
   return NULL;
 }
@@ -451,7 +461,9 @@ void Klass::append_to_sibling_list() {
     Klass* prev_first_subklass = Atomic::load_acquire(&_super->_subklass);
     if (prev_first_subklass != NULL) {
       // set our sibling to be the superklass' previous first subklass
+#ifndef LEYDEN
       assert(prev_first_subklass->is_loader_alive(), "May not attach not alive klasses");
+#endif
       set_next_sibling(prev_first_subklass);
     }
     // Note that the prev_first_subklass is always alive, meaning no sibling_next links
@@ -468,9 +480,15 @@ void Klass::clean_subklass() {
   for (;;) {
     // Need load_acquire, due to contending with concurrent inserts
     Klass* subklass = Atomic::load_acquire(&_subklass);
+#ifndef LEYDEN
     if (subklass == NULL || subklass->is_loader_alive()) {
       return;
     }
+#else
+    if (subklass == NULL) {
+      return;
+    }
+#endif
     // Try to fix _subklass until it points at something not dead.
     Atomic::cmpxchg(&_subklass, subklass, subklass->next_sibling());
   }
@@ -520,6 +538,8 @@ void Klass::clean_weak_klass_links(bool unloading_occurred, bool clean_alive_kla
 }
 #endif
 
+#ifndef LEYDEN
+
 void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   if (log_is_enabled(Trace, cds)) {
     ResourceMark rm;
@@ -542,6 +562,8 @@ void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
     it->push(vt[i].method_addr());
   }
 }
+
+#endif
 
 void Klass::remove_unshareable_info() {
   assert (Arguments::is_dumping_archive(),

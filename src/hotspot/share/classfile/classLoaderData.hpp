@@ -38,6 +38,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
+#ifndef LEYDEN
 // external name (synthetic) for the primordial "bootstrap" class loader instance
 #define BOOTSTRAP_LOADER_NAME "bootstrap"
 #define BOOTSTRAP_LOADER_NAME_LEN 9
@@ -332,4 +333,6 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   JFR_ONLY(DEFINE_TRACE_ID_METHODS;)
 };
 
+#endif
 #endif // SHARE_CLASSFILE_CLASSLOADERDATA_HPP
+

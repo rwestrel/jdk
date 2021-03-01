@@ -153,6 +153,8 @@ public:
 };
 #endif
 
+#ifndef LEYDEN
+
 class ClaimMetadataVisitingOopIterateClosure : public OopIterateClosure {
  protected:
   const int _claim;
@@ -174,6 +176,8 @@ class MetadataVisitingOopIterateClosure: public ClaimMetadataVisitingOopIterateC
  public:
   MetadataVisitingOopIterateClosure(ReferenceDiscoverer* rd = NULL);
 };
+
+#endif
 
 // ObjectClosure is used for iterating through an object space
 

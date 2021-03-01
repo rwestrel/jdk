@@ -32,6 +32,7 @@
 #include "utilities/accessFlags.hpp"
 #include "utilities/constantTag.hpp"
 
+#ifndef LEYDEN
 // A fieldDescriptor describes the attributes of a single field (instance or class variable).
 // It needs the class constant pool to work (because it only holds indices into the pool
 // rather than the actual info).
@@ -117,5 +118,7 @@ class fieldDescriptor {
   void print_on_for(outputStream* st, oop obj)  PRODUCT_RETURN;
   void verify() const                           PRODUCT_RETURN;
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_FIELDDESCRIPTOR_HPP

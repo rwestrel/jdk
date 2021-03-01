@@ -30,6 +30,7 @@
 #include "oops/method.hpp"
 #include "utilities/bytes.hpp"
 
+#ifndef LEYDEN
 // A BytecodeStream is used for fast iteration over the bytecodes
 // of a Method*.
 //
@@ -229,5 +230,7 @@ class BytecodeStream: public BaseBytecodeStream {
                                                    return bytecode().get_index_u4(raw_code()); }
   bool            has_index_u4() const           { return bytecode().has_index_u4(raw_code()); }
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_BYTECODESTREAM_HPP

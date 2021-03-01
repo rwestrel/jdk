@@ -149,6 +149,7 @@ CodeBuffer::~CodeBuffer() {
   // This is resource clean up, let's hope that all were properly copied out.
   NOT_PRODUCT(free_strings();)
 
+#ifndef LEYDEN
 #ifdef ASSERT
   // Save allocation type to execute assert in ~ResourceObj()
   // which is called after this destructor.
@@ -157,13 +158,18 @@ CodeBuffer::~CodeBuffer() {
   Copy::fill_to_bytes(this, sizeof(*this), badResourceValue);
   ResourceObj::set_allocation_type((address)(&_default_oop_recorder), at);
 #endif
+#endif
 }
+
+#ifndef LEYDEN
 
 void CodeBuffer::initialize_oop_recorder(OopRecorder* r) {
   assert(_oop_recorder == &_default_oop_recorder && _default_oop_recorder.is_unused(), "do this once");
   DEBUG_ONLY(_default_oop_recorder.freeze());  // force unused OR to be frozen
   _oop_recorder = r;
 }
+
+#endif
 
 void CodeBuffer::initialize_section_size(CodeSection* cs, csize_t size) {
   assert(cs != &_insts, "insts is the memory provider, not the consumer");
@@ -245,9 +251,13 @@ int CodeBuffer::locator(address addr) const {
 }
 
 
+#ifndef LEYDEN
+
 bool CodeBuffer::is_backward_branch(Label& L) {
   return L.is_bound() && insts_end() <= locator_address(L.loc());
 }
+
+#endif
 
 #ifndef PRODUCT
 address CodeBuffer::decode_begin() {

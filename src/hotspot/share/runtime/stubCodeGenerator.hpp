@@ -28,6 +28,7 @@
 #include "asm/assembler.hpp"
 #include "memory/allocation.hpp"
 
+#ifndef LEYDEN
 // All the basic framework for stub code generation/debugging/printing.
 
 
@@ -127,5 +128,7 @@ class StubCodeMark: public StackObj {
   ~StubCodeMark();
 
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_STUBCODEGENERATOR_HPP

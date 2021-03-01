@@ -31,6 +31,8 @@
 #include "utilities/align.hpp"
 #include "utilities/bytes.hpp"
 
+#ifndef LEYDEN
+
 class ciBytecodeStream;
 
 // The base class for different kinds of bytecode abstractions.
@@ -341,5 +343,7 @@ class Bytecode_loadconstant: public Bytecode {
 
   oop resolve_constant(TRAPS) const;
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_BYTECODE_HPP

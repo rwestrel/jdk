@@ -32,6 +32,7 @@
 #include "runtime/monitorChunk.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 // A vframeArray is an array used for momentarily storing off stack Java method activations
 // during deoptimization. Essentially it is an array of vframes where each vframe
 // data is stored off stack. This structure will never exist across a safepoint so
@@ -227,5 +228,7 @@ class vframeArray: public CHeapObj<mtCompiler> {
 #endif
 
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_VFRAMEARRAY_HPP

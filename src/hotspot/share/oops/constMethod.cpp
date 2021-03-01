@@ -83,6 +83,8 @@ void ConstMethod::copy_stackmap_data(ClassLoaderData* loader_data,
 #endif
 
 // Deallocate metadata fields associated with ConstMethod*
+#ifndef LEYDEN
+
 void ConstMethod::deallocate_contents(ClassLoaderData* loader_data) {
   if (stackmap_data() != NULL) {
     MetadataFactory::free_array<u1>(loader_data, stackmap_data());
@@ -99,6 +101,8 @@ void ConstMethod::deallocate_contents(ClassLoaderData* loader_data) {
   if (has_default_annotations())
     MetadataFactory::free_array<u1>(loader_data, default_annotations());
 }
+
+#endif
 
 // How big must this constMethodObject be?
 
@@ -156,8 +160,12 @@ int ConstMethod::size(int code_size,
 }
 
 Method* ConstMethod::method() const {
-    return _constants->pool_holder()->method_with_idnum(_method_idnum);
-  }
+#ifndef LEYDEN
+  return _constants->pool_holder()->method_with_idnum(_method_idnum);
+#else
+  return NULL;
+#endif
+}
 
 // linenumber table - note that length is unknown until decompression,
 // see class CompressedLineNumberReadStream.
@@ -409,6 +417,8 @@ void ConstMethod::copy_annotations_from(ClassLoaderData* loader_data, ConstMetho
 }
 #endif
 
+#ifndef LEYDEN
+
 void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(ConstMethod): %p", this);
 
@@ -429,6 +439,8 @@ void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   ConstMethod* this_ptr = this;
   it->push_method_entry(&this_ptr, (intptr_t*)&_adapter_trampoline);
 }
+
+#endif
 
 void ConstMethod::set_adapter_trampoline(AdapterHandlerEntry** trampoline) {
   Arguments::assert_is_dumping_archive();

@@ -113,6 +113,8 @@ ReferenceArgumentCount::ReferenceArgumentCount(Symbol* signature)
   do_parameters_on(this);  // non-virtual template execution
 }
 
+#ifndef LEYDEN
+
 void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   // See if we fingerprinted this method already
   if (_method != NULL) {
@@ -171,6 +173,8 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
     _method->constMethod()->set_fingerprint(_fingerprint);
   }
 }
+
+#endif
 
 // Implementation of SignatureStream
 
@@ -310,16 +314,22 @@ BasicType Signature::basic_type(int ch) {
   return btcode;
 }
 
+#ifndef LEYDEN
+
 Symbol* Signature::strip_envelope(const Symbol* signature) {
   assert(has_envelope(signature), "precondition");
   return SymbolTable::new_symbol((char*) signature->bytes() + 1,
                                  signature->utf8_length() - 2);
 }
 
+#endif
+
 static const int jl_len = 10, object_len = 6, jl_object_len = jl_len + object_len;
 static const char jl_str[] = "java/lang/";
 
 #ifdef ASSERT
+#ifndef LEYDEN
+
 static bool signature_symbols_sane() {
   static bool done;
   if (done)  return true;
@@ -336,9 +346,13 @@ static bool signature_symbols_sane() {
          "sanity");
   return true;
 }
+
+#endif
 #endif //ASSERT
 
 // returns a symbol; the caller is responsible for decrementing it
+#ifndef LEYDEN
+
 Symbol* SignatureStream::find_symbol() {
   // Create a symbol from for string _begin _end
   int begin = raw_symbol_begin();
@@ -378,6 +392,8 @@ Symbol* SignatureStream::find_symbol() {
   _previous_name = name;
   return name;
 }
+
+#endif
 #ifndef LEYDEN
 Klass* SignatureStream::as_klass(Handle class_loader, Handle protection_domain,
                                  FailureMode failure_mode, TRAPS) {
@@ -457,11 +473,15 @@ ResolvingSignatureStream::ResolvingSignatureStream(fieldDescriptor& field)
   initialize_load_origin(field.field_holder());
 }
 
+#ifndef LEYDEN
+
 void ResolvingSignatureStream::cache_handles(TRAPS) {
   assert(_load_origin != NULL, "");
   _class_loader = Handle(THREAD, _load_origin->class_loader());
   _protection_domain = Handle(THREAD, _load_origin->protection_domain());
 }
+
+#endif
 
 Klass* ResolvingSignatureStream::as_klass_if_loaded(TRAPS) {
   Klass* klass = as_klass(CachedOrNull, THREAD);

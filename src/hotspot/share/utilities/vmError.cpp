@@ -136,6 +136,7 @@ static char* next_OnError_command(char* buf, int buflen, const char** ptr) {
   return buf;
 }
 
+#ifndef LEYDEN
 static void print_bug_submit_message(outputStream *out, Thread *thread) {
   if (out == NULL) return;
   const char *url = Arguments::java_vendor_url_bug();
@@ -156,6 +157,7 @@ static void print_bug_submit_message(outputStream *out, Thread *thread) {
   }
   out->print_raw_cr("#");
 }
+#endif
 
 void VMError::record_coredump_status(const char* message, bool status) {
   coredump_status = status;
@@ -283,6 +285,7 @@ void VMError::print_native_stack(outputStream* st, frame fr, Thread* t, char* bu
   }
 }
 
+#ifndef LEYDEN
 static void print_oom_reasons(outputStream* st) {
   st->print_cr("# Possible reasons:");
   st->print_cr("#   The system is out of physical RAM or swap space");
@@ -323,7 +326,9 @@ static void print_oom_reasons(outputStream* st) {
   }
   st->print_cr("# This output file may be truncated or incomplete.");
 }
+#endif
 
+#ifndef LEYDEN
 static void report_vm_version(outputStream* st, char* buf, int buflen) {
    // VM version
    st->print_cr("#");
@@ -361,6 +366,7 @@ static void report_vm_version(outputStream* st, char* buf, int buflen) {
                  VM_Version::vm_platform_string()
                );
 }
+#endif
 
 // Returns true if at least one thread reported a fatal error and fatal error handling is in process.
 bool VMError::is_error_reported() {
@@ -428,6 +434,7 @@ void VMError::clear_step_start_time() {
 // thread can report error, so large buffers are statically allocated in data
 // segment.
 void VMError::report(outputStream* st, bool _verbose) {
+#ifndef LEYDEN
 
 # define BEGIN if (_current_step == 0) { _current_step = __LINE__;
 # define STEP(s) } if (_current_step < __LINE__) { _current_step = __LINE__; _current_step_info = s; \
@@ -1087,13 +1094,14 @@ void VMError::report(outputStream* st, bool _verbose) {
 # undef BEGIN
 # undef STEP
 # undef END
+#endif
 }
 
 // Report for the vm_info_cmd. This prints out the information above omitting
 // crash and thread specific information.  If output is added above, it should be added
 // here also, if it is safe to call during a running process.
 void VMError::print_vm_info(outputStream* st) {
-
+#ifndef LEYDEN
   char buf[O_BUFLEN];
   report_vm_version(st, buf, sizeof(buf));
 
@@ -1248,9 +1256,11 @@ void VMError::print_vm_info(outputStream* st) {
   // STEP("printing end marker")
 
   st->print_cr("END.");
+#endif
 }
 
 /** Expand a pattern into a buffer starting at pos and open a file using constructed path */
+#ifndef LEYDEN
 static int expand_and_open(const char* pattern, bool overwrite_existing, char* buf, size_t buflen, size_t pos) {
   int fd = -1;
   int mode = O_RDWR | O_CREAT;
@@ -1264,12 +1274,14 @@ static int expand_and_open(const char* pattern, bool overwrite_existing, char* b
   }
   return fd;
 }
+#endif
 
 /**
  * Construct file name for a log file and return it's file descriptor.
  * Name and location depends on pattern, default_pattern params and access
  * permissions.
  */
+#ifndef LEYDEN
 static int prepare_log_file(const char* pattern, const char* default_pattern, bool overwrite_existing, char* buf, size_t buflen) {
   int fd = -1;
 
@@ -1305,6 +1317,7 @@ static int prepare_log_file(const char* pattern, const char* default_pattern, bo
 
   return fd;
 }
+#endif
 
 void VMError::report_and_die(Thread* thread, unsigned int sig, address pc, void* siginfo,
                              void* context, const char* detail_fmt, ...)
@@ -1335,6 +1348,7 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
                              Thread* thread, address pc, void* siginfo, void* context, const char* filename,
                              int lineno, size_t size)
 {
+#ifndef LEYDEN
   // A single scratch buffer to be used from here on.
   // Do not rely on it being preserved across function calls.
   static char buffer[O_BUFLEN];
@@ -1623,6 +1637,7 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
     // if os::abort() doesn't abort, try os::die();
     os::die();
   }
+#endif
 }
 
 /*

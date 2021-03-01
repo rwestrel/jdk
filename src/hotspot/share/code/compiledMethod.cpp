@@ -748,6 +748,8 @@ address CompiledMethod::continuation_for_implicit_exception(address pc, bool for
   return code_begin() + cont_offset;
 }
 
+#ifndef LEYDEN
+
 class HasEvolDependency : public MetadataClosure {
   bool _has_evol_dependency;
  public:
@@ -779,4 +781,7 @@ bool CompiledMethod::has_evol_metadata() {
   }
   return check_evol.has_evol_dependency();
 }
+
+#endif
+
 

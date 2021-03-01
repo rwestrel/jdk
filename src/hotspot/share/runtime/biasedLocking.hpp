@@ -28,6 +28,7 @@
 #include "runtime/handles.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 // This class describes operations to implement Store-Free Biased
 // Locking. The high-level properties of the scheme are similar to
 // IBM's lock reservation, Dice-Moir-Scherer QR locks, and other biased
@@ -208,5 +209,7 @@ public:
   static void preserve_marks();
   static void restore_marks();
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_BIASEDLOCKING_HPP

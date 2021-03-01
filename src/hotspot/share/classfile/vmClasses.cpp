@@ -43,11 +43,15 @@ InstanceKlass* vmClasses::_box_klasses[T_VOID+1] =  { NULL /*, NULL...*/ };
 
 
 // CDS: scan and relocate all classes referenced by _klasses[].
+#ifndef LEYDEN
+
 void vmClasses::metaspace_pointers_do(MetaspaceClosure* it) {
   for (auto id : EnumRange<vmClassID>{}) {
     it->push(klass_addr_at(id));
   }
 }
+
+#endif
 
 bool vmClasses::is_loaded(InstanceKlass* klass) {
   return klass != NULL && klass->is_loaded();
@@ -113,6 +117,7 @@ void vmClasses::resolve_until(vmClassID limit_id, vmClassID &start_id, TRAPS) {
 }
 
 void vmClasses::resolve_all(TRAPS) {
+#ifndef LEYDEN
   assert(!Object_klass_loaded(), "well-known classes should only be initialized once");
 
   // Create the ModuleEntry for java.base.  This call needs to be done here,
@@ -211,6 +216,7 @@ void vmClasses::resolve_all(TRAPS) {
       assert(k->is_shared(), "must not be replaced by JVMTI class file load hook");
     }
   }
+#endif
 #endif
 }
 

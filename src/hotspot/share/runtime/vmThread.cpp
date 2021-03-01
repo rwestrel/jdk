@@ -183,7 +183,9 @@ void VMThread::run() {
     Universe::verify();
   }
 
+#ifndef LEYDEN
   CompileBroker::set_should_block();
+#endif
 
   // wait for threads (compiler threads or daemon threads) in the
   // _thread_in_native state to block.

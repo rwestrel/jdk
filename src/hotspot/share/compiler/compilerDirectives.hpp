@@ -34,7 +34,8 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/tribool.hpp"
 
-  //      Directives flag name,    type, default value, compile command name
+#ifndef LEYDEN
+//      Directives flag name,    type, default value, compile command name
   #define compilerdirectives_common_flags(cflags) \
     cflags(Enable,                  bool, false, Unknown) \
     cflags(Exclude,                 bool, false, Unknown) \
@@ -252,5 +253,7 @@ public:
   DirectiveSet* _c1_store;
   DirectiveSet* _c2_store;
 };
+
+#endif
 
 #endif // SHARE_COMPILER_COMPILERDIRECTIVES_HPP

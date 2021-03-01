@@ -228,6 +228,8 @@ const char* Symbol::as_klass_external_name() const {
   return str;
 }
 
+#ifndef LEYDEN
+
 static void print_class(outputStream *os, const SignatureStream& ss) {
   int sb = ss.raw_symbol_begin(), se = ss.raw_symbol_end();
   for (int i = sb; i < se; ++i) {
@@ -252,6 +254,8 @@ static void print_array(outputStream *os, SignatureStream& ss) {
     os->print("[]");
   }
 }
+
+
 void Symbol::print_as_signature_external_return_type(outputStream *os) {
   for (SignatureStream ss(this); !ss.is_done(); ss.next()) {
     if (ss.at_return_type()) {
@@ -281,6 +285,8 @@ void Symbol::print_as_signature_external_parameters(outputStream *os) {
     first = false;
   }
 }
+
+#endif
 
 // Increment refcount while checking for zero.  If the Symbol's refcount becomes zero
 // a thread could be concurrently removing the Symbol.  This is used during SymbolTable

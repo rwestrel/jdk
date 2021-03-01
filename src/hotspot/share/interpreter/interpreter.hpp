@@ -32,6 +32,7 @@
 #include "memory/resourceArea.hpp"
 #include "utilities/align.hpp"
 
+#ifndef LEYDEN
 // This file contains the platform-independent parts
 // of the interpreter and the interpreter generator.
 
@@ -119,5 +120,6 @@ class CodeletMark: ResourceMark {
 // the Zero interpreter or the template interpreter.
 
 typedef ZERO_ONLY(ZeroInterpreter) NOT_ZERO(TemplateInterpreter) Interpreter;
+#endif
 
 #endif // SHARE_INTERPRETER_INTERPRETER_HPP

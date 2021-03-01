@@ -1436,6 +1436,7 @@ bool Arguments::check_unsupported_cds_runtime_properties() {
 // Setting int/mixed/comp mode flags
 
 void Arguments::set_mode_flags(Mode mode) {
+#ifndef LEYDEN
   // Set up default values for all flags.
   // If you add a flag to any of the branches below,
   // add a default value for it here.
@@ -1491,6 +1492,7 @@ void Arguments::set_mode_flags(Mode mode) {
     }
     break;
   }
+#endif
 }
 
 // Conflict: required to use shared spaces (-Xshare:on), but

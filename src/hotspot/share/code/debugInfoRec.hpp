@@ -35,6 +35,7 @@
 #include "oops/oop.hpp"
 #include "utilities/growableArray.hpp"
 
+#ifndef LEYDEN
 //** The DebugInformationRecorder collects debugging information
 //   for a compiled method.
 //   Debugging information is used for:
@@ -63,7 +64,7 @@
 class DebugToken; // Opaque datatype for stored:
                   //  - GrowableArray<ScopeValue*>
                   //  - GrowableArray<MonitorValue*>
-
+#endif
 // Alias for InvocationEntryBci.
 // Both constants are used for a pseudo-BCI which refers
 // to the state just _before_ a method is entered.
@@ -71,6 +72,7 @@ class DebugToken; // Opaque datatype for stored:
 // is on the implicit monitorenter of a synchronized method.
 const int SynchronizationEntryBCI = InvocationEntryBci;
 
+#ifndef LEYDEN
 class DIR_Chunk; // private class, a nugget of collected information
 
 class DebugInformationRecorder: public ResourceObj {
@@ -210,5 +212,7 @@ class DebugInformationRecorder: public ResourceObj {
  public:
   enum { serialized_null = 0 };
 };
+
+#endif
 
 #endif // SHARE_CODE_DEBUGINFOREC_HPP

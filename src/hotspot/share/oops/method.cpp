@@ -170,6 +170,8 @@ address Method::get_c2i_no_clinit_check_entry() {
 }
 #endif
 
+#ifndef LEYDEN
+
 char* Method::name_and_sig_as_C_string() const {
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature());
 }
@@ -230,7 +232,10 @@ void Method::print_external_name(outputStream *os, Klass* klass, Symbol* method_
   os->print(")");
 }
 
+#endif
+
 int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_klass, int throw_bci, TRAPS) {
+#ifndef LEYDEN
   // exception table holds quadruple entries of the form (beg_bci, end_bci, handler_bci, klass_index)
   // access exception table
   ExceptionTable table(mh());
@@ -263,6 +268,7 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
       }
     }
   }
+#endif
 
   return -1;
 }
@@ -282,6 +288,8 @@ void Method::mask_for(int bci, InterpreterOopMap* mask) {
 #endif
 
 
+#ifndef LEYDEN
+
 int Method::bci_from(address bcp) const {
   if (is_native() && bcp == 0) {
     return 0;
@@ -297,6 +305,8 @@ int Method::bci_from(address bcp) const {
   return bcp - code_base();
 }
 
+#endif
+
 
 int Method::validate_bci(int bci) const {
   return (bci == 0 || bci < code_size()) ? bci : -1;
@@ -306,6 +316,8 @@ int Method::validate_bci(int bci) const {
 // Return -1 otherwise.
 // Used by profiling code, when invalid data is a possibility.
 // The caller is responsible for validating the Method* itself.
+#ifndef LEYDEN
+
 int Method::validate_bci_from_bcp(address bcp) const {
   // keep bci as -1 if not a valid bci
   int bci = -1;
@@ -320,6 +332,8 @@ int Method::validate_bci_from_bcp(address bcp) const {
   assert(bci == -1 || bci == bci_from(bcp_from(bci)), "sane bci if >=0");
   return bci;
 }
+
+#endif
 
 address Method::bcp_from(int bci) const {
   assert((is_native() && bci == 0) || (!is_native() && 0 <= bci && bci < code_size()),
@@ -344,9 +358,15 @@ int Method::size(bool is_native) {
   return align_metadata_size(header_size() + extra_words);
 }
 
+#ifndef LEYDEN
+
 Symbol* Method::klass_name() const {
   return method_holder()->name();
 }
+
+#endif
+
+#ifndef LEYDEN
 
 void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(Method): %p", this);
@@ -360,6 +380,8 @@ void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push_method_entry(&this_ptr, (intptr_t*)&_from_compiled_entry);
   it->push_method_entry(&this_ptr, (intptr_t*)&_from_interpreted_entry);
 }
+
+#endif
 
 // Attempt to return method to original state.  Clear any pointers
 // (to objects outside the shared spaces).  We won't be able to predict
@@ -590,10 +612,14 @@ bool Method::init_method_counters(MethodCounters* counters) {
   return Atomic::replace_if_null(&_method_counters, counters);
 }
 
+#ifndef LEYDEN
+
 int Method::extra_stack_words() {
   // not an inline function, to avoid a header dependency on Interpreter
   return extra_stack_entries() * Interpreter::stackElementSize;
 }
+
+#endif
 
 // Derive size of parameters, return type, and fingerprint,
 // all in one pass, which is run at load time.
@@ -609,10 +635,16 @@ void Method::compute_from_signature(Symbol* sig) {
 }
 #endif
 
+#ifndef LEYDEN
+
 bool Method::is_empty_method() const {
   return  code_size() == 1
       && *code_base() == Bytecodes::_return;
 }
+
+#endif
+
+#ifndef LEYDEN
 
 bool Method::is_vanilla_constructor() const {
   // Returns true if this method is a vanilla constructor, i.e. an "<init>" "()V" method
@@ -655,6 +687,8 @@ bool Method::is_vanilla_constructor() const {
   }
   return true;
 }
+
+#endif
 
 
 #ifndef LEYDEN
@@ -725,7 +759,6 @@ bool Method::compute_has_loops_flag() {
   _access_flags.set_loops_flag_init();
   return _access_flags.has_loops();
 }
-#endif
 
 bool Method::is_final_method(AccessFlags class_access_flags) const {
   // or "does_not_require_vtable_entry"
@@ -734,6 +767,7 @@ bool Method::is_final_method(AccessFlags class_access_flags) const {
   if (is_overpass() || is_default_method())  return false;
   return is_final() || class_access_flags.is_final();
 }
+
 
 bool Method::is_final_method() const {
   return is_final_method(method_holder()->access_flags());
@@ -771,6 +805,10 @@ bool Method::can_be_statically_bound() const {
 bool Method::can_be_statically_bound(InstanceKlass* context) const {
   return (method_holder() == context) && can_be_statically_bound();
 }
+
+#endif
+
+#ifndef LEYDEN
 
 bool Method::is_accessor() const {
   return is_getter() || is_setter();
@@ -829,6 +867,7 @@ bool Method::is_initializer() const {
   return is_object_initializer() || is_static_initializer();
 }
 
+
 bool Method::has_valid_initializer_flags() const {
   return (is_static() ||
           method_holder()->major_version() < 51);
@@ -842,6 +881,10 @@ bool Method::is_static_initializer() const {
          has_valid_initializer_flags();
 }
 
+#endif
+
+#ifndef LEYDEN
+
 bool Method::is_object_initializer() const {
    return name() == vmSymbols::object_initializer_name();
 }
@@ -849,6 +892,10 @@ bool Method::is_object_initializer() const {
 bool Method::needs_clinit_barrier() const {
   return is_static() && !method_holder()->is_initialized();
 }
+
+#endif
+
+#ifndef LEYDEN
 
 objArrayHandle Method::resolved_checked_exceptions_impl(Method* method, TRAPS) {
   int length = method->checked_exceptions_length();
@@ -873,6 +920,7 @@ objArrayHandle Method::resolved_checked_exceptions_impl(Method* method, TRAPS) {
     return mirrors;
   }
 };
+#endif
 
 
 int Method::line_number_from_bci(int bci) const {
@@ -1368,6 +1416,8 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
 }
 #endif
 
+#ifndef LEYDEN
+
 bool Method::is_overridden_in(Klass* k) const {
   InstanceKlass* ik = InstanceKlass::cast(k);
 
@@ -1393,6 +1443,8 @@ bool Method::is_overridden_in(Klass* k) const {
   }
 }
 
+#endif
+
 
 // give advice about whether this Method* should be cached or not
 bool Method::should_not_be_cached() const {
@@ -1413,6 +1465,8 @@ bool Method::should_not_be_cached() const {
  *  Returns true if this is one of the specially treated methods for
  *  security related stack walks (like Reflection.getCallerClass).
  */
+#ifndef LEYDEN
+
 bool Method::is_ignored_by_security_stack_walk() const {
   if (intrinsic_id() == vmIntrinsics::_invoke) {
     // This is Method.invoke() -- ignore it
@@ -1422,12 +1476,16 @@ bool Method::is_ignored_by_security_stack_walk() const {
     // This is an auxilary frame -- ignore it
     return true;
   }
+#ifndef LEYDEN
   if (is_method_handle_intrinsic() || is_compiled_lambda_form()) {
     // This is an internal adapter frame for method handles -- ignore it
     return true;
   }
+#endif
   return false;
 }
+
+#endif
 
 
 // Constant pool structure for invoke methods:
@@ -1439,6 +1497,8 @@ enum {
 
 // Test if this method is an MH adapter frame generated by Java code.
 // Cf. java/lang/invoke/InvokerBytecodeGenerator
+#ifndef LEYDEN
+
 bool Method::is_compiled_lambda_form() const {
   return intrinsic_id() == vmIntrinsics::_compiledLambdaForm;
 }
@@ -1455,6 +1515,8 @@ bool Method::has_member_arg() const {
   return (MethodHandles::is_signature_polymorphic(iid) &&
           MethodHandles::has_member_arg(iid));
 }
+
+#endif
 
 // Make an instance of a signature-polymorphic internal MH primitive.
 #ifndef LEYDEN
@@ -1531,7 +1593,6 @@ methodHandle Method::make_method_handle_intrinsic(vmIntrinsics::ID iid,
 
   return m;
 }
-#endif
 
 Klass* Method::check_non_bcp_klass(Klass* klass) {
   if (klass != NULL && klass->class_loader() != NULL) {
@@ -1543,7 +1604,6 @@ Klass* Method::check_non_bcp_klass(Klass* klass) {
 }
 
 
-#ifndef LEYDEN
 methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code, int new_code_length,
                                                 u_char* new_compressed_linenumber_table, int new_compressed_linenumber_size, TRAPS) {
   // Code below does not work for native methods - they should never get rewritten anyway
@@ -1804,6 +1864,8 @@ void Method::print_short_name(outputStream* st) {
 
 // Comparer for sorting an object array containing
 // Method*s.
+#ifndef LEYDEN
+
 static int method_comparator(Method* a, Method* b) {
   return a->name()->fast_compare(b->name());
 }
@@ -1830,6 +1892,8 @@ void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_compa
     }
   }
 }
+
+#endif
 
 //-----------------------------------------------------------------------------------
 // Non-product code unless JVM/TI needs it
@@ -2000,6 +2064,8 @@ void Method::clear_all_breakpoints() {
 
 #endif // INCLUDE_JVMTI
 
+#ifndef LEYDEN
+
 int Method::invocation_count() {
   MethodCounters* mcs = method_counters();
   MethodData* mdo = method_data();
@@ -2023,6 +2089,10 @@ int Method::backedge_count() {
            ((mdo != NULL) ? mdo->backedge_counter()->count() : 0);
   }
 }
+
+#endif
+
+#ifndef LEYDEN
 
 int Method::highest_comp_level() const {
   const MethodCounters* mcs = method_counters();
@@ -2055,6 +2125,8 @@ void Method::set_highest_osr_comp_level(int level) {
     mcs->set_highest_osr_comp_level(level);
   }
 }
+
+#endif
 
 #if INCLUDE_JVMTI
 
@@ -2240,6 +2312,8 @@ JNIMethodBlockNode::JNIMethodBlockNode(int num_methods) : _top(0), _next(NULL) {
   }
 }
 
+#ifndef LEYDEN
+
 void Method::ensure_jmethod_ids(ClassLoaderData* loader_data, int capacity) {
   ClassLoaderData* cld = loader_data;
   if (!SafepointSynchronize::is_at_safepoint()) {
@@ -2329,7 +2403,6 @@ Method* Method::checked_resolve_jmethod_id(jmethodID mid) {
   return o;
 };
 
-#ifndef LEYDEN
 void Method::set_on_stack(const bool value) {
   // Set both the method itself and its constant pool.  The constant pool
   // on stack means some method referring to it is also on the stack.
@@ -2343,12 +2416,12 @@ void Method::set_on_stack(const bool value) {
   assert(!value || !is_old() || is_obsolete() || is_running_emcp(),
          "emcp methods cannot run after emcp bit is cleared");
 }
-#endif
 
 // Called when the class loader is unloaded to make all methods weak.
 void Method::clear_jmethod_ids(ClassLoaderData* loader_data) {
   loader_data->jmethod_ids()->clear_all_methods();
 }
+#endif
 
 bool Method::has_method_vptr(const void* ptr) {
   Method m;
@@ -2372,11 +2445,13 @@ bool Method::is_valid_method(const Method* m) {
   }
 }
 
+#ifndef LEYDEN
 #ifndef PRODUCT
 void Method::print_jmethod_ids(const ClassLoaderData* loader_data, outputStream* out) {
   out->print(" jni_method_id count = %d", loader_data->jmethod_ids()->count_methods());
 }
 #endif // PRODUCT
+#endif
 
 
 // Printing
@@ -2466,6 +2541,8 @@ void Method::print_on(outputStream* st) const {
 #endif
 }
 
+#ifndef LEYDEN
+
 void Method::print_linkage_flags(outputStream* st) {
   access_flags().print_on(st);
   if (is_default_method()) {
@@ -2475,9 +2552,12 @@ void Method::print_linkage_flags(outputStream* st) {
     st->print("overpass ");
   }
 }
+
+#endif
 #endif //PRODUCT
 
 void Method::print_value_on(outputStream* st) const {
+#ifndef LEYDEN
   assert(is_method(), "must be method");
   st->print("%s", internal_name());
   print_address_on(st);
@@ -2490,8 +2570,10 @@ void Method::print_value_on(outputStream* st) const {
   if (WizardMode) st->print("#%d", _vtable_index);
   if (WizardMode) st->print("[%d,%d]", size_of_parameters(), max_locals());
   if (WizardMode && code() != NULL) st->print(" ((nmethod*)%p)", code());
+#endif
 }
 
+#ifndef LEYDEN
 // LogTouchedMethods and PrintTouchedMethods
 
 // TouchedMethodRecord -- we can't use a HashtableEntry<Method*> because
@@ -2571,12 +2653,16 @@ void Method::print_touched_methods(outputStream* out) {
   }
 }
 
+#endif
+
 // Verification
 
 void Method::verify_on(outputStream* st) {
   guarantee(is_method(), "object must be method");
+#ifndef LEYDEN
   guarantee(constants()->is_constantPool(), "should be constant pool");
   MethodData* md = method_data();
   guarantee(md == NULL ||
       md->is_methodData(), "should be method data");
+#endif
 }

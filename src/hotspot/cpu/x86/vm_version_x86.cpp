@@ -63,6 +63,8 @@ static get_cpu_info_stub_t get_cpu_info_stub = NULL;
 static detect_virt_stub_t detect_virt_stub = NULL;
 
 
+#ifndef LEYDEN
+
 class VM_Version_StubGenerator: public StubCodeGenerator {
  public:
 
@@ -611,6 +613,8 @@ class VM_Version_StubGenerator: public StubCodeGenerator {
     return start;
   };
 };
+
+#endif
 
 void VM_Version::get_processor_features() {
 
@@ -1859,6 +1863,7 @@ void VM_Version::check_virtualizations() {
 void VM_Version::initialize() {
   ResourceMark rm;
   // Making this stub must be FIRST use of assembler
+#ifndef LEYDEN
   stub_blob = BufferBlob::create("VM_Version stub", stub_size);
   if (stub_blob == NULL) {
     vm_exit_during_initialization("Unable to allocate stub for VM_Version");
@@ -1870,10 +1875,13 @@ void VM_Version::initialize() {
                                      g.generate_get_cpu_info());
   detect_virt_stub = CAST_TO_FN_PTR(detect_virt_stub_t,
                                      g.generate_detect_virt());
+#endif
 
   get_processor_features();
 
+#ifndef LEYDEN
   LP64_ONLY(Assembler::precompute_instructions();)
+#endif
 
   if (VM_Version::supports_hv()) { // Supports hypervisor
     check_virtualizations();

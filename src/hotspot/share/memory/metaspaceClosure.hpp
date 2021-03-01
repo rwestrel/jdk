@@ -34,6 +34,7 @@
 #include "utilities/hashtable.inline.hpp"
 #include "utilities/macros.hpp"
 #include <type_traits>
+#ifndef LEYDEN
 
 // The metadata hierarchy is separate from the oop hierarchy
   class MetaspaceObj;        // no C++ vtable
@@ -398,5 +399,6 @@ public:
 private:
   KVHashtable<address, bool, mtInternal> _has_been_visited;
 };
-
+#endif
 #endif // SHARE_MEMORY_METASPACECLOSURE_HPP
+

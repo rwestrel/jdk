@@ -35,6 +35,8 @@
 
 // Constructors
 
+#ifndef LEYDEN
+
 DebugInfoWriteStream::DebugInfoWriteStream(DebugInformationRecorder* recorder, int initial_size)
 : CompressedWriteStream(initial_size) {
   _recorder = recorder;
@@ -49,6 +51,8 @@ void DebugInfoWriteStream::write_handle(jobject h) {
 void DebugInfoWriteStream::write_metadata(Metadata* h) {
   write_int(recorder()->oop_recorder()->find_index(h));
 }
+
+#endif
 
 oop DebugInfoReadStream::read_oop() {
 #ifndef LEYDEN
@@ -126,10 +130,14 @@ LocationValue::LocationValue(DebugInfoReadStream* stream) {
   _location = Location(stream);
 }
 
+#ifndef LEYDEN
+
 void LocationValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(LOCATION_CODE);
   location().write_on(stream);
 }
+
+#endif
 
 void LocationValue::print_on(outputStream* st) const {
   location().print_on(st);
@@ -137,9 +145,13 @@ void LocationValue::print_on(outputStream* st) const {
 
 // MarkerValue
 
+#ifndef LEYDEN
+
 void MarkerValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(MARKER_CODE);
 }
+
+#endif
 
 void MarkerValue::print_on(outputStream* st) const {
     st->print("marker");
@@ -161,6 +173,8 @@ void ObjectValue::read_object(DebugInfoReadStream* stream) {
   }
 }
 
+#ifndef LEYDEN
+
 void ObjectValue::write_on(DebugInfoWriteStream* stream) {
   if (_visited) {
     stream->write_int(OBJECT_ID_CODE);
@@ -177,6 +191,8 @@ void ObjectValue::write_on(DebugInfoWriteStream* stream) {
     }
   }
 }
+
+#endif
 
 void ObjectValue::print_on(outputStream* st) const {
   st->print("%s[%d]", is_auto_box() ? "box_obj" : "obj", _id);
@@ -200,10 +216,14 @@ ConstantIntValue::ConstantIntValue(DebugInfoReadStream* stream) {
   _value = stream->read_signed_int();
 }
 
+#ifndef LEYDEN
+
 void ConstantIntValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(CONSTANT_INT_CODE);
   stream->write_signed_int(value());
 }
+
+#endif
 
 void ConstantIntValue::print_on(outputStream* st) const {
   st->print("%d", value());
@@ -215,10 +235,14 @@ ConstantLongValue::ConstantLongValue(DebugInfoReadStream* stream) {
   _value = stream->read_long();
 }
 
+#ifndef LEYDEN
+
 void ConstantLongValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(CONSTANT_LONG_CODE);
   stream->write_long(value());
 }
+
+#endif
 
 void ConstantLongValue::print_on(outputStream* st) const {
   st->print(JLONG_FORMAT, value());
@@ -230,16 +254,22 @@ ConstantDoubleValue::ConstantDoubleValue(DebugInfoReadStream* stream) {
   _value = stream->read_double();
 }
 
+#ifndef LEYDEN
+
 void ConstantDoubleValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(CONSTANT_DOUBLE_CODE);
   stream->write_double(value());
 }
+
+#endif
 
 void ConstantDoubleValue::print_on(outputStream* st) const {
   st->print("%f", value());
 }
 
 // ConstantOopWriteValue
+
+#ifndef LEYDEN
 
 void ConstantOopWriteValue::write_on(DebugInfoWriteStream* stream) {
 #ifdef ASSERT
@@ -255,6 +285,8 @@ void ConstantOopWriteValue::write_on(DebugInfoWriteStream* stream) {
   stream->write_int(CONSTANT_OOP_CODE);
   stream->write_handle(value());
 }
+
+#endif
 
 void ConstantOopWriteValue::print_on(outputStream* st) const {
   // using ThreadInVMfromUnknown here since in case of JVMCI compiler,
@@ -272,9 +304,13 @@ ConstantOopReadValue::ConstantOopReadValue(DebugInfoReadStream* stream) {
          Universe::heap()->is_in(_value()), "Should be in heap");
 }
 
+#ifndef LEYDEN
+
 void ConstantOopReadValue::write_on(DebugInfoWriteStream* stream) {
   ShouldNotReachHere();
 }
+
+#endif
 
 void ConstantOopReadValue::print_on(outputStream* st) const {
   if (value()() != NULL) {
@@ -299,11 +335,15 @@ MonitorValue::MonitorValue(DebugInfoReadStream* stream) {
   _eliminated  = (stream->read_bool() != 0);
 }
 
+#ifndef LEYDEN
+
 void MonitorValue::write_on(DebugInfoWriteStream* stream) {
   _basic_lock.write_on(stream);
   _owner->write_on(stream);
   stream->write_bool(_eliminated);
 }
+
+#endif
 
 #ifndef PRODUCT
 void MonitorValue::print_on(outputStream* st) const {

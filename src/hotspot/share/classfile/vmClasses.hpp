@@ -22,6 +22,7 @@
  *
  */
 
+#if 1 //ndef LEYDEN
 #ifndef SHARE_CLASSFILE_VMCLASSES_HPP
 #define SHARE_CLASSFILE_VMCLASSES_HPP
 
@@ -113,3 +114,4 @@ public:
 };
 
 #endif // SHARE_CLASSFILE_VMCLASSES_HPP
+#endif
