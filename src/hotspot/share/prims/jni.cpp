@@ -90,6 +90,8 @@
 #include "utilities/events.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/vmError.hpp"
+
+#ifndef LEYDEN
 #if INCLUDE_JVMCI
 #include "jvmci/jvmciCompiler.hpp"
 #endif
@@ -3505,9 +3507,12 @@ struct JavaVM_ main_vm = {&jni_InvokeInterface};
 enum { VERIFY_NONE, VERIFY_REMOTE, VERIFY_ALL };
 
 DT_RETURN_MARK_DECL(GetDefaultJavaVMInitArgs, jint
-                    , HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_RETURN(_ret_ref));
+, HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_RETURN(_ret_ref));
+
+#endif
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void *args_) {
+#ifndef LEYDEN
   HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_ENTRY(args_);
   JDK1_1InitArgs *args = (JDK1_1InitArgs *)args_;
   jint ret = JNI_ERR;
@@ -3527,8 +3532,13 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void *args_) {
     args->javaStackSize = (jint)(ThreadStackSize * K);
   }
   return ret;
+#else
+  ShouldNotReachHere();
+  return 0;
+#endif
 }
 
+#ifndef LEYDEN
 DT_RETURN_MARK_DECL(CreateJavaVM, jint
                     , HOTSPOT_JNI_CREATEJAVAVM_RETURN(_ret_ref));
 
@@ -3671,7 +3681,10 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
 }
 
+#endif
+
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM **vm, void **penv, void *args) {
+#ifndef LEYDEN
   jint result = JNI_ERR;
   // On Windows, let CreateJavaVM run with SEH protection
 #if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
@@ -3684,9 +3697,15 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM **vm, void **penv, v
   }
 #endif
   return result;
+#else
+  ShouldNotReachHere();
+return 0;
+#endif
 }
 
+
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize bufLen, jsize *numVMs) {
+#ifndef LEYDEN
   HOTSPOT_JNI_GETCREATEDJAVAVMS_ENTRY((void **) vm_buf, bufLen, (uintptr_t *) numVMs);
 
   if (vm_created == 1) {
@@ -3696,9 +3715,13 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize
     if (numVMs != NULL) *numVMs = 0;
   }
   HOTSPOT_JNI_GETCREATEDJAVAVMS_RETURN(JNI_OK);
+#else
+  ShouldNotReachHere();
+#endif
   return JNI_OK;
 }
 
+#ifndef LEYDEN
 extern "C" {
 
 DT_RETURN_MARK_DECL(DestroyJavaVM, jint
@@ -4014,3 +4037,4 @@ const struct JNIInvokeInterface_ jni_InvokeInterface = {
     jni_GetEnv,
     jni_AttachCurrentThreadAsDaemon
 };
+#endif
