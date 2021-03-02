@@ -102,7 +102,11 @@ class ArrayKlass: public Klass {
   // Sizing
   static int static_size(int header_size);
 
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
+
+#endif
 
   // Iterators
   void array_klasses_do(void f(Klass* k));
@@ -120,7 +124,11 @@ class ArrayKlass: public Klass {
   jint jvmti_class_status() const;
 
   // CDS support - remove and restore oops from metadata. Oops are not shared.
+#ifndef LEYDEN
+
   virtual void remove_unshareable_info();
+
+#endif
   virtual void remove_java_mirror();
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS);
 

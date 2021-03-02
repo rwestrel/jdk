@@ -36,14 +36,23 @@ class compiledVFrame: public javaVFrame {
   Method*                      method()             const;
   int                          bci()                const;
   bool                         should_reexecute()   const;
+
+#ifndef LEYDEN
+
   StackValueCollection*        locals()             const;
   StackValueCollection*        expressions()        const;
   GrowableArray<MonitorInfo*>* monitors()           const;
+
+#endif
   int                          vframe_id()          const { return _vframe_id; }
   bool                         has_ea_local_in_scope() const;
   bool                         arg_escape()         const; // at call with arg escape in parameter list
 
+#ifndef LEYDEN
+
   void set_locals(StackValueCollection* values) const;
+
+#endif
 
   // Virtuals defined in vframe
   bool is_compiled_frame() const { return true; }

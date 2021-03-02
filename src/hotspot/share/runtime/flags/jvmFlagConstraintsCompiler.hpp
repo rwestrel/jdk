@@ -28,6 +28,7 @@
 #include "runtime/flags/jvmFlag.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 /*
  * Here we have compiler arguments constraints functions, which are called automatically
  * whenever flag's value changes. If the constraint fails the function should return
@@ -60,5 +61,6 @@ COMPILER2_PRESENT(                                      \
 )
 
 COMPILER_CONSTRAINTS(DECLARE_CONSTRAINT)
+#endif
 
 #endif // SHARE_RUNTIME_FLAGS_JVMFLAGCONSTRAINTSCOMPILER_HPP

@@ -80,7 +80,7 @@ void SerialHeap::initialize_serviceability() {
 
 }
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 GrowableArray<GCMemoryManager*> SerialHeap::memory_managers() {
   GrowableArray<GCMemoryManager*> memory_managers(2);
   memory_managers.append(_young_manager);

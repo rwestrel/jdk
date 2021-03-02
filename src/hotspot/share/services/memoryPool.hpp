@@ -145,6 +145,8 @@ public:
   bool is_collected_pool()            { return true; }
 };
 
+#ifndef LEYDEN
+
 class CodeHeapPool: public MemoryPool {
 private:
   CodeHeap* _codeHeap;
@@ -153,6 +155,8 @@ public:
   MemoryUsage get_memory_usage();
   size_t used_in_bytes()            { return _codeHeap->allocated_capacity(); }
 };
+
+#endif
 
 class MetaspacePool : public MemoryPool {
   size_t calculate_max_size() const;

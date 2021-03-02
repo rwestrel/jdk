@@ -85,14 +85,14 @@
     range,                    \
     constraint))              \
                               \
-  COMPILER_FLAGS(             \
+  NOT_LEYDEN(COMPILER_FLAGS(             \
     develop,                  \
     develop_pd,               \
     product,                  \
     product_pd,               \
     notproduct,               \
     range,                    \
-    constraint)               \
+    constraint))               \
                               \
   RUNTIME_FLAGS(              \
     develop,                  \
@@ -130,10 +130,16 @@
     range,                    \
     constraint)
 
+#ifndef LEYDEN
 #define ALL_CONSTRAINTS(f) \
   COMPILER_CONSTRAINTS(f)  \
   RUNTIME_CONSTRAINTS(f)   \
   GC_CONSTRAINTS(f)
+#else
+#define ALL_CONSTRAINTS(f) \
+  RUNTIME_CONSTRAINTS(f)   \
+  GC_CONSTRAINTS(f)
+#endif
 
 
 #endif // SHARE_RUNTIME_FLAGS_ALLFLAGS_HPP

@@ -359,14 +359,14 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, UseSignumIntrinsic, false, DIAGNOSTIC,                      \
           "Enables intrinsification of Math.signum")                        \
                                                                             \
-  product(ccstrlist, DisableIntrinsic, "", DIAGNOSTIC,                      \
+  NOT_LEYDEN(product(ccstrlist, DisableIntrinsic, "", DIAGNOSTIC,                      \
          "do not expand intrinsics whose (internal) names appear here")     \
-         constraint(DisableIntrinsicConstraintFunc,AfterErgo)               \
+         constraint(DisableIntrinsicConstraintFunc,AfterErgo))               \
                                                                             \
-  product(ccstrlist, ControlIntrinsic, "", DIAGNOSTIC,                      \
+  NOT_LEYDEN(product(ccstrlist, ControlIntrinsic, "", DIAGNOSTIC,                      \
          "Control intrinsics using a list of +/- (internal) names, "        \
          "separated by commas")                                             \
-         constraint(ControlIntrinsicConstraintFunc,AfterErgo)               \
+         constraint(ControlIntrinsicConstraintFunc,AfterErgo))               \
                                                                             \
   develop(bool, TraceCallFixup, false,                                      \
           "Trace all call fixups")                                          \
@@ -960,10 +960,10 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   /* notice: the max range value here is max_jint, not max_intx  */         \
   /* because of overflow issue                                   */         \
-  product(intx, CICompilerCount, CI_COMPILER_COUNT,                         \
+  NOT_LEYDEN(product(intx, CICompilerCount, CI_COMPILER_COUNT,                         \
           "Number of compiler threads to run")                              \
           range(0, max_jint)                                                \
-          constraint(CICompilerCountConstraintFunc, AfterErgo)              \
+          constraint(CICompilerCountConstraintFunc, AfterErgo))              \
                                                                             \
   product(bool, UseDynamicNumberOfCompilerThreads, true,                    \
           "Dynamically choose the number of parallel compiler threads")     \
@@ -1175,12 +1175,12 @@ const intx ObjectAlignmentInBytes = 8;
   product_pd(bool, CompactStrings,                                          \
           "Enable Strings to use single byte chars in backing store")       \
                                                                             \
-  product_pd(uintx, TypeProfileLevel,                                       \
+  NOT_LEYDEN(product_pd(uintx, TypeProfileLevel,                                       \
           "=XYZ, with Z: Type profiling of arguments at call; "             \
                      "Y: Type profiling of return value at call; "          \
                      "X: Type profiling of parameters to methods; "         \
           "X, Y and Z in 0=off ; 1=jsr292 only; 2=all methods")             \
-          constraint(TypeProfileLevelConstraintFunc, AfterErgo)             \
+          constraint(TypeProfileLevelConstraintFunc, AfterErgo))             \
                                                                             \
   product(intx, TypeProfileArgsLimit,     2,                                \
           "max number of call arguments to consider for type profiling")    \
@@ -1315,10 +1315,10 @@ const intx ObjectAlignmentInBytes = 8;
           "3 = generate one prefetch instruction per cache line")           \
           range(0, 3)                                                       \
                                                                             \
-  product(intx,  AllocatePrefetchDistance, -1,                              \
+  NOT_LEYDEN(product(intx,  AllocatePrefetchDistance, -1,                              \
           "Distance to prefetch ahead of allocation pointer. "              \
           "-1: use system-specific value (automatically determined")        \
-          constraint(AllocatePrefetchDistanceConstraintFunc,AfterMemoryInit)\
+          constraint(AllocatePrefetchDistanceConstraintFunc,AfterMemoryInit))\
                                                                             \
   product(intx,  AllocatePrefetchLines, 3,                                  \
           "Number of lines to prefetch ahead of array allocation pointer")  \
@@ -1329,14 +1329,14 @@ const intx ObjectAlignmentInBytes = 8;
           "pointer")                                                        \
           range(1, 64)                                                      \
                                                                             \
-  product(intx,  AllocatePrefetchStepSize, 16,                              \
+  NOT_LEYDEN(product(intx,  AllocatePrefetchStepSize, 16,                              \
           "Step size in bytes of sequential prefetch instructions")         \
           range(1, 512)                                                     \
-          constraint(AllocatePrefetchStepSizeConstraintFunc,AfterMemoryInit)\
+          constraint(AllocatePrefetchStepSizeConstraintFunc,AfterMemoryInit))\
                                                                             \
-  product(intx,  AllocatePrefetchInstr, 0,                                  \
+  NOT_LEYDEN(product(intx,  AllocatePrefetchInstr, 0,                                  \
           "Select instruction to prefetch ahead of allocation pointer")     \
-          constraint(AllocatePrefetchInstrConstraintFunc, AfterMemoryInit)  \
+          constraint(AllocatePrefetchInstrConstraintFunc, AfterMemoryInit))  \
                                                                             \
   /* deoptimization */                                                      \
   develop(bool, TraceDeoptimization, false,                                 \
@@ -1589,20 +1589,20 @@ const intx ObjectAlignmentInBytes = 8;
           "Stack space (bytes) required for JVM_InvokeMethod to complete")  \
                                                                             \
   /* code cache parameters                                    */            \
-  develop_pd(uintx, CodeCacheSegmentSize,                                   \
+  NOT_LEYDEN(develop_pd(uintx, CodeCacheSegmentSize,                                   \
           "Code cache segment size (in bytes) - smallest unit of "          \
           "allocation")                                                     \
           range(1, 1024)                                                    \
-          constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo)         \
+          constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo))         \
                                                                             \
-  develop_pd(intx, CodeEntryAlignment,                                      \
+  NOT_LEYDEN(develop_pd(intx, CodeEntryAlignment,                                      \
           "Code entry alignment for generated code (in bytes)")             \
-          constraint(CodeEntryAlignmentConstraintFunc, AfterErgo)           \
+          constraint(CodeEntryAlignmentConstraintFunc, AfterErgo))           \
                                                                             \
-  product_pd(intx, OptoLoopAlignment,                                       \
+  NOT_LEYDEN(product_pd(intx, OptoLoopAlignment,                                       \
           "Align inner loops to zero relative to this modulus")             \
           range(1, 16)                                                      \
-          constraint(OptoLoopAlignmentConstraintFunc, AfterErgo)            \
+          constraint(OptoLoopAlignmentConstraintFunc, AfterErgo))            \
                                                                             \
   product_pd(uintx, InitialCodeCacheSize,                                   \
           "Initial code cache size (in bytes)")                             \
@@ -1779,9 +1779,9 @@ const intx ObjectAlignmentInBytes = 8;
           "Minimum number of OopMap entries in an OopMapSet")               \
                                                                             \
   /* recompilation */                                                       \
-  product_pd(intx, CompileThreshold,                                        \
+  NOT_LEYDEN(product_pd(intx, CompileThreshold,                                        \
           "number of interpreted method invocations before (re-)compiling") \
-          constraint(CompileThresholdConstraintFunc, AfterErgo)             \
+          constraint(CompileThresholdConstraintFunc, AfterErgo))             \
                                                                             \
   product_pd(bool, TieredCompilation,                                       \
           "Enable tiered compilation")                                      \
@@ -2043,12 +2043,12 @@ const intx ObjectAlignmentInBytes = 8;
              "in the loaded class C. "                                      \
              "Check (3) is available only in debug builds.")                \
                                                                             \
-  product_pd(intx, InitArrayShortSize, DIAGNOSTIC,                          \
+  NOT_LEYDEN(product_pd(intx, InitArrayShortSize, DIAGNOSTIC,                          \
           "Threshold small size (in bytes) for clearing arrays. "           \
           "Anything this size or smaller may get converted to discrete "    \
           "scalar stores.")                                                 \
           range(0, max_intx)                                                \
-          constraint(InitArrayShortSizeConstraintFunc, AfterErgo)           \
+          constraint(InitArrayShortSizeConstraintFunc, AfterErgo))           \
                                                                             \
   product(ccstr, AllocateHeapAt, NULL,                                      \
           "Path to the directory where a temporary file will be created "   \

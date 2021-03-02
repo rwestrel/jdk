@@ -580,6 +580,7 @@ ThreadsList* ThreadDumpResult::t_list() {
 }
 
 StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
+#ifndef LEYDEN
   _method = jvf->method();
   _bci = jvf->bci();
 #ifndef LEYDEN
@@ -601,6 +602,7 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
       }
     }
   }
+#endif
 }
 
 StackFrameInfo::~StackFrameInfo() {

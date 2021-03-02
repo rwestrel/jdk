@@ -29,6 +29,7 @@
 #include "oops/method.hpp"
 
 
+#ifndef LEYDEN
 // Static routines and parsing loops for processing field and method
 // descriptors.  In the HotSpot sources we call them "signatures".
 //
@@ -646,5 +647,6 @@ void SignatureIterator::do_parameters_on(T* callback) {
   private:
     static ssize_t is_valid_type(const char*, ssize_t);
 };
+#endif
 #endif
 #endif // SHARE_RUNTIME_SIGNATURE_HPP

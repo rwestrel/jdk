@@ -100,8 +100,8 @@ class OopIterateClosure : public OopClosure {
   // 3) do_cld   on the class loader data in class loaders.
 
   virtual bool do_metadata() = 0;
-  virtual void do_klass(Klass* k) = 0;
 #ifndef LEYDEN
+  virtual void do_klass(Klass* k) = 0;
   virtual void do_cld(ClassLoaderData* cld) = 0;
 #endif
 };

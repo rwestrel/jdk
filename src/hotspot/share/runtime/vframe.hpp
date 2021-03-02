@@ -35,6 +35,7 @@
 #include "runtime/stackValueCollection.hpp"
 #include "utilities/growableArray.hpp"
 
+#if 1 //ndef LEYDEN
 // vframes are virtual stack frames representing source level activations.
 // A single frame may hold several source level activations in the case of
 // optimized code. The debugging stored with the optimized code enables
@@ -108,6 +109,9 @@ class javaVFrame: public vframe {
   // JVM state
   virtual Method*                      method()         const = 0;
   virtual int                          bci()            const = 0;
+
+#ifndef LEYDEN
+
   virtual StackValueCollection*        locals()         const = 0;
   virtual StackValueCollection*        expressions()    const = 0;
   // the order returned by monitors() is from oldest -> youngest#4418568
@@ -117,6 +121,8 @@ class javaVFrame: public vframe {
   // NOTE that this is not guaranteed to give correct results for compiled vframes.
   // Deoptimize first if necessary.
   virtual void set_locals(StackValueCollection* values) const = 0;
+
+#endif
 
   // Test operation
   bool is_java_frame() const { return true; }
@@ -342,5 +348,7 @@ class vframeStream : public vframeStreamCommon {
   // top_frame may not be at safepoint, start with sender
   vframeStream(JavaThread* thread, frame top_frame, bool stop_at_java_call_stub = false);
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_VFRAME_HPP

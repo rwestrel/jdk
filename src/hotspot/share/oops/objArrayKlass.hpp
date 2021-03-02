@@ -62,8 +62,12 @@ class ObjArrayKlass : public ArrayKlass {
   void set_bottom_klass(Klass* k)   { _bottom_klass = k; }
   Klass** bottom_klass_addr()       { return &_bottom_klass; }
 
+#ifndef LEYDEN
+
   ModuleEntry* module() const;
   PackageEntry* package() const;
+
+#endif
 
   // Compiler/Interpreter offset
   static ByteSize element_klass_offset() { return in_ByteSize(offset_of(ObjArrayKlass, _element_klass)); }
@@ -91,7 +95,11 @@ class ObjArrayKlass : public ArrayKlass {
   // Compute protection domain
   oop protection_domain() const { return bottom_klass()->protection_domain(); }
 
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
+
+#endif
 
  private:
   // Either oop or narrowOop depending on UseCompressedOops.

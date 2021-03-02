@@ -358,13 +358,10 @@ int Method::size(bool is_native) {
   return align_metadata_size(header_size() + extra_words);
 }
 
-#ifndef LEYDEN
 
 Symbol* Method::klass_name() const {
   return method_holder()->name();
 }
-
-#endif
 
 #ifndef LEYDEN
 

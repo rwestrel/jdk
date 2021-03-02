@@ -28,6 +28,7 @@
 #include "runtime/handles.hpp"
 #include "utilities/exceptions.hpp"
 
+#ifndef LEYDEN
 // InvocationCounters are used to trigger actions when a limit (threshold) is reached.
 //
 // The counter is incremented before a method is activated and an
@@ -85,5 +86,7 @@ public:
   // Miscellaneous
   static ByteSize counter_offset()               { return byte_offset_of(InvocationCounter, _counter); }
 };
+
+#endif
 
 #endif // SHARE_INTERPRETER_INVOCATIONCOUNTER_HPP

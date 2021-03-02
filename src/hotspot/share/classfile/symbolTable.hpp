@@ -30,6 +30,8 @@
 #include "oops/symbol.hpp"
 #include "utilities/tableStatistics.hpp"
 
+#ifndef LEYDEN
+
 class JavaThread;
 template <typename T> class GrowableArray;
 
@@ -224,5 +226,7 @@ public:
   // Histogram
   static void print_histogram() PRODUCT_RETURN;
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_SYMBOLTABLE_HPP

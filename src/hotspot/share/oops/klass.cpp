@@ -565,6 +565,8 @@ void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
 
 #endif
 
+#ifndef LEYDEN
+
 void Klass::remove_unshareable_info() {
   assert (Arguments::is_dumping_archive(),
           "only called during CDS dump time");
@@ -582,6 +584,8 @@ void Klass::remove_unshareable_info() {
   set_class_loader_data(NULL);
   set_is_shared();
 }
+
+#endif
 
 void Klass::remove_java_mirror() {
   Arguments::assert_is_dumping_archive();

@@ -30,6 +30,8 @@
 #include "runtime/perfMemory.hpp"
 #include "runtime/timer.hpp"
 
+#if 1 //ndef LEYDEN
+
 template <typename T> class GrowableArray;
 
 /* jvmstat global and subsystem counter name space - enumeration value
@@ -937,5 +939,7 @@ class PerfTraceTimedEvent : public PerfTraceTime {
     }
 
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_PERFDATA_HPP

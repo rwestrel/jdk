@@ -745,7 +745,9 @@ void* Universe::non_oop_word() {
 }
 
 static void initialize_global_behaviours() {
+#ifndef LEYDEN
   CompiledICProtectionBehaviour::set_current(new DefaultICProtectionBehaviour());
+#endif
 }
 
 jint universe_init() {
@@ -1004,27 +1006,31 @@ bool universe_post_init() {
 
   // Setup preallocated NullPointerException
   // (this is currently used for a cheap & dirty solution in compiler exception handling)
+#ifndef LEYDEN
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_NullPointerException(), true, CHECK_false);
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_null_ptr_exception_instance = OopHandle(Universe::vm_global(), instance);
+#endif
 
   // Setup preallocated ArithmeticException
   // (this is currently used for a cheap & dirty solution in compiler exception handling)
+#ifndef LEYDEN
   k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_ArithmeticException(), true, CHECK_false);
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_arithmetic_exception_instance = OopHandle(Universe::vm_global(), instance);
+#endif
 
   // Virtual Machine Error for when we get into a situation we can't resolve
-  k = vmClasses::VirtualMachineError_klass();
 #ifndef LEYDEN
+  k = vmClasses::VirtualMachineError_klass();
   bool linked = InstanceKlass::cast(k)->link_class_or_fail(CHECK_false);
   if (!linked) {
      tty->print_cr("Unable to link/verify VirtualMachineError class");
      return false; // initialization failed
   }
-#endif
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_virtual_machine_error_instance = OopHandle(Universe::vm_global(), instance);
+#endif
 
 #ifndef LEYDEN
   Handle msg = java_lang_String::create_from_str("/ by zero", CHECK_false);

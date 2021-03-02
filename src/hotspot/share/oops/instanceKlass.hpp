@@ -528,8 +528,13 @@ public:
   };
 
   // package
+
+#ifndef LEYDEN
   PackageEntry* package() const     { return _package_entry; }
+
   ModuleEntry* module() const;
+
+#endif
   bool in_unnamed_package() const   { return (_package_entry == NULL); }
   void set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS);
   // If the package for the InstanceKlass is in the boot loader's package entry
@@ -587,8 +592,8 @@ public:
 
   // initialization (virtuals from Klass)
   bool should_be_initialized() const;  // means that initialize should be called
-  void initialize(TRAPS);
 #ifndef LEYDEN
+  void initialize(TRAPS);
   void link_class(TRAPS);
   bool link_class_or_fail(TRAPS); // returns false on failure
 #endif
@@ -614,6 +619,8 @@ public:
 
   static ByteSize reference_type_offset() { return in_ByteSize(offset_of(InstanceKlass, _reference_type)); }
 
+#ifndef LEYDEN
+
   // find local field, returns true if found
   bool find_local_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
   // find field in direct superinterfaces, returns the interface in which the field is defined
@@ -622,6 +629,8 @@ public:
   Klass* find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
   // find instance or static fields according to JVM spec 5.4.3.2, returns the klass in which the field is defined
   Klass* find_field(Symbol* name, Symbol* sig, bool is_static, fieldDescriptor* fd) const;
+
+#endif
 
   // find a non-static or static field given its offset within the class.
   bool contains_field_offset(int offset);
@@ -674,11 +683,15 @@ public:
                                StaticLookupMode static_mode,
                                PrivateLookupMode private_mode);
 
+#ifndef LEYDEN
+
   // lookup operation (returns NULL if not found)
   Method* uncached_lookup_method(const Symbol* name,
                                  const Symbol* signature,
                                  OverpassLookupMode overpass_mode,
                                  PrivateLookupMode private_mode = PrivateLookupMode::find) const;
+
+#endif
 
   // lookup a method in all the interfaces that this class implements
   // (returns NULL if not found)
@@ -700,8 +713,12 @@ public:
   ConstantPool* constants() const        { return _constants; }
   void set_constants(ConstantPool* c)    { _constants = c; }
 
+#ifndef LEYDEN
+
   // protection domain
   oop protection_domain() const;
+
+#endif
 
   // signers
   objArrayOop signers() const;
@@ -1000,7 +1017,11 @@ public:
 
   // Check whether reflection/jni/jvm code is allowed to instantiate this class;
   // if not, throw either an Error or an Exception.
+#ifndef LEYDEN
+
   virtual void check_valid_for_instantiation(bool throwError, TRAPS);
+
+#endif
 
   // initialization
   void call_class_initializer(TRAPS);
@@ -1180,7 +1201,11 @@ public:
   // callbacks for actions during class unloading
   static void unload_class(InstanceKlass* ik);
 
+#ifndef LEYDEN
+
   virtual void release_C_heap_structures();
+
+#endif
 
   // Naming
   const char* signature_name() const;
@@ -1310,19 +1335,31 @@ private:
   void log_to_classlist(const ClassFileStream* cfs) const;
 public:
   // CDS support - remove and restore oops from metadata. Oops are not shared.
+#ifndef LEYDEN
+
   virtual void remove_unshareable_info();
+
+#endif
   virtual void remove_java_mirror();
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, PackageEntry* pkg_entry, TRAPS);
   void init_shared_package_entry();
 
+#ifndef LEYDEN
+
   // jvm support
   jint compute_modifier_flags(TRAPS) const;
+
+#endif
 
 public:
   // JVMTI support
   jint jvmti_class_status() const;
 
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
+
+#endif
 
  public:
   // Printing

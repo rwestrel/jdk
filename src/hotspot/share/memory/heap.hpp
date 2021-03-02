@@ -30,6 +30,7 @@
 #include "memory/virtualspace.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 // Blocks
 
 class HeapBlock {
@@ -237,5 +238,7 @@ public:
   void verify() PRODUCT_RETURN;
   void print()  PRODUCT_RETURN;
 };
+
+#endif
 
 #endif // SHARE_MEMORY_HEAP_HPP

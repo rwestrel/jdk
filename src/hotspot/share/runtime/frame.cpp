@@ -795,6 +795,9 @@ class InterpretedArgumentOopFinder: public SignatureIterator {
 
 
 // visits and GC's all the arguments in entry frame
+
+#ifndef LEYDEN
+
 class EntryFrameOopFinder: public SignatureIterator {
  private:
   bool         _is_static;
@@ -833,6 +836,9 @@ class EntryFrameOopFinder: public SignatureIterator {
   }
 
 };
+
+#endif
+
 
 #ifndef LEYDEN
 
@@ -953,6 +959,8 @@ void frame::oops_code_blob_do(OopClosure* f, CodeBlobClosure* cf, const Register
     cf->do_code_blob(_cb);
 }
 
+#ifndef LEYDEN
+
 class CompiledArgumentOopFinder: public SignatureIterator {
  protected:
   OopClosure*     _f;
@@ -1018,6 +1026,8 @@ void frame::oops_compiled_arguments_do(Symbol* signature, bool has_receiver, boo
   CompiledArgumentOopFinder finder(signature, has_receiver, has_appendix, f, *this, reg_map);
   finder.oops_do();
 }
+
+#endif
 
 
 // Get receiver out of callers frame, i.e. find parameter 0 in callers

@@ -27,6 +27,8 @@
 
 #include "memory/allocation.hpp"
 
+#ifndef LEYDEN
+
 class CompiledMethod;
 
 class CompiledICProtectionBehaviour {
@@ -46,5 +48,7 @@ class DefaultICProtectionBehaviour: public CompiledICProtectionBehaviour, public
   virtual void unlock(CompiledMethod* method);
   virtual bool is_safe(CompiledMethod* method);
 };
+
+#endif
 
 #endif // SHARE_CODE_CODEBEHAVIOURS_HPP

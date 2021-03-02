@@ -339,8 +339,12 @@ protected:
 
 
   // Obtain the module or package for this class
+#ifndef LEYDEN
+
   virtual ModuleEntry* module() const = 0;
   virtual PackageEntry* package() const = 0;
+
+#endif
 
  protected:                                // internal accessors
   void     set_subklass(Klass* s);
@@ -542,7 +546,11 @@ protected:
   }
 
   // CDS support - remove and restore oops from metadata. Oops are not shared.
+#ifndef LEYDEN
+
   virtual void remove_unshareable_info();
+
+#endif
   virtual void remove_java_mirror();
 
   bool is_unshareable_info_restored() const {
@@ -682,7 +690,11 @@ protected:
 
   JFR_ONLY(DEFINE_TRACE_ID_METHODS;)
 
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
+
+#endif
   virtual MetaspaceObj::Type type() const { return ClassType; }
 
   // Iff the class loader (or mirror for unsafe anonymous classes) is alive the

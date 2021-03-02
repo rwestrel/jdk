@@ -28,6 +28,8 @@
 #include "runtime/perfData.hpp"
 #include "runtime/task.hpp"
 
+#if 1 //ndef LEYDEN
+
 class StatSamplerTask;
 
 /*
@@ -66,5 +68,7 @@ class StatSampler : AllStatic {
     static void initialize();
     static void destroy();
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_STATSAMPLER_HPP

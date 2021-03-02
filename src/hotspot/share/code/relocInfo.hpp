@@ -740,10 +740,18 @@ class Relocation {
   void       const_set_data_value    (address x);
   void       const_verify_data_value (address x);
   // platform-dependent utilities for decoding and patching instructions
+#ifndef LEYDEN
+
   void       pd_set_data_value       (address x, intptr_t off, bool verify_only = false); // a set or mem-ref
   void       pd_verify_data_value    (address x, intptr_t off) { pd_set_data_value(x, off, true); }
+#endif
   address    pd_call_destination     (address orig_addr = NULL);
+
+#ifndef LEYDEN
+
   void       pd_set_call_destination (address x);
+
+#endif
 
   // this extracts the address of an address in the code stream instead of the reloc data
   address* pd_address_in_code       ();
@@ -797,15 +805,23 @@ class Relocation {
   // some relocations can compute their own values
   virtual address  value();
 
+#ifndef LEYDEN
+
   // all relocations are able to reassert their values
   virtual void set_value(address x);
 
+#endif
+
   virtual bool clear_inline_cache()              { return true; }
+
+#ifndef LEYDEN
 
   // This method assumes that all virtual/static (inline) caches are cleared (since for static_call_type and
   // ic_call_type is not always posisition dependent (depending on the state of the cache)). However, this is
   // probably a reasonable assumption, since empty caches simplifies code reloacation.
   virtual void fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) { }
+
+#endif
 };
 
 
@@ -840,7 +856,15 @@ class DataRelocation : public Relocation {
 
   // both target and offset must be computed somehow from relocation data
   virtual int    offset()                      { return 0; }
+
+#ifndef LEYDEN
+
   address         value()                      = 0;
+
+#endif
+
+#ifndef LEYDEN
+
   void        set_value(address x)             { set_value(x, offset()); }
   void        set_value(address x, intptr_t o) {
     if (addr_in_const())
@@ -848,12 +872,14 @@ class DataRelocation : public Relocation {
     else
       pd_set_data_value(x, o);
   }
+
   void        verify_value(address x) {
     if (addr_in_const())
       const_verify_data_value(x);
     else
       pd_verify_data_value(x, offset());
   }
+#endif
 
   // The "o" (displacement) argument is relevant only to split relocations
   // on RISC machines.  In some CPUs (SPARC), the set-hi and set-lo ins'ns
@@ -879,9 +905,18 @@ class CallRelocation : public Relocation {
   address  destination()                    { return pd_call_destination(); }
   void     set_destination(address x); // pd_set_call_destination
 
+#ifndef LEYDEN
+
   void     fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest);
+
+#endif
   address  value()                          { return destination();  }
+
+#ifndef LEYDEN
+
   void     set_value(address x)             { set_destination(x); }
+
+#endif
 };
 
 class oop_Relocation : public DataRelocation {
@@ -1034,7 +1069,11 @@ class virtual_call_Relocation : public CallRelocation {
   void pack_data_to(CodeSection* dest);
   void unpack_data();
 
+#ifndef LEYDEN
+
   bool clear_inline_cache();
+
+#endif
 };
 
 
@@ -1063,7 +1102,11 @@ class opt_virtual_call_Relocation : public CallRelocation {
   void pack_data_to(CodeSection* dest);
   void unpack_data();
 
+#ifndef LEYDEN
+
   bool clear_inline_cache();
+
+#endif
 
   // find the matching static_stub
   address static_stub(bool is_aot);
@@ -1095,7 +1138,11 @@ class static_call_Relocation : public CallRelocation {
   void pack_data_to(CodeSection* dest);
   void unpack_data();
 
+#ifndef LEYDEN
+
   bool clear_inline_cache();
+
+#endif
 
   // find the matching static_stub
   address static_stub(bool is_aot);
@@ -1121,7 +1168,11 @@ class static_stub_Relocation : public Relocation {
   static_stub_Relocation() : Relocation(relocInfo::static_stub_type) { }
 
  public:
+#ifndef LEYDEN
+
   bool clear_inline_cache();
+
+#endif
 
   address static_call() { return _static_call; }
   bool is_aot() { return _is_aot; }
@@ -1255,9 +1306,13 @@ class external_word_Relocation : public DataRelocation {
   void pack_data_to(CodeSection* dest);
   void unpack_data();
 
+#ifndef LEYDEN
+
   void fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest);
   address  target();        // if _target==NULL, fetch addr from code stream
   address  value()          { return target(); }
+
+#endif
 };
 
 class internal_word_Relocation : public DataRelocation {
@@ -1301,10 +1356,14 @@ class internal_word_Relocation : public DataRelocation {
   void pack_data_to(CodeSection* dest);
   void unpack_data();
 
+#ifndef LEYDEN
+
   void fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest);
   address  target();        // if _target==NULL, fetch addr from code stream
-  int      section()        { return _section;   }
   address  value()          { return target();   }
+
+#endif
+  int      section()        { return _section;   }
 };
 
 class section_word_Relocation : public internal_word_Relocation {

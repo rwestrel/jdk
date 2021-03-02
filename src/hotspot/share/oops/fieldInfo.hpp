@@ -126,19 +126,27 @@ class FieldInfo {
   }
 
   Symbol* name(ConstantPool* cp) const {
+#ifndef LEYDEN
     int index = name_index();
     if (is_internal()) {
       return lookup_symbol(index);
     }
     return cp->symbol_at(index);
+#else
+    return NULL;
+#endif
   }
 
   Symbol* signature(ConstantPool* cp) const {
+#ifndef LEYDEN
     int index = signature_index();
     if (is_internal()) {
       return lookup_symbol(index);
     }
     return cp->symbol_at(index);
+#else
+    return NULL;
+#endif
   }
 
   void set_access_flags(u2 val)                  { _shorts[access_flags_offset] = val;             }

@@ -27,6 +27,8 @@
 
 #include "compiler/compiler_globals_pd.hpp"
 #include "runtime/globals_shared.hpp"
+
+#ifndef LEYDEN
 #ifdef COMPILER1
 #include "c1/c1_globals.hpp"
 #endif // COMPILER1
@@ -398,5 +400,6 @@
 // end of COMPILER_FLAGS
 
 DECLARE_FLAGS(COMPILER_FLAGS)
+#endif
 
 #endif // SHARE_COMPILER_COMPILER_GLOBALS_HPP

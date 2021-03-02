@@ -123,6 +123,8 @@ javaVFrame* vframe::java_sender() const {
 
 // ------------- javaVFrame --------------
 
+#ifndef LEYDEN
+
 GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
   assert(SafepointSynchronize::is_at_safepoint() || JavaThread::current() == thread(),
          "must be at safepoint or it's a java frame of the current thread");
@@ -159,6 +161,8 @@ GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {
   }
   return result;
 }
+
+#endif
 
 void javaVFrame::print_locked_object_class_name(outputStream* st, Handle obj, const char* lock_state) {
 #ifndef LEYDEN
@@ -756,6 +760,8 @@ void javaVFrame::print_value() const {
 }
 
 
+#ifndef LEYDEN
+
 bool javaVFrame::structural_compare(javaVFrame* other) {
   // Check static part
   if (method() != other->method()) return false;
@@ -787,6 +793,8 @@ bool javaVFrame::structural_compare(javaVFrame* other) {
 
   return true;
 }
+
+#endif
 
 
 void javaVFrame::print_activation(int index) const {

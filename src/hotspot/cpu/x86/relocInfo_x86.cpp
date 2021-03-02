@@ -148,6 +148,7 @@ void Relocation::pd_set_call_destination(address x) {
 
 
 address* Relocation::pd_address_in_code() {
+#ifndef LEYDEN
   // All embedded Intel addresses are stored in 32-bit words.
   // Since the addr points at the start of the instruction,
   // we must parse the instruction a bit to find the embedded word.
@@ -165,10 +166,14 @@ address* Relocation::pd_address_in_code() {
   assert(which == Assembler::disp32_operand || which == Assembler::imm_operand, "format unpacks ok");
 #endif // AMD64
   return (address*) Assembler::locate_operand(addr(), which);
+#else
+  return NULL;
+#endif
 }
 
 
 address Relocation::pd_get_address_from_code() {
+#ifndef LEYDEN
 #ifdef AMD64
   // All embedded Intel addresses are stored in 32-bit words.
   // Since the addr points at the start of the instruction,
@@ -188,6 +193,9 @@ address Relocation::pd_get_address_from_code() {
   }
 #endif // AMD64
   return *pd_address_in_code();
+#else
+  return NULL;
+#endif
 }
 
 void poll_Relocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) {

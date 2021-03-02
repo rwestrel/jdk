@@ -30,6 +30,7 @@
 #include "runtime/signature.hpp"
 #include "utilities/vmEnums.hpp"
 
+#ifndef LEYDEN
 // The dictionary in each ClassLoaderData stores all loaded classes, either
 // initiatied by its class loader or defined by its class loader:
 //
@@ -441,5 +442,7 @@ public:
   static TableStatistics loader_constraints_statistics();
   static TableStatistics protection_domain_cache_statistics();
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_SYSTEMDICTIONARY_HPP

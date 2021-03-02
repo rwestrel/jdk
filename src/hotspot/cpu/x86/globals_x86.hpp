@@ -173,10 +173,10 @@ define_pd_global(intx, InitArrayShortSize, 8*BytesPerLong);
           "Lock abort ratio at which to stop use RTM lock eliding")         \
           range(0, 100) /* natural range */                                 \
                                                                             \
-  product(int, RTMTotalCountIncrRate, 64, EXPERIMENTAL,                     \
+  NOT_LEYDEN(product(int, RTMTotalCountIncrRate, 64, EXPERIMENTAL,                     \
           "Increment total RTM attempted lock count once every n times")    \
           range(1, max_jint)                                                \
-          constraint(RTMTotalCountIncrRateConstraintFunc,AfterErgo)         \
+          constraint(RTMTotalCountIncrRateConstraintFunc,AfterErgo))         \
                                                                             \
   product(intx, RTMLockingCalculationDelay, 0, EXPERIMENTAL,                \
           "Number of milliseconds to wait before start calculating aborts " \
@@ -208,12 +208,12 @@ define_pd_global(intx, InitArrayShortSize, 8*BytesPerLong);
   /* for copy, inflate and fill which don't bail out early based on any */  \
   /* condition. When this value is set to zero compare operations like */   \
   /* compare, vectorizedMismatch, compress can also use AVX512 intrinsics.*/\
-  product(int, AVX3Threshold, 4096, DIAGNOSTIC,                             \
+  NOT_LEYDEN(product(int, AVX3Threshold, 4096, DIAGNOSTIC,                             \
              "Minimum array size in bytes to use AVX512 intrinsics"         \
              "for copy, inflate and fill. When this value is set as zero"   \
              "compare operations can also use AVX512 intrinsics.")          \
              range(0, max_jint)                                             \
-             constraint(AVX3ThresholdConstraintFunc,AfterErgo)              \
+             constraint(AVX3ThresholdConstraintFunc,AfterErgo))              \
                                                                             \
   product(bool, IntelJccErratumMitigation, true, DIAGNOSTIC,                \
              "Turn off JVM mitigations related to Intel micro code "        \

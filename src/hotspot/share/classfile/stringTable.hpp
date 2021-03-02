@@ -31,6 +31,8 @@
 #include "oops/weakHandle.hpp"
 #include "utilities/tableStatistics.hpp"
 
+#ifndef LEYDEN
+
 class CompactHashtableWriter;
 class DumpedInternedStrings;
 class JavaThread;
@@ -118,5 +120,7 @@ class StringTable : public CHeapObj<mtSymbol>{
   static size_t verify_and_compare_entries();
   static void verify();
 };
+
+#endif
 
 #endif // SHARE_CLASSFILE_STRINGTABLE_HPP

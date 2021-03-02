@@ -169,7 +169,6 @@ void CodeBuffer::initialize_oop_recorder(OopRecorder* r) {
   _oop_recorder = r;
 }
 
-#endif
 
 void CodeBuffer::initialize_section_size(CodeSection* cs, csize_t size) {
   assert(cs != &_insts, "insts is the memory provider, not the consumer");
@@ -189,7 +188,6 @@ void CodeBuffer::initialize_section_size(CodeSection* cs, csize_t size) {
   if (_insts.has_locs())  cs->initialize_locs(1);
 }
 
-#ifndef LEYDEN
 void CodeBuffer::set_blob(BufferBlob* blob) {
   _blob = blob;
   if (blob != NULL) {
@@ -459,6 +457,8 @@ void CodeSection::expand_locs(int new_capacity) {
 /// The pattern is the same for all functions.
 /// We iterate over all the sections, padding each to alignment.
 
+#ifndef LEYDEN
+
 csize_t CodeBuffer::total_content_size() const {
   csize_t size_so_far = 0;
   for (int n = 0; n < (int)SECT_LIMIT; n++) {
@@ -469,6 +469,7 @@ csize_t CodeBuffer::total_content_size() const {
   }
   return size_so_far;
 }
+
 
 void CodeBuffer::compute_final_layout(CodeBuffer* dest) const {
   address buf = dest->_total_start;
@@ -523,7 +524,6 @@ void CodeBuffer::compute_final_layout(CodeBuffer* dest) const {
 }
 
 // Append an oop reference that keeps the class alive.
-#ifndef LEYDEN
 static void append_oop_references(GrowableArray<oop>* oops, Klass* k) {
   oop cl = k->klass_holder();
   if (cl != NULL && !oops->contains(cl)) {
@@ -600,6 +600,8 @@ void CodeBuffer::finalize_oop_references(const methodHandle& mh) {
 }
 #endif
 
+
+#ifndef LEYDEN
 
 csize_t CodeBuffer::total_offset_of(const CodeSection* cs) const {
   csize_t size_so_far = 0;
@@ -722,6 +724,8 @@ csize_t CodeBuffer::copy_relocations_to(CodeBlob* dest) const {
   return buf_offset;
 }
 
+#endif
+
 #ifndef LEYDEN
 void CodeBuffer::copy_code_to(CodeBlob* dest_blob) {
 #ifndef PRODUCT
@@ -817,7 +821,7 @@ void CodeBuffer::relocate_code_to(CodeBuffer* dest) const {
 
   }
 }
-#endif
+
 csize_t CodeBuffer::figure_expanded_capacities(CodeSection* which_cs,
                                                csize_t amount,
                                                csize_t* new_capacity) {
@@ -865,7 +869,6 @@ csize_t CodeBuffer::figure_expanded_capacities(CodeSection* which_cs,
   return new_total_cap;
 }
 
-#ifndef LEYDEN
 void CodeBuffer::expand(CodeSection* which_cs, csize_t amount) {
 #ifndef PRODUCT
   if (PrintNMethods && (WizardMode || Verbose)) {

@@ -273,9 +273,13 @@ address Relocation::value() {
 }
 
 
+#ifndef LEYDEN
+
 void Relocation::set_value(address x) {
   ShouldNotReachHere();
 }
+
+#endif
 
 void Relocation::const_set_data_value(address x) {
 #ifdef _LP64
@@ -534,7 +538,7 @@ void section_word_Relocation::unpack_data() {
 }
 
 //// miscellaneous methods
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 oop* oop_Relocation::oop_addr() {
   int n = _oop_index;
@@ -559,7 +563,6 @@ oop oop_Relocation::oop_value() {
   return v;
 }
 
-#endif
 
 
 void oop_Relocation::fix_oop_relocation() {
@@ -570,6 +573,7 @@ void oop_Relocation::fix_oop_relocation() {
 }
 
 
+
 void oop_Relocation::verify_oop_relocation() {
   if (!oop_is_immediate()) {
     // get the oop from the pool, and re-insert it into the instruction:
@@ -577,8 +581,10 @@ void oop_Relocation::verify_oop_relocation() {
   }
 }
 
+#endif
+
 // meta data versions
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 Metadata** metadata_Relocation::metadata_addr() {
   int n = _metadata_index;

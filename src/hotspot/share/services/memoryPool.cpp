@@ -176,6 +176,8 @@ void MemoryPool::set_gc_usage_sensor_obj(instanceHandle sh) {
   set_sensor_obj_at(&_gc_usage_sensor, sh);
 }
 
+#ifndef LEYDEN
+
 CodeHeapPool::CodeHeapPool(CodeHeap* codeHeap, const char* name, bool support_usage_threshold) :
   MemoryPool(name, NonHeap, codeHeap->capacity(), codeHeap->max_capacity(),
              support_usage_threshold, false), _codeHeap(codeHeap) {
@@ -188,6 +190,8 @@ MemoryUsage CodeHeapPool::get_memory_usage() {
 
   return MemoryUsage(initial_size(), used, committed, maxSize);
 }
+
+#endif
 
 MetaspacePool::MetaspacePool() :
   MemoryPool("Metaspace", NonHeap, 0, calculate_max_size(), true, false) { }

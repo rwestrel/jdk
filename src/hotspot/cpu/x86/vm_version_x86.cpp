@@ -1237,9 +1237,11 @@ void VM_Version::get_processor_features() {
       }
     }
 
+#ifndef LEYDEN
     if (FLAG_IS_DEFAULT(AllocatePrefetchInstr) && supports_3dnow_prefetch()) {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 3);
     }
+#endif
   }
 
   if (is_amd_family()) { // AMD cpus specific settings
@@ -1297,9 +1299,11 @@ void VM_Version::get_processor_features() {
         FLAG_SET_DEFAULT(AllocatePrefetchStyle, 0);
       }
       // Also, if some other prefetch style is specified, default instruction type is PREFETCHW
+#ifndef LEYDEN
       if (FLAG_IS_DEFAULT(AllocatePrefetchInstr)) {
         FLAG_SET_DEFAULT(AllocatePrefetchInstr, 3);
       }
+#endif
       // On family 15h processors use XMM and UnalignedLoadStores for Array Copy
       if (supports_sse2() && FLAG_IS_DEFAULT(UseXMMForArrayCopy)) {
         FLAG_SET_DEFAULT(UseXMMForArrayCopy, true);
@@ -1403,9 +1407,11 @@ void VM_Version::get_processor_features() {
         FLAG_SET_DEFAULT(UseIncDec, false);
       }
     }
+#ifndef LEYDEN
     if (FLAG_IS_DEFAULT(AllocatePrefetchInstr) && supports_3dnow_prefetch()) {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 3);
     }
+#endif
 #ifdef COMPILER2
     if (UseAVX > 2) {
       if (FLAG_IS_DEFAULT(ArrayCopyPartialInlineSize) ||
@@ -1564,6 +1570,7 @@ void VM_Version::get_processor_features() {
   }
 #endif // COMPILER2
 
+#ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchInstr)) {
     if (AllocatePrefetchInstr == 3 && !supports_3dnow_prefetch()) {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 0);
@@ -1571,14 +1578,18 @@ void VM_Version::get_processor_features() {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 3);
     }
   }
+#endif
 
   // Allocation prefetch settings
   intx cache_line_size = prefetch_data_size();
+#ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchStepSize) &&
       (cache_line_size > AllocatePrefetchStepSize)) {
     FLAG_SET_DEFAULT(AllocatePrefetchStepSize, cache_line_size);
   }
+#endif
 
+#ifndef LEYDEN
   if ((AllocatePrefetchDistance == 0) && (AllocatePrefetchStyle != 0)) {
     assert(!FLAG_IS_DEFAULT(AllocatePrefetchDistance), "default value should not be 0");
     if (!FLAG_IS_DEFAULT(AllocatePrefetchStyle)) {
@@ -1586,11 +1597,14 @@ void VM_Version::get_processor_features() {
     }
     FLAG_SET_DEFAULT(AllocatePrefetchStyle, 0);
   }
+#endif
 
+#ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchDistance)) {
     bool use_watermark_prefetch = (AllocatePrefetchStyle == 2);
     FLAG_SET_DEFAULT(AllocatePrefetchDistance, allocate_prefetch_distance(use_watermark_prefetch));
   }
+#endif
 
   if (is_intel() && cpu_family() == 6 && supports_sse3()) {
     if (FLAG_IS_DEFAULT(AllocatePrefetchLines) &&
@@ -1673,6 +1687,7 @@ void VM_Version::get_processor_features() {
       if (UseSSE == 0 && supports_3dnow_prefetch()) {
         log->print("PREFETCHW");
       } else if (UseSSE >= 1) {
+#ifndef LEYDEN
         if (AllocatePrefetchInstr == 0) {
           log->print("PREFETCHNTA");
         } else if (AllocatePrefetchInstr == 1) {
@@ -1682,12 +1697,15 @@ void VM_Version::get_processor_features() {
         } else if (AllocatePrefetchInstr == 3) {
           log->print("PREFETCHW");
         }
+#endif
       }
+#ifndef LEYDEN
       if (AllocatePrefetchLines > 1) {
         log->print_cr(" at distance %d, %d lines of %d bytes", (int) AllocatePrefetchDistance, (int) AllocatePrefetchLines, (int) AllocatePrefetchStepSize);
       } else {
         log->print_cr(" at distance %d, one line of %d bytes", (int) AllocatePrefetchDistance, (int) AllocatePrefetchStepSize);
       }
+#endif
     }
 
     if (PrefetchCopyIntervalInBytes > 0) {

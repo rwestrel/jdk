@@ -178,6 +178,7 @@ void StatSampler::collect_sample() {
  * specified property matches
  */
 void StatSampler::assert_system_property(const char* name, const char* value, TRAPS) {
+#ifndef LEYDEN
 #ifdef ASSERT
   ResourceMark rm(THREAD);
 
@@ -203,6 +204,7 @@ void StatSampler::assert_system_property(const char* name, const char* value, TR
 
   assert(strcmp(value, system_value) == 0, "property value mustn't differ from System.getProperty");
 #endif // ASSERT
+#endif
 }
 
 /*

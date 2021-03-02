@@ -762,6 +762,8 @@ public:
 //   VM.stringtable -verbose: for dumping the string table
 //   VM.systemdictionary -verbose: for dumping the system dictionary table
 //
+#ifndef LEYDEN
+
 class VM_DumpHashtable : public VM_Operation {
 private:
   outputStream* _out;
@@ -797,6 +799,8 @@ public:
     }
   }
 };
+
+#endif
 
 class SymboltableDCmd : public DCmdWithParser {
 protected:
@@ -912,5 +916,6 @@ public:
   static int num_arguments();
   virtual void execute(DCmdSource source, TRAPS);
 };
+
 
 #endif // SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP

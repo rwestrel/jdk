@@ -84,8 +84,10 @@ bool   Arguments::_AlwaysCompileLoopMethods     = AlwaysCompileLoopMethods;
 bool   Arguments::_UseOnStackReplacement        = UseOnStackReplacement;
 bool   Arguments::_BackgroundCompilation        = BackgroundCompilation;
 bool   Arguments::_ClipInlining                 = ClipInlining;
+#ifndef LEYDEN
 intx   Arguments::_Tier3InvokeNotifyFreqLog     = Tier3InvokeNotifyFreqLog;
 intx   Arguments::_Tier4InvocationThreshold     = Tier4InvocationThreshold;
+#endif
 size_t Arguments::_default_SharedBaseAddress    = SharedBaseAddress;
 
 bool   Arguments::_enable_preview               = false;
@@ -2138,8 +2140,10 @@ jint Arguments::parse_vm_init_args(const JavaVMInitArgs *vm_options_args,
   Arguments::_UseOnStackReplacement    = UseOnStackReplacement;
   Arguments::_ClipInlining             = ClipInlining;
   Arguments::_BackgroundCompilation    = BackgroundCompilation;
+#ifndef LEYDEN
   Arguments::_Tier3InvokeNotifyFreqLog = Tier3InvokeNotifyFreqLog;
   Arguments::_Tier4InvocationThreshold = Tier4InvocationThreshold;
+#endif
 
   // Remember the default value of SharedBaseAddress.
   Arguments::_default_SharedBaseAddress = SharedBaseAddress;
@@ -3094,9 +3098,11 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   // CompileThresholdScaling == 0.0 is same as -Xint: Disable compilation (enable interpreter-only mode),
   // but like -Xint, leave compilation thresholds unaffected.
   // With tiered compilation disabled, setting CompileThreshold to 0 disables compilation as well.
+#ifndef LEYDEN
   if ((CompileThresholdScaling == 0.0) || (!TieredCompilation && CompileThreshold == 0)) {
     set_mode_flags(_int);
   }
+#endif
 
 #ifdef ZERO
   // Zero always runs in interpreted mode
@@ -3165,6 +3171,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   }
 #endif
 
+#ifndef LEYDEN
 #if !INCLUDE_AOT
   UNSUPPORTED_OPTION(UseAOT);
   UNSUPPORTED_OPTION(PrintAOT);
@@ -3177,6 +3184,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   UNSUPPORTED_OPTION_INIT(Tier3AOTBackEdgeThreshold, 0);
 #ifndef PRODUCT
   UNSUPPORTED_OPTION(PrintAOTStatistics);
+#endif
 #endif
 #endif
 
@@ -3803,9 +3811,11 @@ bool Arguments::handle_deprecated_print_gc_flags() {
 }
 
 static void apply_debugger_ergo() {
+#ifndef LEYDEN
   if (ReplayCompiles) {
     FLAG_SET_ERGO_IF_DEFAULT(UseDebuggerErgo, true);
   }
+#endif
 
   if (UseDebuggerErgo) {
     // Turn on sub-flags
@@ -3818,7 +3828,9 @@ static void apply_debugger_ergo() {
     FLAG_SET_ERGO_IF_DEFAULT(UseNUMA, false);
     FLAG_SET_ERGO_IF_DEFAULT(ConcGCThreads, 1);
     FLAG_SET_ERGO_IF_DEFAULT(ParallelGCThreads, 1);
+#ifndef LEYDEN
     FLAG_SET_ERGO_IF_DEFAULT(CICompilerCount, 2);
+#endif
   }
 }
 

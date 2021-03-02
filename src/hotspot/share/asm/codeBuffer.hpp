@@ -256,12 +256,16 @@ class CodeSection {
   // Requirements are that the instruction area and the
   // stubs area must start on CodeEntryAlignment, and
   // the ctable on sizeof(jdouble)
-  int alignment() const             { return MAX2((int)sizeof(jdouble), (int)CodeEntryAlignment); }
+#ifndef LEYDEN
 
+  int alignment() const             { return MAX2((int)sizeof(jdouble), (int)CodeEntryAlignment); }
   // Slop between sections, used only when allocating temporary BufferBlob buffers.
   static csize_t end_slop()         { return MAX2((int)sizeof(jdouble), (int)CodeEntryAlignment); }
 
   csize_t align_at_start(csize_t off) const { return (csize_t) align_up(off, alignment()); }
+
+#endif
+
 
   // Ensure there's enough space left in the current section.
   // Return true if there was an expansion.

@@ -28,6 +28,7 @@
 #include "runtime/globals.hpp"
 #include "utilities/exceptions.hpp"
 
+#if 1 //ndef LEYDEN
 /*
  * PerfData Version Constants
  *   - Major Version - change whenever the structure of PerfDataEntry changes
@@ -167,5 +168,7 @@ class PerfMemory : AllStatic {
 
 void perfMemory_init();
 void perfMemory_exit();
+
+#endif
 
 #endif // SHARE_RUNTIME_PERFMEMORY_HPP

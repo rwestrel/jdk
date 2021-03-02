@@ -501,9 +501,9 @@ bool SafepointSynchronize::is_cleanup_needed() {
   // Need a safepoint if some inline cache buffers is non-empty
 #ifndef LEYDEN
   if (!InlineCacheBuffer::is_empty()) return true;
-#endif
   if (StringTable::needs_rehashing()) return true;
   if (SymbolTable::needs_rehashing()) return true;
+#endif
   return false;
 }
 

@@ -29,6 +29,8 @@
 #include "runtime/thread.inline.hpp"
 #include "runtime/vframe.hpp"
 
+#if 1//ndef LEYDEN
+
 inline vframeStreamCommon::vframeStreamCommon(JavaThread* thread, bool process_frames) : _reg_map(thread, false, process_frames) {
   _thread = thread;
 }
@@ -96,6 +98,7 @@ decode_offset == DebugInformationRecorder::serialized_null ||
     // that could lead to crashes in product mode.
     // Therefore, do not use the decode offset if invalid, but fill the frame
     // as it were a native compiled frame (no Java-level assumptions).
+#ifndef LEYDEN
 #ifdef ASSERT
     if (WizardMode) {
       ttyLocker ttyl;
@@ -108,6 +111,7 @@ decode_offset == DebugInformationRecorder::serialized_null ||
       nm()->print_pcs();
     }
     found_bad_method_frame();
+#endif
 #endif
     // Provide a cheap fallback in product mode.  (See comment above.)
     fill_from_compiled_native_frame();
@@ -138,10 +142,12 @@ inline void vframeStreamCommon::fill_from_compiled_native_frame() {
 
 inline bool vframeStreamCommon::fill_from_frame() {
   // Interpreted frame
+#ifndef LEYDEN
   if (_frame.is_interpreted_frame()) {
     fill_from_interpreter_frame();
     return true;
   }
+#endif
 
   // Compiled frame
 
@@ -218,6 +224,8 @@ inline bool vframeStreamCommon::fill_from_frame() {
 }
 
 
+#ifndef LEYDEN
+
 inline void vframeStreamCommon::fill_from_interpreter_frame() {
   Method* method = _frame.interpreter_frame_method();
   address   bcp    = _frame.interpreter_frame_bcp();
@@ -237,5 +245,8 @@ inline void vframeStreamCommon::fill_from_interpreter_frame() {
   _method = method;
   _bci    = bci;
 }
+
+#endif
+#endif
 
 #endif // SHARE_RUNTIME_VFRAME_INLINE_HPP

@@ -183,8 +183,8 @@ public:
   virtual void do_oop(narrowOop* p);
 
   virtual bool do_metadata() { return true; }
-  virtual void do_klass(Klass* k);
 #ifndef LEYDEN
+  virtual void do_klass(Klass* k);
   virtual void do_cld(ClassLoaderData* cld);
 #endif
 

@@ -83,6 +83,8 @@ bool vmClasses::contain(Klass* k) {
 }
 #endif
 
+#ifndef LEYDEN
+
 bool vmClasses::resolve(vmClassID id, TRAPS) {
   InstanceKlass** klassp = &_klasses[as_int(id)];
 
@@ -106,7 +108,10 @@ bool vmClasses::resolve(vmClassID id, TRAPS) {
   return ((*klassp) != NULL);
 }
 
+#endif
+
 void vmClasses::resolve_until(vmClassID limit_id, vmClassID &start_id, TRAPS) {
+#ifndef LEYDEN
   assert((int)start_id <= (int)limit_id, "IDs are out of order!");
   for (auto id : EnumRange<vmClassID>{start_id, limit_id}) { // (inclusive start, exclusive end)
     resolve(id, CHECK);
@@ -114,6 +119,7 @@ void vmClasses::resolve_until(vmClassID limit_id, vmClassID &start_id, TRAPS) {
 
   // move the starting value forward to the limit:
   start_id = limit_id;
+#endif
 }
 
 void vmClasses::resolve_all(TRAPS) {

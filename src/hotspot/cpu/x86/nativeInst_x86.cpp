@@ -36,9 +36,13 @@
 #include "c1/c1_Runtime1.hpp"
 #endif
 
+#ifndef LEYDEN
+
 void NativeInstruction::wrote(int offset) {
   ICache::invalidate_word(addr_at(offset));
 }
+
+#endif
 
 #ifdef ASSERT
 void NativeLoadGot::report_and_fail() const {
@@ -202,6 +206,8 @@ void NativeCall::print() {
 }
 
 // Inserts a native call instruction at a given pc
+#ifndef LEYDEN
+
 void NativeCall::insert(address code_pos, address entry) {
   intptr_t disp = (intptr_t)entry - ((intptr_t)code_pos + 1 + 4);
 #ifdef AMD64
@@ -212,10 +218,14 @@ void NativeCall::insert(address code_pos, address entry) {
   ICache::invalidate_range(code_pos, instruction_size);
 }
 
+#endif
+
 // MT-safe patching of a call instruction.
 // First patches first word of instruction to two jmp's that jmps to them
 // selfs (spinlock). Then patches the last byte, and then atomicly replaces
 // the jmp's with the first 4 byte of the new instruction.
+#ifndef LEYDEN
+
 void NativeCall::replace_mt_safe(address instr_addr, address code_buffer) {
   assert(Patching_lock->is_locked() ||
          SafepointSynchronize::is_at_safepoint(), "concurrent code patching");
@@ -259,6 +269,8 @@ void NativeCall::replace_mt_safe(address instr_addr, address code_buffer) {
 
 }
 
+#endif
+
 
 // Similar to replace_mt_safe, but just changes the destination.  The
 // important thing is that free-running threads are able to execute this
@@ -273,6 +285,8 @@ void NativeCall::replace_mt_safe(address instr_addr, address code_buffer) {
 //
 // Used in the runtime linkage of calls; see class CompiledIC.
 // (Cf. 4506997 and 4479829, where threads witnessed garbage displacements.)
+#ifndef LEYDEN
+
 void NativeCall::set_destination_mt_safe(address dest) {
   debug_only(verify());
   // Make sure patching code is locked.  No two threads can patch at the same
@@ -289,6 +303,8 @@ void NativeCall::set_destination_mt_safe(address dest) {
   // The destination lies within a single cache line.
   set_destination(dest);
 }
+
+#endif
 
 
 void NativeMovConstReg::verify() {
@@ -459,6 +475,8 @@ void NativeJump::verify() {
 }
 
 
+#ifndef LEYDEN
+
 void NativeJump::insert(address code_pos, address entry) {
   intptr_t disp = (intptr_t)entry - ((intptr_t)code_pos + 1 + 4);
 #ifdef AMD64
@@ -470,6 +488,8 @@ void NativeJump::insert(address code_pos, address entry) {
 
   ICache::invalidate_range(code_pos, instruction_size);
 }
+
+#endif
 
 void NativeJump::check_verified_entry_alignment(address entry, address verified_entry) {
   // Patching to not_entrant can happen while activations of the method are
@@ -505,6 +525,8 @@ void NativeJump::check_verified_entry_alignment(address entry, address verified_
 // In C1 the restriction is enforced by CodeEmitter::method_entry
 // In JVMCI, the restriction is enforced by HotSpotFrameContext.enter(...)
 //
+#ifndef LEYDEN
+
 void NativeJump::patch_verified_entry(address entry, address verified_entry, address dest) {
   // complete jump instruction (to be inserted) is in code_buffer;
   unsigned char code_buffer[5];
@@ -546,6 +568,8 @@ void NativeJump::patch_verified_entry(address entry, address verified_entry, add
 
 }
 
+#endif
+
 address NativeFarJump::jump_destination() const          {
   NativeMovConstReg* mov = nativeMovConstReg_at(addr_at(0));
   return (address)mov->data();
@@ -560,6 +584,8 @@ void NativeFarJump::verify() {
   fatal("not a jump instruction");
 }
 
+#ifndef LEYDEN
+
 void NativePopReg::insert(address code_pos, Register reg) {
   assert(reg->encoding() < 8, "no space for REX");
   assert(NativePopReg::instruction_size == sizeof(char), "right address unit for update");
@@ -567,6 +593,10 @@ void NativePopReg::insert(address code_pos, Register reg) {
   ICache::invalidate_range(code_pos, instruction_size);
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void NativeIllegalInstruction::insert(address code_pos) {
   assert(NativeIllegalInstruction::instruction_size == sizeof(short), "right address unit for update");
@@ -574,11 +604,15 @@ void NativeIllegalInstruction::insert(address code_pos) {
   ICache::invalidate_range(code_pos, instruction_size);
 }
 
+#endif
+
 void NativeGeneralJump::verify() {
   assert(((NativeInstruction *)this)->is_jump() ||
          ((NativeInstruction *)this)->is_cond_jump(), "not a general jump instruction");
 }
 
+
+#ifndef LEYDEN
 
 void NativeGeneralJump::insert_unconditional(address code_pos, address entry) {
   intptr_t disp = (intptr_t)entry - ((intptr_t)code_pos + 1 + 4);
@@ -591,11 +625,15 @@ void NativeGeneralJump::insert_unconditional(address code_pos, address entry) {
   ICache::invalidate_range(code_pos, instruction_size);
 }
 
+#endif
+
 
 // MT-safe patching of a long jump instruction.
 // First patches first word of instruction to two jmp's that jmps to them
 // selfs (spinlock). Then patches the last byte, and then atomicly replaces
 // the jmp's with the first 4 byte of the new instruction.
+#ifndef LEYDEN
+
 void NativeGeneralJump::replace_mt_safe(address instr_addr, address code_buffer) {
    assert (instr_addr != NULL, "illegal address for code patching (4)");
    NativeGeneralJump* n_jump =  nativeGeneralJump_at (instr_addr); // checking that it is a jump
@@ -632,6 +670,8 @@ void NativeGeneralJump::replace_mt_safe(address instr_addr, address code_buffer)
 #endif
 
 }
+
+#endif
 
 
 

@@ -420,6 +420,8 @@ jint ObjArrayKlass::compute_modifier_flags(TRAPS) const {
                         | (JVM_ACC_ABSTRACT | JVM_ACC_FINAL);
 }
 
+#ifndef LEYDEN
+
 ModuleEntry* ObjArrayKlass::module() const {
   assert(bottom_klass() != NULL, "ObjArrayKlass returned unexpected NULL bottom_klass");
   // The array is defined in the module of its bottom class
@@ -430,6 +432,8 @@ PackageEntry* ObjArrayKlass::package() const {
   assert(bottom_klass() != NULL, "ObjArrayKlass returned unexpected NULL bottom_klass");
   return bottom_klass()->package();
 }
+
+#endif
 
 // Printing
 

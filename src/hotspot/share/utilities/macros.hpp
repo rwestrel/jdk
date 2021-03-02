@@ -628,4 +628,13 @@
 #define NOT_CDS_JAVA_HEAP_RETURN_(code) { return code; }
 #endif
 
+#ifdef LEYDEN
+#define LEYDEN_PRESENT(code) code
+#define NOT_LEYDEN(code)
+#else
+#define LEYDEN_PRESENT(code)
+#define NOT_LEYDEN(code) code
+#endif // COMPILER2
+
+
 #endif // SHARE_UTILITIES_MACROS_HPP

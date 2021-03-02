@@ -395,11 +395,9 @@ void xmlStream::method(Method* method) {
   print(" count='%d'", method->invocation_count());
   int bec = method->backedge_count();
   if (bec != 0)  print(" backedge_count='%d'", bec);
-#endif
   print(" iicount='%d'", method->interpreter_invocation_count());
   int throwouts = method->interpreter_throwout_count();
   if (throwouts != 0)  print(" throwouts='%d'", throwouts);
-#ifndef LEYDEN
   MethodData* mdo = method->method_data();
   if (mdo != NULL) {
     uint cnt;

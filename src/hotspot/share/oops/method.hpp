@@ -164,11 +164,13 @@ class Method : public Metadata {
   void set_name_index(int index)                 { constMethod()->set_name_index(index);       }
 
   // signature
+  Symbol* signature() const                      {
 #ifndef LEYDEN
-
-  Symbol* signature() const                      { return constants()->symbol_at(signature_index()); }
-
+    return constants()->symbol_at(signature_index());
+#else
+    return NULL;
 #endif
+  }
   int signature_index() const                    { return constMethod()->signature_index();         }
   void set_signature_index(int index)            { constMethod()->set_signature_index(index);       }
 
@@ -319,6 +321,8 @@ class Method : public Metadata {
   }
 #endif
 
+#ifndef LEYDEN
+
   int  interpreter_throwout_count() const        {
     MethodCounters* mcs = method_counters();
     if (mcs == NULL) {
@@ -327,6 +331,8 @@ class Method : public Metadata {
       return mcs->interpreter_throwout_count();
     }
   }
+
+#endif
 
   // Derive stuff from the signature at load time.
   void compute_from_signature(Symbol* sig);
@@ -392,6 +398,8 @@ class Method : public Metadata {
 
   bool init_method_counters(MethodCounters* counters);
 
+#ifndef LEYDEN
+
   int prev_event_count() const {
     MethodCounters* mcs = method_counters();
     return mcs == NULL ? 0 : mcs->prev_event_count();
@@ -423,6 +431,8 @@ class Method : public Metadata {
     }
   }
 
+#endif
+
 #if INCLUDE_AOT
   void set_aot_code(CompiledMethod* aot_code) {
     _aot_code = aot_code;
@@ -435,6 +445,8 @@ class Method : public Metadata {
   CompiledMethod* aot_code() const { return NULL; }
 #endif // INCLUDE_AOT
 
+#ifndef LEYDEN
+
   int nmethod_age() const {
     if (method_counters() == NULL) {
       return INT_MAX;
@@ -442,6 +454,8 @@ class Method : public Metadata {
       return method_counters()->nmethod_age();
     }
   }
+
+#endif
 
   int invocation_count();
   int backedge_count();
@@ -510,7 +524,11 @@ public:
   // clear entry points. Used by sharing code during dump time
   void unlink_method() NOT_CDS_RETURN;
 
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
+
+#endif
   virtual MetaspaceObj::Type type() const { return MethodType; }
 
   // vtable index
@@ -576,9 +594,13 @@ public:
   bool    contains(address bcp) const { return constMethod()->contains(bcp); }
 
   // prints byte codes
+#ifndef LEYDEN
+
   void print_codes() const            { print_codes_on(tty); }
   void print_codes_on(outputStream* st) const;
   void print_codes_on(int from, int to, outputStream* st) const;
+
+#endif
 
   // method parameters
   bool has_method_parameters() const
@@ -608,11 +630,14 @@ public:
                        { return constMethod()->compressed_linenumber_table(); }
 
   // method holder (the Klass* holding this method)
+
+  InstanceKlass* method_holder() const         {
 #ifndef LEYDEN
-
-  InstanceKlass* method_holder() const         { return constants()->pool_holder(); }
-
+    return constants()->pool_holder();
+#else
+    return NULL;
 #endif
+  }
 
   Symbol* klass_name() const;                    // returns the name of the method holder
   BasicType result_type() const                  { return constMethod()->result_type(); }
@@ -812,7 +837,12 @@ public:
   }
 
   bool on_stack() const                             { return access_flags().on_stack(); }
+
+#ifndef LEYDEN
+
   void set_on_stack(const bool value);
+
+#endif
 
   // see the definition in Method*.cpp for the gory details
   bool should_not_be_cached() const;

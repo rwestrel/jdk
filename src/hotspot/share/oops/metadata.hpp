@@ -48,7 +48,12 @@ class Metadata : public MetaspaceObj {
   virtual int  size()                  const = 0;
   virtual MetaspaceObj::Type type()    const = 0;
   virtual const char* internal_name()  const = 0;
+
+#ifndef LEYDEN
+
   virtual void metaspace_pointers_do(MetaspaceClosure* iter) {}
+
+#endif
 
   void print()       const;
   void print_value() const;

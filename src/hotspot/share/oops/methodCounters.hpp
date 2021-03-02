@@ -31,6 +31,8 @@
 #include "interpreter/invocationCounter.hpp"
 #include "utilities/align.hpp"
 
+#ifndef LEYDEN
+
 class MethodCounters : public Metadata {
  friend class VMStructs;
  friend class JVMCIVMStructs;
@@ -169,4 +171,6 @@ class MethodCounters : public Metadata {
   virtual void print_value_on(outputStream* st) const;
 
 };
+
+#endif
 #endif // SHARE_OOPS_METHODCOUNTERS_HPP

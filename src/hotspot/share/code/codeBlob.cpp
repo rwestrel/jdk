@@ -60,11 +60,15 @@ const char* CodeBlob::compiler_name() const {
 
 #endif
 
+#ifndef LEYDEN
+
 unsigned int CodeBlob::align_code_offset(int offset) {
   // align the size to CodeEntryAlignment
   int header_size = (int)CodeHeap::header_size();
   return align_up(offset + header_size, CodeEntryAlignment) - header_size;
 }
+
+#endif
 
 
 // This must be consistent with the CodeBlob constructor's layout actions.
@@ -82,6 +86,8 @@ unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
 }
 
 #endif
+
+#ifndef LEYDEN
 
 CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments) :
   _type(type),
@@ -141,6 +147,8 @@ CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& la
 #endif // COMPILER1
   S390_ONLY(_ctable_offset = 0;) // avoid uninitialized fields
 }
+
+#endif
 
 #ifndef LEYDEN
 // Creates a simple CodeBlob. Sets up the size of the different regions.

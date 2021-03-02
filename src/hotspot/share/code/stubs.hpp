@@ -28,6 +28,7 @@
 #include "asm/codeBuffer.hpp"
 #include "memory/allocation.hpp"
 
+#ifndef LEYDEN
 // The classes in this file provide a simple framework for the
 // management of little pieces of machine code - or stubs -
 // created on the fly and frequently discarded. In this frame-
@@ -214,5 +215,7 @@ class StubQueue: public CHeapObj<mtCode> {
   void  print();                                 // prints information about the stub queue
 
 };
+
+#endif
 
 #endif // SHARE_CODE_STUBS_HPP

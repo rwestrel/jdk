@@ -252,6 +252,8 @@ public:
 #endif
 };
 
+#ifndef LEYDEN
+
 class CodeBlobLayout : public StackObj {
 private:
   int _size;
@@ -342,6 +344,8 @@ public:
   address content_begin() const { return _content_begin; }
   address content_end() const { return _content_end; }
 };
+
+#endif
 
 #ifndef LEYDEN
 class RuntimeBlob : public CodeBlob {
