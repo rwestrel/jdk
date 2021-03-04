@@ -1311,7 +1311,7 @@ public:
   const Type* base_element_type(int& dims) const;
 
   // Accessors
-  bool  is_loaded() const { return (_ary->_elem->isa_oopptr() ? _ary->_elem->is_oopptr()->is_loaded() : true); }
+  bool  is_loaded() const { return (_ary->_elem->make_oopptr() ? _ary->_elem->make_oopptr()->is_loaded() : true); }
   
   const TypeAry* ary() const  { return _ary; }
   const Type*    elem() const { return _ary->_elem; }
