@@ -134,9 +134,7 @@ void MetaspaceUtils::print_metaspace_change(const metaspace::MetaspaceSizesSnaps
 // This will print out a basic metaspace usage report but
 // unlike print_report() is guaranteed not to lock or to walk the CLDG.
 void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
-#ifndef LEYDEN
   MetaspaceReporter::print_basic_report(out, scale);
-#endif
 }
 
 // Prints a report about the current metaspace state.
@@ -144,13 +142,11 @@ void MetaspaceUtils::print_basic_report(outputStream* out, size_t scale) {
 // Function will walk the CLDG and will lock the expand lock; if that is not
 // convenient, use print_basic_report() instead.
 void MetaspaceUtils::print_report(outputStream* out, size_t scale) {
-#ifndef LEYDEN
   const int flags =
       (int)MetaspaceReporter::Option::ShowLoaders |
       (int)MetaspaceReporter::Option::BreakDownByChunkType |
       (int)MetaspaceReporter::Option::ShowClasses;
   MetaspaceReporter::print_report(out, scale, flags);
-#endif
 }
 
 void MetaspaceUtils::print_on(outputStream* out) {

@@ -465,9 +465,7 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
   FormatBuffer<> title("Collect gen: %s", gen->short_name());
   GCTraceTime(Trace, gc, phases) t1(title);
   TraceCollectorStats tcs(gen->counters());
-#ifndef LEYDEN
   TraceMemoryManagerStats tmms(gen->gc_manager(), gc_cause());
-#endif
 
   gen->stat_record()->invocations++;
   gen->stat_record()->accumulated_time.start();
@@ -616,9 +614,7 @@ void GenCollectedHeap::do_collection(bool           full,
       print_heap_change(pre_gc_values);
 
       // Track memory usage and detect low memory after GC finishes
-#ifndef LEYDEN
       MemoryService::track_memory_usage();
-#endif
 
       gc_epilogue(complete);
     }
@@ -678,9 +674,7 @@ void GenCollectedHeap::do_collection(bool           full,
     print_heap_change(pre_gc_values);
 
     // Track memory usage and detect low memory after GC finishes
-#ifndef LEYDEN
     MemoryService::track_memory_usage();
-#endif
 
     // Need to tell the epilogue code we are done with Full GC, regardless what was
     // the initial value for "complete" flag.

@@ -42,10 +42,8 @@ SerialHeap::SerialHeap() :
     _eden_pool(NULL),
     _survivor_pool(NULL),
     _old_pool(NULL) {
-#ifndef LEYDEN
   _young_manager = new GCMemoryManager("Copy", "end of minor GC");
   _old_manager = new GCMemoryManager("MarkSweepCompact", "end of major GC");
-#endif
 }
 
 void SerialHeap::initialize_serviceability() {
@@ -65,29 +63,23 @@ void SerialHeap::initialize_serviceability() {
   TenuredGeneration* old = old_gen();
   _old_pool = new GenerationPool(old, "Tenured Gen", true);
 
-#ifndef LEYDEN
   _young_manager->add_pool(_eden_pool);
   _young_manager->add_pool(_survivor_pool);
-#endif
   young->set_gc_manager(_young_manager);
 
-#ifndef LEYDEN
   _old_manager->add_pool(_eden_pool);
   _old_manager->add_pool(_survivor_pool);
   _old_manager->add_pool(_old_pool);
-#endif
   old->set_gc_manager(_old_manager);
 
 }
 
-#if 1 //ndef LEYDEN
 GrowableArray<GCMemoryManager*> SerialHeap::memory_managers() {
   GrowableArray<GCMemoryManager*> memory_managers(2);
   memory_managers.append(_young_manager);
   memory_managers.append(_old_manager);
   return memory_managers;
 }
-#endif
 
 GrowableArray<MemoryPool*> SerialHeap::memory_pools() {
   GrowableArray<MemoryPool*> memory_pools(3);

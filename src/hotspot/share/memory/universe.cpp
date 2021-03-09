@@ -1051,11 +1051,8 @@ bool universe_post_init() {
   // ("weak") refs processing infrastructure initialization
   Universe::heap()->post_initialize();
 
-#ifndef LEYDEN
   MemoryService::add_metaspace_memory_pools();
   MemoryService::set_universe_heap(Universe::heap());
-#endif
-
 #if INCLUDE_CDS
   MetaspaceShared::post_initialize(CHECK_false);
 #endif

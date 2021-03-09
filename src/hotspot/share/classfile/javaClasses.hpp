@@ -32,7 +32,7 @@
 #include "runtime/os.hpp"
 #include "utilities/vmEnums.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 class RecordComponent;
 
 // Interface for manipulating the basic Java classes.

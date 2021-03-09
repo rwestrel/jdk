@@ -81,6 +81,7 @@
 #include "jvmci/jvmciJavaClasses.hpp"
 #endif
 
+#ifndef LEYDEN
 #define INJECTED_FIELD_COMPUTE_OFFSET(klass, name, signature, may_be_java)    \
   klass::_##name##_offset = JavaClasses::compute_injected_offset(JavaClasses::klass##_##name##_enum);
 
@@ -213,6 +214,7 @@ bool java_lang_String::is_instance(oop obj) {
   macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
   macro(_coder_offset, k, "coder",                 byte_signature,       false);
 
+
 void java_lang_String::compute_offsets() {
   if (_initialized) {
     return;
@@ -224,12 +226,14 @@ void java_lang_String::compute_offsets() {
   _initialized = true;
 }
 
+
 #if INCLUDE_CDS
 void java_lang_String::serialize_offsets(SerializeClosure* f) {
   STRING_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
   f->do_bool(&_initialized);
 }
 #endif
+
 
 class CompactStringsFixup : public FieldClosure {
 private:
@@ -3674,6 +3678,8 @@ void java_lang_boxing_object::print(BasicType type, jvalue* value, outputStream*
   }
 }
 
+#endif
+
 
 // Support for java_lang_ref_SoftReference
 //
@@ -3681,6 +3687,7 @@ void java_lang_boxing_object::print(BasicType type, jvalue* value, outputStream*
 int java_lang_ref_SoftReference::_timestamp_offset;
 int java_lang_ref_SoftReference::_static_clock_offset;
 
+#ifndef LEYDEN
 #define SOFTREFERENCE_FIELDS_DO(macro) \
   macro(_timestamp_offset,    k, "timestamp", long_signature, false); \
   macro(_static_clock_offset, k, "clock",     long_signature, true)
@@ -3689,6 +3696,8 @@ void java_lang_ref_SoftReference::compute_offsets() {
   InstanceKlass* k = vmClasses::SoftReference_klass();
   SOFTREFERENCE_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
+
+#endif
 
 #if INCLUDE_CDS
 void java_lang_ref_SoftReference::serialize_offsets(SerializeClosure* f) {
@@ -3712,6 +3721,7 @@ void java_lang_ref_SoftReference::set_clock(jlong value) {
   base->long_field_put(_static_clock_offset, value);
 }
 
+#ifndef LEYDEN
 // Support for java_lang_invoke_DirectMethodHandle
 
 int java_lang_invoke_DirectMethodHandle::_member_offset;
@@ -5036,3 +5046,5 @@ void javaClasses_init() {
   JavaClasses::check_offsets();
   FilteredFieldsMap::initialize();  // must be done after computing offsets.
 }
+
+#endif
