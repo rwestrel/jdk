@@ -182,6 +182,7 @@ static BasicType runtime_type_from(JavaValue* result) {
 // ============ Virtual calls ============
 
 void JavaCalls::call_virtual(JavaValue* result, Klass* spec_klass, Symbol* name, Symbol* signature, JavaCallArguments* args, TRAPS) {
+#ifndef LEYDEN
   CallInfo callinfo;
   Handle receiver = args->receiver();
   Klass* recvrKlass = receiver.is_null() ? (Klass*)NULL : receiver->klass();
@@ -193,6 +194,7 @@ void JavaCalls::call_virtual(JavaValue* result, Klass* spec_klass, Symbol* name,
 
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
+#endif
 }
 
 
@@ -221,6 +223,7 @@ void JavaCalls::call_virtual(JavaValue* result, Handle receiver, Klass* spec_kla
 // ============ Special calls ============
 
 void JavaCalls::call_special(JavaValue* result, Klass* klass, Symbol* name, Symbol* signature, JavaCallArguments* args, TRAPS) {
+#ifndef LEYDEN
   CallInfo callinfo;
   LinkInfo link_info(klass, name, signature);
   LinkResolver::resolve_special_call(callinfo, args->receiver(), link_info, CHECK);
@@ -229,6 +232,7 @@ void JavaCalls::call_special(JavaValue* result, Klass* klass, Symbol* name, Symb
 
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
+#endif
 }
 
 
@@ -256,6 +260,7 @@ void JavaCalls::call_special(JavaValue* result, Handle receiver, Klass* klass, S
 // ============ Static calls ============
 
 void JavaCalls::call_static(JavaValue* result, Klass* klass, Symbol* name, Symbol* signature, JavaCallArguments* args, TRAPS) {
+#ifndef LEYDEN
   CallInfo callinfo;
   LinkInfo link_info(klass, name, signature);
   LinkResolver::resolve_static_call(callinfo, link_info, true, CHECK);
@@ -264,6 +269,7 @@ void JavaCalls::call_static(JavaValue* result, Klass* klass, Symbol* name, Symbo
 
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
+#endif
 }
 
 
@@ -366,7 +372,9 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
   }
 #endif
 
+#ifndef LEYDEN
   CompilationPolicy::compile_if_required(method, CHECK);
+#endif
 
   // Since the call stub sets up like the interpreter we call the from_interpreted_entry
   // so we can go compiled via a i2c. Otherwise initial entry method will always
@@ -423,6 +431,7 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
         }
       }
 #endif
+#ifndef LEYDEN
       StubRoutines::call_stub()(
         (address)&link,
         // (intptr_t*)&(result->_value), // see NOTE above (compiler problem)
@@ -434,6 +443,7 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
         args->size_of_parameters(),
         CHECK
       );
+#endif
 
       result = link.result();  // circumvent MS C++ 5.0 compiler bug (result is clobbered across call)
       // Preserve oop return value across possible gc points

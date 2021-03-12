@@ -444,6 +444,8 @@ void SignatureStream::skip_to_return_type() {
   }
 }
 
+#ifndef LEYDEN
+
 ResolvingSignatureStream::ResolvingSignatureStream(Symbol* signature,
                                                    Handle class_loader,
                                                    Handle protection_domain,
@@ -467,21 +469,18 @@ ResolvingSignatureStream::ResolvingSignatureStream(const Method* method)
   initialize_load_origin(method->method_holder());
 }
 
+
 ResolvingSignatureStream::ResolvingSignatureStream(fieldDescriptor& field)
   : SignatureStream(field.signature(), false)
 {
   initialize_load_origin(field.field_holder());
 }
 
-#ifndef LEYDEN
-
 void ResolvingSignatureStream::cache_handles(TRAPS) {
   assert(_load_origin != NULL, "");
   _class_loader = Handle(THREAD, _load_origin->class_loader());
   _protection_domain = Handle(THREAD, _load_origin->protection_domain());
 }
-
-#endif
 
 Klass* ResolvingSignatureStream::as_klass_if_loaded(TRAPS) {
   Klass* klass = as_klass(CachedOrNull, THREAD);
@@ -493,7 +492,7 @@ Klass* ResolvingSignatureStream::as_klass_if_loaded(TRAPS) {
   }
   return klass;
 }
-
+#endif
 #ifdef ASSERT
 
 extern bool signature_constants_sane(); // called from basic_types_init()

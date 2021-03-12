@@ -796,8 +796,6 @@ class InterpretedArgumentOopFinder: public SignatureIterator {
 
 // visits and GC's all the arguments in entry frame
 
-#ifndef LEYDEN
-
 class EntryFrameOopFinder: public SignatureIterator {
  private:
   bool         _is_static;
@@ -824,9 +822,7 @@ class EntryFrameOopFinder: public SignatureIterator {
     _f = NULL; // will be set later
     _fr = frame;
     _is_static = is_static;
-#ifndef LEYDEN
     _offset = ArgumentSizeComputer(signature).size();  // pre-decremented down to zero
-#endif
   }
 
   void arguments_do(OopClosure* f) {
@@ -836,8 +832,6 @@ class EntryFrameOopFinder: public SignatureIterator {
   }
 
 };
-
-#endif
 
 
 #ifndef LEYDEN
@@ -1052,6 +1046,8 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 }
 
 
+#ifndef LEYDEN
+
 BasicLock* frame::get_native_monitor() {
 #ifndef LEYDEN
   nmethod* nm = (nmethod*)_cb;
@@ -1080,8 +1076,9 @@ oop frame::get_native_receiver() {
 #endif
 }
 
+#endif
+
 void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
-#ifndef LEYDEN
   assert(map != NULL, "map must be set");
   if (map->include_argument_oops()) {
     // must collect argument oops, as nobody else is doing it
@@ -1091,10 +1088,7 @@ void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
     finder.arguments_do(f);
   }
   // Traverse the Handle Block saved in the entry frame
-#ifndef LEYDEN
   entry_frame_call_wrapper()->oops_do(f);
-#endif
-#endif
 }
 
 void frame::oops_do(OopClosure* f, CodeBlobClosure* cf, const RegisterMap* map,
@@ -1125,15 +1119,15 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, const RegisterM
   if (is_interpreted_frame()) {
     oops_interpreted_do(f, map, use_interpreter_oop_map_cache);
   } else if (is_entry_frame()) {
+#else
+    if (is_entry_frame()) {
+#endif
     oops_entry_do(f, map);
   } else if (CodeCache::contains(pc())) {
-#endif
     oops_code_blob_do(f, cf, map, derived_mode);
-#ifndef LEYDEN
   } else {
     ShouldNotReachHere();
   }
-#endif
 }
 
 void frame::nmethods_do(CodeBlobClosure* cf) const {

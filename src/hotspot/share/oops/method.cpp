@@ -632,14 +632,10 @@ void Method::compute_from_signature(Symbol* sig) {
 }
 #endif
 
-#ifndef LEYDEN
-
 bool Method::is_empty_method() const {
   return  code_size() == 1
       && *code_base() == Bytecodes::_return;
 }
-
-#endif
 
 #ifndef LEYDEN
 

@@ -34,7 +34,7 @@
 #include "runtime/thread.hpp"
 #include "runtime/vmThread.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // This file contains the platform-independent parts
 // of the abstract interpreter and the abstract interpreter generator.
 
@@ -53,6 +53,8 @@
 class InterpreterMacroAssembler;
 
 class AbstractInterpreter: AllStatic {
+#ifndef LEYDEN
+
   friend class VMStructs;
   friend class ZeroInterpreterGenerator;
   friend class TemplateInterpreterGenerator;
@@ -225,6 +227,7 @@ class AbstractInterpreter: AllStatic {
   static bool       in_native_entry(address pc)                 { return _native_entry_begin <= pc && pc < _native_entry_end; }
   // Debugging/printing
   static void       print();                                    // prints the interpreter code
+#endif
 
  public:
   // Interpreter helpers
@@ -243,6 +246,8 @@ class AbstractInterpreter: AllStatic {
     return stackElementSize * i;
 #endif
   }
+
+#ifndef LEYDEN
 
   static int local_index_at(int i) {
     assert(i <= 0, "local direction already negated");
@@ -287,10 +292,14 @@ class AbstractInterpreter: AllStatic {
   }
 
   static void initialize_method_handle_entries();
+
+#endif
 };
 
 //------------------------------------------------------------------------------------------------------------------------
 // The interpreter generator.
+
+#ifndef LEYDEN
 
 class Template;
 class AbstractInterpreterGenerator: public StackObj {
@@ -300,6 +309,8 @@ class AbstractInterpreterGenerator: public StackObj {
  public:
   AbstractInterpreterGenerator(StubQueue* _code);
 };
+
+#endif
 
 #endif
 

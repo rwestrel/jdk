@@ -29,7 +29,7 @@
 #include "oops/method.hpp"
 
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // Static routines and parsing loops for processing field and method
 // descriptors.  In the HotSpot sources we call them "signatures".
 //
@@ -571,6 +571,8 @@ class SignatureStream : public StackObj {
 // Specialized SignatureStream: used for invoking SystemDictionary to either find
 //                              or resolve the underlying type when iterating over a
 //                              Java descriptor (or parts of it).
+#ifndef LEYDEN
+
 class ResolvingSignatureStream : public SignatureStream {
   Klass*       _load_origin;
   bool         _handles_cached;
@@ -613,6 +615,8 @@ class ResolvingSignatureStream : public SignatureStream {
                                            failure_mode, THREAD);
   }
 };
+
+#endif
 
 // Here is how all the SignatureIterator classes invoke the
 // SignatureStream engine to do their parsing.
