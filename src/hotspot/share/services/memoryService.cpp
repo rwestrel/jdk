@@ -89,8 +89,6 @@ void MemoryService::set_universe_heap(CollectedHeap* heap) {
   }
 }
 
-#ifndef LEYDEN
-
 void MemoryService::add_code_heap_memory_pool(CodeHeap* heap, const char* name) {
   // Create new memory pool for this heap
   MemoryPool* code_heap_pool = new CodeHeapPool(heap, name, true /* support_usage_threshold */);
@@ -107,8 +105,6 @@ void MemoryService::add_code_heap_memory_pool(CodeHeap* heap, const char* name) 
 
   _code_cache_manager->add_pool(code_heap_pool);
 }
-
-#endif
 
 void MemoryService::add_metaspace_memory_pools() {
   MemoryManager* mgr = MemoryManager::get_metaspace_memory_manager();

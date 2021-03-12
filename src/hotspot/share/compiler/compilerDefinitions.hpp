@@ -56,7 +56,6 @@ enum MethodCompilation {
   InvalidFrameStateBci = -6
 };
 
-#ifndef LEYDEN
 // Enumeration to distinguish tiers of compilation
 enum CompLevel {
   CompLevel_any               = -2,
@@ -69,6 +68,7 @@ enum CompLevel {
   CompLevel_full_optimization = 4          // C2 or JVMCI
 };
 
+#ifndef LEYDEN
 class CompilationModeFlag : AllStatic {
   enum class Mode {
     NORMAL,

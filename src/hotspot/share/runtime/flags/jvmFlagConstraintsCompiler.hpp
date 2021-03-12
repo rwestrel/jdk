@@ -61,6 +61,12 @@ COMPILER2_PRESENT(                                      \
 )
 
 COMPILER_CONSTRAINTS(DECLARE_CONSTRAINT)
+#else
+#define COMPILER_CONSTRAINTS(f)                         \
+  f(uintx, CodeCacheSegmentSizeConstraintFunc)          \
+  f(intx,  CodeEntryAlignmentConstraintFunc)            \
+
+COMPILER_CONSTRAINTS(DECLARE_CONSTRAINT)
 #endif
 
 #endif // SHARE_RUNTIME_FLAGS_JVMFLAGCONSTRAINTSCOMPILER_HPP

@@ -1589,15 +1589,15 @@ const intx ObjectAlignmentInBytes = 8;
           "Stack space (bytes) required for JVM_InvokeMethod to complete")  \
                                                                             \
   /* code cache parameters                                    */            \
-  NOT_LEYDEN(develop_pd(uintx, CodeCacheSegmentSize,                                   \
+  develop_pd(uintx, CodeCacheSegmentSize,                                   \
           "Code cache segment size (in bytes) - smallest unit of "          \
           "allocation")                                                     \
           range(1, 1024)                                                    \
-          constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo))         \
+          constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo)         \
                                                                             \
-  NOT_LEYDEN(develop_pd(intx, CodeEntryAlignment,                                      \
+  develop_pd(intx, CodeEntryAlignment,                                      \
           "Code entry alignment for generated code (in bytes)")             \
-          constraint(CodeEntryAlignmentConstraintFunc, AfterErgo))           \
+          constraint(CodeEntryAlignmentConstraintFunc, AfterErgo)           \
                                                                             \
   NOT_LEYDEN(product_pd(intx, OptoLoopAlignment,                                       \
           "Align inner loops to zero relative to this modulus")             \

@@ -145,7 +145,7 @@ public:
   bool is_collected_pool()            { return true; }
 };
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class CodeHeapPool: public MemoryPool {
 private:

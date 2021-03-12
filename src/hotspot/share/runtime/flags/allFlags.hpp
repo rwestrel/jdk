@@ -130,7 +130,7 @@
     range,                    \
     constraint)
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 #define ALL_CONSTRAINTS(f) \
   COMPILER_CONSTRAINTS(f)  \
   RUNTIME_CONSTRAINTS(f)   \

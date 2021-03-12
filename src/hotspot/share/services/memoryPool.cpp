@@ -176,7 +176,7 @@ void MemoryPool::set_gc_usage_sensor_obj(instanceHandle sh) {
   set_sensor_obj_at(&_gc_usage_sensor, sh);
 }
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 CodeHeapPool::CodeHeapPool(CodeHeap* codeHeap, const char* name, bool support_usage_threshold) :
   MemoryPool(name, NonHeap, codeHeap->capacity(), codeHeap->max_capacity(),

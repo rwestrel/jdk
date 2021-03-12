@@ -36,6 +36,8 @@
 #include "runtime/globals_extension.hpp"
 #include "utilities/powerOfTwo.hpp"
 
+#ifndef LEYDEN
+
 JVMFlag::Error AliasLevelConstraintFunc(intx value, bool verbose) {
   if ((value <= 1) && (Arguments::mode() == Arguments::_comp || Arguments::mode() == Arguments::_mixed)) {
     JVMFlag::printError(verbose,
@@ -180,7 +182,10 @@ JVMFlag::Error OnStackReplacePercentageConstraintFunc(intx value, bool verbose) 
   return JVMFlag::SUCCESS;
 }
 
+#endif
+
 JVMFlag::Error CodeCacheSegmentSizeConstraintFunc(uintx value, bool verbose) {
+#ifndef LEYDEN
   if (CodeCacheSegmentSize < (uintx)CodeEntryAlignment) {
     JVMFlag::printError(verbose,
                         "CodeCacheSegmentSize  (" UINTX_FORMAT ") must be "
@@ -208,6 +213,7 @@ JVMFlag::Error CodeCacheSegmentSizeConstraintFunc(uintx value, bool verbose) {
     return JVMFlag::VIOLATES_CONSTRAINT;
   }
 #endif
+#endif
 
   return JVMFlag::SUCCESS;
 }
@@ -230,6 +236,8 @@ JVMFlag::Error CodeEntryAlignmentConstraintFunc(intx value, bool verbose) {
 
   return JVMFlag::SUCCESS;
 }
+
+#ifndef LEYDEN
 
 JVMFlag::Error OptoLoopAlignmentConstraintFunc(intx value, bool verbose) {
   if (!is_power_of_2(value)) {
@@ -419,4 +427,6 @@ JVMFlag::Error ControlIntrinsicConstraintFunc(ccstrlist value, bool verbose) {
 
   return JVMFlag::SUCCESS;
 }
+
+#endif
 
