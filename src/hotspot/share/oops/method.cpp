@@ -170,15 +170,23 @@ address Method::get_c2i_no_clinit_check_entry() {
 }
 #endif
 
-#ifndef LEYDEN
-
 char* Method::name_and_sig_as_C_string() const {
+#ifndef LEYDEN
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature());
+#else
+  return NULL;
+#endif
 }
 
 char* Method::name_and_sig_as_C_string(char* buf, int size) const {
+#ifndef LEYDEN
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature(), buf, size);
+#else
+  return NULL;
+#endif
 }
+
+#ifndef LEYDEN
 
 char* Method::name_and_sig_as_C_string(Klass* klass, Symbol* method_name, Symbol* signature) {
   const char* klass_name = klass->external_name();

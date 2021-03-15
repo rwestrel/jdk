@@ -29,6 +29,7 @@
 #include "gc/shared/cardTable.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+#ifndef LEYDEN
 // The following routines and definitions are used internally in the
 // compiler interface.
 
@@ -55,5 +56,7 @@ CardTable::CardValue* ci_card_table_address();
 template <typename T> T ci_card_table_address_as() {
   return reinterpret_cast<T>(ci_card_table_address());
 }
+
+#endif
 
 #endif // SHARE_CI_CIUTILITIES_HPP

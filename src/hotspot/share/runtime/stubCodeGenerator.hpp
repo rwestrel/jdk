@@ -28,7 +28,6 @@
 #include "asm/assembler.hpp"
 #include "memory/allocation.hpp"
 
-#ifndef LEYDEN
 // All the basic framework for stub code generation/debugging/printing.
 
 
@@ -59,15 +58,27 @@ class StubCodeDesc: public CHeapObj<mtCode> {
     _begin = begin;
   }
 
+#ifndef LEYDEN
+
   friend class StubCodeMark;
   friend class StubCodeGenerator;
 
+#endif
+
+
  public:
+#ifndef LEYDEN
+
   static StubCodeDesc* first() { return _list; }
   static StubCodeDesc* next(StubCodeDesc* desc)  { return desc->_next; }
 
+#endif
+
   static StubCodeDesc* desc_for(address pc);     // returns the code descriptor for the code containing pc or NULL
+#ifndef LEYDEN
+
   static const char*   name_for(address pc);     // returns the name of the code containing pc or NULL
+#endif
 
   StubCodeDesc(const char* group, const char* name, address begin, address end = NULL) {
     assert(!_frozen, "no modifications allowed");
@@ -80,18 +91,24 @@ class StubCodeDesc: public CHeapObj<mtCode> {
     _list           = this;
   };
 
+#ifndef LEYDEN
+
   static void freeze();
 
   const char* group() const                      { return _group; }
+#endif
   const char* name() const                       { return _name; }
   address     begin() const                      { return _begin; }
   address     end() const                        { return _end; }
+#ifndef LEYDEN
   int         size_in_bytes() const              { return _end - _begin; }
   bool        contains(address pc) const         { return _begin <= pc && pc < _end; }
   void        print_on(outputStream* st) const;
   void        print() const;
+#endif
 };
 
+#ifndef LEYDEN
 // The base class for all stub-generating code generators.
 // Provides utility functions.
 

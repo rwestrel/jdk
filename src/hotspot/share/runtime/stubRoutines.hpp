@@ -32,7 +32,6 @@
 #include "runtime/stubCodeGenerator.hpp"
 #include "utilities/macros.hpp"
 
-#ifndef LEYDEN
 // StubRoutines provides entry points to assembly routines used by
 // compiled code and the run-time system. Platform-specific entry
 // points are defined in the platform-specific inner class.
@@ -112,6 +111,8 @@ class UnsafeCopyMemory : public CHeapObj<mtCode> {
   static void    create_table(int max_size);
 };
 
+#ifndef LEYDEN
+
 class UnsafeCopyMemoryMark : public StackObj {
  private:
   UnsafeCopyMemory*  _ucm_entry;
@@ -121,14 +122,18 @@ class UnsafeCopyMemoryMark : public StackObj {
   ~UnsafeCopyMemoryMark();
 };
 
+#endif
+
 class StubRoutines: AllStatic {
 
  public:
   // Dependencies
   friend class StubGenerator;
 
+
 #include CPU_HEADER(stubRoutines)
 
+#ifndef LEYDEN
   static jint    _verify_oop_count;
   static address _verify_oop_subroutine_entry;
 
@@ -265,24 +270,32 @@ class StubRoutines: AllStatic {
   static address _safefetchN_entry;
   static address _safefetchN_fault_pc;
   static address _safefetchN_continuation_pc;
+#endif
 
  public:
+#ifndef LEYDEN
+
   // Initialization/Testing
   static void    initialize1();                            // must happen before universe::genesis
   static void    initialize2();                            // must happen after  universe::genesis
-
-#ifndef LEYDEN
+#endif
 
   static bool is_stub_code(address addr)                   { return contains(addr); }
+
   static bool contains(address addr) {
+#ifndef LEYDEN
     return
       (_code1 != NULL && _code1->blob_contains(addr)) ||
       (_code2 != NULL && _code2->blob_contains(addr)) ;
+#else
+    return false;
+#endif
   }
+
+#ifndef LEYDEN
 
   static RuntimeBlob* code1() { return _code1; }
   static RuntimeBlob* code2() { return _code2; }
-#endif
 
   // Debugging
   static jint    verify_oop_count()                        { return _verify_oop_count; }
@@ -489,8 +502,9 @@ class StubRoutines: AllStatic {
   static void arrayof_jlong_copy     (HeapWord* src, HeapWord* dest, size_t count);
   static void arrayof_oop_copy       (HeapWord* src, HeapWord* dest, size_t count);
   static void arrayof_oop_copy_uninit(HeapWord* src, HeapWord* dest, size_t count);
-};
+
 #endif
+};
 
 // Safefetch allows to load a value from a location that's not known
 // to be valid. If the load causes a fault, the error value is returned.

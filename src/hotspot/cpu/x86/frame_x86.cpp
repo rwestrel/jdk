@@ -52,7 +52,6 @@ void RegisterMap::check_location_valid() {
 
 // Profiling/safepoint support
 
-#ifndef LEYDEN
 bool frame::safe_for_sender(JavaThread *thread) {
   address   sp = (address)_sp;
   address   fp = (address)_fp;
@@ -109,6 +108,7 @@ bool frame::safe_for_sender(JavaThread *thread) {
     address   sender_pc = NULL;
     intptr_t* saved_fp =  NULL;
 
+#ifndef LEYDEN
     if (is_interpreted_frame()) {
       // fp must be safe
       if (!fp_safe) {
@@ -163,6 +163,7 @@ bool frame::safe_for_sender(JavaThread *thread) {
       return sender.is_interpreted_frame_valid(thread);
 
     }
+#endif
 
     // We must always be able to find a recognizable pc
     CodeBlob* sender_blob = CodeCache::find_blob_unsafe(sender_pc);
@@ -203,10 +204,12 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
     CompiledMethod* nm = sender_blob->as_compiled_method_or_null();
     if (nm != NULL) {
-        if (nm->is_deopt_mh_entry(sender_pc) || nm->is_deopt_entry(sender_pc) ||
+#ifndef LEYDEN
+      if (nm->is_deopt_mh_entry(sender_pc) || nm->is_deopt_entry(sender_pc) ||
             nm->method()->is_method_handle_intrinsic()) {
             return false;
         }
+#endif
     }
 
     // If the frame size is 0 something (or less) is bad because every nmethod has a non-zero frame size
@@ -253,6 +256,9 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
 }
 
+
+#ifndef LEYDEN
+
 void frame::patch_pc(Thread* thread, address pc) {
   assert(_cb == CodeCache::find_blob(pc), "unexpected pc");
   address* pc_addr = &(((address*) sp())[-1]);
@@ -278,6 +284,7 @@ void frame::patch_pc(Thread* thread, address pc) {
 bool frame::is_interpreted_frame() const  {
   return Interpreter::contains(pc());
 }
+
 #endif
 
 int frame::frame_size(RegisterMap* map) const {
@@ -490,9 +497,9 @@ frame frame::sender_raw(RegisterMap* map) const {
 
   if (is_entry_frame())       return sender_for_entry_frame(map);
 #ifndef LEYDEN
-  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
   if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
 #endif
+  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
 
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
@@ -636,6 +643,7 @@ intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
   return &interpreter_frame_tos_address()[index];
 }
+#endif
 
 #ifndef PRODUCT
 
@@ -643,6 +651,7 @@ intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   values.describe(frame_no, fp() + frame::name##_offset, #name)
 
 void frame::describe_pd(FrameValues& values, int frame_no) {
+#ifndef LEYDEN
   if (is_interpreted_frame()) {
     DESCRIBE_FP_OFFSET(interpreter_frame_sender_sp);
     DESCRIBE_FP_OFFSET(interpreter_frame_last_sp);
@@ -653,6 +662,9 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     DESCRIBE_FP_OFFSET(interpreter_frame_locals);
     DESCRIBE_FP_OFFSET(interpreter_frame_bcp);
     DESCRIBE_FP_OFFSET(interpreter_frame_initial_sp);
+#else
+    if (0) {
+#endif
 #ifdef AMD64
   } else if (is_entry_frame()) {
     // This could be more descriptive if we use the enum in
@@ -665,7 +677,6 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
   }
 }
 #endif // !PRODUCT
-#endif
 
 intptr_t *frame::initial_deoptimization_info() {
   // used to reset the saved FP

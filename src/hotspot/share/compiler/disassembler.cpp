@@ -143,6 +143,7 @@ class decode_env {
     outputStream* st = output();
 
     if (AbstractDisassembler::show_comment()) {
+#ifndef LEYDEN
       if ((_nm != NULL) && _nm->has_code_comment(pc0, pc)) {
         _nm->print_code_comment_on
                (st,
@@ -150,6 +151,7 @@ class decode_env {
                 pc0, pc);
         // this calls reloc_string_for which calls oop::print_value_on
       }
+#endif
       print_hook_comments(pc0, _nm != NULL);
     }
     Disassembler::annotate(pc0, output());
@@ -212,7 +214,9 @@ class decode_env {
 
  public:
   decode_env(CodeBlob*   code, outputStream* output);
+#ifndef LEYDEN
   decode_env(nmethod*    code, outputStream* output);
+#endif
   // Constructor for a 'decode_env' to decode an arbitrary
   // piece of memory, hopefully containing code.
   decode_env(address start, address end, outputStream* output, const CodeStrings* strings = NULL);
@@ -340,6 +344,7 @@ decode_env::decode_env(CodeBlob* code, outputStream* output) :
 
 }
 
+#ifndef LEYDEN
 decode_env::decode_env(nmethod* code, outputStream* output) :
   _output(output ? output : tty),
   _codeBlob(NULL),
@@ -360,6 +365,7 @@ decode_env::decode_env(nmethod* code, outputStream* output) :
   memset(_option_buf, 0, sizeof(_option_buf));
   process_options(_output);
 }
+#endif
 
 // Constructor for a 'decode_env' to decode a memory range [start, end)
 // of unknown origin, assuming it contains code.
@@ -589,7 +595,6 @@ void decode_env::print_address(address adr) {
   }
 
   if (Universe::is_fully_initialized()) {
-#ifndef LEYDEN
     if (StubRoutines::contains(adr)) {
       StubCodeDesc* desc = StubCodeDesc::desc_for(adr);
       if (desc == NULL) {
@@ -607,8 +612,8 @@ void decode_env::print_address(address adr) {
       st->print("Stub::<unknown> " PTR_FORMAT, p2i(adr));
       return;
     }
-#endif
 
+#ifndef LEYDEN
     BarrierSet* bs = BarrierSet::barrier_set();
     if (bs->is_a(BarrierSet::CardTableBarrierSet) &&
         adr == ci_card_table_address_as<address>()) {
@@ -616,6 +621,7 @@ void decode_env::print_address(address adr) {
       if (WizardMode) st->print(" " INTPTR_FORMAT, p2i(adr));
       return;
     }
+#endif
   }
 
   if (_nm == NULL) {
@@ -648,9 +654,11 @@ void decode_env::print_insn_labels() {
     //---<  Block comments for nmethod  >---
     // Outputs a bol() before and a cr() after, but only if a comment is printed.
     // Prints nmethod_section_label as well.
+#ifndef LEYDEN
     if (_nm != NULL) {
       _nm->print_block_comment(st, p);
     }
+#endif
     if (_codeBlob != NULL) {
       _codeBlob->print_block_comment(st, p);
     }
@@ -875,12 +883,14 @@ bool Disassembler::load_library(outputStream* st) {
 // Directly disassemble code blob.
 void Disassembler::decode(CodeBlob* cb, outputStream* st) {
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
+#ifndef LEYDEN
   if (cb->is_nmethod()) {
     // If we  have an nmethod at hand,
     // call the specialized decoder directly.
     decode((nmethod*)cb, st);
     return;
   }
+#endif
 
   decode_env env(cb, st);
   env.output()->print_cr("--------------------------------------------------------------------------------");
@@ -916,6 +926,8 @@ void Disassembler::decode(CodeBlob* cb, outputStream* st) {
 // Decode a nmethod.
 // This includes printing the constant pool and all code segments.
 // The nmethod data structures (oop maps, relocations and the like) are not printed.
+#ifndef LEYDEN
+
 void Disassembler::decode(nmethod* nm, outputStream* st) {
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
   ttyLocker ttyl;
@@ -933,6 +945,8 @@ void Disassembler::decode(nmethod* nm, outputStream* st) {
   env.output()->print_cr("--------------------------------------------------------------------------------");
 #endif
 }
+
+#endif
 
 // Decode a range, given as [start address, end address)
 void Disassembler::decode(address start, address end, outputStream* st, const CodeStrings* c) {
@@ -971,8 +985,12 @@ void Disassembler::decode(address start, address end, outputStream* st, const Co
 #endif
 }
 
+#ifndef LEYDEN
+
 // To prevent excessive code expansion in the interpreter generator, we
 // do not inline this function into Disassembler::hook().
 void Disassembler::_hook(const char* file, int line, MacroAssembler* masm) {
   decode_env::hook(file, line, masm->code_section()->end());
 }
+
+#endif

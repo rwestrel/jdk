@@ -155,11 +155,13 @@ class Method : public Metadata {
   void set_access_flags(AccessFlags flags)       { _access_flags = flags; }
 
   // name
+  Symbol* name() const                           {
 #ifndef LEYDEN
-
-  Symbol* name() const                           { return constants()->symbol_at(name_index()); }
-
+    return constants()->symbol_at(name_index());
+#else
+    return NULL;
 #endif
+  }
   int name_index() const                         { return constMethod()->name_index();         }
   void set_name_index(int index)                 { constMethod()->set_name_index(index);       }
 

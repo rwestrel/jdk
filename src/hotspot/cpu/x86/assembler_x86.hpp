@@ -655,8 +655,6 @@ class Assembler : public AbstractAssembler  {
     Q = 3
   };
 
-#ifndef LEYDEN
-
   //---<  calculate length of instruction  >---
   // As instruction size can't be found out easily on x86/x64,
   // we just use '4' for len and maxlen.
@@ -669,6 +667,7 @@ class Assembler : public AbstractAssembler  {
   // instruction length guess from above.
   static unsigned int instr_maxlen() { return 4; }
 
+#ifndef LEYDEN
   // NOTE: The general philopsophy of the declarations here is that 64bit versions
   // of instructions are freely declared without the need for wrapping them an ifdef.
   // (Some dangerous instructions are ifdef's out of inappropriate jvm's.)

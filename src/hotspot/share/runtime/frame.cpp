@@ -433,20 +433,21 @@ jint frame::interpreter_frame_expression_stack_size() const {
 // (frame::interpreter_frame_sender_sp accessor is in frame_<arch>.cpp)
 
 const char* frame::print_name() const {
-#ifndef LEYDEN
   if (is_native_frame())      return "Native";
+#ifndef LEYDEN
   if (is_interpreted_frame()) return "Interpreted";
+#endif
   if (is_compiled_frame()) {
+#ifndef LEYDEN
     if (is_deoptimized_frame()) return "Deoptimized";
+#endif
     return "Compiled";
   }
   if (sp() == NULL)            return "Empty";
-#endif
   return "C";
 }
 
 void frame::print_value_on(outputStream* st, JavaThread *thread) const {
-#ifndef LEYDEN
   NOT_PRODUCT(address begin = pc()-40;)
   NOT_PRODUCT(address end   = NULL;)
 
@@ -455,13 +456,13 @@ void frame::print_value_on(outputStream* st, JavaThread *thread) const {
     st->print(", fp=" INTPTR_FORMAT ", real_fp=" INTPTR_FORMAT ", pc=" INTPTR_FORMAT,
               p2i(fp()), p2i(real_fp()), p2i(pc()));
 
-#ifndef LEYDEN
   if (StubRoutines::contains(pc())) {
     st->print_cr(")");
     st->print("(");
     StubCodeDesc* desc = StubCodeDesc::desc_for(pc());
     st->print("~Stub::%s", desc->name());
     NOT_PRODUCT(begin = desc->begin(); end = desc->end();)
+#ifndef LEYDEN
   } else if (Interpreter::contains(pc())) {
     st->print_cr(")");
     st->print("(");
@@ -473,8 +474,8 @@ void frame::print_value_on(outputStream* st, JavaThread *thread) const {
     } else {
       st->print("~interpreter");
     }
-  }
 #endif
+  }
   st->print_cr(")");
 
   if (_cb != NULL) {
@@ -489,13 +490,12 @@ void frame::print_value_on(outputStream* st, JavaThread *thread) const {
 #endif
   }
   NOT_PRODUCT(if (WizardMode && Verbose) Disassembler::decode(begin, end);)
-#endif
 }
 
 
 void frame::print_on(outputStream* st) const {
-#ifndef LEYDEN
   print_value_on(st,NULL);
+#ifndef LEYDEN
   if (is_interpreted_frame()) {
     interpreter_frame_print_on(st);
   }
@@ -503,8 +503,9 @@ void frame::print_on(outputStream* st) const {
 }
 
 
-void frame::interpreter_frame_print_on(outputStream* st) const {
 #ifndef LEYDEN
+
+void frame::interpreter_frame_print_on(outputStream* st) const {
 #ifndef PRODUCT
   assert(is_interpreted_frame(), "Not an interpreted frame");
   jint i;
@@ -546,8 +547,9 @@ void frame::interpreter_frame_print_on(outputStream* st) const {
   interpreter_frame_method()->print_name(st);
   st->cr();
 #endif
-#endif
 }
+
+#endif
 
 // Print whether the frame is in the VM or OS indicating a HotSpot problem.
 // Otherwise, it's likely a bug in the native library that the Java code calls,
@@ -597,8 +599,8 @@ void frame::print_C_frame(outputStream* st, char* buf, int buflen, address pc) {
 // suggests the problem is in user lib; everything else is likely a VM bug.
 
 void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose) const {
-#ifndef LEYDEN
   if (_cb != NULL) {
+#ifndef LEYDEN
     if (Interpreter::contains(pc())) {
       Method* m = this->interpreter_frame_method();
       if (m != NULL) {
@@ -617,14 +619,17 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
       } else {
         st->print("j  " PTR_FORMAT, p2i(pc()));
       }
-#ifndef LEYDEN
     } else if (StubRoutines::contains(pc())) {
+#else
+      if (StubRoutines::contains(pc())) {
+#endif
       StubCodeDesc* desc = StubCodeDesc::desc_for(pc());
       if (desc != NULL) {
         st->print("v  ~StubRoutines::%s", desc->name());
       } else {
         st->print("v  ~StubRoutines::" PTR_FORMAT, p2i(pc()));
       }
+#ifndef LEYDEN
     } else if (_cb->is_buffer_blob()) {
       st->print("v  ~BufferBlob::%s", ((BufferBlob *)_cb)->name());
 #endif
@@ -634,13 +639,16 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
       if (m != NULL) {
         if (cm->is_aot()) {
           st->print("A %d ", cm->compile_id());
+#ifndef LEYDEN
         } else if (cm->is_nmethod()) {
           nmethod* nm = cm->as_nmethod();
           st->print("J %d%s", nm->compile_id(), (nm->is_osr_method() ? "%" : ""));
           st->print(" %s", nm->compiler_name());
+#endif
         }
         m->name_and_sig_as_C_string(buf, buflen);
         st->print(" %s", buf);
+#ifndef LEYDEN
         ModuleEntry* module = m->method_holder()->module();
         if (module->is_named()) {
           module->name()->as_C_string(buf, buflen);
@@ -650,6 +658,7 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
             st->print("@%s", buf);
           }
         }
+#endif
         st->print(" (%d bytes) @ " PTR_FORMAT " [" PTR_FORMAT "+" INTPTR_FORMAT "]",
                   m->code_size(), p2i(_pc), p2i(_cb->code_begin()), _pc - _cb->code_begin());
 #if INCLUDE_JVMCI
@@ -664,8 +673,10 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
       } else {
         st->print("J  " PTR_FORMAT, p2i(pc()));
       }
+#ifndef LEYDEN
     } else if (_cb->is_runtime_stub()) {
       st->print("v  ~RuntimeStub::%s", ((RuntimeStub *)_cb)->name());
+#endif
     } else if (_cb->is_deoptimization_stub()) {
       st->print("v  ~DeoptimizationBlob");
     } else if (_cb->is_exception_stub()) {
@@ -686,7 +697,6 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
   } else {
     print_C_frame(st, buf, buflen, pc());
   }
-#endif
 }
 
 
@@ -795,7 +805,6 @@ class InterpretedArgumentOopFinder: public SignatureIterator {
 
 
 // visits and GC's all the arguments in entry frame
-
 class EntryFrameOopFinder: public SignatureIterator {
  private:
   bool         _is_static;
@@ -841,6 +850,8 @@ oop* frame::interpreter_callee_receiver_addr(Symbol* signature) {
   int size = asc.size();
   return (oop *)interpreter_frame_tos_at(size);
 }
+
+
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   assert(map != NULL, "map must be set");
@@ -992,9 +1003,7 @@ class CompiledArgumentOopFinder: public SignatureIterator {
     _has_appendix = has_appendix;
     _fr        = fr;
     _reg_map   = (RegisterMap*)reg_map;
-#ifndef LEYDEN
     _arg_size  = ArgumentSizeComputer(signature).size() + (has_receiver ? 1 : 0) + (has_appendix ? 1 : 0);
-#endif
 
     int arg_size;
     _regs = SharedRuntime::find_callee_arguments(signature, has_receiver, has_appendix, &arg_size);
@@ -1150,8 +1159,8 @@ void frame::metadata_do(MetadataClosure* f) const {
 }
 
 void frame::verify(const RegisterMap* map) const {
-#ifndef LEYDEN
   // for now make sure receiver type is correct
+#ifndef LEYDEN
   if (is_interpreted_frame()) {
     Method* method = interpreter_frame_method();
     guarantee(method->is_method(), "method is wrong in frame::verify");
@@ -1161,23 +1170,23 @@ void frame::verify(const RegisterMap* map) const {
       // make sure we have the right receiver type
     }
   }
+#endif
 #if COMPILER2_OR_JVMCI
   assert(DerivedPointerTable::is_empty(), "must be empty before verify");
 #endif
   oops_do_internal(&VerifyOopClosure::verify_oop, NULL, map, false, DerivedPointerIterationMode::_ignore);
-#endif
 }
 
 
 #ifdef ASSERT
 bool frame::verify_return_pc(address x) {
-#ifndef LEYDEN
   if (StubRoutines::returns_to_call_stub(x)) {
     return true;
   }
   if (CodeCache::contains(x)) {
     return true;
   }
+#ifndef LEYDEN
   if (Interpreter::contains(x)) {
     return true;
   }
@@ -1209,7 +1218,6 @@ void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
 // callers need a ResourceMark because of name_and_sig_as_C_string() usage,
 // RA allocated string is returned to the caller
 void frame::describe(FrameValues& values, int frame_no) {
-#ifndef LEYDEN
   // boundaries: sp and the 'real' frame pointer
   values.describe(-1, sp(), err_msg("sp for #%d", frame_no), 1);
   intptr_t* frame_pointer = real_fp(); // Note: may differ from fp()
@@ -1222,11 +1230,19 @@ void frame::describe(FrameValues& values, int frame_no) {
     values.describe(-1, frame_pointer, err_msg("frame pointer for #%d", frame_no), 1);
   }
 
+#ifndef LEYDEN
   if (is_entry_frame() || is_compiled_frame() || is_interpreted_frame() || is_native_frame()) {
     // Label values common to most frames
     values.describe(-1, unextended_sp(), err_msg("unextended_sp for #%d", frame_no));
   }
+#else
+  if (is_entry_frame() || is_compiled_frame()) {
+    // Label values common to most frames
+    values.describe(-1, unextended_sp(), err_msg("unextended_sp for #%d", frame_no));
+  }
+#endif
 
+#ifndef LEYDEN
   if (is_interpreted_frame()) {
     Method* m = interpreter_frame_method();
     int bci = interpreter_frame_bci();
@@ -1265,6 +1281,9 @@ void frame::describe(FrameValues& values, int frame_no) {
       values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_end(), "monitors end");
     }
   } else if (is_entry_frame()) {
+#else
+  if (is_entry_frame()) {
+#endif
     // For now just label the frame
     values.describe(-1, info_address, err_msg("#%d entry frame", frame_no), 2);
   } else if (is_compiled_frame()) {
@@ -1279,12 +1298,14 @@ void frame::describe(FrameValues& values, int frame_no) {
                                        " (deoptimized)" :
                                        ((_deopt_state == unknown) ? " (state unknown)" : "")),
                     2);
+#ifndef LEYDEN
   } else if (is_native_frame()) {
     // For now just label the frame
     nmethod* nm = cb()->as_nmethod_or_null();
     values.describe(-1, info_address,
                     FormatBuffer<1024>("#%d nmethod " INTPTR_FORMAT " for native method %s", frame_no,
                                        p2i(nm), nm->method()->name_and_sig_as_C_string()), 2);
+#endif
   } else {
     // provide default info if not handled before
     char *info = (char *) "special frame";
@@ -1297,7 +1318,6 @@ void frame::describe(FrameValues& values, int frame_no) {
 
   // platform dependent additional data
   describe_pd(values, frame_no);
-#endif
 }
 
 #endif
