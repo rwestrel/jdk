@@ -347,10 +347,11 @@ public:
 
 #endif
 
-#ifndef LEYDEN
 class RuntimeBlob : public CodeBlob {
   friend class VMStructs;
  public:
+
+#ifndef LEYDEN
 
   // Creation
   // a) simple CodeBlob
@@ -373,19 +374,30 @@ class RuntimeBlob : public CodeBlob {
   // GC support
   virtual bool is_alive() const                  = 0;
 
+#endif
+
   void verify();
+
+#ifndef LEYDEN
 
   // OopMap for frame
   virtual void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f)  { ShouldNotReachHere(); }
+
+#endif
 
   // Debugging
   virtual void print_on(outputStream* st) const { CodeBlob::print_on(st); }
   virtual void print_value_on(outputStream* st) const { CodeBlob::print_value_on(st); }
 
+#ifndef LEYDEN
+
   // Deal with Disassembler, VTune, Forte, JvmtiExport, MemoryService.
   static void trace_new_stub(RuntimeBlob* blob, const char* name1, const char* name2 = "");
+
+#endif
 };
 
+#ifndef LEYDEN
 class WhiteBox;
 //----------------------------------------------------------------------------------------------------
 // BufferBlob: used to hold non-relocatable machine code such as the interpreter, stubroutines, etc.
@@ -525,7 +537,7 @@ class RuntimeStub: public RuntimeBlob {
   void print_on(outputStream* st) const;
   void print_value_on(outputStream* st) const;
 };
-
+#endif
 
 //----------------------------------------------------------------------------------------------------
 // Super-class for all blobs that exist in only one instance. Implements default behaviour.
@@ -534,14 +546,19 @@ class SingletonBlob: public RuntimeBlob {
   friend class VMStructs;
 
  protected:
+#ifndef LEYDEN
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
   // delete rather than an ordinary sized delete; see C++14 3.7.4.2/p2.
   void operator delete(void* p);
   void* operator new(size_t s, unsigned size) throw();
 
+#endif
+
  public:
-   SingletonBlob(
+#ifndef LEYDEN
+
+  SingletonBlob(
      const char* name,
      CodeBuffer* cb,
      int         header_size,
@@ -551,19 +568,24 @@ class SingletonBlob: public RuntimeBlob {
    )
    : RuntimeBlob(name, cb, header_size, size, CodeOffsets::frame_never_safe, frame_size, oop_maps)
   {};
+#endif
 
   address entry_point()                          { return code_begin(); }
+
+#ifndef LEYDEN
 
   bool is_alive() const                          { return true; }
 
   // GC/Verification support
   void preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f)  { /* nothing to do */ }
+
+#endif
   void verify(); // does nothing
   void print_on(outputStream* st) const;
   void print_value_on(outputStream* st) const;
 };
 
-
+#ifndef LEYDEN
 //----------------------------------------------------------------------------------------------------
 // DeoptimizationBlob
 
@@ -708,13 +730,15 @@ class ExceptionBlob: public SingletonBlob {
 };
 #endif // COMPILER2
 
-
+#endif
 //----------------------------------------------------------------------------------------------------
 // SafepointBlob: handles illegal_instruction exceptions during a safepoint
 
 class SafepointBlob: public SingletonBlob {
   friend class VMStructs;
  private:
+#ifndef LEYDEN
+
   // Creation support
   SafepointBlob(
     CodeBuffer* cb,
@@ -723,7 +747,11 @@ class SafepointBlob: public SingletonBlob {
     int         frame_size
   );
 
+#endif
+
  public:
+#ifndef LEYDEN
+
   // Creation
   static SafepointBlob* create(
     CodeBuffer* cb,
@@ -734,9 +762,10 @@ class SafepointBlob: public SingletonBlob {
   // GC for args
   void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f)  { /* nothing to do */ }
 
+#endif
+
   // Typing
   bool is_safepoint_stub() const                 { return true; }
 };
-#endif
 
 #endif // SHARE_CODE_CODEBLOB_HPP

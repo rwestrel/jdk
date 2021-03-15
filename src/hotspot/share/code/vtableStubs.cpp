@@ -47,9 +47,12 @@
 // -----------------------------------------------------------------------------------------
 // Implementation of VtableStub
 
+#ifndef LEYDEN
 address VtableStub::_chunk             = NULL;
 address VtableStub::_chunk_end         = NULL;
+#endif
 VMReg   VtableStub::_receiver_location = VMRegImpl::Bad();
+#ifndef LEYDEN
 
 
 void* VtableStub::operator new(size_t size, int code_size) throw() {
@@ -80,6 +83,7 @@ void* VtableStub::operator new(size_t size, int code_size) throw() {
  return res;
 }
 
+#endif
 
 void VtableStub::print_on(outputStream* st) const {
   st->print("vtable stub (index = %d, receiver_location = " INTX_FORMAT ", code = [" INTPTR_FORMAT ", " INTPTR_FORMAT "])",
@@ -124,6 +128,7 @@ int VtableStubs::_itab_stub_size = 0;
   static const int first_itableStub_size =  512;
 #endif
 
+#ifndef LEYDEN
 
 void VtableStubs::initialize() {
   VtableStub::_receiver_location = SharedRuntime::name_for_receiver();
@@ -137,7 +142,7 @@ void VtableStubs::initialize() {
   }
 }
 
-
+#endif
 int VtableStubs::code_size_limit(bool is_vtable_stub) {
   if (is_vtable_stub) {
     return _vtab_stub_size > 0 ? _vtab_stub_size : first_vtableStub_size;
@@ -146,7 +151,7 @@ int VtableStubs::code_size_limit(bool is_vtable_stub) {
   }
 }   // code_size_limit
 
-
+#ifndef LEYDEN
 void VtableStubs::check_and_set_size_limit(bool is_vtable_stub,
                                            int  code_size,
                                            int  padding) {
@@ -283,6 +288,8 @@ VtableStub* VtableStubs::entry_point(address pc) {
   return (s == stub) ? s : NULL;
 }
 
+#endif
+
 bool VtableStubs::contains(address pc) {
   // simple solution for now - we may want to use
   // a faster way if this function is called often
@@ -302,6 +309,7 @@ VtableStub* VtableStubs::stub_containing(address pc) {
   return NULL;
 }
 
+#ifndef LEYDEN
 void vtableStubs_init() {
   VtableStubs::initialize();
 }
@@ -331,3 +339,4 @@ extern "C" void bad_compiled_vtable_index(JavaThread* thread, oop receiver, int 
 }
 
 #endif // PRODUCT
+#endif

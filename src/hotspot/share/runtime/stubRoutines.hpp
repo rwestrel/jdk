@@ -143,8 +143,10 @@ class StubRoutines: AllStatic {
   static address _catch_exception_entry;
   static address _throw_AbstractMethodError_entry;
   static address _throw_IncompatibleClassChangeError_entry;
+#endif
   static address _throw_NullPointerException_at_call_entry;
   static address _throw_StackOverflowError_entry;
+#ifndef LEYDEN
   static address _throw_delayed_StackOverflowError_entry;
 
   static address _atomic_xchg_entry;
@@ -324,8 +326,10 @@ class StubRoutines: AllStatic {
   // Implicit exceptions
   static address throw_AbstractMethodError_entry()         { return _throw_AbstractMethodError_entry; }
   static address throw_IncompatibleClassChangeError_entry(){ return _throw_IncompatibleClassChangeError_entry; }
+#endif
   static address throw_NullPointerException_at_call_entry(){ return _throw_NullPointerException_at_call_entry; }
   static address throw_StackOverflowError_entry()          { return _throw_StackOverflowError_entry; }
+#ifndef LEYDEN
   static address throw_delayed_StackOverflowError_entry()  { return _throw_delayed_StackOverflowError_entry; }
 
   static address atomic_xchg_entry()                       { return _atomic_xchg_entry; }

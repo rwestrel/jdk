@@ -92,10 +92,11 @@ RuntimeStub*        SharedRuntime::_resolve_static_call_blob;
 address             SharedRuntime::_resolve_static_call_entry;
 
 DeoptimizationBlob* SharedRuntime::_deopt_blob;
+#endif
 SafepointBlob*      SharedRuntime::_polling_page_vectors_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_return_handler_blob;
-#endif
+
 #ifdef COMPILER2
 UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #endif // COMPILER2
@@ -547,7 +548,6 @@ JRT_LEAF(address, SharedRuntime::exception_handler_for_return_address(JavaThread
 JRT_END
 
 
-#ifndef LEYDEN
 address SharedRuntime::get_poll_stub(address pc) {
   address stub;
   // Look up the code blob
@@ -589,7 +589,6 @@ address SharedRuntime::get_poll_stub(address pc) {
                        (intptr_t)pc, (intptr_t)stub);
   return stub;
 }
-#endif
 
 #ifndef LEYDEN
 oop SharedRuntime::retrieve_receiver( Symbol* sig, frame caller ) {
@@ -840,9 +839,10 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
                                                            address pc,
                                                            ImplicitExceptionKind exception_kind)
 {
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
   address target_pc = NULL;
 
+#ifndef LEYDEN
   if (Interpreter::contains(pc)) {
     switch (exception_kind) {
       case IMPLICIT_NULL:           return Interpreter::throw_NullPointerException_entry();
@@ -851,6 +851,7 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
       default:                      ShouldNotReachHere();
     }
   } else {
+#endif
     switch (exception_kind) {
       case STACK_OVERFLOW: {
         // Stack overflow only occurs upon frame setup; the callee is
@@ -930,11 +931,13 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
             return StubRoutines::throw_NullPointerException_at_call_entry();
           }
 
+#ifndef LEYDEN
           if (cm->method()->is_method_handle_intrinsic()) {
             // exception happened inside MH dispatch code, similar to a vtable stub
             Events::log_exception(thread, "NullPointerException in MH adapter " INTPTR_FORMAT, p2i(pc));
             return StubRoutines::throw_NullPointerException_at_call_entry();
           }
+#endif
 
 #ifndef PRODUCT
           _implicit_null_throws++;
@@ -981,7 +984,9 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
       Events::log_exception(thread, "Implicit division by zero exception at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(pc), p2i(target_pc));
     }
     return target_pc;
+#ifndef LEYDEN
   }
+#endif
 
   ShouldNotReachHere();
 #endif

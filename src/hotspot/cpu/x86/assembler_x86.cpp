@@ -38,6 +38,7 @@
 #include "runtime/vm_version.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
 #define STOP(error) stop(error)
@@ -708,6 +709,8 @@ void Assembler::emit_operand(XMMRegister xmmreg, Register base, XMMRegister xmmi
                       scale, disp, rspec, /* rip_relative_correction */ 0);
 }
 
+#endif
+
 // Secret local extension to Assembler::WhichOperand:
 #define end_pc_operand (_WhichOperand_limit)
 
@@ -1172,6 +1175,7 @@ address Assembler::locate_next_instruction(address inst) {
 }
 
 
+#ifndef LEYDEN
 #ifdef ASSERT
 void Assembler::check_relocation(RelocationHolder const& rspec, int format) {
   address inst = inst_mark();
@@ -10593,3 +10597,5 @@ void InstructionAttr::set_address_attributes(int tuple_type, int input_size_in_b
     _input_size_in_bits = input_size_in_bits;
   }
 }
+
+#endif

@@ -73,7 +73,7 @@
 class VtableStub;
 
 class VtableStubs : AllStatic {
- public:                                         // N must be public (some compilers need this for _table)
+public:                                         // N must be public (some compilers need this for _table)
   enum {
     N    = 256,                                  // size of stub table; must be power of two
     mask = N - 1
@@ -86,6 +86,7 @@ class VtableStubs : AllStatic {
   static int         _vtab_stub_size;            // current size estimate for vtable stub (quasi-constant)
   static int         _itab_stub_size;            // current size estimate for itable stub (quasi-constant)
 
+  #ifndef LEYDEN
   static VtableStub* create_vtable_stub(int vtable_index);
   static VtableStub* create_itable_stub(int vtable_index);
   static VtableStub* lookup            (bool is_vtable_stub, int vtable_index);
@@ -95,30 +96,42 @@ class VtableStubs : AllStatic {
   static void        bookkeeping(MacroAssembler* masm, outputStream* out, VtableStub* s,
                                  address npe_addr, address ame_addr,   bool is_vtable_stub,
                                  int     index,    int     slop_bytes, int  index_dependent_slop);
+#endif
   static int         code_size_limit(bool is_vtable_stub);
+#ifndef LEYDEN
   static void        check_and_set_size_limit(bool is_vtable_stub,
                                               int   code_size,
                                               int   padding);
 
+#endif
+
  public:
+#ifndef LEYDEN
+
   static address     find_vtable_stub(int vtable_index) { return find_stub(true,  vtable_index); }
   static address     find_itable_stub(int itable_index) { return find_stub(false, itable_index); }
 
   static VtableStub* entry_point(address pc);                        // vtable stub entry point for a pc
+#endif
   static bool        contains(address pc);                           // is pc within any stub?
   static VtableStub* stub_containing(address pc);                    // stub containing pc or NULL
+#ifndef LEYDEN
+
   static int         number_of_vtable_stubs() { return _number_of_vtable_stubs; }
   static void        initialize();
   static void        vtable_stub_do(void f(VtableStub*));            // iterates over all vtable stubs
+#endif
 };
 
 
 class VtableStub {
- private:
+private:
   friend class VtableStubs;
 
+#ifndef LEYDEN
   static address _chunk;             // For allocation
   static address _chunk_end;         // For allocation
+#endif
   static VMReg   _receiver_location; // Where to find receiver
 
   VtableStub*    _next;              // Pointer to next entry in hash table
@@ -126,6 +139,7 @@ class VtableStub {
   short          _ame_offset;        // Where an AbstractMethodError might occur
   short          _npe_offset;        // Where a NullPointerException might occur
   bool           _is_vtable_stub;    // True if vtable stub, false, is itable stub
+#ifndef LEYDEN
   /* code follows here */            // The vtableStub code
 
   void* operator new(size_t size, int code_size) throw();
@@ -133,22 +147,29 @@ class VtableStub {
   VtableStub(bool is_vtable_stub, int index)
         : _next(NULL), _index(index), _ame_offset(-1), _npe_offset(-1),
           _is_vtable_stub(is_vtable_stub) {}
+#else
+  VtableStub() : _index(0) {}
+#endif
   VtableStub* next() const                       { return _next; }
   int index() const                              { return _index; }
   static VMReg receiver_location()               { return _receiver_location; }
+#ifndef LEYDEN
   void set_next(VtableStub* n)                   { _next = n; }
 
+#endif
  public:
   address code_begin() const                     { return (address)(this + 1); }
   address code_end() const                       { return code_begin() + VtableStubs::code_size_limit(_is_vtable_stub); }
   address entry_point() const                    { return code_begin(); }
+#ifndef LEYDEN
   static int entry_offset()                      { return sizeof(class VtableStub); }
 
   bool matches(bool is_vtable_stub, int index) const {
     return _index == index && _is_vtable_stub == is_vtable_stub;
   }
+#endif
   bool contains(address pc) const                { return code_begin() <= pc && pc < code_end(); }
-
+#ifndef LEYDEN
  private:
   void set_exception_points(address npe_addr, address ame_addr) {
     _npe_offset = npe_addr - code_begin();
@@ -170,6 +191,7 @@ class VtableStub {
   }
 
  public:
+#endif
   // Query
   bool is_itable_stub()                          { return !_is_vtable_stub; }
   bool is_vtable_stub()                          { return  _is_vtable_stub; }
@@ -178,7 +200,6 @@ class VtableStub {
 
   void print_on(outputStream* st) const;
   void print() const;
-
 };
 
 #endif // SHARE_CODE_VTABLESTUBS_HPP

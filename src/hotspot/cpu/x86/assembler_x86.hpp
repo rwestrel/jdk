@@ -883,18 +883,21 @@ private:
 
   // Instruction prefixes
   void prefix(Prefix p);
-
+#endif
   public:
 
+#ifndef LEYDEN
   // Creation
   Assembler(CodeBuffer* code) : AbstractAssembler(code) {
     init_attributes();
   }
 
+#endif
   // Decoding
   static address locate_operand(address inst, WhichOperand which);
   static address locate_next_instruction(address inst);
 
+#ifndef LEYDEN
   // Utilities
   static bool query_compressed_disp_byte(int disp, bool is_evex_inst, int vector_len,
                                          int cur_tuple_type, int in_size_in_bits, int cur_encoding);

@@ -231,7 +231,6 @@ class Method : public Metadata {
     return Bytecodes::code_at(this, bcp_from(bci));
   }
 
-
   // JVMTI breakpoints
 #if !INCLUDE_JVMTI
   Bytecodes::Code orig_bytecode_at(int bci) const {

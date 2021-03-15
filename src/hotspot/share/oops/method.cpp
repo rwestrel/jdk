@@ -96,9 +96,7 @@ Method* Method::allocate(ClassLoaderData* loader_data,
   int size = Method::size(access_flags.is_native());
   return new (loader_data, size, MetaspaceObj::MethodType, THREAD) Method(cm, access_flags);
 }
-#endif
 
-#ifndef LEYDEN
 Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
   NoSafepointVerifier no_safepoint;
   set_constMethod(xconst);

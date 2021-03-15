@@ -686,11 +686,11 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
 #endif
 }
 
-#ifndef LEYDEN
 void RuntimeBlob::verify() {
   ShouldNotReachHere();
 }
 
+#ifndef LEYDEN
 void BufferBlob::verify() {
   // unimplemented
 }
@@ -703,7 +703,6 @@ void BufferBlob::print_on(outputStream* st) const {
 void BufferBlob::print_value_on(outputStream* st) const {
   st->print_cr("BufferBlob (" INTPTR_FORMAT  ") used for %s", p2i(this), name());
 }
-
 void RuntimeStub::verify() {
   // unimplemented
 }
@@ -719,6 +718,7 @@ void RuntimeStub::print_on(outputStream* st) const {
 void RuntimeStub::print_value_on(outputStream* st) const {
   st->print("RuntimeStub (" INTPTR_FORMAT "): ", p2i(this)); st->print("%s", name());
 }
+#endif
 
 void SingletonBlob::verify() {
   // unimplemented
@@ -734,7 +734,7 @@ void SingletonBlob::print_on(outputStream* st) const {
 void SingletonBlob::print_value_on(outputStream* st) const {
   st->print_cr("%s", name());
 }
-
+#ifndef LEYDEN
 void DeoptimizationBlob::print_value_on(outputStream* st) const {
   st->print_cr("Deoptimization (frame not available)");
 }

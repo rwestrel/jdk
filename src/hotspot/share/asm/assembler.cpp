@@ -41,6 +41,8 @@
 // emitting bytes rather than using the code buffers accessor functions all the time.
 // The code buffer is updated via set_code_end(...) after emitting a whole instruction.
 
+#ifndef LEYDEN
+
 AbstractAssembler::AbstractAssembler(CodeBuffer* code) {
   if (code == NULL)  return;
   CodeSection* cs = code->insts();
@@ -214,6 +216,8 @@ const char* AbstractAssembler::code_string(const char* str) {
   }
   return NULL;
 }
+
+#endif
 
 bool MacroAssembler::uses_implicit_null_check(void* address) {
   // Exception handler checks the nmethod's implicit null checks table

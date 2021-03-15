@@ -201,7 +201,6 @@ enum {
 
 bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                                              ucontext_t* uc, JavaThread* thread) {
-#ifndef LEYDEN
 
   /*
   NOTE: does not seem to work on linux.
@@ -254,9 +253,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
       // a fault inside compiled code, the interpreter, or a stub
 
       if (sig == SIGSEGV && SafepointMechanism::is_poll_address((address)info->si_addr)) {
-#ifndef LEYDEN
         stub = SharedRuntime::get_poll_stub(pc);
-#endif
       } else if (sig == SIGBUS /* && info->si_code == BUS_OBJERR */) {
         // BugId 4454115: A read from a MappedByteBuffer can fault
         // here if the underlying file has been truncated.
@@ -319,7 +316,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                 thread->thread_state() == _thread_in_native) &&
                (sig == SIGBUS && /* info->si_code == BUS_OBJERR && */
                thread->doing_unsafe_access())) {
-        address next_pc = Assembler::locate_next_instruction(pc);
+      address next_pc = Assembler::locate_next_instruction(pc);
         if (UnsafeCopyMemory::contains_pc(pc)) {
           next_pc = UnsafeCopyMemory::page_error_continue_pc(pc);
         }
@@ -329,10 +326,12 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     // jni_fast_Get<Primitive>Field can trap at certain pc's if a GC kicks in
     // and the heap gets shrunk before the field access.
     if ((sig == SIGSEGV) || (sig == SIGBUS)) {
+#ifndef LEYDEN
       address addr = JNI_FastGetField::find_slowcase_pc(pc);
       if (addr != (address)-1) {
         stub = addr;
       }
+#endif
     }
   }
 
@@ -417,7 +416,6 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     os::Posix::ucontext_set_pc(uc, stub);
     return true;
   }
-#endif
   return false;
 }
 

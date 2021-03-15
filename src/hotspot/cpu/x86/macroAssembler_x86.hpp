@@ -30,13 +30,15 @@
 #include "runtime/rtmLocking.hpp"
 #include "runtime/vm_version.hpp"
 
-#ifndef LEYDEN
 // MacroAssembler extends Assembler by frequently used macros.
 //
 // Instructions for which a 'better' code sequence exists depending
 // on arguments should also go in here.
 
 class MacroAssembler: public Assembler {
+
+#ifndef LEYDEN
+
   friend class LIR_Assembler;
   friend class Runtime1;      // as_Address()
 
@@ -97,8 +99,14 @@ class MacroAssembler: public Assembler {
   // range (0 <= offset <= page_size).
 
   void null_check(Register reg, int offset = -1);
+#else
+public:
+#endif
+
   static bool needs_explicit_null_check(intptr_t offset);
   static bool uses_implicit_null_check(void* address);
+
+#ifndef LEYDEN
 
   // Required platform-specific helpers for Label::patch_instructions.
   // They _shadow_ the declarations in AbstractAssembler, which are undefined.
@@ -1860,7 +1868,11 @@ public:
 #endif // _LP64
 
   void vallones(XMMRegister dst, int vector_len);
+
+#endif
 };
+
+#ifndef LEYDEN
 
 /**
  * class SkipIfEqual:

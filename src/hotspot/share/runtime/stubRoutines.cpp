@@ -40,6 +40,7 @@
 
 UnsafeCopyMemory* UnsafeCopyMemory::_table                      = NULL;
 int UnsafeCopyMemory::_table_length                             = 0;
+#ifndef LEYDEN
 int UnsafeCopyMemory::_table_max_length                         = 0;
 address UnsafeCopyMemory::_common_exit_stub_pc                  = NULL;
 
@@ -58,8 +59,10 @@ address StubRoutines::_catch_exception_entry                    = NULL;
 address StubRoutines::_forward_exception_entry                  = NULL;
 address StubRoutines::_throw_AbstractMethodError_entry          = NULL;
 address StubRoutines::_throw_IncompatibleClassChangeError_entry = NULL;
+#endif
 address StubRoutines::_throw_NullPointerException_at_call_entry = NULL;
 address StubRoutines::_throw_StackOverflowError_entry           = NULL;
+#ifndef LEYDEN
 address StubRoutines::_throw_delayed_StackOverflowError_entry   = NULL;
 jint    StubRoutines::_verify_oop_count                         = 0;
 address StubRoutines::_verify_oop_subroutine_entry              = NULL;
@@ -194,7 +197,7 @@ void UnsafeCopyMemory::create_table(int max_size) {
   UnsafeCopyMemory::_table = new UnsafeCopyMemory[max_size];
   UnsafeCopyMemory::_table_max_length = max_size;
 }
-
+#endif
 bool UnsafeCopyMemory::contains_pc(address pc) {
   for (int i = 0; i < UnsafeCopyMemory::_table_length; i++) {
     UnsafeCopyMemory* entry = &UnsafeCopyMemory::_table[i];
@@ -204,7 +207,6 @@ bool UnsafeCopyMemory::contains_pc(address pc) {
   }
   return false;
 }
-
 address UnsafeCopyMemory::page_error_continue_pc(address pc) {
   for (int i = 0; i < UnsafeCopyMemory::_table_length; i++) {
     UnsafeCopyMemory* entry = &UnsafeCopyMemory::_table[i];
@@ -214,6 +216,7 @@ address UnsafeCopyMemory::page_error_continue_pc(address pc) {
   }
   return NULL;
 }
+#ifndef LEYDEN
 
 void StubRoutines::initialize1() {
   if (_code1 == NULL) {
@@ -589,3 +592,5 @@ UnsafeCopyMemoryMark::~UnsafeCopyMemoryMark() {
     }
   }
 }
+
+#endif

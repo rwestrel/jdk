@@ -72,10 +72,10 @@ class SharedRuntime: AllStatic {
 
   static DeoptimizationBlob* _deopt_blob;
 
+#endif
   static SafepointBlob*      _polling_page_vectors_safepoint_handler_blob;
   static SafepointBlob*      _polling_page_safepoint_handler_blob;
   static SafepointBlob*      _polling_page_return_handler_blob;
-#endif
 
 #ifdef COMPILER2
   static UncommonTrapBlob*   _uncommon_trap_blob;
@@ -223,9 +223,9 @@ class SharedRuntime: AllStatic {
   static frame look_for_reserved_stack_annotated_method(JavaThread* thread, frame fr);
 
   // Shared stub locations
-#ifndef LEYDEN
   static address get_poll_stub(address pc);
 
+#ifndef LEYDEN
   static address get_ic_miss_stub() {
     assert(_ic_miss_blob!= NULL, "oops");
     return _ic_miss_blob->entry_point();
@@ -258,11 +258,11 @@ class SharedRuntime: AllStatic {
     assert(_resolve_static_call_blob != NULL, "oops");
     return _resolve_static_call_blob->entry_point();
   }
+#endif
 
   static SafepointBlob* polling_page_return_handler_blob()     { return _polling_page_return_handler_blob; }
   static SafepointBlob* polling_page_safepoint_handler_blob()  { return _polling_page_safepoint_handler_blob; }
   static SafepointBlob* polling_page_vectors_safepoint_handler_blob()  { return _polling_page_vectors_safepoint_handler_blob; }
-#endif
 
   // Counters
 #ifndef PRODUCT
