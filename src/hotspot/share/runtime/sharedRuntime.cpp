@@ -687,7 +687,8 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   nmethod* nm = cm->as_nmethod();
   ScopeDesc* sd = nm->scope_desc_at(ret_pc);
 #else
-  ScopeDesc* sd = NULL;
+  ScopeDesc* sd = cm->scope_desc_at(ret_pc);
+  CompiledMethod* nm = cm;
 #endif
   // determine handler bci, if any
   EXCEPTION_MARK;
@@ -735,13 +736,8 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 
   // found handling method => lookup exception handler
-#ifndef LEYDEN
   int catch_pco = ret_pc - nm->code_begin();
-#else
-  int catch_pco = 0;
-#endif
 
-#ifndef LEYDEN
   ExceptionHandlerTable table(nm);
   HandlerTableEntry *t = table.entry_for(catch_pco, handler_bci, scope_depth);
   if (t == NULL && (nm->is_compiled_by_c1() || handler_bci != -1)) {
@@ -753,7 +749,6 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
     // the bytecodes.
     t = table.entry_for(catch_pco, -1, 0);
   }
-#endif
 
 #ifdef COMPILER1
   if (t == NULL && nm->is_compiled_by_c1()) {
@@ -762,7 +757,6 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
   }
 #endif
 
-#ifndef LEYDEN
   if (t == NULL) {
     ttyLocker ttyl;
     tty->print_cr("MISSING EXCEPTION HANDLER for pc " INTPTR_FORMAT " and handler bci %d", p2i(ret_pc), handler_bci);
@@ -771,17 +765,14 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
     tty->cr();
     tty->print_cr(" Compiled exception table :");
     table.print();
+#ifndef LEYDEN
     nm->print_code();
+#endif
     guarantee(false, "missing exception handler");
     return NULL;
   }
-#endif
 
-#ifndef LEYDEN
   return nm->code_begin() + t->pco();
-#else
-  return 0;
-#endif
 }
 
 JRT_ENTRY(void, SharedRuntime::throw_AbstractMethodError(JavaThread* thread))
