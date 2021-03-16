@@ -133,10 +133,15 @@ public:
   }
   // We use default allocation/deallocation but counted
   static void* allocate_node(size_t size, Value const& value) {
+#ifndef LEYDEN
     SymbolTable::item_added();
     return AllocateHeap(size, mtSymbol);
+#else
+    return NULL;
+#endif
   }
   static void free_node(void* memory, Value const& value) {
+#ifndef LEYDEN
     // We get here because #1 some threads lost a race to insert a newly created Symbol
     // or #2 we're cleaning up unused symbol.
     // If #1, then the symbol can be either permanent,
@@ -151,16 +156,17 @@ public:
     SymbolTable::delete_symbol(value);
     FreeHeap(memory);
     SymbolTable::item_removed();
+#endif
   }
 };
+
+#ifndef LEYDEN
 
 static size_t ceil_log2(size_t value) {
   size_t ret;
   for (ret = 1; ((size_t)1 << ret) < value; ++ret);
   return ret;
 }
-
-#ifndef LEYDEN
 
 void SymbolTable::create_table ()  {
   size_t start_size_log_2 = ceil_log2(SymbolTableSize);
@@ -179,6 +185,8 @@ void SymbolTable::create_table ()  {
 
 #endif
 
+#ifndef LEYDEN
+
 void SymbolTable::delete_symbol(Symbol* sym) {
   if (sym->is_permanent()) {
     MutexLocker ml(SymbolArena_lock, Mutex::_no_safepoint_check_flag); // Protect arena
@@ -192,6 +200,8 @@ void SymbolTable::delete_symbol(Symbol* sym) {
     delete sym;
   }
 }
+
+#endif
 
 void SymbolTable::reset_has_items_to_clean() { Atomic::store(&_has_items_to_clean, false); }
 void SymbolTable::mark_has_items_to_clean()  { Atomic::store(&_has_items_to_clean, true); }
@@ -220,6 +230,8 @@ void SymbolTable::trigger_cleanup() {
   Service_lock->notify_all();
 }
 
+#ifndef LEYDEN
+
 Symbol* SymbolTable::allocate_symbol(const char* name, int len, bool c_heap) {
   assert (len <= Symbol::max_length(), "should be checked by caller");
 
@@ -244,6 +256,8 @@ Symbol* SymbolTable::allocate_symbol(const char* name, int len, bool c_heap) {
   }
   return sym;
 }
+
+#endif
 
 class SymbolsDo : StackObj {
   SymbolClosure *_cl;
@@ -326,6 +340,8 @@ Symbol* SymbolTable::lookup_common(const char* name,
   return sym;
 }
 
+#ifndef LEYDEN
+
 Symbol* SymbolTable::new_symbol(const char* name, int len) {
   unsigned int hash = hash_symbol(name, len, _alt_hash);
   Symbol* sym = lookup_common(name, len, hash);
@@ -349,6 +365,8 @@ Symbol* SymbolTable::new_symbol(const Symbol* sym, int begin, int end) {
   }
   return found;
 }
+
+#endif
 
 class SymbolTableLookup : StackObj {
 private:
@@ -412,6 +430,8 @@ Symbol* SymbolTable::lookup_only(const char* name, int len, unsigned int& hash) 
   return lookup_common(name, len, hash);
 }
 
+#ifndef LEYDEN
+
 // Suggestion: Push unicode-based lookup all the way into the hashing
 // and probing logic, so there is no need for convert_to_utf8 until
 // an actual new Symbol* is created.
@@ -430,6 +450,8 @@ Symbol* SymbolTable::new_symbol(const jchar* name, int utf16_length) {
   }
 }
 
+#endif
+
 Symbol* SymbolTable::lookup_only_unicode(const jchar* name, int utf16_length,
                                          unsigned int& hash) {
   int utf8_length = UNICODE::utf8_length((jchar*) name, utf16_length);
@@ -445,6 +467,8 @@ Symbol* SymbolTable::lookup_only_unicode(const jchar* name, int utf16_length,
     return lookup_only(chars, utf8_length, hash);
   }
 }
+
+#ifndef LEYDEN
 
 void SymbolTable::new_symbols(ClassLoaderData* loader_data, const constantPoolHandle& cp,
                               int names_count, const char** names, int* lengths,
@@ -509,6 +533,8 @@ Symbol* SymbolTable::new_permanent_symbol(const char* name) {
   }
   return sym;
 }
+
+#endif
 
 struct SizeFunc : StackObj {
   size_t operator()(Symbol** value) {
@@ -743,6 +769,8 @@ void SymbolTable::do_concurrent_work(JavaThread* jt) {
   _has_work = false;
 }
 
+#ifndef LEYDEN
+
 // Rehash
 bool SymbolTable::do_rehash() {
   if (!_local_table->is_safepoint_safe()) {
@@ -766,6 +794,10 @@ bool SymbolTable::do_rehash() {
 
   return true;
 }
+
+#endif
+
+#ifndef LEYDEN
 
 void SymbolTable::rehash_table() {
   static bool rehashed = false;
@@ -798,6 +830,8 @@ void SymbolTable::rehash_table() {
 
   _needs_rehashing = false;
 }
+
+#endif
 
 //---------------------------------------------------------------------------
 // Non-product code

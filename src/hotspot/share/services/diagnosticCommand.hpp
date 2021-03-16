@@ -762,7 +762,7 @@ public:
 //   VM.stringtable -verbose: for dumping the string table
 //   VM.systemdictionary -verbose: for dumping the system dictionary table
 //
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class VM_DumpHashtable : public VM_Operation {
 private:
@@ -788,11 +788,13 @@ public:
     case DumpSymbols:
       SymbolTable::dump(_out, _verbose);
       break;
-    case DumpStrings:
+#ifndef LEYDEN
+      case DumpStrings:
       StringTable::dump(_out, _verbose);
       break;
     case DumpSysDict:
       SystemDictionary::dump(_out, _verbose);
+#endif
       break;
     default:
       ShouldNotReachHere();

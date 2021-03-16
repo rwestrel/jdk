@@ -30,7 +30,7 @@
 #include "oops/symbol.hpp"
 #include "utilities/tableStatistics.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class JavaThread;
 template <typename T> class GrowableArray;
