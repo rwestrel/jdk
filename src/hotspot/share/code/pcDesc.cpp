@@ -41,7 +41,6 @@ address PcDesc::real_pc(const CompiledMethod* code) const {
 }
 
 void PcDesc::print_on(outputStream* st, CompiledMethod* code) {
-#ifndef LEYDEN
 #ifndef PRODUCT
   ResourceMark rm;
   st->print("PcDesc(pc=" PTR_FORMAT " offset=%x bits=%x):", p2i(real_pc(code)), pc_offset(), _flags);
@@ -60,7 +59,6 @@ void PcDesc::print_on(outputStream* st, CompiledMethod* code) {
        sd = sd->sender()) {
     sd->print_on(st);
   }
-#endif
 #endif
 }
 

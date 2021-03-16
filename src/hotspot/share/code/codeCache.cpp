@@ -571,10 +571,6 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
   return cb;
 }
 
-#endif
-
-#ifndef LEYDEN
-
 void CodeCache::free(CodeBlob* cb) {
   assert_locked_or_safepoint(CodeCache_lock);
   CodeHeap* heap = get_code_heap(cb);
@@ -597,7 +593,6 @@ void CodeCache::free(CodeBlob* cb) {
   assert(heap->blob_count() >= 0, "sanity check");
 }
 
-
 void CodeCache::free_unused_tail(CodeBlob* cb, size_t used) {
   assert_locked_or_safepoint(CodeCache_lock);
   guarantee(cb->is_buffer_blob() && strncmp("Interpreter", cb->name(), 11) == 0, "Only possible for interpreter!");
@@ -612,7 +607,6 @@ void CodeCache::free_unused_tail(CodeBlob* cb, size_t used) {
   // Adjust the sizes of the CodeBlob
   cb->adjust_size(used);
 }
-
 
 void CodeCache::commit(CodeBlob* cb) {
   // this is called by nmethod::nmethod, which must already own CodeCache_lock

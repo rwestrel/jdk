@@ -412,6 +412,7 @@ Method* CompiledMethod::attached_method_before_pc(address pc) {
   }
   return NULL; // not a call
 }
+
 void CompiledMethod::clear_inline_caches() {
   assert(SafepointSynchronize::is_at_safepoint(), "cleaning of IC's only allowed at safepoint");
   if (is_zombie()) {
@@ -438,9 +439,6 @@ void CompiledMethod::clear_ic_callsites() {
   }
 }
 
-#endif
-
-#ifndef LEYDEN
 #ifdef ASSERT
 // Check class_loader is alive for this bit of metadata.
 class CheckClass : public MetadataClosure {
@@ -567,7 +565,6 @@ static bool clean_if_nmethod_is_unloaded(CompiledStaticCall *csc, CompiledMethod
 // nmethods are unloaded.  Return postponed=true in the parallel case for
 // inline caches found that point to nmethods that are not yet visited during
 // the do_unloading walk.
-#ifndef LEYDEN
 bool CompiledMethod::unload_nmethod_caches(bool unloading_occurred) {
   ResourceMark rm;
 
@@ -587,7 +584,6 @@ bool CompiledMethod::unload_nmethod_caches(bool unloading_occurred) {
 #endif
   return true;
 }
-#endif
 #endif
 
 void CompiledMethod::run_nmethod_entry_barrier() {
@@ -717,7 +713,6 @@ address CompiledMethod::continuation_for_implicit_exception(address pc, bool for
   // an active nmethod => use cpc to determine a return address
   int exception_offset = pc - code_begin();
   int cont_offset = ImplicitExceptionTable(this).continuation_offset( exception_offset );
-#ifndef LEYDEN
 #ifdef ASSERT
   if (cont_offset == 0) {
     Thread* thread = Thread::current();
@@ -727,11 +722,12 @@ address CompiledMethod::continuation_for_implicit_exception(address pc, bool for
     ttyLocker ttyl;
     tty->print_cr("implicit exception happened at " INTPTR_FORMAT, p2i(pc));
     print();
+#ifndef LEYDEN
     method()->print_codes();
+#endif
     print_code();
     print_pcs();
   }
-#endif
 #endif
   if (cont_offset == 0) {
     // Let the normal error handling report the exception

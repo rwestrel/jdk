@@ -58,22 +58,14 @@ const char* CodeBlob::compiler_name() const {
   return compilertype2name(_type);
 }
 
-#endif
-
-#ifndef LEYDEN
-
 unsigned int CodeBlob::align_code_offset(int offset) {
   // align the size to CodeEntryAlignment
   int header_size = (int)CodeHeap::header_size();
   return align_up(offset + header_size, CodeEntryAlignment) - header_size;
 }
 
-#endif
-
 
 // This must be consistent with the CodeBlob constructor's layout actions.
-#ifndef LEYDEN
-
 unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
   unsigned int size = header_size;
   size += align_up(cb->total_relocation_size(), oopSize);
@@ -84,10 +76,6 @@ unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
   size += align_up(cb->total_metadata_size(), oopSize);
   return size;
 }
-
-#endif
-
-#ifndef LEYDEN
 
 CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments) :
   _type(type),
@@ -148,9 +136,7 @@ CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& la
   S390_ONLY(_ctable_offset = 0;) // avoid uninitialized fields
 }
 
-#endif
 
-#ifndef LEYDEN
 // Creates a simple CodeBlob. Sets up the size of the different regions.
 RuntimeBlob::RuntimeBlob(const char* name, int header_size, int size, int frame_complete, int locs_size)
   : CodeBlob(name, compiler_none, CodeBlobLayout((address) this, size, header_size, locs_size, size), frame_complete, 0, NULL, false /* caller_must_gc_arguments */)
@@ -232,10 +218,8 @@ const ImmutableOopMap* CodeBlob::oop_map_for_return_address(address return_addre
 }
 
 void CodeBlob::print_code() {
-#ifndef LEYDEN
   ResourceMark m;
   Disassembler::decode(this, tty);
-#endif
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -247,7 +231,6 @@ BufferBlob::BufferBlob(const char* name, int size)
 : RuntimeBlob(name, sizeof(BufferBlob), size, CodeOffsets::frame_never_safe, /*locs_size:*/ 0)
 {}
 
-#ifndef LEYDEN
 BufferBlob* BufferBlob::create(const char* name, int buffer_size) {
   ThreadInVMfromUnknown __tiv;  // get to VM state in case we block on CodeCache_lock
 
@@ -266,14 +249,12 @@ BufferBlob* BufferBlob::create(const char* name, int buffer_size) {
 
   return blob;
 }
-#endif
 
 
 BufferBlob::BufferBlob(const char* name, int size, CodeBuffer* cb)
   : RuntimeBlob(name, cb, sizeof(BufferBlob), size, CodeOffsets::frame_never_safe, 0, NULL)
 {}
 
-#ifndef LEYDEN
 BufferBlob* BufferBlob::create(const char* name, CodeBuffer* cb) {
   ThreadInVMfromUnknown __tiv;  // get to VM state in case we block on CodeCache_lock
 
@@ -289,9 +270,7 @@ BufferBlob* BufferBlob::create(const char* name, CodeBuffer* cb) {
 
   return blob;
 }
-#endif
 
-#ifndef LEYDEN
 void* BufferBlob::operator new(size_t s, unsigned size) throw() {
   return CodeCache::allocate(size, CodeBlobType::NonNMethod);
 }
@@ -307,7 +286,6 @@ void BufferBlob::free(BufferBlob *blob) {
   // Track memory usage statistic after releasing CodeCache_lock
   MemoryService::track_code_cache_memory_usage();
 }
-#endif
 
 
 //----------------------------------------------------------------------------------------------------
@@ -703,6 +681,7 @@ void BufferBlob::print_on(outputStream* st) const {
 void BufferBlob::print_value_on(outputStream* st) const {
   st->print_cr("BufferBlob (" INTPTR_FORMAT  ") used for %s", p2i(this), name());
 }
+
 void RuntimeStub::verify() {
   // unimplemented
 }

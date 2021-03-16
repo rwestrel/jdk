@@ -538,8 +538,6 @@ void section_word_Relocation::unpack_data() {
 }
 
 //// miscellaneous methods
-#if 1 //ndef LEYDEN
-
 oop* oop_Relocation::oop_addr() {
   int n = _oop_index;
   if (n == 0) {
@@ -550,8 +548,6 @@ oop* oop_Relocation::oop_addr() {
     return code()->oop_addr_at(n);
   }
 }
-
-#endif
 
 
 oop oop_Relocation::oop_value() {
@@ -573,7 +569,6 @@ void oop_Relocation::fix_oop_relocation() {
 }
 
 
-
 void oop_Relocation::verify_oop_relocation() {
   if (!oop_is_immediate()) {
     // get the oop from the pool, and re-insert it into the instruction:
@@ -584,8 +579,6 @@ void oop_Relocation::verify_oop_relocation() {
 #endif
 
 // meta data versions
-#if 1 //ndef LEYDEN
-
 Metadata** metadata_Relocation::metadata_addr() {
   int n = _metadata_index;
   if (n == 0) {
@@ -594,10 +587,8 @@ Metadata** metadata_Relocation::metadata_addr() {
     } else {
     // metadata is stored in table at nmethod::metadatas_begin
     return code()->metadata_addr_at(n);
+    }
   }
-}
-
-#endif
 
 
 Metadata* metadata_Relocation::metadata_value() {
@@ -605,7 +596,7 @@ Metadata* metadata_Relocation::metadata_value() {
   // clean inline caches store a special pseudo-null
   if (v == (Metadata*)Universe::non_oop_word())  v = NULL;
   return v;
-}
+  }
 
 
 #ifndef LEYDEN
@@ -672,10 +663,6 @@ static bool set_to_clean_no_ic_refill(CompiledICorStaticCall* ic) {
   guarantee(ic->set_to_clean(), "Should not need transition stubs");
   return true;
 }
-
-#endif
-
-#ifndef LEYDEN
 
 bool opt_virtual_call_Relocation::clear_inline_cache() {
   // No stubs for ICs
@@ -769,10 +756,6 @@ address trampoline_stub_Relocation::get_trampoline_for(address call, nmethod* co
   return NULL;
 }
 
-#endif
-
-#ifndef LEYDEN
-
 bool static_stub_Relocation::clear_inline_cache() {
   // Call stub is only used when calling the interpreted code.
   // It does not really need to be cleared, except that we want to clean out the methodoop.
@@ -780,10 +763,6 @@ bool static_stub_Relocation::clear_inline_cache() {
   return true;
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 void external_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) {
   if (_target != NULL) {
@@ -798,10 +777,6 @@ void external_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, 
   postcond(dest->section_index_of(target()) == CodeBuffer::SECT_NONE);
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 address external_word_Relocation::target() {
   address target = _target;
@@ -811,10 +786,6 @@ address external_word_Relocation::target() {
   return target;
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 void internal_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, CodeBuffer* dest) {
   address target = _target;
@@ -824,10 +795,6 @@ void internal_word_Relocation::fix_relocation_after_move(const CodeBuffer* src, 
   set_value(target);
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 address internal_word_Relocation::target() {
   address target = _target;
@@ -1019,10 +986,10 @@ void print_blob_locs(nmethod* nm) {
   RelocIterator iter(nm);
   iter.print();
 }
+#endif
 extern "C"
 void print_buf_locs(CodeBuffer* cb) {
   FlagSetting fs(PrintRelocations, true);
   cb->print();
 }
-#endif
 #endif // !PRODUCT
