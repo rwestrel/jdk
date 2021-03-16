@@ -316,7 +316,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                 thread->thread_state() == _thread_in_native) &&
                (sig == SIGBUS && /* info->si_code == BUS_OBJERR && */
                thread->doing_unsafe_access())) {
-      address next_pc = Assembler::locate_next_instruction(pc);
+        address next_pc = Assembler::locate_next_instruction(pc);
         if (UnsafeCopyMemory::contains_pc(pc)) {
           next_pc = UnsafeCopyMemory::page_error_continue_pc(pc);
         }
@@ -416,6 +416,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     os::Posix::ucontext_set_pc(uc, stub);
     return true;
   }
+
   return false;
 }
 

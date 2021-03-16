@@ -554,8 +554,6 @@ oop* oop_Relocation::oop_addr() {
 #endif
 
 
-#ifndef LEYDEN
-
 oop oop_Relocation::oop_value() {
   oop v = *oop_addr();
   // clean inline caches store a special pseudo-null
@@ -563,6 +561,8 @@ oop oop_Relocation::oop_value() {
   return v;
 }
 
+
+#ifndef LEYDEN
 
 
 void oop_Relocation::fix_oop_relocation() {
@@ -600,16 +600,12 @@ Metadata** metadata_Relocation::metadata_addr() {
 #endif
 
 
-#ifndef LEYDEN
-
 Metadata* metadata_Relocation::metadata_value() {
   Metadata* v = *metadata_addr();
   // clean inline caches store a special pseudo-null
   if (v == (Metadata*)Universe::non_oop_word())  v = NULL;
   return v;
 }
-
-#endif
 
 
 #ifndef LEYDEN
@@ -852,8 +848,6 @@ address internal_word_Relocation::target() {
 
 #ifndef PRODUCT
 
-#ifndef LEYDEN
-
 static const char* reloc_type_string(relocInfo::relocType t) {
   switch (t) {
   #define EACH_CASE(name) \
@@ -872,10 +866,6 @@ static const char* reloc_type_string(relocInfo::relocType t) {
   }
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 void RelocIterator::print_current() {
   if (!has_current()) {
@@ -993,10 +983,6 @@ void RelocIterator::print_current() {
   tty->cr();
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 void RelocIterator::print() {
   RelocIterator save_this = (*this);
@@ -1024,8 +1010,6 @@ void RelocIterator::print() {
 
   (*this) = save_this;
 }
-
-#endif
 
 // For the debugger:
 #ifndef LEYDEN

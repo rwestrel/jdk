@@ -214,7 +214,6 @@ bool java_lang_String::is_instance(oop obj) {
   macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
   macro(_coder_offset, k, "coder",                 byte_signature,       false);
 
-
 void java_lang_String::compute_offsets() {
   if (_initialized) {
     return;
@@ -226,14 +225,12 @@ void java_lang_String::compute_offsets() {
   _initialized = true;
 }
 
-
 #if INCLUDE_CDS
 void java_lang_String::serialize_offsets(SerializeClosure* f) {
   STRING_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
   f->do_bool(&_initialized);
 }
 #endif
-
 
 class CompactStringsFixup : public FieldClosure {
 private:

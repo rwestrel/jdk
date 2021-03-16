@@ -84,18 +84,16 @@
 
 typedef CodeBuffer::csize_t csize_t;  // file-local definition
 
+#ifndef LEYDEN
 // External buffer, in a predefined CodeBlob.
 // Important: The code_start must be taken exactly, and not realigned.
 CodeBuffer::CodeBuffer(CodeBlob* blob) {
   // Provide code buffer with meaningful name
   initialize_misc(blob->name());
   initialize(blob->content_begin(), blob->content_size());
-#ifndef LEYDEN
   debug_only(verify_section_allocation();)
-#endif
 }
 
-#ifndef LEYDEN
 void CodeBuffer::initialize(csize_t code_size, csize_t locs_size) {
   // Compute maximal alignment.
   int align = _insts.alignment();
@@ -122,25 +120,20 @@ void CodeBuffer::initialize(csize_t code_size, csize_t locs_size) {
 
   debug_only(verify_section_allocation();)
 }
-#endif
 
 CodeBuffer::~CodeBuffer() {
-#ifndef LEYDEN
   verify_section_allocation();
-#endif
 
   // If we allocate our code buffer from the CodeCache
   // via a BufferBlob, and it's not permanent, then
   // free the BufferBlob.
   // The rest of the memory will be freed when the ResourceObj
   // is released.
-#ifndef LEYDEN
   for (CodeBuffer* cb = this; cb != NULL; cb = cb->before_expand()) {
     // Previous incarnations of this buffer are held live, so that internal
     // addresses constructed before expansions will not be confused.
     cb->free_blob();
   }
-#endif
 
   // free any overflow storage
   delete _overflow_arena;
@@ -149,7 +142,6 @@ CodeBuffer::~CodeBuffer() {
   // This is resource clean up, let's hope that all were properly copied out.
   NOT_PRODUCT(free_strings();)
 
-#ifndef LEYDEN
 #ifdef ASSERT
   // Save allocation type to execute assert in ~ResourceObj()
   // which is called after this destructor.
@@ -158,17 +150,14 @@ CodeBuffer::~CodeBuffer() {
   Copy::fill_to_bytes(this, sizeof(*this), badResourceValue);
   ResourceObj::set_allocation_type((address)(&_default_oop_recorder), at);
 #endif
-#endif
 }
 
-#ifndef LEYDEN
 
 void CodeBuffer::initialize_oop_recorder(OopRecorder* r) {
   assert(_oop_recorder == &_default_oop_recorder && _default_oop_recorder.is_unused(), "do this once");
   DEBUG_ONLY(_default_oop_recorder.freeze());  // force unused OR to be frozen
   _oop_recorder = r;
 }
-
 
 void CodeBuffer::initialize_section_size(CodeSection* cs, csize_t size) {
   assert(cs != &_insts, "insts is the memory provider, not the consumer");
@@ -470,7 +459,6 @@ csize_t CodeBuffer::total_content_size() const {
   return size_so_far;
 }
 
-
 void CodeBuffer::compute_final_layout(CodeBuffer* dest) const {
   address buf = dest->_total_start;
   csize_t buf_offset = 0;
@@ -518,9 +506,7 @@ void CodeBuffer::compute_final_layout(CodeBuffer* dest) const {
 
   // Done calculating sections; did it come out to the right end?
   assert(buf_offset == total_content_size(), "sanity");
-#ifndef LEYDEN
   debug_only(dest->verify_section_allocation();)
-#endif
 }
 
 // Append an oop reference that keeps the class alive.
@@ -1212,15 +1198,12 @@ const char* CodeStrings::add_string(const char * string) {
 }
 
 void CodeBuffer::decode() {
-#ifndef LEYDEN
   ttyLocker ttyl;
   Disassembler::decode(decode_begin(), insts_end(), tty NOT_PRODUCT(COMMA &strings()));
   _decode_begin = insts_end();
-#endif
 }
 
 void CodeSection::print(const char* name) {
-#ifndef LEYDEN
   csize_t locs_size = locs_end() - locs_start();
   tty->print_cr(" %7s.code = " PTR_FORMAT " : " PTR_FORMAT " : " PTR_FORMAT " (%d of %d)",
                 name, p2i(start()), p2i(end()), p2i(limit()), size(), capacity());
@@ -1230,7 +1213,6 @@ void CodeSection::print(const char* name) {
     RelocIterator iter(this);
     iter.print();
   }
-#endif
 }
 
 void CodeBuffer::print() {

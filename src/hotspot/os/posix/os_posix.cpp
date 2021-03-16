@@ -905,8 +905,8 @@ size_t os::Posix::get_initial_stack_size(ThreadType thr_type, size_t req_stack_s
 
 #ifndef ZERO
 #ifndef ARM
-#ifndef LEYDEN
 static bool get_frame_at_stack_banging_point(JavaThread* thread, address pc, const void* ucVoid, frame* fr) {
+#ifndef LEYDEN
   if (Interpreter::contains(pc)) {
     // interpreter performs stack banging after the fixed frame header has
     // been generated while the compilers perform it before. To maintain
@@ -922,6 +922,9 @@ static bool get_frame_at_stack_banging_point(JavaThread* thread, address pc, con
   } else {
     // more complex code with compiled code
     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+#else
+    {
+#endif
     CodeBlob* cb = CodeCache::find_blob(pc);
     if (cb == NULL || !cb->is_nmethod() || cb->is_frame_complete_at(pc)) {
       // Not sure where the pc points to, fallback to default
@@ -941,13 +944,11 @@ static bool get_frame_at_stack_banging_point(JavaThread* thread, address pc, con
   assert(fr->is_java_frame(), "Safety check");
   return true;
 }
-#endif
 #endif // ARM
 
 // This return true if the signal handler should just continue, ie. return after calling this
 bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address pc,
                                       const void* ucVoid, address* stub) {
-#ifndef LEYDEN
   // stack overflow
   StackOverflow* overflow_state = thread->stack_overflow_state();
   if (overflow_state->in_stack_yellow_reserved_zone(addr)) {
@@ -962,6 +963,7 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
             SharedRuntime::look_for_reserved_stack_annotated_method(thread, fr);
           if (activation.sp() != NULL) {
             overflow_state->disable_stack_reserved_zone();
+#ifndef LEYDEN
             if (activation.is_interpreted_frame()) {
               overflow_state->set_reserved_stack_activation((address)(activation.fp()
                 // Some platforms use frame pointers for interpreter frames, others use initial sp.
@@ -970,6 +972,9 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
 #endif
                 ));
             } else {
+#else
+              {
+#endif
               overflow_state->set_reserved_stack_activation((address)activation.unextended_sp());
             }
             return true; // just continue
@@ -1019,7 +1024,6 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
     tty->print_raw_cr("SIGSEGV happened inside stack but outside yellow and red zone.");
 #endif // AIX or BSD
   }
-#endif
   return false;
 }
 #endif // ZERO

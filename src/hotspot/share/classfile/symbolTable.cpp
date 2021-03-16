@@ -107,13 +107,9 @@ static inline void log_trace_symboltable_helper(Symbol* sym, const char* msg) {
 
 // Pick hashing algorithm.
 static uintx hash_symbol(const char* s, int len, bool useAlt) {
-#ifndef LEYDEN
   return useAlt ?
   AltHashing::halfsiphash_32(_alt_hash_seed, (const uint8_t*)s, len) :
   java_lang_String::hash_code((const jbyte*)s, len);
-#else
-  return 0;
-#endif
 }
 
 #if INCLUDE_CDS
@@ -164,6 +160,8 @@ static size_t ceil_log2(size_t value) {
   return ret;
 }
 
+#ifndef LEYDEN
+
 void SymbolTable::create_table ()  {
   size_t start_size_log_2 = ceil_log2(SymbolTableSize);
   _current_size = ((size_t)1) << start_size_log_2;
@@ -178,6 +176,8 @@ void SymbolTable::create_table ()  {
     _arena = new (mtSymbol) Arena(mtSymbol, symbol_alloc_arena_size);
   }
 }
+
+#endif
 
 void SymbolTable::delete_symbol(Symbol* sym) {
   if (sym->is_permanent()) {

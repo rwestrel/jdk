@@ -182,12 +182,16 @@ address StubRoutines::_dlibm_tan_cot_huge = NULL;
 address StubRoutines::_dtan = NULL;
 
 address StubRoutines::_safefetch32_entry                 = NULL;
+#endif
 address StubRoutines::_safefetch32_fault_pc              = NULL;
 address StubRoutines::_safefetch32_continuation_pc       = NULL;
+#ifndef LEYDEN
 address StubRoutines::_safefetchN_entry                  = NULL;
+#endif
 address StubRoutines::_safefetchN_fault_pc               = NULL;
 address StubRoutines::_safefetchN_continuation_pc        = NULL;
 
+#ifndef LEYDEN
 // Initialization
 //
 // Note: to break cycle with universe initialization, stubs are generated in two phases.

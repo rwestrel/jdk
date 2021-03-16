@@ -267,12 +267,14 @@ class StubRoutines: AllStatic {
 
   // Safefetch stubs.
   static address _safefetch32_entry;
+#endif
   static address _safefetch32_fault_pc;
   static address _safefetch32_continuation_pc;
+#ifndef LEYDEN
   static address _safefetchN_entry;
+#endif
   static address _safefetchN_fault_pc;
   static address _safefetchN_continuation_pc;
-#endif
 
  public:
 #ifndef LEYDEN
@@ -470,7 +472,7 @@ class StubRoutines: AllStatic {
 
   static SafeFetch32Stub SafeFetch32_stub() { return CAST_TO_FN_PTR(SafeFetch32Stub, _safefetch32_entry); }
   static SafeFetchNStub  SafeFetchN_stub()  { return CAST_TO_FN_PTR(SafeFetchNStub,  _safefetchN_entry); }
-
+#endif
   static bool is_safefetch_fault(address pc) {
     return pc != NULL &&
           (pc == _safefetch32_fault_pc ||
@@ -488,6 +490,7 @@ class StubRoutines: AllStatic {
     ShouldNotReachHere();
     return NULL;
   }
+#ifndef LEYDEN
 
   //
   // Default versions of the above arraycopy functions for platforms which do

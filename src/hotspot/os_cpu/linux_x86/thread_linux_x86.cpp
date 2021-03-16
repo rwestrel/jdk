@@ -33,7 +33,6 @@ frame JavaThread::pd_last_frame() {
   return frame(_anchor.last_Java_sp(), _anchor.last_Java_fp(), _anchor.last_Java_pc());
 }
 
-#ifndef LEYDEN
 // For Forte Analyzer AsyncGetCallTrace profiling support - thread is
 // currently interrupted by SIGPROF
 bool JavaThread::pd_get_top_frame_for_signal_handler(frame* fr_addr,
@@ -97,6 +96,5 @@ bool JavaThread::pd_get_top_frame(frame* fr_addr, void* ucontext, bool isInJava)
   // nothing else to try
   return false;
 }
-#endif
 
 void JavaThread::cache_global_variables() { }
