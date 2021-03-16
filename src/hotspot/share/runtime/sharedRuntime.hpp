@@ -77,9 +77,11 @@ class SharedRuntime: AllStatic {
   static SafepointBlob*      _polling_page_safepoint_handler_blob;
   static SafepointBlob*      _polling_page_return_handler_blob;
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   static UncommonTrapBlob*   _uncommon_trap_blob;
 #endif // COMPILER2
+#endif
 
 #ifndef PRODUCT
   // Counters

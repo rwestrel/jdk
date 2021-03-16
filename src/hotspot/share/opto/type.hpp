@@ -28,6 +28,7 @@
 #include "opto/adlcVMDeps.hpp"
 #include "runtime/handles.hpp"
 
+#ifndef LEYDEN
 // Portions of code courtesy of Clifford Click
 
 // Optimization - Graph Style
@@ -1903,6 +1904,7 @@ inline bool Type::is_ptr_to_boxing_obj() const {
 #define ConvX2L(x)   ConvI2L(x)
 #define ConvX2UL(x)  ConvI2UL(x)
 
+#endif
 #endif
 
 #endif // SHARE_OPTO_TYPE_HPP

@@ -249,6 +249,7 @@ void ScopeDesc::print_on(outputStream* st, PcDesc* pd) const {
     }
   }
 
+#ifndef LEYDEN
 #if COMPILER2_OR_JVMCI
   if (NOT_JVMCI(DoEscapeAnalysis &&) is_top() && _objects != NULL) {
     st->print_cr("   Objects");
@@ -261,6 +262,7 @@ void ScopeDesc::print_on(outputStream* st, PcDesc* pd) const {
     }
   }
 #endif // COMPILER2_OR_JVMCI
+#endif
 }
 
 #endif

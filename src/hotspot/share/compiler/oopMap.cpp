@@ -43,8 +43,10 @@
 #ifdef COMPILER1
 #include "c1/c1_Defs.hpp"
 #endif
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "opto/optoreg.hpp"
+#endif
 #endif
 #if INCLUDE_JVMCI
 #include "jvmci/jvmci_globals.hpp"
@@ -375,11 +377,13 @@ void OopMapSet::update_register_map(const frame *fr, RegisterMap *reg_map) {
   }
 
   // Check that runtime stubs save all callee-saved registers
+#ifndef LEYDEN
 #ifdef COMPILER2
   assert(cb->is_compiled_by_c1() || cb->is_compiled_by_jvmci() || !cb->is_runtime_stub() ||
          (nof_callee >= SAVED_ON_ENTRY_REG_COUNT || nof_callee >= C_SAVED_ON_ENTRY_REG_COUNT),
          "must save all");
 #endif // COMPILER2
+#endif
 }
 
 // Printing code is present in product build for -XX:+PrintAssembly.

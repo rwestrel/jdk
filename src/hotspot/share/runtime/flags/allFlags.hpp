@@ -76,14 +76,14 @@
     range,                    \
     constraint))              \
                               \
-  COMPILER2_PRESENT(C2_FLAGS( \
+  NOT_LEYDEN(COMPILER2_PRESENT(C2_FLAGS( \
     develop,                  \
     develop_pd,               \
     product,                  \
     product_pd,               \
     notproduct,               \
     range,                    \
-    constraint))              \
+    constraint)))              \
                               \
   NOT_LEYDEN(COMPILER_FLAGS(             \
     develop,                  \

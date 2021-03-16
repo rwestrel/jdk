@@ -30,6 +30,7 @@
 #include "opto/type.hpp"
 #include "utilities/copy.hpp"
 
+#ifndef LEYDEN
 // Portions of code courtesy of Clifford Click
 
 // Optimization - Graph Style
@@ -1814,5 +1815,7 @@ public:
   virtual void dump_compact_spec(outputStream *st) const;
 #endif
 };
+
+#endif
 
 #endif // SHARE_OPTO_NODE_HPP

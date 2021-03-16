@@ -83,11 +83,13 @@
 #include "c1/c1_Compiler.hpp"
 #include "c1/c1_Runtime1.hpp"
 #endif
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "code/compiledIC.hpp"
 #include "opto/compile.hpp"
 #include "opto/indexSet.hpp"
 #include "opto/runtime.hpp"
+#endif
 #endif
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
@@ -239,6 +241,7 @@ void print_statistics() {
   }
 #endif /* COMPILER1 */
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   if ((PrintOptoStatistics || LogVMOutput || LogCompilation) && UseCompiler) {
     FlagSetting fs(DisplayVMOutput, DisplayVMOutput && PrintOptoStatistics);
@@ -269,6 +272,7 @@ void print_statistics() {
 #endif // COMPILER1
 #endif // INCLUDE_JVMCI
 #endif // COMPILER2
+#endif
 
   if (PrintAOTStatistics) {
     AOTLoader::print_statistics();

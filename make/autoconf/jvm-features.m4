@@ -501,7 +501,7 @@ AC_DEFUN([JVM_FEATURES_PREPARE_VARIANT],
   elif test "x$variant" = "xzero"; then
     JVM_FEATURES_VARIANT_FILTER="jfr link-time-opt opt-size leyden"
   elif test "x$variant" = "xleyden"; then
-    JVM_FEATURES_VARIANT_FILTER="aot cds compiler2 dtrace epsilongc g1gc \
+    JVM_FEATURES_VARIANT_FILTER="aot cds dtrace epsilongc g1gc \
         graal jfr jni-check jvmci jvmti management nmt parallelgc services \
         shenandoahgc vm-structs zgc compiler1 link-time-opt opt-size"
   else

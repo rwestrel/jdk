@@ -60,9 +60,11 @@ const bool CCallingConventionRequiresIntsAsLongs = false;
   #endif
 #endif
 
+#ifndef LEYDEN
 #if defined(COMPILER2)
 // Include Restricted Transactional Memory lock eliding optimization
 #define INCLUDE_RTM_OPT 1
+#endif
 #endif
 
 #if defined(LINUX) || defined(__APPLE__)

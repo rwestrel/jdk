@@ -34,8 +34,11 @@
 #include "runtime/stubRoutines.hpp"
 #include "utilities/align.hpp"
 #include "utilities/copy.hpp"
+
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
+#endif
 #endif
 
 UnsafeCopyMemory* UnsafeCopyMemory::_table                      = NULL;

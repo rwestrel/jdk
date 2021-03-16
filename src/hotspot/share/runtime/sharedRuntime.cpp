@@ -97,9 +97,11 @@ SafepointBlob*      SharedRuntime::_polling_page_vectors_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_safepoint_handler_blob;
 SafepointBlob*      SharedRuntime::_polling_page_return_handler_blob;
 
+#ifndef LEYDEN
 #ifdef COMPILER2
 UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #endif // COMPILER2
+#endif
 
 
 //----------------------------generate_stubs-----------------------------------

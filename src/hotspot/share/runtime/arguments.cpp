@@ -1914,6 +1914,7 @@ void Arguments::set_bytecode_flags() {
 
 // Aggressive optimization flags
 jint Arguments::set_aggressive_opts_flags() {
+#ifndef LEYDEN
 #ifdef COMPILER2
   if (AggressiveUnboxing) {
     if (FLAG_IS_DEFAULT(EliminateAutoBox)) {
@@ -1940,6 +1941,7 @@ jint Arguments::set_aggressive_opts_flags() {
       return JNI_ENOMEM;
     }
   }
+#endif
 #endif
 
   return JNI_OK;
@@ -2005,8 +2007,10 @@ bool Arguments::check_vm_args_consistency() {
     }
 #endif
   }
+#ifndef LEYDEN
 #if HAS_COMPILER
   status = CompilerConfig::check_args_consistency(status);
+#endif
 #endif
 #if INCLUDE_JVMCI
   if (status && EnableJVMCI) {
@@ -3128,10 +3132,12 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
 #endif
 
   // Parse the CompilationMode flag
+#ifndef LEYDEN
 #if HAS_COMPILER
   if (!CompilationModeFlag::initialize()) {
     return JNI_ERR;
   }
+#endif
 #endif
 
   if (!check_vm_args_consistency()) {
@@ -3607,11 +3613,13 @@ static bool use_vm_log() {
   }
 #endif // COMPILER1
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   if (PrintOptoAssembly || PrintOptoStatistics) {
     return true;
   }
 #endif // COMPILER2
+#endif
 
   return false;
 }
@@ -4050,8 +4058,10 @@ jint Arguments::apply_ergo() {
 
   // Set compiler flags after GC is selected and GC specific
   // flags (LoopStripMiningIter) are set.
+#ifndef LEYDEN
 #if HAS_COMPILER
   CompilerConfig::ergo_initialize();
+#endif
 #endif
 
   // Set bytecode rewriting flags
@@ -4125,7 +4135,6 @@ jint Arguments::apply_ergo() {
       UseBiasedLocking = false;
     }
   }
-#endif
 #ifdef COMPILER2
   if (!UseBiasedLocking) {
     UseOptoBiasInlining = false;
@@ -4147,6 +4156,7 @@ jint Arguments::apply_ergo() {
     FLAG_SET_DEFAULT(EnableVectorAggressiveReboxing, false);
   }
 #endif // COMPILER2
+#endif
 
   if (FLAG_IS_CMDLINE(DiagnoseSyncOnValueBasedClasses)) {
     if (DiagnoseSyncOnValueBasedClasses == ObjectSynchronizer::LOG_WARNING && !log_is_enabled(Info, valuebasedclasses)) {

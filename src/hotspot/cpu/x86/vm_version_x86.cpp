@@ -1008,6 +1008,7 @@ void VM_Version::get_processor_features() {
     vm_exit_during_initialization("RTM instructions are not available on this CPU");
   }
 
+#ifndef LEYDEN
 #if INCLUDE_RTM_OPT
   if (UseRTMLocking) {
     if (!CompilerConfig::is_c2_enabled()) {
@@ -1173,6 +1174,7 @@ void VM_Version::get_processor_features() {
   }
 #endif // _LP64
 #endif // COMPILER2_OR_JVMCI
+#endif
 
   // On new cpus instructions which update whole XMM register should be used
   // to prevent partial register stall due to dependencies on high half.
@@ -1204,6 +1206,7 @@ void VM_Version::get_processor_features() {
       }
     }
     if (((cpu_family() == 6) || (cpu_family() == 7)) && supports_sse3()) { // new ZX cpus
+#ifndef LEYDEN
 #ifdef COMPILER2
       if (FLAG_IS_DEFAULT(MaxLoopPad)) {
         // For new ZX cpus do the next optimization:
@@ -1217,6 +1220,7 @@ void VM_Version::get_processor_features() {
         MaxLoopPad = 11;
       }
 #endif // COMPILER2
+#endif
       if (FLAG_IS_DEFAULT(UseXMMForArrayCopy)) {
         UseXMMForArrayCopy = true; // use SSE2 movq on new ZX cpus
       }
@@ -1313,12 +1317,14 @@ void VM_Version::get_processor_features() {
       }
     }
 
+#ifndef LEYDEN
 #ifdef COMPILER2
     if (cpu_family() < 0x17 && MaxVectorSize > 16) {
       // Limit vectors size to 16 bytes on AMD cpus < 17h.
       FLAG_SET_DEFAULT(MaxVectorSize, 16);
     }
 #endif // COMPILER2
+#endif
 
     // Some defaults for AMD family >= 17h && Hygon family 18h
     if (cpu_family() >= 0x17) {
@@ -1330,10 +1336,12 @@ void VM_Version::get_processor_features() {
       if (supports_sse2() && FLAG_IS_DEFAULT(UseUnalignedLoadStores)) {
         FLAG_SET_DEFAULT(UseUnalignedLoadStores, true);
       }
+#ifndef LEYDEN
 #ifdef COMPILER2
       if (supports_sse4_2() && FLAG_IS_DEFAULT(UseFPUForSpilling)) {
         FLAG_SET_DEFAULT(UseFPUForSpilling, true);
       }
+#endif
 #endif
     }
   }
@@ -1359,6 +1367,7 @@ void VM_Version::get_processor_features() {
       }
     }
     if (cpu_family() == 6 && supports_sse3()) { // New Intel cpus
+#ifndef LEYDEN
 #ifdef COMPILER2
       if (FLAG_IS_DEFAULT(MaxLoopPad)) {
         // For new Intel cpus do the next optimization:
@@ -1372,6 +1381,7 @@ void VM_Version::get_processor_features() {
         MaxLoopPad = 11;
       }
 #endif // COMPILER2
+#endif
 
       if (FLAG_IS_DEFAULT(UseXMMForArrayCopy)) {
         UseXMMForArrayCopy = true; // use SSE2 movq on new Intel cpus
@@ -1393,10 +1403,12 @@ void VM_Version::get_processor_features() {
       }
     }
     if (is_atom_family() || is_knights_family()) {
+#ifndef LEYDEN
 #ifdef COMPILER2
       if (FLAG_IS_DEFAULT(OptoScheduling)) {
         OptoScheduling = true;
       }
+#endif
 #endif
       if (supports_sse4_2()) { // Silvermont
         if (FLAG_IS_DEFAULT(UseUnalignedLoadStores)) {
@@ -1411,7 +1423,6 @@ void VM_Version::get_processor_features() {
     if (FLAG_IS_DEFAULT(AllocatePrefetchInstr) && supports_3dnow_prefetch()) {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 3);
     }
-#endif
 #ifdef COMPILER2
     if (UseAVX > 2) {
       if (FLAG_IS_DEFAULT(ArrayCopyPartialInlineSize) ||
@@ -1443,6 +1454,7 @@ void VM_Version::get_processor_features() {
         }
       }
     }
+#endif
 #endif
   }
 
@@ -1539,12 +1551,14 @@ void VM_Version::get_processor_features() {
     }
   }
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   if (is_intel() && MaxVectorSize > 16) {
     if (FLAG_IS_DEFAULT(UseFastStosb)) {
       UseFastStosb = false;
     }
   }
+#endif
 #endif
 
   // Use XMM/YMM MOVDQU instruction for Object Initialization
@@ -1557,6 +1571,7 @@ void VM_Version::get_processor_features() {
     FLAG_SET_DEFAULT(UseXMMForObjInit, false);
   }
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   if (FLAG_IS_DEFAULT(AlignVector)) {
     // Modern processors allow misaligned memory operations for vectors.
@@ -1569,6 +1584,7 @@ void VM_Version::get_processor_features() {
     OptimizeFill = false;
   }
 #endif // COMPILER2
+#endif
 
 #ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchInstr)) {
@@ -1611,18 +1627,22 @@ void VM_Version::get_processor_features() {
         supports_sse4_2() && supports_ht()) { // Nehalem based cpus
       FLAG_SET_DEFAULT(AllocatePrefetchLines, 4);
     }
+#ifndef LEYDEN
 #ifdef COMPILER2
     if (FLAG_IS_DEFAULT(UseFPUForSpilling) && supports_sse4_2()) {
       FLAG_SET_DEFAULT(UseFPUForSpilling, true);
     }
 #endif
+#endif
   }
 
   if (is_zx() && ((cpu_family() == 6) || (cpu_family() == 7)) && supports_sse4_2()) {
+#ifndef LEYDEN
 #ifdef COMPILER2
     if (FLAG_IS_DEFAULT(UseFPUForSpilling)) {
       FLAG_SET_DEFAULT(UseFPUForSpilling, true);
     }
+#endif
 #endif
   }
 
@@ -1673,10 +1693,12 @@ void VM_Version::get_processor_features() {
     if (UseAES) {
       log->print("  UseAES=1");
     }
+#ifndef LEYDEN
 #ifdef COMPILER2
     if (MaxVectorSize > 0) {
       log->print("  MaxVectorSize=%d", (int) MaxVectorSize);
     }
+#endif
 #endif
     log->cr();
     log->print("Allocation");

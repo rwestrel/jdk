@@ -45,6 +45,7 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
 #if COMPILER2_OR_JVMCI
 
 // Returns true iff objects were reallocated and relocked because of access through JVMTI
@@ -362,3 +363,4 @@ bool EscapeBarrier::deoptimize_objects_internal(JavaThread* deoptee, intptr_t* f
 }
 
 #endif // COMPILER2_OR_JVMCI
+#endif

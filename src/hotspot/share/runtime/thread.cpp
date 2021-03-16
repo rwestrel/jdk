@@ -136,9 +136,11 @@
 #ifdef COMPILER1
 #include "c1/c1_Compiler.hpp"
 #endif
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "opto/c2compiler.hpp"
 #include "opto/idealGraphPrinter.hpp"
+#endif
 #endif
 #if INCLUDE_RTM_OPT
 #include "runtime/rtmLocking.hpp"
@@ -3819,6 +3821,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   MonitorDeflationThread::initialize();
 #endif
   // initialize compiler(s)
+#ifndef LEYDEN
 #if defined(COMPILER1) || COMPILER2_OR_JVMCI
 #if INCLUDE_JVMCI
   bool force_JVMCI_intialization = false;
@@ -3840,6 +3843,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   if (JVMCI_ONLY(!force_JVMCI_intialization) NOT_JVMCI(true)) {
     CompileBroker::compilation_init_phase2();
   }
+#endif
 #endif
 
   // Pre-initialize some JSR292 core classes to avoid deadlock during class loading.
@@ -4312,8 +4316,10 @@ bool Threads::destroy_vm() {
   // clean_up() function's use of a JavaThreadIteratorWithHandle
   // would be a problem except set_vm_exited() has remembered the
   // shutdown thread which is granted a policy exception.
+#ifndef LEYDEN
 #if defined(COMPILER2) && !defined(PRODUCT)
   IdealGraphPrinter::clean_up();
+#endif
 #endif
 
   notify_vm_shutdown();

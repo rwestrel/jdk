@@ -38,8 +38,10 @@
 #ifdef COMPILER1
 #include "gc/shared/c1/cardTableBarrierSetC1.hpp"
 #endif
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "gc/shared/c2/cardTableBarrierSetC2.hpp"
+#endif
 #endif
 
 class CardTableBarrierSetC1;
@@ -134,6 +136,7 @@ void CardTableBarrierSet::print_on(outputStream* st) const {
 // that specific collector in mind, and the documentation above suitably
 // extended and updated.
 void CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread* thread, oop new_obj) {
+#ifndef LEYDEN
 #if COMPILER2_OR_JVMCI
   if (!ReduceInitialCardMarks) {
     return;
@@ -157,12 +160,13 @@ void CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread* thread, oop ne
     }
   }
 #endif // COMPILER2_OR_JVMCI
+#endif
 }
 
 void CardTableBarrierSet::initialize_deferred_card_mark_barriers() {
   // Used for ReduceInitialCardMarks (when COMPILER2 or JVMCI is used);
   // otherwise remains unused.
-#if COMPILER2_OR_JVMCI
+#if COMPILER2_OR_JVMCI && !defined(LEYDEN)
   _defer_initial_card_mark = CompilerConfig::is_c2_or_jvmci_compiler_enabled() && ReduceInitialCardMarks
                              && (DeferInitialCardMark || card_mark_must_follow_store());
 #else

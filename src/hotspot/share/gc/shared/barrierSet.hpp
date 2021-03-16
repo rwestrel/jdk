@@ -118,7 +118,7 @@ protected:
 
   template <class BarrierSetC2T>
   static BarrierSetC2* make_barrier_set_c2() {
-    return COMPILER2_PRESENT(new BarrierSetC2T()) NOT_COMPILER2(NULL);
+    return NOT_LEYDEN(COMPILER2_PRESENT(new BarrierSetC2T()) NOT_COMPILER2(NULL)) LEYDEN_PRESENT(NULL);
   }
 
 public:

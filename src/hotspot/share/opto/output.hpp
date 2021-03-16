@@ -35,6 +35,8 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
+
 class AbstractCompiler;
 class Arena;
 class Bundle;
@@ -267,5 +269,7 @@ public:
   static void print_statistics();
 #endif
 };
+
+#endif
 
 #endif // SHARE_OPTO_OUTPUT_HPP

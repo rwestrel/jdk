@@ -23,6 +23,7 @@
 # questions.
 #
 
+ifeq ($(call check-jvm-feature, leyden), false)
 $(eval $(call IncludeCustomExtension, hotspot/gensrc/GensrcAdlc.gmk))
 
 ifeq ($(call check-jvm-feature, compiler2), true)
@@ -216,4 +217,5 @@ ifeq ($(call check-jvm-feature, compiler2), true)
 
   TARGETS += $(ADLC_GENERATED_FILES)
 
+endif
 endif

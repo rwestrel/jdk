@@ -40,8 +40,11 @@
 #include "runtime/sharedRuntime.hpp"
 #include "utilities/align.hpp"
 #include "utilities/powerOfTwo.hpp"
+
+#ifndef LEYDEN
 #ifdef COMPILER2
 #include "opto/matcher.hpp"
+#endif
 #endif
 
 // -----------------------------------------------------------------------------------------

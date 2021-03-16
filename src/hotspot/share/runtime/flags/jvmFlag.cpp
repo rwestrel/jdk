@@ -478,7 +478,7 @@ enum FlagCounter_LP64  { LP64_RUNTIME_FLAGS(        ENUM_F, ENUM_F, ENUM_F, ENUM
 enum FlagCounter_ARCH  { ARCH_FLAGS(                ENUM_F,         ENUM_F,         ENUM_F, IGNORE_F, IGNORE_F)  num_flags_ARCH   };
 enum FlagCounter_JVMCI { JVMCI_ONLY(JVMCI_FLAGS(    ENUM_F, ENUM_F, ENUM_F, ENUM_F, ENUM_F, IGNORE_F, IGNORE_F)) num_flags_JVMCI  };
 enum FlagCounter_C1    { COMPILER1_PRESENT(C1_FLAGS(ENUM_F, ENUM_F, ENUM_F, ENUM_F, ENUM_F, IGNORE_F, IGNORE_F)) num_flags_C1     };
-enum FlagCounter_C2    { COMPILER2_PRESENT(C2_FLAGS(ENUM_F, ENUM_F, ENUM_F, ENUM_F, ENUM_F, IGNORE_F, IGNORE_F)) num_flags_C2     };
+enum FlagCounter_C2    { NOT_LEYDEN(COMPILER2_PRESENT(C2_FLAGS(ENUM_F, ENUM_F, ENUM_F, ENUM_F, ENUM_F, IGNORE_F, IGNORE_F))) num_flags_C2     };
 
 const int first_flag_enum_LP64   = 0;
 const int first_flag_enum_ARCH   = first_flag_enum_LP64  + num_flags_LP64;

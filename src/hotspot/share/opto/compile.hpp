@@ -46,6 +46,8 @@
 #include "runtime/vmThread.hpp"
 #include "utilities/ticks.hpp"
 
+#ifndef LEYDEN
+
 class AddPNode;
 class Block;
 class Bundle;
@@ -1196,5 +1198,7 @@ class Compile : public Phase {
   push_thru_add(PhaseGVN* phase, Node* z, const TypeInteger* tz, const TypeInteger*& rx, const TypeInteger*& ry,
                 BasicType bt);
 };
+
+#endif
 
 #endif // SHARE_OPTO_COMPILE_HPP

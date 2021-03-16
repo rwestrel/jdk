@@ -1263,11 +1263,13 @@ class GenGCEpilogueClosure: public GenCollectedHeap::GenClosure {
 };
 
 void GenCollectedHeap::gc_epilogue(bool full) {
+#ifndef LEYDEN
 #if COMPILER2_OR_JVMCI
   assert(DerivedPointerTable::is_empty(), "derived pointer present");
   size_t actual_gap = pointer_delta((HeapWord*) (max_uintx-3), *(end_addr()));
   guarantee(!CompilerConfig::is_c2_or_jvmci_compiler_enabled() || actual_gap > (size_t)FastAllocateSizeLimit, "inline allocation wraps");
 #endif // COMPILER2_OR_JVMCI
+#endif
 
   resize_all_tlabs();
 

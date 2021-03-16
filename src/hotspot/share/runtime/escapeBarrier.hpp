@@ -39,7 +39,7 @@ class JavaThread;
 
 class EscapeBarrier : StackObj {
 
-#if COMPILER2_OR_JVMCI
+#if COMPILER2_OR_JVMCI && !defined(LEYDEN)
   JavaThread* const _calling_thread;
   JavaThread* const _deoptee_thread;
   bool        const _barrier_active;
@@ -72,7 +72,7 @@ public:
   EscapeBarrier(bool barrier_active, JavaThread* calling_thread, JavaThread* deoptee_thread)
     : _calling_thread(calling_thread), _deoptee_thread(deoptee_thread),
       _barrier_active(barrier_active && (JVMCI_ONLY(UseJVMCICompiler) NOT_JVMCI(false)
-                      COMPILER2_PRESENT(|| DoEscapeAnalysis)))
+                      NOT_LEYDEN(COMPILER2_PRESENT(|| DoEscapeAnalysis))))
   {
     if (_barrier_active) sync_and_suspend_one();
   }
@@ -81,7 +81,7 @@ public:
   EscapeBarrier(bool barrier_active, JavaThread* calling_thread)
     : _calling_thread(calling_thread), _deoptee_thread(NULL),
       _barrier_active(barrier_active && (JVMCI_ONLY(UseJVMCICompiler) NOT_JVMCI(false)
-                      COMPILER2_PRESENT(|| DoEscapeAnalysis)))
+                      NOT_LEYDEN(COMPILER2_PRESENT(|| DoEscapeAnalysis))))
   {
     if (_barrier_active) sync_and_suspend_all();
   }
@@ -98,13 +98,19 @@ public:
   // Deoptimize objects of frames of the target thread up to the given depth.
   // Deoptimize objects of caller frames if they passed references to ArgEscape objects as arguments.
   // Return false in the case of a reallocation failure and true otherwise.
+#ifndef LEYDEN
+
   bool deoptimize_objects(int depth) {
     return deoptimize_objects(0, depth);
   }
 
+#endif
+
   // Deoptimize objects of frames of the target thread at depth >= d1 and depth <= d2.
   // Deoptimize objects of caller frames if they passed references to ArgEscape objects as arguments.
   // Return false in the case of a reallocation failure and true otherwise.
+#ifndef LEYDEN
+
   bool deoptimize_objects(int d1, int d2)                      NOT_COMPILER2_OR_JVMCI_RETURN_(true);
 
   // Find and deoptimize non escaping objects and the holding frames on all stacks.
@@ -144,6 +150,13 @@ public:
   JavaThread* calling_thread() const     { return _calling_thread; }
   JavaThread* deoptee_thread() const     { return _deoptee_thread; }
 #endif // COMPILER2_OR_JVMCI
+#else
+  // A java thread was added to the list of threads.
+  static void thread_added(JavaThread* jt)                     { }
+
+  // A java thread was removed from the list of threads.
+  static void thread_removed(JavaThread* jt)                   {}
+#endif
 };
 
 #endif // SHARE_RUNTIME_ESCAPEBARRIER_HPP
