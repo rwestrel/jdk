@@ -44,12 +44,11 @@ inline klassVtable Klass::vtable() const {
   return klassVtable(const_cast<Klass*>(this), start_of_vtable(), vtable_length() / vtableEntry::size());
 }
 
+#endif
 
 inline oop Klass::class_loader() const {
   return class_loader_data()->class_loader();
 }
-
-#endif
 
 inline vtableEntry* Klass::start_of_vtable() const {
   return (vtableEntry*) ((address)this + in_bytes(vtable_start_offset()));

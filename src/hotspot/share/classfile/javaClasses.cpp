@@ -2884,6 +2884,7 @@ void java_lang_StackFrameInfo::serialize_offsets(SerializeClosure* f) {
   STACKFRAMEINFO_INJECTED_FIELDS(INJECTED_FIELD_SERIALIZE_OFFSET);
 }
 #endif
+#endif
 
 Method* java_lang_StackFrameInfo::get_method(Handle stackFrame, InstanceKlass* holder, TRAPS) {
   HandleMark hm(THREAD);
@@ -2893,6 +2894,8 @@ Method* java_lang_StackFrameInfo::get_method(Handle stackFrame, InstanceKlass* h
   // MethodHandles::expand_MemberName(mname, MethodHandles::_suppress_defc|MethodHandles::_suppress_type, CHECK_NULL);
   return method;
 }
+
+#ifndef LEYDEN
 
 void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const methodHandle& method, int bci, TRAPS) {
   // set Method* or mid/cpref
@@ -2908,6 +2911,8 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   assert((jushort)version == version, "version should be short");
   java_lang_StackFrameInfo::set_version(stackFrame(), (short)version);
 }
+
+#endif
 
 void java_lang_StackFrameInfo::to_stack_trace_element(Handle stackFrame, Handle stack_trace_element, TRAPS) {
   ResourceMark rm(THREAD);
@@ -2933,6 +2938,7 @@ void java_lang_StackFrameInfo::set_bci(oop element, int value) {
   element->int_field_put(_bci_offset, value);
 }
 
+#ifndef LEYDEN
 int java_lang_LiveStackFrameInfo::_monitors_offset;
 int java_lang_LiveStackFrameInfo::_locals_offset;
 int java_lang_LiveStackFrameInfo::_operands_offset;
@@ -2999,7 +3005,7 @@ void java_lang_reflect_AccessibleObject::set_override(oop reflect, jboolean valu
 }
 
 // java_lang_reflect_Method
-
+#endif
 int java_lang_reflect_Method::_clazz_offset;
 int java_lang_reflect_Method::_name_offset;
 int java_lang_reflect_Method::_returnType_offset;
@@ -3012,6 +3018,7 @@ int java_lang_reflect_Method::_annotations_offset;
 int java_lang_reflect_Method::_parameter_annotations_offset;
 int java_lang_reflect_Method::_annotation_default_offset;
 
+#ifndef LEYDEN
 #define METHOD_FIELDS_DO(macro) \
   macro(_clazz_offset,          k, vmSymbols::clazz_name(),          class_signature,       false); \
   macro(_name_offset,           k, vmSymbols::name_name(),           string_signature,      false); \
@@ -3044,15 +3051,13 @@ Handle java_lang_reflect_Method::create(TRAPS) {
   assert(InstanceKlass::cast(klass)->is_initialized(), "must be initialized");
   return InstanceKlass::cast(klass)->allocate_instance_handle(THREAD);
 }
-
+#endif
 oop java_lang_reflect_Method::clazz(oop reflect) {
   return reflect->obj_field(_clazz_offset);
 }
-
 void java_lang_reflect_Method::set_clazz(oop reflect, oop value) {
    reflect->obj_field_put(_clazz_offset, value);
 }
-
 int java_lang_reflect_Method::slot(oop reflect) {
   return reflect->int_field(_slot_offset);
 }
@@ -3060,7 +3065,7 @@ int java_lang_reflect_Method::slot(oop reflect) {
 void java_lang_reflect_Method::set_slot(oop reflect, int value) {
   reflect->int_field_put(_slot_offset, value);
 }
-
+#ifndef LEYDEN
 void java_lang_reflect_Method::set_name(oop method, oop value) {
   method->obj_field_put(_name_offset, value);
 }
@@ -3104,6 +3109,7 @@ void java_lang_reflect_Method::set_parameter_annotations(oop method, oop value) 
 void java_lang_reflect_Method::set_annotation_default(oop method, oop value) {
   method->obj_field_put(_annotation_default_offset, value);
 }
+#endif
 
 int java_lang_reflect_Constructor::_clazz_offset;
 int java_lang_reflect_Constructor::_parameterTypes_offset;
@@ -3114,6 +3120,7 @@ int java_lang_reflect_Constructor::_signature_offset;
 int java_lang_reflect_Constructor::_annotations_offset;
 int java_lang_reflect_Constructor::_parameter_annotations_offset;
 
+#ifndef LEYDEN
 #define CONSTRUCTOR_FIELDS_DO(macro) \
   macro(_clazz_offset,          k, vmSymbols::clazz_name(),          class_signature,       false); \
   macro(_parameterTypes_offset, k, vmSymbols::parameterTypes_name(), class_array_signature, false); \
@@ -3144,11 +3151,11 @@ Handle java_lang_reflect_Constructor::create(TRAPS) {
   ik->initialize(CHECK_NH);
   return ik->allocate_instance_handle(THREAD);
 }
-
+#endif
 oop java_lang_reflect_Constructor::clazz(oop reflect) {
   return reflect->obj_field(_clazz_offset);
 }
-
+#ifndef LEYDEN
 void java_lang_reflect_Constructor::set_clazz(oop reflect, oop value) {
    reflect->obj_field_put(_clazz_offset, value);
 }
@@ -3164,11 +3171,12 @@ void java_lang_reflect_Constructor::set_parameter_types(oop constructor, oop val
 void java_lang_reflect_Constructor::set_exception_types(oop constructor, oop value) {
   constructor->obj_field_put(_exceptionTypes_offset, value);
 }
+#endif
 
 int java_lang_reflect_Constructor::slot(oop reflect) {
   return reflect->int_field(_slot_offset);
 }
-
+#ifndef LEYDEN
 void java_lang_reflect_Constructor::set_slot(oop reflect, int value) {
   reflect->int_field_put(_slot_offset, value);
 }
@@ -3813,7 +3821,7 @@ void java_lang_invoke_DirectMethodHandle::serialize_offsets(SerializeClosure* f)
 #endif
 
 // Support for java_lang_invoke_MethodHandle
-
+#endif
 int java_lang_invoke_MethodHandle::_type_offset;
 int java_lang_invoke_MethodHandle::_form_offset;
 
@@ -3828,7 +3836,7 @@ int java_lang_invoke_ResolvedMethodName::_vmtarget_offset;
 int java_lang_invoke_ResolvedMethodName::_vmholder_offset;
 
 int java_lang_invoke_LambdaForm::_vmentry_offset;
-
+#ifndef LEYDEN
 #define METHODHANDLE_FIELDS_DO(macro) \
   macro(_type_offset, k, vmSymbols::type_name(), java_lang_invoke_MethodType_signature, false); \
   macro(_form_offset, k, "form",                 java_lang_invoke_LambdaForm_signature, false)
@@ -3974,12 +3982,12 @@ void java_lang_invoke_MethodHandle::set_form(oop mh, oop lform) {
 }
 
 /// MemberName accessors
-
+#endif
 oop java_lang_invoke_MemberName::clazz(oop mname) {
   assert(is_instance(mname), "wrong type");
   return mname->obj_field(_clazz_offset);
 }
-
+#ifndef LEYDEN
 void java_lang_invoke_MemberName::set_clazz(oop mname, oop clazz) {
   assert(is_instance(mname), "wrong type");
   mname->obj_field_put(_clazz_offset, clazz);
@@ -4015,7 +4023,7 @@ void java_lang_invoke_MemberName::set_flags(oop mname, int flags) {
   mname->int_field_put(_flags_offset, flags);
 }
 
-
+#endif
 // Return vmtarget from ResolvedMethodName method field through indirection
 Method* java_lang_invoke_MemberName::vmtarget(oop mname) {
   assert(is_instance(mname), "wrong type");
@@ -4023,6 +4031,7 @@ Method* java_lang_invoke_MemberName::vmtarget(oop mname) {
   return method == NULL ? NULL : java_lang_invoke_ResolvedMethodName::vmtarget(method);
 }
 
+#ifndef LEYDEN
 bool java_lang_invoke_MemberName::is_method(oop mname) {
   assert(is_instance(mname), "must be MemberName");
   return (flags(mname) & (MN_IS_METHOD | MN_IS_CONSTRUCTOR)) > 0;
@@ -4043,14 +4052,14 @@ void java_lang_invoke_MemberName::set_vmindex(oop mname, intptr_t index) {
   mname->address_field_put(_vmindex_offset, (address) index);
 }
 
-
+#endif
 Method* java_lang_invoke_ResolvedMethodName::vmtarget(oop resolved_method) {
   assert(is_instance(resolved_method), "wrong type");
   Method* m = (Method*)resolved_method->address_field(_vmtarget_offset);
   assert(m->is_method(), "must be");
   return m;
 }
-
+#ifndef LEYDEN
 // Used by redefinition to change Method* to new Method* with same hash (name, signature)
 void java_lang_invoke_ResolvedMethodName::set_vmtarget(oop resolved_method, Method* m) {
   assert(is_instance(resolved_method), "wrong type");
@@ -4269,13 +4278,15 @@ DependencyContext java_lang_invoke_MethodHandleNatives_CallSiteContext::vmdepend
   DependencyContext dep_ctx(vmdeps_addr, last_cleanup_addr);
   return dep_ctx;
 }
-
+#endif
 // Support for java_security_AccessControlContext
 
 int java_security_AccessControlContext::_context_offset;
 int java_security_AccessControlContext::_privilegedContext_offset;
 int java_security_AccessControlContext::_isPrivileged_offset;
 int java_security_AccessControlContext::_isAuthorized_offset;
+
+#ifndef LEYDEN
 
 #define ACCESSCONTROLCONTEXT_FIELDS_DO(macro) \
   macro(_context_offset,           k, "context",      protectiondomain_signature, false); \
@@ -4294,7 +4305,7 @@ void java_security_AccessControlContext::serialize_offsets(SerializeClosure* f) 
   ACCESSCONTROLCONTEXT_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
-
+#endif
 oop java_security_AccessControlContext::create(objArrayHandle context, bool isPrivileged, Handle privileged_context, TRAPS) {
   assert(_isPrivileged_offset != 0, "offsets should have been initialized");
   assert(_isAuthorized_offset != 0, "offsets should have been initialized");
@@ -4309,7 +4320,6 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   result->bool_field_put(_isAuthorized_offset, true);
   return result;
 }
-#endif
 
 // Support for java_lang_ClassLoader
 

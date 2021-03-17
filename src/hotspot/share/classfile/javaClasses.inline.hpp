@@ -188,7 +188,7 @@ inline bool java_lang_invoke_ConstantCallSite::is_instance(oop obj) {
 inline bool java_lang_invoke_MethodHandleNatives_CallSiteContext::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
-
+#endif
 inline bool java_lang_invoke_MemberName::is_instance(oop obj) {
   return obj != NULL && obj->klass() == vmClasses::MemberName_klass();
 }
@@ -196,6 +196,8 @@ inline bool java_lang_invoke_MemberName::is_instance(oop obj) {
 inline bool java_lang_invoke_ResolvedMethodName::is_instance(oop obj) {
   return obj != NULL && obj->klass() == vmClasses::ResolvedMethodName_klass();
 }
+
+#ifndef LEYDEN
 
 inline bool java_lang_invoke_MethodType::is_instance(oop obj) {
   return obj != NULL && obj->klass() == vmClasses::MethodType_klass();
