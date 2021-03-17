@@ -39,7 +39,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 #define UNNAMED_MODULE "unnamed module"
 #define UNNAMED_MODULE_LEN 14
 #define JAVAPKG "java"

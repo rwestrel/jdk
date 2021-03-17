@@ -38,7 +38,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // external name (synthetic) for the primordial "bootstrap" class loader instance
 #define BOOTSTRAP_LOADER_NAME "bootstrap"
 #define BOOTSTRAP_LOADER_NAME_LEN 9

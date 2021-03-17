@@ -55,6 +55,8 @@ bool PackageEntry::is_qexported_to(ModuleEntry* m) const {
   }
 }
 
+#ifndef LEYDEN
+
 // Add a module to the package's qualified export list.
 void PackageEntry::add_qexport(ModuleEntry* m) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
@@ -71,6 +73,7 @@ void PackageEntry::add_qexport(ModuleEntry* m) {
   // Establish exportability to module m
   _qualified_exports->append_if_missing(m);
 }
+
 
 // If the module's loader, that an export is being established to, is
 // not the same loader as this module's and is not one of the 3 builtin
@@ -95,6 +98,10 @@ void PackageEntry::set_export_walk_required(ClassLoaderData* m_loader_data) {
   }
 }
 
+#endif
+
+#ifndef LEYDEN
+
 // Set the package's exported states based on the value of the ModuleEntry.
 void PackageEntry::set_exported(ModuleEntry* m) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
@@ -114,6 +121,8 @@ void PackageEntry::set_exported(ModuleEntry* m) {
   }
 }
 
+#endif
+
 // Set the package as exported to all unnamed modules unless the package is
 // already unqualifiedly exported.
 void PackageEntry::set_is_exported_allUnnamed() {
@@ -123,6 +132,8 @@ void PackageEntry::set_is_exported_allUnnamed() {
    _export_flags = PKG_EXP_ALLUNNAMED;
   }
 }
+
+#ifndef LEYDEN
 
 // Remove dead module entries within the package's exported list.  Note that
 // if all of the modules on the _qualified_exports get purged the list does not
@@ -161,6 +172,8 @@ void PackageEntry::purge_qualified_exports() {
     }
   }
 }
+
+#endif
 
 void PackageEntry::delete_qualified_exports() {
   if (_qualified_exports != NULL) {
@@ -426,6 +439,8 @@ bool PackageEntry::exported_pending_delete() const {
   return (is_unqual_exported() && _qualified_exports != NULL);
 }
 
+#ifndef LEYDEN
+
 // Remove dead entries from all packages' exported list
 void PackageEntryTable::purge_all_package_exports() {
   assert_locked_or_safepoint(Module_lock);
@@ -443,6 +458,8 @@ void PackageEntryTable::purge_all_package_exports() {
     }
   }
 }
+
+#endif
 
 void PackageEntryTable::print(outputStream* st) {
   st->print_cr("Package Entry Table (table_size=%d, entries=%d)",

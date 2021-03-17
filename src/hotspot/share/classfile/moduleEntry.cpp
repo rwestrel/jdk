@@ -273,6 +273,8 @@ void ModuleEntry::delete_reads() {
   _reads = NULL;
 }
 
+#ifndef LEYDEN
+
 ModuleEntry* ModuleEntry::create_unnamed_module(ClassLoaderData* cld) {
   // The java.lang.Module for this loader's
   // corresponding unnamed module can be found in the java.lang.ClassLoader object.
@@ -319,11 +321,13 @@ ModuleEntry* ModuleEntry::new_unnamed_module_entry(Handle module_handle, ClassLo
   // Unnamed modules can read all other unnamed modules.
   entry->set_can_read_all_unnamed();
 
+#ifndef LEYDEN
   if (!module_handle.is_null()) {
     entry->set_module(cld->add_handle(module_handle));
   }
 
   entry->set_loader_data(cld);
+#endif
   entry->_is_open = true;
 
   JFR_ONLY(INIT_ID(entry);)
@@ -335,6 +339,8 @@ void ModuleEntry::delete_unnamed_module() {
   // Do not need unlink_entry() since the unnamed module is not in the hashtable
   FREE_C_HEAP_OBJ(this);
 }
+
+#endif
 
 ModuleEntryTable::ModuleEntryTable(int table_size)
   : Hashtable<Symbol*, mtModule>(table_size, sizeof(ModuleEntry))
@@ -580,6 +586,8 @@ void ModuleEntryTable::restore_archived_oops(ClassLoaderData* loader_data, Array
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
 
+#ifndef LEYDEN
+
 ModuleEntry* ModuleEntryTable::new_entry(unsigned int hash, Handle module_handle,
                                          bool is_open, Symbol* name,
                                          Symbol* version, Symbol* location,
@@ -596,11 +604,13 @@ ModuleEntry* ModuleEntryTable::new_entry(unsigned int hash, Handle module_handle
     entry->set_can_read_all_unnamed();
   }
 
+#ifndef LEYDEN
   if (!module_handle.is_null()) {
     entry->set_module(loader_data->add_handle(module_handle));
   }
 
   entry->set_loader_data(loader_data);
+#endif
   entry->set_version(version);
   entry->set_location(location);
   entry->set_is_open(is_open);
@@ -624,6 +634,10 @@ void ModuleEntryTable::add_entry(int index, ModuleEntry* new_entry) {
   Hashtable<Symbol*, mtModule>::add_entry(index, (HashtableEntry<Symbol*, mtModule>*)new_entry);
 }
 
+#endif
+
+#ifndef LEYDEN
+
 // Create an entry in the class loader's module_entry_table.  It is the
 // caller's responsibility to ensure that the entry has not already been
 // created.
@@ -641,6 +655,8 @@ ModuleEntry* ModuleEntryTable::locked_create_entry(Handle module_handle,
   add_entry(index_for(module_name), entry);
   return entry;
 }
+
+#endif
 
 // lookup_only by Symbol* to find a ModuleEntry.
 ModuleEntry* ModuleEntryTable::lookup_only(Symbol* name) {
@@ -667,6 +683,8 @@ void ModuleEntryTable::purge_all_module_reads() {
   }
 }
 
+#ifndef LEYDEN
+
 void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, Symbol* location) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
   ClassLoaderData* boot_loader_data = ClassLoaderData::the_null_class_loader_data();
@@ -690,6 +708,10 @@ void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, 
   // Store pointer to the ModuleEntry for java.base in the java.lang.Module object.
   java_lang_Module::set_module_entry(module_handle(), jb_module);
 }
+
+#endif
+
+#ifndef LEYDEN
 
 // Within java.lang.Class instances there is a java.lang.Module field that must
 // be set with the defining module.  During startup, prior to java.base's definition,
@@ -726,6 +748,8 @@ void ModuleEntryTable::patch_javabase_entries(Handle module_handle) {
   java_lang_Class::set_fixup_module_field_list(NULL);
 }
 
+#endif
+
 void ModuleEntryTable::print(outputStream* st) {
   st->print_cr("Module Entry Table (table_size=%d, entries=%d)",
                table_size(), number_of_entries());
@@ -744,7 +768,11 @@ void ModuleEntry::print(outputStream* st) {
                p2i(this),
                name() == NULL ? UNNAMED_MODULE : name()->as_C_string(),
                p2i(module()),
-               loader_data()->loader_name_and_id(),
+#ifndef LEYDEN
+          loader_data()->loader_name_and_id(),
+#else
+"",
+#endif
                version() != NULL ? version()->as_C_string() : "NULL",
                location() != NULL ? location()->as_C_string() : "NULL",
                BOOL_TO_STR(!can_read_all_unnamed()), p2i(next()));

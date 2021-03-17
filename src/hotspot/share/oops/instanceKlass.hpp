@@ -527,13 +527,9 @@ public:
     enclosing_method_attribute_size = 2
   };
 
-#ifndef LEYDEN
-
   // package
   PackageEntry* package() const     { return _package_entry; }
   ModuleEntry* module() const;
-
-#endif
 
   bool in_unnamed_package() const   { return (_package_entry == NULL); }
   void set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS);
@@ -683,15 +679,12 @@ public:
                                StaticLookupMode static_mode,
                                PrivateLookupMode private_mode);
 
-#ifndef LEYDEN
-
   // lookup operation (returns NULL if not found)
   Method* uncached_lookup_method(const Symbol* name,
                                  const Symbol* signature,
                                  OverpassLookupMode overpass_mode,
                                  PrivateLookupMode private_mode = PrivateLookupMode::find) const;
 
-#endif
 
   // lookup a method in all the interfaces that this class implements
   // (returns NULL if not found)
@@ -764,11 +757,29 @@ public:
 #endif
 
   // minor and major version numbers of class file
+  u2 minor_version() const                 {
+#ifndef LEYDEN
+    return _constants->minor_version();
+#else
+    return 0;
+#endif
+  }
+
 #ifndef LEYDEN
 
-  u2 minor_version() const                 { return _constants->minor_version(); }
   void set_minor_version(u2 minor_version) { _constants->set_minor_version(minor_version); }
-  u2 major_version() const                 { return _constants->major_version(); }
+
+#endif
+  u2 major_version() const                 {
+#ifndef LEYDEN
+    return _constants->major_version();
+#else
+    return 0;
+#endif
+  }
+
+#ifndef LEYDEN
+
   void set_major_version(u2 major_version) { _constants->set_major_version(major_version); }
 
 #endif

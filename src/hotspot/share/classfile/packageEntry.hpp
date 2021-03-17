@@ -36,7 +36,7 @@
 #include "jfr/support/jfrTraceIdExtension.hpp"
 #endif
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 template <class T> class Array;
 class MetaspaceClosure;
 

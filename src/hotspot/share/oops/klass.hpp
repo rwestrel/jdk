@@ -338,13 +338,9 @@ protected:
   }
 
 
-#ifndef LEYDEN
-
   // Obtain the module or package for this class
   virtual ModuleEntry* module() const = 0;
   virtual PackageEntry* package() const = 0;
-
-#endif
 
  protected:                                // internal accessors
   void     set_subklass(Klass* s);

@@ -80,7 +80,9 @@
 
 ClassLoaderData * ClassLoaderData::_the_null_class_loader_data = NULL;
 
-void ClassLoaderData::init_null_class_loader_data() {
+#ifndef LEYDEN
+
+ void ClassLoaderData::init_null_class_loader_data() {
   assert(_the_null_class_loader_data == NULL, "cannot initialize twice");
   assert(ClassLoaderDataGraph::_head == NULL, "cannot initialize twice");
 
@@ -199,6 +201,8 @@ OopHandle ClassLoaderData::ChunkedHandleList::add(oop o) {
   Atomic::release_store(&_head->_size, _head->_size + 1);
   return OopHandle(handle);
 }
+
+#endif
 
 int ClassLoaderData::ChunkedHandleList::count() const {
   int count = 0;
@@ -410,7 +414,9 @@ void ClassLoaderData::packages_do(void f(PackageEntry*)) {
   }
 }
 
-void ClassLoaderData::record_dependency(const Klass* k) {
+#ifndef LEYDEN
+
+ void ClassLoaderData::record_dependency(const Klass* k) {
   assert(k != NULL, "invariant");
 
   ClassLoaderData * const from_cld = this;
@@ -465,7 +471,11 @@ void ClassLoaderData::record_dependency(const Klass* k) {
   }
 }
 
-void ClassLoaderData::add_class(Klass* k, bool publicize /* true */) {
+#endif
+
+#ifndef LEYDEN
+
+ void ClassLoaderData::add_class(Klass* k, bool publicize /* true */) {
   {
     MutexLocker ml(metaspace_lock(), Mutex::_no_safepoint_check_flag);
     Klass* old_value = _klasses;
@@ -498,6 +508,7 @@ void ClassLoaderData::initialize_holder(Handle loader_or_mirror) {
     _holder = WeakHandle(Universe::vm_weak(), loader_or_mirror);
   }
 }
+
 
 // Remove a klass from the _klasses list for scratch_class during redefinition
 // or parsed class in the case of an error.
@@ -555,6 +566,7 @@ void ClassLoaderData::unload() {
   // Clean up global class iterator for compiler
   ClassLoaderDataGraph::adjust_saved_class(this);
 }
+#endif
 
 ModuleEntryTable* ClassLoaderData::modules() {
   // Lazily create the module entry table at first request.
@@ -579,7 +591,9 @@ ModuleEntryTable* ClassLoaderData::modules() {
 const int _boot_loader_dictionary_size    = 1009;
 const int _default_loader_dictionary_size = 107;
 
-Dictionary* ClassLoaderData::create_dictionary() {
+#ifndef LEYDEN
+
+ Dictionary* ClassLoaderData::create_dictionary() {
   assert(!has_class_mirror_holder(), "class mirror holder cld does not have a dictionary");
   int size;
   bool resizable = false;
@@ -600,6 +614,8 @@ Dictionary* ClassLoaderData::create_dictionary() {
   }
   return new Dictionary(this, size, resizable);
 }
+
+#endif
 
 // Tell the GC to keep this klass alive while iterating ClassLoaderDataGraph
 oop ClassLoaderData::holder_phantom() const {
@@ -653,7 +669,9 @@ public:
   }
 };
 
-ClassLoaderData::~ClassLoaderData() {
+#ifndef LEYDEN
+
+ ClassLoaderData::~ClassLoaderData() {
   // Release C heap structures for all the classes.
   ReleaseKlassClosure cl;
   classes_do(&cl);
@@ -722,6 +740,10 @@ ClassLoaderData::~ClassLoaderData() {
   }
 }
 
+#endif
+
+#ifndef LEYDEN
+
 // Returns true if this class loader data is for the app class loader
 // or a user defined system class loader.  (Note that the class loader
 // data may have a Class holder.)
@@ -753,6 +775,8 @@ bool ClassLoaderData::is_permanent_class_loader_data() const {
   return is_builtin_class_loader_data() && !has_class_mirror_holder();
 }
 
+#endif
+
 ClassLoaderMetaspace* ClassLoaderData::metaspace_non_null() {
   // If the metaspace has not been allocated, create a new one.  Might want
   // to create smaller arena for Reflection class loaders also.
@@ -781,7 +805,9 @@ ClassLoaderMetaspace* ClassLoaderData::metaspace_non_null() {
   return metaspace;
 }
 
-OopHandle ClassLoaderData::add_handle(Handle h) {
+#ifndef LEYDEN
+
+ OopHandle ClassLoaderData::add_handle(Handle h) {
   MutexLocker ml(metaspace_lock(),  Mutex::_no_safepoint_check_flag);
   record_modified_oops();
   return _handles.add(h());
@@ -804,6 +830,10 @@ void ClassLoaderData::init_handle_locked(OopHandle& dest, Handle h) {
     dest = _handles.add(h());
   }
 }
+
+#endif
+
+#ifndef LEYDEN
 
 // Add this metadata pointer to be freed when it's safe.  This is only during
 // a safepoint which checks if handles point to this metadata field.
@@ -885,6 +915,8 @@ void ClassLoaderData::free_deallocate_list_C_heap_structures() {
   }
 }
 
+#endif
+
 // Caller needs ResourceMark
 // If the class loader's _name has not been explicitly set, the class loader's
 // qualified class name is returned.
@@ -938,9 +970,11 @@ void ClassLoaderData::print_on(outputStream* out) const {
   if (is_unloading()) out->print(" unloading");
   out->print(" metaspace: " INTPTR_FORMAT, p2i(metaspace_or_null()));
 
+#ifndef LEYDEN
   if (_jmethod_ids != NULL) {
     Method::print_jmethod_ids(this, out);
   }
+#endif
   out->print(" handles count %d", _handles.count());
   out->print(" dependencies %d", _dependency_count);
   out->print_cr("}");

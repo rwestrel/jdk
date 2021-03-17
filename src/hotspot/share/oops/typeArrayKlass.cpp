@@ -355,8 +355,6 @@ const char* TypeArrayKlass::internal_name() const {
   return Klass::external_name();
 }
 
-#ifndef LEYDEN
-
 // A TypeArrayKlass is an array of a primitive type, its defining module is java.base
 ModuleEntry* TypeArrayKlass::module() const {
   return ModuleEntryTable::javabase_moduleEntry();
@@ -365,5 +363,3 @@ ModuleEntry* TypeArrayKlass::module() const {
 PackageEntry* TypeArrayKlass::package() const {
   return NULL;
 }
-
-#endif

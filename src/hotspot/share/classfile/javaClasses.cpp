@@ -830,10 +830,12 @@ int java_lang_Class::_source_file_offset;
 int java_lang_Class::_classData_offset;
 int java_lang_Class::_classRedefinedCount_offset;
 
-#ifndef LEYDEN
 bool java_lang_Class::_offsets_computed = false;
 GrowableArray<Klass*>* java_lang_Class::_fixup_mirror_list = NULL;
 GrowableArray<Klass*>* java_lang_Class::_fixup_module_field_list = NULL;
+
+
+#ifndef LEYDEN
 
 static void initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
   assert(mirror.not_null() && fd->is_static(), "just checking");
@@ -1373,6 +1375,8 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
 
+#endif
+
 void java_lang_Class::fixup_module_field(Klass* k, Handle module) {
   assert(_module_offset != 0, "must have been computed already");
   java_lang_Class::set_module(k->java_mirror(), module());
@@ -1471,7 +1475,6 @@ void java_lang_Class::set_module(oop java_class, oop module) {
   assert(_module_offset != 0, "must be set");
   java_class->obj_field_put(_module_offset, module);
 }
-#endif
 
 oop java_lang_Class::name(Handle java_class, TRAPS) {
   assert(_name_offset != 0, "must be set");
@@ -1494,6 +1497,7 @@ void java_lang_Class::set_source_file(oop java_class, oop source_file) {
 }
 
 #ifndef LEYDEN
+
 oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, BasicType type, TRAPS) {
   // This should be improved by adding a field at the Java level or by
   // introducing a new VM klass (see comment in ClassFileParser)
@@ -1509,6 +1513,8 @@ oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, Basic
 #endif
   return java_class;
 }
+
+#endif
 
 
 Klass* java_lang_Class::as_Klass_raw(oop java_class) {
@@ -1546,6 +1552,8 @@ void java_lang_Class::print_signature(oop java_class, outputStream* st) {
   if (is_instance)  st->print(";");
 }
 
+#ifndef LEYDEN
+
 Symbol* java_lang_Class::as_signature(oop java_class, bool intern_if_not_found) {
   assert(java_lang_Class::is_instance(java_class), "must be a Class object");
   Symbol* name;
@@ -1573,6 +1581,7 @@ Symbol* java_lang_Class::as_signature(oop java_class, bool intern_if_not_found) 
   }
   return name;
 }
+
 #endif
 // Returns the Java name for this Java mirror (Resource allocated)
 // See Klass::external_name().
@@ -1590,7 +1599,6 @@ const char* java_lang_Class::as_external_name(oop java_class) {
   }
   return name;
 }
-#ifndef LEYDEN
 Klass* java_lang_Class::array_klass_acquire(oop java_class) {
   Klass* k = ((Klass*)java_class->metadata_field_acquire(_array_klass_offset));
   assert(k == NULL || k->is_klass() && k->is_array_klass(), "should be array klass");
@@ -1602,7 +1610,6 @@ void java_lang_Class::release_set_array_klass(oop java_class, Klass* klass) {
   assert(klass->is_klass() && klass->is_array_klass(), "should be array klass");
   java_class->release_metadata_field_put(_array_klass_offset, klass);
 }
-#endif
 
 BasicType java_lang_Class::primitive_type(oop java_class) {
   assert(java_lang_Class::is_primitive(java_class), "just checking");
@@ -1617,7 +1624,6 @@ BasicType java_lang_Class::primitive_type(oop java_class) {
   assert(Universe::java_mirror(type) == java_class, "must be consistent");
   return type;
 }
-#ifndef LEYDEN
 BasicType java_lang_Class::as_BasicType(oop java_class, Klass** reference_klass) {
   assert(java_lang_Class::is_instance(java_class), "must be a Class object");
   if (is_primitive(java_class)) {
@@ -1638,6 +1644,7 @@ oop java_lang_Class::primitive_mirror(BasicType t) {
   assert(java_lang_Class::is_primitive(mirror), "must be primitive");
   return mirror;
 }
+#ifndef LEYDEN
 
 #define CLASS_FIELDS_DO(macro) \
   macro(_classRedefinedCount_offset, k, "classRedefinedCount", int_signature,         false); \
@@ -4302,7 +4309,7 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   result->bool_field_put(_isAuthorized_offset, true);
   return result;
 }
-
+#endif
 
 // Support for java_lang_ClassLoader
 
@@ -4331,6 +4338,8 @@ void java_lang_ClassLoader::release_set_loader_data(oop loader, ClassLoaderData*
   HeapAccess<MO_RELEASE>::store_at(loader, _loader_data_offset, new_data);
 }
 
+#ifndef LEYDEN
+
 #define CLASSLOADER_FIELDS_DO(macro) \
   macro(_parallelCapable_offset, k1, "parallelLockMap",      concurrenthashmap_signature, false); \
   macro(_name_offset,            k1, vmSymbols::name_name(), string_signature, false); \
@@ -4351,7 +4360,7 @@ void java_lang_ClassLoader::serialize_offsets(SerializeClosure* f) {
   CLASSLOADER_INJECTED_FIELDS(INJECTED_FIELD_SERIALIZE_OFFSET);
 }
 #endif
-
+#endif
 oop java_lang_ClassLoader::parent(oop loader) {
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_parent_offset);
@@ -4404,6 +4413,9 @@ bool java_lang_ClassLoader::parallelCapable(oop class_loader) {
   return (class_loader->obj_field(_parallelCapable_offset) != NULL);
 }
 
+
+#ifndef LEYDEN
+
 bool java_lang_ClassLoader::is_trusted_loader(oop loader) {
   // Fix for 4474172; see evaluation for more details
   loader = non_reflection_class_loader(loader);
@@ -4415,6 +4427,9 @@ bool java_lang_ClassLoader::is_trusted_loader(oop loader) {
   }
   return false;
 }
+
+#endif
+
 
 // Return true if this is one of the class loaders associated with
 // the generated bytecodes for reflection.
@@ -4451,6 +4466,7 @@ int java_lang_System::_static_out_offset;
 int java_lang_System::_static_err_offset;
 int java_lang_System::_static_security_offset;
 
+#ifndef LEYDEN
 #define SYSTEM_FIELDS_DO(macro) \
   macro(_static_in_offset,  k, "in",  input_stream_signature, true); \
   macro(_static_out_offset, k, "out", print_stream_signature, true); \

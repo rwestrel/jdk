@@ -46,6 +46,7 @@ inline int compare_symbol(const Symbol* a, const Symbol* b) {
 }
 
 static vmSymbolID vm_symbol_index[vmSymbols::number_of_symbols()];
+#ifndef LEYDEN
 extern "C" {
   static int compare_vmsymbol_sid(const void* void_a, const void* void_b) {
     const Symbol* a = Symbol::vm_symbol_at(*((vmSymbolID*) void_a));
@@ -53,12 +54,15 @@ extern "C" {
     return compare_symbol(a, b);
   }
 }
+#endif
 
 #ifdef ASSERT
 #define VM_SYMBOL_ENUM_NAME_BODY(name, string) #name "\0"
 static const char* vm_symbol_enum_names =
   VM_SYMBOLS_DO(VM_SYMBOL_ENUM_NAME_BODY, VM_ALIAS_IGNORE)
   "\0";
+#ifndef LEYDEN
+
 static const char* vm_symbol_enum_name(vmSymbolID sid) {
   const char* string = &vm_symbol_enum_names[0];
   int skip = vmSymbols::as_int(sid) - vmSymbols::as_int(vmSymbolID::FIRST_SID);
@@ -69,6 +73,8 @@ static const char* vm_symbol_enum_name(vmSymbolID sid) {
   }
   return string;
 }
+
+#endif
 #endif //ASSERT
 
 // Put all the VM symbol strings in one place.
@@ -76,6 +82,7 @@ static const char* vm_symbol_enum_name(vmSymbolID sid) {
 #define VM_SYMBOL_BODY(name, string) string "\0"
 static const char* vm_symbol_bodies = VM_SYMBOLS_DO(VM_SYMBOL_BODY, VM_ALIAS_IGNORE);
 
+#ifndef LEYDEN
 void vmSymbols::initialize(TRAPS) {
   assert(SID_LIMIT <= (1<<log2_SID_LIMIT), "must fit in this bitfield");
   assert(SID_LIMIT*5 > (1<<log2_SID_LIMIT), "make the bitfield smaller, please");
@@ -168,6 +175,8 @@ void vmSymbols::initialize(TRAPS) {
 #endif
 }
 
+#endif
+
 
 #ifndef PRODUCT
 const char* vmSymbols::name_for(vmSymbolID sid) {
@@ -195,6 +204,8 @@ void vmSymbols::symbols_do(SymbolClosure* f) {
   }
 }
 
+#ifndef LEYDEN
+
 void vmSymbols::metaspace_pointers_do(MetaspaceClosure *closure) {
   for (auto index : EnumRange<vmSymbolID>{}) {
     closure->push(&Symbol::_vm_symbols[as_int(index)]);
@@ -203,6 +214,8 @@ void vmSymbols::metaspace_pointers_do(MetaspaceClosure *closure) {
     closure->push(&_type_signatures[i]);
   }
 }
+
+#endif
 
 void vmSymbols::serialize(SerializeClosure* soc) {
   soc->do_region((u_char*)&Symbol::_vm_symbols[FIRST_SID],

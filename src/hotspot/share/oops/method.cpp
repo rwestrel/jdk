@@ -857,12 +857,13 @@ bool Method::is_constant_getter() const {
 bool Method::is_initializer() const {
   return is_object_initializer() || is_static_initializer();
 }
+#endif
 
 bool Method::has_valid_initializer_flags() const {
   return (is_static() ||
           method_holder()->major_version() < 51);
 }
-
+#ifndef LEYDEN
 bool Method::is_static_initializer() const {
   // For classfiles version 51 or greater, ensure that the clinit method is
   // static.  Non-static methods with the name "<clinit>" are not static

@@ -137,12 +137,8 @@ class TypeArrayKlass : public ArrayKlass {
  public:
   const char* internal_name() const;
 
-#ifndef LEYDEN
-
   ModuleEntry* module() const;
   PackageEntry* package() const;
-
-#endif
 };
 
 #endif // SHARE_OOPS_TYPEARRAYKLASS_HPP

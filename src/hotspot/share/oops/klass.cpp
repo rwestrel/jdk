@@ -381,7 +381,6 @@ InstanceKlass* Klass::superklass() const {
   return _super == NULL ? NULL : InstanceKlass::cast(_super);
 }
 
-#ifndef LEYDEN
 // subklass links.  Used by the compiler (and vtable initialization)
 // May be cleaned concurrently, so must use the Compile_lock.
 // The log parameter is for clean_weak_klass_links to report unlinked classes.
@@ -394,9 +393,13 @@ Klass* Klass::subklass(bool log) const {
        // create _next_sibling edges to dead data.
        chain = Atomic::load(&chain->_next_sibling))
   {
+#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
+#else
+    if (log) {
+#endif
       if (log_is_enabled(Trace, class, unload)) {
         ResourceMark rm;
         log_trace(class, unload)("unlinking class (subclass): %s", chain->external_name());
@@ -414,9 +417,13 @@ Klass* Klass::next_sibling(bool log) const {
        chain = Atomic::load(&chain->_next_sibling)) {
     // Only return alive klass, there may be stale klass
     // in this chain if cleaned concurrently.
+#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
+#else
+    if (log) {
+#endif
       if (log_is_enabled(Trace, class, unload)) {
         ResourceMark rm;
         log_trace(class, unload)("unlinking class (sibling): %s", chain->external_name());
@@ -426,6 +433,7 @@ Klass* Klass::next_sibling(bool log) const {
   return NULL;
 }
 
+#ifndef LEYDEN
 void Klass::set_subklass(Klass* s) {
   assert(s != this, "sanity check");
   Atomic::release_store(&_subklass, s);
