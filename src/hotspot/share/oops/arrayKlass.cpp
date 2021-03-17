@@ -83,6 +83,8 @@ Method* ArrayKlass::uncached_lookup_method(const Symbol* name,
   return super()->uncached_lookup_method(name, signature, OverpassLookupMode::skip, private_mode);
 }
 
+#ifndef LEYDEN
+
 ArrayKlass::ArrayKlass(Symbol* name, KlassID id) :
   Klass(id),
   _dimension(1),
@@ -97,6 +99,8 @@ ArrayKlass::ArrayKlass(Symbol* name, KlassID id) :
     set_is_cloneable(); // All arrays are considered to be cloneable (See JLS 20.1.5)
     JFR_ONLY(INIT_ID(this);)
 }
+
+#endif
 
 
 // Initialization of vtables and mirror object is done separatly from base_create_array_klass,

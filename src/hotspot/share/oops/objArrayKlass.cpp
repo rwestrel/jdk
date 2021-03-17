@@ -136,8 +136,6 @@ ObjArrayKlass* ObjArrayKlass::allocate_objArray_klass(ClassLoaderData* loader_da
 
   return oak;
 }
-#endif
-
 
 ObjArrayKlass::ObjArrayKlass(int n, Klass* element_klass, Symbol* name) : ArrayKlass(name, ID) {
   set_dimension(n);
@@ -157,6 +155,8 @@ ObjArrayKlass::ObjArrayKlass(int n, Klass* element_klass, Symbol* name) : ArrayK
   assert(is_array_klass(), "sanity");
   assert(is_objArray_klass(), "sanity");
 }
+
+#endif
 
 int ObjArrayKlass::oop_size(oop obj) const {
   assert(obj->is_objArray(), "must be object array");

@@ -482,7 +482,6 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
   }
   COMPILER2_OR_JVMCI_PRESENT(DerivedPointerTable::clear());
 
-#ifndef LEYDEN
   if (restore_marks_for_biased_locking) {
     // We perform this mark word preservation work lazily
     // because it's only at this point that we know whether we
@@ -490,7 +489,6 @@ void GenCollectedHeap::collect_generation(Generation* gen, bool full, size_t siz
     // scavenge-only collections where it's unnecessary
     BiasedLocking::preserve_marks();
   }
-#endif
 
   // Do collection work
   {
@@ -680,9 +678,7 @@ void GenCollectedHeap::do_collection(bool           full,
     // the initial value for "complete" flag.
     gc_epilogue(true);
 
-#ifndef LEYDEN
     BiasedLocking::restore_marks();
-#endif
 
     print_heap_after_gc();
   }
@@ -693,22 +689,18 @@ bool GenCollectedHeap::should_do_full_collection(size_t size, bool full, bool is
   return max_gen == OldGen && _old_gen->should_collect(full, size, is_tlab);
 }
 
-void GenCollectedHeap::register_nmethod(nmethod* nm) {
 #ifndef LEYDEN
+
+void GenCollectedHeap::register_nmethod(nmethod* nm) {
   ScavengableNMethods::register_nmethod(nm);
-#endif
 }
 
 void GenCollectedHeap::unregister_nmethod(nmethod* nm) {
-#ifndef LEYDEN
   ScavengableNMethods::unregister_nmethod(nm);
-#endif
 }
 
 void GenCollectedHeap::verify_nmethod(nmethod* nm) {
-#ifndef LEYDEN
   ScavengableNMethods::verify_nmethod(nm);
-#endif
 }
 
 void GenCollectedHeap::flush_nmethod(nmethod* nm) {
@@ -716,10 +708,10 @@ void GenCollectedHeap::flush_nmethod(nmethod* nm) {
 }
 
 void GenCollectedHeap::prune_scavengable_nmethods() {
-#ifndef LEYDEN
   ScavengableNMethods::prune_nmethods();
-#endif
 }
+
+#endif
 
 HeapWord* GenCollectedHeap::satisfy_failed_allocation(size_t size, bool is_tlab) {
   GCCauseSetter x(this, GCCause::_allocation_failure);

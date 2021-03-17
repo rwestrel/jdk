@@ -41,9 +41,9 @@ class compiledVFrame: public javaVFrame {
 
   StackValueCollection*        locals()             const;
   StackValueCollection*        expressions()        const;
+#endif
   GrowableArray<MonitorInfo*>* monitors()           const;
 
-#endif
   int                          vframe_id()          const { return _vframe_id; }
   bool                         has_ea_local_in_scope() const;
   bool                         arg_escape()         const; // at call with arg escape in parameter list

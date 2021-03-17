@@ -83,5 +83,6 @@ bool LRUMaxHeapPolicy::should_clear_reference(oop p,
   if(interval <= _max_interval) {
     return false;
   }
+
   return true;
 }

@@ -50,9 +50,13 @@ BiasedLockingCounters BiasedLocking::_counters;
 static GrowableArray<Handle>*   _preserved_oop_stack  = NULL;
 static GrowableArray<markWord>* _preserved_mark_stack = NULL;
 
+#ifndef LEYDEN
+
 static void enable_biased_locking(InstanceKlass* k) {
   k->set_prototype_header(markWord::biased_locking_prototype());
 }
+
+#endif
 
 static void enable_biased_locking() {
   _biased_locking_enabled = true;
@@ -67,7 +71,9 @@ class VM_EnableBiasedLocking: public VM_Operation {
   void doit() {
     // Iterate the class loader data dictionaries enabling biased locking for all
     // currently loaded classes.
+#ifndef LEYDEN
     ClassLoaderDataGraph::dictionary_classes_do(enable_biased_locking);
+#endif
     // Indicate that future instances should enable it as well
     enable_biased_locking();
   }

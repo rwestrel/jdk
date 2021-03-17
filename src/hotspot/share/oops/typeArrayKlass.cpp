@@ -66,9 +66,7 @@ TypeArrayKlass* TypeArrayKlass::create_klass(BasicType type,
 
   return ak;
 }
-#endif
 
-#ifndef LEYDEN
 TypeArrayKlass* TypeArrayKlass::allocate(ClassLoaderData* loader_data, BasicType type, Symbol* name, TRAPS) {
   assert(TypeArrayKlass::header_size() <= InstanceKlass::header_size(),
       "array klasses must be same size as InstanceKlass");
@@ -77,7 +75,6 @@ TypeArrayKlass* TypeArrayKlass::allocate(ClassLoaderData* loader_data, BasicType
 
   return new (loader_data, size, THREAD) TypeArrayKlass(type, name);
 }
-#endif
 
 TypeArrayKlass::TypeArrayKlass(BasicType type, Symbol* name) : ArrayKlass(name, ID) {
   set_layout_helper(array_layout_helper(type));
@@ -87,10 +84,10 @@ TypeArrayKlass::TypeArrayKlass(BasicType type, Symbol* name) : ArrayKlass(name, 
   set_max_length(arrayOopDesc::max_array_length(type));
   assert(size() >= TypeArrayKlass::header_size(), "bad size");
 
-#ifndef LEYDEN
   set_class_loader_data(ClassLoaderData::the_null_class_loader_data());
-#endif
 }
+
+#endif
 
 typeArrayOop TypeArrayKlass::allocate_common(int length, bool do_zero, TRAPS) {
   assert(log2_element_size() >= 0, "bad scale");
@@ -358,9 +355,9 @@ const char* TypeArrayKlass::internal_name() const {
   return Klass::external_name();
 }
 
-// A TypeArrayKlass is an array of a primitive type, its defining module is java.base
 #ifndef LEYDEN
 
+// A TypeArrayKlass is an array of a primitive type, its defining module is java.base
 ModuleEntry* TypeArrayKlass::module() const {
   return ModuleEntryTable::javabase_moduleEntry();
 }
@@ -368,4 +365,5 @@ ModuleEntry* TypeArrayKlass::module() const {
 PackageEntry* TypeArrayKlass::package() const {
   return NULL;
 }
+
 #endif

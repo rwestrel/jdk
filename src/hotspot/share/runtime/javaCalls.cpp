@@ -431,7 +431,6 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
         }
       }
 #endif
-#ifndef LEYDEN
       StubRoutines::call_stub()(
         (address)&link,
         // (intptr_t*)&(result->_value), // see NOTE above (compiler problem)
@@ -443,7 +442,6 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
         args->size_of_parameters(),
         CHECK
       );
-#endif
 
       result = link.result();  // circumvent MS C++ 5.0 compiler bug (result is clobbered across call)
       // Preserve oop return value across possible gc points

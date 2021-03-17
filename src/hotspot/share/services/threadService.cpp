@@ -371,7 +371,6 @@ void ThreadService::reset_contention_time_stat(JavaThread* thread) {
 
 // Find deadlocks involving raw monitors, object monitors and concurrent locks
 // if concurrent_locks is true.
-#ifndef LEYDEN
 
 DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, bool concurrent_locks) {
   assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint");
@@ -461,12 +460,10 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
       } else {
         if (concurrent_locks) {
           if (waitingToLockBlocker->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
-#ifndef LEYDEN
             oop threadObj = java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(waitingToLockBlocker);
             // This JavaThread (if there is one) is protected by the
             // ThreadsListSetter in VM_FindDeadlocks::doit().
             currentThread = threadObj != NULL ? java_lang_Thread::thread(threadObj) : NULL;
-#endif
           } else {
             currentThread = NULL;
           }
@@ -513,8 +510,6 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
   delete cycle;
   return deadlocks;
 }
-
-#endif
 
 ThreadDumpResult::ThreadDumpResult() : _num_threads(0), _num_snapshots(0), _snapshots(NULL), _last(NULL), _next(NULL), _setter() {
 
@@ -982,8 +977,6 @@ void ThreadSnapshot::metadata_do(void f(Metadata*)) {
 }
 
 
-#ifndef LEYDEN
-
 DeadlockCycle::DeadlockCycle() {
   _is_deadlock = false;
   _threads = new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<JavaThread*>(INITIAL_ARRAY_SIZE, mtServiceability);
@@ -1078,8 +1071,6 @@ void DeadlockCycle::print_on_with(ThreadsList * t_list, outputStream* st) const 
   }
   JavaMonitorsInStackTrace = oldJavaMonitorsInStackTrace;
 }
-
-#endif
 
 ThreadsListEnumerator::ThreadsListEnumerator(Thread* cur_thread,
                                              bool include_jvmti_agent_threads,

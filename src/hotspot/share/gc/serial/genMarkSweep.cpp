@@ -128,7 +128,9 @@ void GenMarkSweep::invoke_at_safepoint(ReferenceProcessor* rp, bool clear_all_so
     rs->invalidate_or_clear(old_gen);
   }
 
+#ifndef LEYDEN
   gch->prune_scavengable_nmethods();
+#endif
 
   // refs processing: clean slate
   set_ref_processor(NULL);

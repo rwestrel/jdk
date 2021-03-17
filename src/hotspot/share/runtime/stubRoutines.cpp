@@ -56,9 +56,10 @@ BufferBlob* StubRoutines::_code1                                = NULL;
 BufferBlob* StubRoutines::_code2                                = NULL;
 
 address StubRoutines::_call_stub_return_address                 = NULL;
+#endif
 address StubRoutines::_call_stub_entry                          = NULL;
-
 address StubRoutines::_catch_exception_entry                    = NULL;
+#ifndef LEYDEN
 address StubRoutines::_forward_exception_entry                  = NULL;
 address StubRoutines::_throw_AbstractMethodError_entry          = NULL;
 address StubRoutines::_throw_IncompatibleClassChangeError_entry = NULL;
@@ -77,7 +78,9 @@ address StubRoutines::_atomic_cmpxchg_byte_entry                = NULL;
 address StubRoutines::_atomic_cmpxchg_long_entry                = NULL;
 address StubRoutines::_atomic_add_entry                         = NULL;
 address StubRoutines::_atomic_add_long_entry                    = NULL;
+#endif
 address StubRoutines::_fence_entry                              = NULL;
+#ifndef LEYDEN
 address StubRoutines::_d2i_wrapper                              = NULL;
 address StubRoutines::_d2l_wrapper                              = NULL;
 

@@ -85,6 +85,7 @@ bool ModuleEntry::should_show_version() {
     const char* loc = location()->as_C_string();
     ClassLoaderData* cld = loader_data();
 
+#ifndef LEYDEN
     assert(!cld->has_class_mirror_holder(), "module's cld should have a ClassLoader holder not a Class holder");
     if ((cld->is_the_null_class_loader_data() || cld->is_platform_class_loader_data()) &&
         (strncmp(loc, "jrt:/java.", 10) == 0)) {
@@ -94,6 +95,7 @@ bool ModuleEntry::should_show_version() {
         cld->is_permanent_class_loader_data() && (strncmp(loc, "jrt:/jdk.", 9) == 0)) {
       return false;
     }
+#endif
   }
   return true;
 }
@@ -122,7 +124,9 @@ void ModuleEntry::set_shared_protection_domain(ClassLoaderData *loader_data,
                                                Handle pd_h) {
   // Create a handle for the shared ProtectionDomain and save it atomically.
   // init_handle_locked checks if someone beats us setting the _shared_pd cache.
+#ifndef LEYDEN
   loader_data->init_handle_locked(_shared_pd, pd_h);
+#endif
 }
 
 // Returns true if this module can read module m
@@ -145,11 +149,13 @@ bool ModuleEntry::can_read(ModuleEntry* m) const {
   // At the same time, another thread can instrument the module classes by
   // injecting dependencies that require the default read edges for resolution.
   if (this->has_default_read_edges() && !m->is_named()) {
+#ifndef LEYDEN
     ClassLoaderData* cld = m->loader_data();
     assert(!cld->has_class_mirror_holder(), "module's cld should have a ClassLoader holder not a Class holder");
     if (cld->is_the_null_class_loader_data() || cld->is_system_class_loader_data()) {
       return true; // default read edge
     }
+#endif
   }
   if (!has_reads_list()) {
     return false;
@@ -191,6 +197,7 @@ void ModuleEntry::add_read(ModuleEntry* m) {
 void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
   assert(is_named(), "Cannot call set_read_walk_required on unnamed module");
   assert_locked_or_safepoint(Module_lock);
+#ifndef LEYDEN
   if (!_must_walk_reads &&
       loader_data() != m_loader_data &&
       !m_loader_data->is_builtin_class_loader_data()) {
@@ -201,6 +208,7 @@ void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
                         (name() != NULL) ? name()->as_C_string() : UNNAMED_MODULE);
     }
   }
+#endif
 }
 
 // Set whether the module is open, i.e. all its packages are unqualifiedly exported
@@ -236,12 +244,14 @@ void ModuleEntry::purge_reads() {
     for (int idx = len - 1; idx >= 0; idx--) {
       ModuleEntry* module_idx = _reads->at(idx);
       ClassLoaderData* cld_idx = module_idx->loader_data();
+#ifndef LEYDEN
       if (cld_idx->is_unloading()) {
         _reads->delete_at(idx);
       } else {
         // Update the need to walk this module's reads based on live modules
         set_read_walk_required(cld_idx);
       }
+#endif
     }
   }
 }

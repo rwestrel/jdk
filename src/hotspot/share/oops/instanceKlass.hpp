@@ -527,14 +527,14 @@ public:
     enclosing_method_attribute_size = 2
   };
 
-  // package
-
 #ifndef LEYDEN
-  PackageEntry* package() const     { return _package_entry; }
 
+  // package
+  PackageEntry* package() const     { return _package_entry; }
   ModuleEntry* module() const;
 
 #endif
+
   bool in_unnamed_package() const   { return (_package_entry == NULL); }
   void set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS);
   // If the package for the InstanceKlass is in the boot loader's package entry
@@ -752,6 +752,12 @@ public:
 #ifndef LEYDEN
 
   Symbol* source_file_name() const               { return _constants->source_file_name(); }
+#else
+  Symbol* source_file_name() const               { return NULL; }
+
+#endif
+#ifndef LEYDEN
+
   u2 source_file_name_index() const              { return _constants->source_file_name_index(); }
   void set_source_file_name_index(u2 sourcefile_index) { _constants->set_source_file_name_index(sourcefile_index); }
 

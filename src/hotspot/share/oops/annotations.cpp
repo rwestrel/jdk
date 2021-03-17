@@ -38,11 +38,8 @@
 Annotations* Annotations::allocate(ClassLoaderData* loader_data, TRAPS) {
   return new (loader_data, size(), MetaspaceObj::AnnotationsType, THREAD) Annotations();
 }
-#endif
 
 // helper
-#ifndef LEYDEN
-
 void Annotations::free_contents(ClassLoaderData* loader_data, Array<AnnotationArray*>* p) {
   if (p != NULL) {
     for (int i = 0; i < p->length(); i++) {

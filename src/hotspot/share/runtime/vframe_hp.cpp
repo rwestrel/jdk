@@ -212,7 +212,7 @@ StackValueCollection* compiledVFrame::expressions() const {
 
   return result;
 }
-
+#endif
 
 // The implementation of the following two methods was factorized into the
 // class StackValue because it is also used from within deoptimization.cpp for
@@ -225,7 +225,6 @@ StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
 BasicLock* compiledVFrame::resolve_monitor_lock(Location location) const {
   return StackValue::resolve_monitor_lock(&_fr, location);
 }
-
 
 GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
   // Natives has no scope
@@ -286,7 +285,6 @@ GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
 
   return result;
 }
-#endif
 
 compiledVFrame::compiledVFrame(const frame* fr, const RegisterMap* reg_map, JavaThread* thread, CompiledMethod* nm)
 : javaVFrame(fr, reg_map, thread) {

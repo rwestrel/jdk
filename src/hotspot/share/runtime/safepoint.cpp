@@ -573,13 +573,13 @@ public:
       }
     }
 
-
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_STRING_TABLE_REHASH)) {
       if (StringTable::needs_rehashing()) {
         Tracer t("rehashing string table");
         StringTable::rehash_table();
       }
     }
+
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_SYSTEM_DICTIONARY_RESIZE)) {
       if (Dictionary::does_any_dictionary_needs_resizing()) {
         Tracer t("resizing system dictionaries");
@@ -902,7 +902,6 @@ void ThreadSafepointState::print_on(outputStream *st) const {
 
 // Process pending operation.
 void ThreadSafepointState::handle_polling_page_exception() {
-#ifndef LEYDEN
   JavaThread* self = thread();
   assert(self == Thread::current()->as_Java_thread(), "must be self");
 
@@ -974,10 +973,12 @@ void ThreadSafepointState::handle_polling_page_exception() {
 
     // If we have a pending async exception deoptimize the frame
     // as otherwise we may never deliver it.
+#ifndef LEYDEN
     if (self->has_async_condition()) {
       ThreadInVMfromJavaNoAsyncException __tiv(self);
       Deoptimization::deoptimize_frame(self, caller_fr.id());
     }
+#endif
 
     // If an exception has been installed we must check for a pending deoptimization
     // Deoptimize frame if exception has been thrown.
@@ -985,6 +986,7 @@ void ThreadSafepointState::handle_polling_page_exception() {
     if (self->has_pending_exception() ) {
       RegisterMap map(self, true, false);
       frame caller_fr = stub_fr.sender(&map);
+#ifndef LEYDEN
       if (caller_fr.is_deoptimized_frame()) {
         // The exception patch will destroy registers that are still
         // live and will be needed during deoptimization. Defer the
@@ -995,9 +997,9 @@ void ThreadSafepointState::handle_polling_page_exception() {
 
         fatal("Exception installed and deoptimization is pending");
       }
+#endif
     }
   }
-#endif
 }
 
 

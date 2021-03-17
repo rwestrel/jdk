@@ -138,9 +138,13 @@ class StubRoutines: AllStatic {
   static address _verify_oop_subroutine_entry;
 
   static address _call_stub_return_address;                // the return PC, when returning to a call stub
+#endif
   static address _call_stub_entry;
+#ifndef LEYDEN
   static address _forward_exception_entry;
+#endif
   static address _catch_exception_entry;
+#ifndef LEYDEN
   static address _throw_AbstractMethodError_entry;
   static address _throw_IncompatibleClassChangeError_entry;
 #endif
@@ -157,7 +161,9 @@ class StubRoutines: AllStatic {
   static address _atomic_cmpxchg_long_entry;
   static address _atomic_add_entry;
   static address _atomic_add_long_entry;
+#endif
   static address _fence_entry;
+#ifndef LEYDEN
   static address _d2i_wrapper;
   static address _d2l_wrapper;
 
@@ -306,6 +312,7 @@ class StubRoutines: AllStatic {
   static jint*   verify_oop_count_addr()                   { return &_verify_oop_count; }
   // a subroutine for debugging the GC
   static address verify_oop_subroutine_entry_address()     { return (address)&_verify_oop_subroutine_entry; }
+#endif
 
   static address catch_exception_entry()                   { return _catch_exception_entry; }
 
@@ -323,6 +330,7 @@ class StubRoutines: AllStatic {
 
   static CallStub call_stub()                              { return CAST_TO_FN_PTR(CallStub, _call_stub_entry); }
 
+#ifndef LEYDEN
   // Exceptions
   static address forward_exception_entry()                 { return _forward_exception_entry; }
   // Implicit exceptions
@@ -342,8 +350,9 @@ class StubRoutines: AllStatic {
   static address atomic_cmpxchg_long_entry()               { return _atomic_cmpxchg_long_entry; }
   static address atomic_add_entry()                        { return _atomic_add_entry; }
   static address atomic_add_long_entry()                   { return _atomic_add_long_entry; }
+#endif
   static address fence_entry()                             { return _fence_entry; }
-
+#ifndef LEYDEN
   static address d2i_wrapper()                             { return _d2i_wrapper; }
   static address d2l_wrapper()                             { return _d2l_wrapper; }
   static jint    fpu_cntrl_wrd_std()                       { return _fpu_cntrl_wrd_std;   }

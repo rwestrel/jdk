@@ -31,7 +31,7 @@
 #include "oops/weakHandle.hpp"
 #include "utilities/tableStatistics.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class CompactHashtableWriter;
 class DumpedInternedStrings;

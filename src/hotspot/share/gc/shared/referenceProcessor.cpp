@@ -49,7 +49,6 @@ void referenceProcessor_init() {
 }
 
 void ReferenceProcessor::init_statics() {
-#ifndef LEYDEN
   // We need a monotonically non-decreasing time in ms but
   // os::javaTimeMillis() does not guarantee monotonicity.
   jlong now = os::javaTimeNanos() / NANOSECS_PER_MILLISEC;
@@ -60,7 +59,7 @@ void ReferenceProcessor::init_statics() {
   java_lang_ref_SoftReference::set_clock(_soft_ref_timestamp_clock);
 
   _always_clear_soft_ref_policy = new AlwaysClearPolicy();
-  if (CompilerConfig::is_c2_or_jvmci_compiler_enabled()) {
+  if (LEYDEN_PRESENT(true) NOT_LEYDEN(CompilerConfig::is_c2_or_jvmci_compiler_enabled())) {
     _default_soft_ref_policy = new LRUMaxHeapPolicy();
   } else {
     _default_soft_ref_policy = new LRUCurrentHeapPolicy();
@@ -68,11 +67,9 @@ void ReferenceProcessor::init_statics() {
   guarantee(RefDiscoveryPolicy == ReferenceBasedDiscovery ||
             RefDiscoveryPolicy == ReferentBasedDiscovery,
             "Unrecognized RefDiscoveryPolicy");
-#endif
 }
 
 void ReferenceProcessor::enable_discovery(bool check_no_refs) {
-#ifndef LEYDEN
 #ifdef ASSERT
   // Verify that we're not currently discovering refs
   assert(!_discovering_refs, "nested call?");
@@ -92,7 +89,6 @@ void ReferenceProcessor::enable_discovery(bool check_no_refs) {
 
   _soft_ref_timestamp_clock = java_lang_ref_SoftReference::clock();
   _discovering_refs = true;
-#endif
 }
 
 ReferenceProcessor::ReferenceProcessor(BoolObjectClosure* is_subject_to_discovery,
@@ -154,7 +150,6 @@ void ReferenceProcessor::weak_oops_do(OopClosure* f) {
 }
 
 void ReferenceProcessor::update_soft_ref_master_clock() {
-#ifndef LEYDEN
   // Update (advance) the soft ref master clock field. This must be done
   // after processing the soft ref list.
 
@@ -181,7 +176,6 @@ void ReferenceProcessor::update_soft_ref_master_clock() {
   }
   // Else leave clock stalled at its old value until time progresses
   // past clock value.
-#endif
 }
 
 size_t ReferenceProcessor::total_count(DiscoveredList lists[]) const {
@@ -205,6 +199,7 @@ ReferenceProcessorStats ReferenceProcessor::process_discovered_references(
   VoidClosure*                  complete_gc,
   AbstractRefProcTaskExecutor*  task_executor,
   ReferenceProcessorPhaseTimes* phase_times) {
+
   double start_time = os::elapsedTime();
 
   assert(!enqueuing_is_done(), "If here enqueuing should not be complete");
@@ -219,9 +214,7 @@ ReferenceProcessorStats ReferenceProcessor::process_discovered_references(
   // here so that we use the new value during processing of the
   // discovered soft refs.
 
-#ifndef LEYDEN
   _soft_ref_timestamp_clock = java_lang_ref_SoftReference::clock();
-#endif
 
   ReferenceProcessorStats stats(total_count(_discoveredSoftRefs),
                                 total_count(_discoveredWeakRefs),
@@ -262,7 +255,6 @@ ReferenceProcessorStats ReferenceProcessor::process_discovered_references(
 }
 
 void DiscoveredListIterator::load_ptrs(DEBUG_ONLY(bool allow_null_referent)) {
-#ifndef LEYDEN
   _current_discovered_addr = java_lang_ref_Reference::discovered_addr_raw(_current_discovered);
   oop discovered = java_lang_ref_Reference::discovered(_current_discovered);
   assert(_current_discovered_addr && oopDesc::is_oop_or_null(discovered),
@@ -277,7 +269,6 @@ void DiscoveredListIterator::load_ptrs(DEBUG_ONLY(bool allow_null_referent)) {
          "Expected an oop%s for referent field at " PTR_FORMAT,
          (allow_null_referent ? " or NULL" : ""),
          p2i(_referent));
-#endif
 }
 
 void DiscoveredListIterator::remove() {
@@ -303,32 +294,25 @@ void DiscoveredListIterator::remove() {
 }
 
 void DiscoveredListIterator::make_referent_alive() {
-#ifndef LEYDEN
   HeapWord* addr = java_lang_ref_Reference::referent_addr_raw(_current_discovered);
   if (UseCompressedOops) {
     _keep_alive->do_oop((narrowOop*)addr);
   } else {
     _keep_alive->do_oop((oop*)addr);
   }
-#endif
 }
 
 void DiscoveredListIterator::clear_referent() {
-#ifndef LEYDEN
   java_lang_ref_Reference::clear_referent(_current_discovered);
-#endif
 }
 
 void DiscoveredListIterator::enqueue() {
-#ifndef LEYDEN
   HeapAccess<AS_NO_KEEPALIVE>::oop_store_at(_current_discovered,
                                             java_lang_ref_Reference::discovered_offset(),
                                             _next_discovered);
-#endif
 }
 
 void DiscoveredListIterator::complete_enqueue() {
-#ifndef LEYDEN
   if (_prev_discovered != NULL) {
     // This is the last object.
     // Swap refs_list into pending list and set obj's
@@ -336,7 +320,6 @@ void DiscoveredListIterator::complete_enqueue() {
     oop old = Universe::swap_reference_pending_list(_refs_list.head());
     HeapAccess<AS_NO_KEEPALIVE>::oop_store_at(_prev_discovered, java_lang_ref_Reference::discovered_offset(), old);
   }
-#endif
 }
 
 inline void log_dropped_ref(const DiscoveredListIterator& iter, const char* reason) {
@@ -436,7 +419,6 @@ size_t ReferenceProcessor::process_soft_weak_final_refs_work(DiscoveredList&    
 size_t ReferenceProcessor::process_final_keep_alive_work(DiscoveredList& refs_list,
                                                          OopClosure*     keep_alive,
                                                          VoidClosure*    complete_gc) {
-#ifndef LEYDEN
   DiscoveredListIterator iter(refs_list, keep_alive, NULL);
   while (iter.has_next()) {
     iter.load_ptrs(DEBUG_ONLY(false /* allow_null_referent */));
@@ -458,9 +440,6 @@ size_t ReferenceProcessor::process_final_keep_alive_work(DiscoveredList& refs_li
 
   assert(iter.removed() == 0, "This phase does not remove anything.");
   return iter.removed();
-#else
-  return 0;
-#endif
 }
 
 size_t ReferenceProcessor::process_phantom_refs_work(DiscoveredList&    refs_list,
@@ -495,7 +474,6 @@ size_t ReferenceProcessor::process_phantom_refs_work(DiscoveredList&    refs_lis
 
 void
 ReferenceProcessor::clear_discovered_references(DiscoveredList& refs_list) {
-#ifndef LEYDEN
   oop obj = NULL;
   oop next = refs_list.head();
   while (next != obj) {
@@ -504,7 +482,6 @@ ReferenceProcessor::clear_discovered_references(DiscoveredList& refs_list) {
     java_lang_ref_Reference::set_discovered_raw(obj, NULL);
   }
   refs_list.clear();
-#endif
 }
 
 void ReferenceProcessor::abandon_partial_discovery() {
@@ -718,7 +695,6 @@ void ReferenceProcessor::maybe_balance_queues(DiscoveredList refs_lists[]) {
 // corresponding to the active workers will be processed.
 void ReferenceProcessor::balance_queues(DiscoveredList ref_lists[])
 {
-#ifndef LEYDEN
   // calculate total length
   size_t total_refs = 0;
   log_develop_trace(gc, ref)("Balance ref_lists ");
@@ -794,7 +770,6 @@ void ReferenceProcessor::balance_queues(DiscoveredList ref_lists[])
     balanced_total_refs += ref_lists[i].length();
   }
   assert(total_refs == balanced_total_refs, "Balancing was incomplete");
-#endif
 #endif
 }
 
@@ -1089,14 +1064,12 @@ ReferenceProcessor::add_to_discovered_list_mt(DiscoveredList& refs_list,
 // to observe j.l.References with NULL referents, being those
 // cleared concurrently by mutators during (or after) discovery.
 void ReferenceProcessor::verify_referent(oop obj) {
-#ifndef LEYDEN
   bool da = discovery_is_atomic();
   oop referent = java_lang_ref_Reference::unknown_referent_no_keepalive(obj);
   assert(da ? oopDesc::is_oop(referent) : oopDesc::is_oop_or_null(referent),
          "Bad referent " INTPTR_FORMAT " found in Reference "
          INTPTR_FORMAT " during %satomic discovery ",
          p2i(referent), p2i(obj), da ? "" : "non-");
-#endif
 }
 #endif
 
@@ -1131,7 +1104,6 @@ bool ReferenceProcessor::is_subject_to_discovery(oop const obj) const {
 //     and complexity in processing these references.
 //     We call this choice the "RefeferentBasedDiscovery" policy.
 bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
-#ifndef LEYDEN
   // Make sure we are discovering refs (rather than processing discovered refs).
   if (!_discovering_refs || !RegisterReferences) {
     return false;
@@ -1238,7 +1210,6 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
   }
   assert(oopDesc::is_oop(obj), "Discovered a bad reference");
   verify_referent(obj);
-#endif
   return true;
 }
 

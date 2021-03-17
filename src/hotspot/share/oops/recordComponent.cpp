@@ -43,9 +43,6 @@ RecordComponent* RecordComponent::allocate(ClassLoaderData* loader_data,
          RecordComponent(name_index, descriptor_index, attributes_count,
                          generic_signature_index, annotations, type_annotations);
 }
-#endif
-
-#ifndef LEYDEN
 
 void RecordComponent::deallocate_contents(ClassLoaderData* loader_data) {
   if (annotations() != NULL) {

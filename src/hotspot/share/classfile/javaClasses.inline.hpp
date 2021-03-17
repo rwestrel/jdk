@@ -31,7 +31,6 @@
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 
-#ifndef LEYDEN
 void java_lang_String::set_coder(oop string, jbyte coder) {
   string->byte_field_put(_coder_offset, coder);
 }
@@ -100,7 +99,6 @@ int java_lang_String::length(oop java_string) {
 bool java_lang_String::is_instance_inlined(oop obj) {
   return obj != NULL && obj->klass() == vmClasses::String_klass();
 }
-
 // Accessors
 
 oop java_lang_ref_Reference::weak_referent_no_keepalive(oop ref) {
@@ -162,7 +160,7 @@ bool java_lang_ref_Reference::is_final(oop ref) {
 bool java_lang_ref_Reference::is_phantom(oop ref) {
   return InstanceKlass::cast(ref->klass())->reference_type() == REF_PHANTOM;
 }
-
+#ifndef LEYDEN
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {
   site->obj_field_put_volatile(_target_offset, target);
 }
@@ -206,6 +204,7 @@ inline bool java_lang_invoke_MethodType::is_instance(oop obj) {
 inline bool java_lang_invoke_MethodHandle::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
+#endif
 
 inline bool java_lang_Class::is_instance(oop obj) {
   return obj != NULL && obj->klass() == vmClasses::Class_klass();
@@ -300,12 +299,15 @@ inline Symbol* Backtrace::get_source_file_name(InstanceKlass* holder, int versio
   // spec laxness allows the constant pool entry associated with
   // the source_file_name_index for any older constant pool version
   // to be unstable so we shouldn't try to use it.
+#ifndef LEYDEN
   if (holder->constants()->version() != version) {
     return NULL;
   } else {
+#else
+    {
+#endif
     return holder->source_file_name();
   }
 }
-#endif
 #endif // SHARE_CLASSFILE_JAVACLASSES_INLINE_HPP
 

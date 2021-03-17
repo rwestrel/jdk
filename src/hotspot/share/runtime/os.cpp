@@ -347,7 +347,6 @@ bool os::dll_locate_lib(char *buffer, size_t buflen,
 
 // sigexitnum_pd is a platform-specific special signal used for terminating the Signal thread.
 
-#ifndef LEYDEN
 static void signal_thread_entry(JavaThread* thread, TRAPS) {
   os::set_priority(thread, NearMaxPriority);
   while (true) {
@@ -414,9 +413,12 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
       }
       default: {
         // Dispatch the signal to java
-#ifndef LEYDEN
         HandleMark hm(THREAD);
+#ifndef LEYDEN
         Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_misc_Signal(), THREAD);
+#else
+        Klass* klass = NULL;
+#endif
         if (klass != NULL) {
           JavaValue result(T_VOID);
           JavaCallArguments args;
@@ -448,12 +450,10 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
           }
           CLEAR_PENDING_EXCEPTION;
         }
-#endif
       }
     }
   }
 }
-#endif
 
 void os::init_before_ergo() {
   initialize_initial_active_processor_count();
@@ -470,7 +470,6 @@ void os::init_before_ergo() {
 
 void os::initialize_jdk_signal_support(TRAPS) {
   if (!ReduceSignalUsage) {
-#ifndef LEYDEN
     // Setup JavaThread for processing signals
     const char thread_name[] = "Signal Dispatcher";
     Handle string = java_lang_String::create_from_str(thread_name, CHECK);
@@ -515,7 +514,6 @@ void os::initialize_jdk_signal_support(TRAPS) {
     }
     // Handle ^BREAK
     os::signal(SIGBREAK, os::user_handler());
-#endif
   }
 }
 

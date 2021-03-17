@@ -172,7 +172,7 @@ char* Method::name_and_sig_as_C_string() const {
 #ifndef LEYDEN
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature());
 #else
-  return NULL;
+  return name_and_sig_as_C_string(NULL, name(), signature());
 #endif
 }
 
@@ -180,11 +180,9 @@ char* Method::name_and_sig_as_C_string(char* buf, int size) const {
 #ifndef LEYDEN
   return name_and_sig_as_C_string(constants()->pool_holder(), name(), signature(), buf, size);
 #else
-  return NULL;
+  return name_and_sig_as_C_string(NULL, name(), signature(), buf, size);
 #endif
 }
-
-#ifndef LEYDEN
 
 char* Method::name_and_sig_as_C_string(Klass* klass, Symbol* method_name, Symbol* signature) {
   const char* klass_name = klass->external_name();
@@ -218,11 +216,19 @@ char* Method::name_and_sig_as_C_string(Klass* klass, Symbol* method_name, Symbol
 }
 
 const char* Method::external_name() const {
+#ifndef LEYDEN
   return external_name(constants()->pool_holder(), name(), signature());
+#else
+  return external_name(NULL, name(), signature());
+#endif
 }
 
 void Method::print_external_name(outputStream *os) const {
+#ifndef LEYDEN
   print_external_name(os, constants()->pool_holder(), name(), signature());
+#else
+  print_external_name(os, NULL, name(), signature());
+#endif
 }
 
 const char* Method::external_name(Klass* klass, Symbol* method_name, Symbol* signature) {
@@ -238,16 +244,15 @@ void Method::print_external_name(outputStream *os, Klass* klass, Symbol* method_
   os->print(")");
 }
 
-#endif
-
 int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_klass, int throw_bci, TRAPS) {
-#ifndef LEYDEN
   // exception table holds quadruple entries of the form (beg_bci, end_bci, handler_bci, klass_index)
   // access exception table
   ExceptionTable table(mh());
   int length = table.length();
   // iterate through all entries sequentially
+#ifndef LEYDEN
   constantPoolHandle pool(THREAD, mh->constants());
+#endif
   for (int i = 0; i < length; i ++) {
     //reacquire the table in case a GC happened
     ExceptionTable table(mh());
@@ -266,7 +271,11 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
         // we know the exception class => get the constraint class
         // this may require loading of the constraint class; if verification
         // fails or some other exception occurs, return handler_bci
+#ifndef LEYDEN
         Klass* k = pool->klass_at(klass_index, CHECK_(handler_bci));
+#else
+        Klass* k = NULL;
+#endif
         assert(k != NULL, "klass not loaded");
         if (ex_klass->is_subtype_of(k)) {
           return handler_bci;
@@ -274,12 +283,12 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
       }
     }
   }
-#endif
 
   return -1;
 }
 
 #ifndef LEYDEN
+
 void Method::mask_for(int bci, InterpreterOopMap* mask) {
   methodHandle h_this(Thread::current(), this);
   // Only GC uses the OopMapCache during thread stack root scanning
@@ -291,10 +300,9 @@ void Method::mask_for(int bci, InterpreterOopMap* mask) {
   }
   return;
 }
+
 #endif
 
-
-#ifndef LEYDEN
 
 int Method::bci_from(address bcp) const {
   if (is_native() && bcp == 0) {
@@ -311,8 +319,6 @@ int Method::bci_from(address bcp) const {
   return bcp - code_base();
 }
 
-#endif
-
 
 int Method::validate_bci(int bci) const {
   return (bci == 0 || bci < code_size()) ? bci : -1;
@@ -322,8 +328,6 @@ int Method::validate_bci(int bci) const {
 // Return -1 otherwise.
 // Used by profiling code, when invalid data is a possibility.
 // The caller is responsible for validating the Method* itself.
-#ifndef LEYDEN
-
 int Method::validate_bci_from_bcp(address bcp) const {
   // keep bci as -1 if not a valid bci
   int bci = -1;
@@ -338,8 +342,6 @@ int Method::validate_bci_from_bcp(address bcp) const {
   assert(bci == -1 || bci == bci_from(bcp_from(bci)), "sane bci if >=0");
   return bci;
 }
-
-#endif
 
 address Method::bcp_from(int bci) const {
   assert((is_native() && bci == 0) || (!is_native() && 0 <= bci && bci < code_size()),
@@ -363,7 +365,6 @@ int Method::size(bool is_native) {
   int extra_words = align_up(extra_bytes, BytesPerWord) / BytesPerWord;
   return align_metadata_size(header_size() + extra_words);
 }
-
 
 Symbol* Method::klass_name() const {
   return method_holder()->name();
@@ -548,10 +549,9 @@ void Method::print_invocation_count() {
   }
 #endif
 }
-#endif
+
 // Build a MethodData* object to hold information about this method
 // collected in the interpreter.
-#ifndef LEYDEN
 void Method::build_interpreter_method_data(const methodHandle& method, TRAPS) {
   // Do not profile the method if metaspace has hit an OOM previously
   // allocating profiling data. Callers clear pending exception so don't
@@ -582,9 +582,7 @@ void Method::build_interpreter_method_data(const methodHandle& method, TRAPS) {
     }
   }
 }
-#endif
 
-#ifndef LEYDEN
 MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
   // Do not profile the method if metaspace has hit an OOM previously
   if (ClassLoaderDataGraph::has_metaspace_oom()) {
@@ -608,26 +606,20 @@ MethodCounters* Method::build_method_counters(Method* m, TRAPS) {
 
   return mh->method_counters();
 }
-#endif
 
 bool Method::init_method_counters(MethodCounters* counters) {
   // Try to install a pointer to MethodCounters, return true on success.
   return Atomic::replace_if_null(&_method_counters, counters);
 }
 
-#ifndef LEYDEN
-
 int Method::extra_stack_words() {
   // not an inline function, to avoid a header dependency on Interpreter
   return extra_stack_entries() * Interpreter::stackElementSize;
 }
 
-#endif
-
 // Derive size of parameters, return type, and fingerprint,
 // all in one pass, which is run at load time.
 // We need the first two, and might as well grab the third.
-#ifndef LEYDEN
 void Method::compute_from_signature(Symbol* sig) {
   // At this point, since we are scanning the signature,
   // we might as well compute the whole fingerprint.
@@ -691,6 +683,7 @@ bool Method::is_vanilla_constructor() const {
 
 
 #ifndef LEYDEN
+
 bool Method::compute_has_loops_flag() {
   BytecodeStream bcs(methodHandle(Thread::current(), this));
   Bytecodes::Code bc;
@@ -759,6 +752,8 @@ bool Method::compute_has_loops_flag() {
   return _access_flags.has_loops();
 }
 
+#endif
+
 bool Method::is_final_method(AccessFlags class_access_flags) const {
   // or "does_not_require_vtable_entry"
   // default method or overpass can occur, is not final (reuses vtable entry)
@@ -766,7 +761,6 @@ bool Method::is_final_method(AccessFlags class_access_flags) const {
   if (is_overpass() || is_default_method())  return false;
   return is_final() || class_access_flags.is_final();
 }
-
 
 bool Method::is_final_method() const {
   return is_final_method(method_holder()->access_flags());
@@ -804,8 +798,6 @@ bool Method::can_be_statically_bound() const {
 bool Method::can_be_statically_bound(InstanceKlass* context) const {
   return (method_holder() == context) && can_be_statically_bound();
 }
-
-#endif
 
 #ifndef LEYDEN
 
@@ -866,7 +858,6 @@ bool Method::is_initializer() const {
   return is_object_initializer() || is_static_initializer();
 }
 
-
 bool Method::has_valid_initializer_flags() const {
   return (is_static() ||
           method_holder()->major_version() < 51);
@@ -880,10 +871,6 @@ bool Method::is_static_initializer() const {
          has_valid_initializer_flags();
 }
 
-#endif
-
-#ifndef LEYDEN
-
 bool Method::is_object_initializer() const {
    return name() == vmSymbols::object_initializer_name();
 }
@@ -892,9 +879,6 @@ bool Method::needs_clinit_barrier() const {
   return is_static() && !method_holder()->is_initialized();
 }
 
-#endif
-
-#ifndef LEYDEN
 
 objArrayHandle Method::resolved_checked_exceptions_impl(Method* method, TRAPS) {
   int length = method->checked_exceptions_length();
@@ -918,7 +902,7 @@ objArrayHandle Method::resolved_checked_exceptions_impl(Method* method, TRAPS) {
     }
     return mirrors;
   }
-};
+}
 #endif
 
 

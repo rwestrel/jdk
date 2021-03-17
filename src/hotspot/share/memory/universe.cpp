@@ -407,7 +407,9 @@ void Universe::genesis(TRAPS) {
   // ---
   // New
   // Have already been initialized.
+#ifndef LEYDEN
   _objectArrayKlassObj->append_to_sibling_list();
+#endif
 
   #ifdef ASSERT
   if (FullGCALot) {

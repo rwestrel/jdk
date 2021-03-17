@@ -33,11 +33,7 @@
 #include "runtime/handles.inline.hpp"
 
 ScopeDesc::ScopeDesc(const CompiledMethod* code, PcDesc* pd, bool ignore_objects) {
-#ifndef LEYDEN
   int obj_decode_offset = ignore_objects ? DebugInformationRecorder::serialized_null : pd->obj_decode_offset();
-#else
-  int obj_decode_offset = 0;
-#endif
   _code          = code;
   _decode_offset = pd->scope_decode_offset();
   _objects       = decode_object_values(obj_decode_offset);
@@ -72,7 +68,6 @@ ScopeDesc::ScopeDesc(const ScopeDesc* parent, int decode_offset) {
 
 
 void ScopeDesc::decode_body() {
-#ifndef LEYDEN
   if (decode_offset() == DebugInformationRecorder::serialized_null) {
     // This is a sentinel record, which is only relevant to
     // approximate queries.  Decode a reasonable frame.
@@ -95,14 +90,11 @@ void ScopeDesc::decode_body() {
     _expressions_decode_offset = stream->read_int();
     _monitors_decode_offset    = stream->read_int();
   }
-#endif
 }
 
 
 GrowableArray<ScopeValue*>* ScopeDesc::decode_scope_values(int decode_offset) {
-#ifndef LEYDEN
   if (decode_offset == DebugInformationRecorder::serialized_null) return NULL;
-#endif
   DebugInfoReadStream* stream = stream_at(decode_offset);
   int length = stream->read_int();
   GrowableArray<ScopeValue*>* result = new GrowableArray<ScopeValue*> (length);
@@ -113,9 +105,7 @@ GrowableArray<ScopeValue*>* ScopeDesc::decode_scope_values(int decode_offset) {
 }
 
 GrowableArray<ScopeValue*>* ScopeDesc::decode_object_values(int decode_offset) {
-#ifndef LEYDEN
   if (decode_offset == DebugInformationRecorder::serialized_null) return NULL;
-#endif
   GrowableArray<ScopeValue*>* result = new GrowableArray<ScopeValue*>();
   DebugInfoReadStream* stream = new DebugInfoReadStream(_code, decode_offset, result);
   int length = stream->read_int();
@@ -130,9 +120,7 @@ GrowableArray<ScopeValue*>* ScopeDesc::decode_object_values(int decode_offset) {
 
 
 GrowableArray<MonitorValue*>* ScopeDesc::decode_monitor_values(int decode_offset) {
-#ifndef LEYDEN
   if (decode_offset == DebugInformationRecorder::serialized_null) return NULL;
-#endif
   DebugInfoReadStream* stream  = stream_at(decode_offset);
   int length = stream->read_int();
   GrowableArray<MonitorValue*>* result = new GrowableArray<MonitorValue*> (length);
@@ -163,11 +151,7 @@ GrowableArray<ScopeValue*>* ScopeDesc::objects() {
 }
 
 bool ScopeDesc::is_top() const {
-#ifndef LEYDEN
-  return _sender_decode_offset == DebugInformationRecorder::serialized_null;
-#else
-  return false;
-#endif
+ return _sender_decode_offset == DebugInformationRecorder::serialized_null;
 }
 
 ScopeDesc* ScopeDesc::sender() const {

@@ -29,7 +29,6 @@
 #include "oops/oop.inline.hpp"
 
 void InstanceRefKlass::update_nonstatic_oop_maps(Klass* k) {
-#ifndef LEYDEN
   // Clear the nonstatic oop-map entries corresponding to referent
   // and discovered fields.  They are treated specially by the
   // garbage collector.
@@ -44,7 +43,6 @@ void InstanceRefKlass::update_nonstatic_oop_maps(Klass* k) {
 
   OopMapBlock* map = ik->start_of_nonstatic_oop_maps();
 
-#ifndef LEYDEN
 #ifdef ASSERT
   // Verify fields are in the expected places.
   int referent_offset = java_lang_ref_Reference::referent_offset();
@@ -58,7 +56,6 @@ void InstanceRefKlass::update_nonstatic_oop_maps(Klass* k) {
     1 + ((discovered_offset - referent_offset) / heapOopSize);
   assert(count == 4, "just checking");
 #endif // ASSERT
-#endif
 
   // Updated map starts at "queue", covers "queue" and "next".
   const int new_offset = java_lang_ref_Reference::queue_offset();
@@ -74,14 +71,12 @@ void InstanceRefKlass::update_nonstatic_oop_maps(Klass* k) {
     map->set_offset(new_offset);
     map->set_count(new_count);
   }
-#endif
 }
 
 
 // Verification
 
 void InstanceRefKlass::oop_verify_on(oop obj, outputStream* st) {
-#ifndef LEYDEN
   InstanceKlass::oop_verify_on(obj, st);
   // Verify referent field
   oop referent = java_lang_ref_Reference::unknown_referent_no_keepalive(obj);
@@ -95,5 +90,4 @@ void InstanceRefKlass::oop_verify_on(oop obj, outputStream* st) {
     guarantee(next->is_instance(), "next field should be an instance");
     guarantee(InstanceKlass::cast(next->klass())->is_reference_instance_klass(), "next field verify failed");
   }
-#endif
 }

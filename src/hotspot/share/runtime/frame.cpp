@@ -931,10 +931,8 @@ void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool quer
   }
   mask.iterate_oop(&blk);
 }
-#endif
 
 
-#ifndef LEYDEN
 void frame::oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const {
   InterpretedArgumentOopFinder finder(signature, has_receiver, this, f);
   finder.oops_do();
@@ -1055,8 +1053,6 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 }
 
 
-#ifndef LEYDEN
-
 BasicLock* frame::get_native_monitor() {
 #ifndef LEYDEN
   nmethod* nm = (nmethod*)_cb;
@@ -1084,8 +1080,6 @@ oop frame::get_native_receiver() {
   return NULL;
 #endif
 }
-
-#endif
 
 void frame::oops_entry_do(OopClosure* f, const RegisterMap* map) const {
   assert(map != NULL, "map must be set");

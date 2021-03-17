@@ -188,8 +188,6 @@ void VM_PrintMetadata::doit() {
 
 #endif
 
-#ifndef LEYDEN
-
 VM_FindDeadlocks::~VM_FindDeadlocks() {
   if (_deadlocks != NULL) {
     DeadlockCycle* cycle = _deadlocks;
@@ -226,6 +224,8 @@ void VM_FindDeadlocks::doit() {
     }
   }
 }
+
+#ifndef LEYDEN
 
 
 VM_ThreadDump::VM_ThreadDump(ThreadDumpResult* result,

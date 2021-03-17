@@ -43,10 +43,14 @@ inline void Method::set_method_data(MethodData* data) {
   Atomic::release_store(&_method_data, data);
 }
 
+#ifndef LEYDEN
+
 inline CompiledMethod* volatile Method::code() const {
   assert( check_code(), "" );
   return Atomic::load_acquire(&_code);
 }
+
+#endif
 
 // Write (bci, line number) pair to stream
 inline void CompressedLineNumberWriteStream::write_pair_regular(int bci_delta, int line_delta) {

@@ -338,9 +338,9 @@ protected:
   }
 
 
-  // Obtain the module or package for this class
 #ifndef LEYDEN
 
+  // Obtain the module or package for this class
   virtual ModuleEntry* module() const = 0;
   virtual PackageEntry* package() const = 0;
 

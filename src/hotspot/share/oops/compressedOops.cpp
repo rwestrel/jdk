@@ -75,12 +75,10 @@ void CompressedOops::initialize(const ReservedHeapSpace& heap_space) {
     print_mode(&ls);
   }
 
-#ifndef LEYDEN
   // Tell tests in which mode we run.
   Arguments::PropertyList_add(new SystemProperty("java.vm.compressedOopsMode",
                                                  mode_to_string(mode()),
                                                  false));
-#endif
 
   // base() is one page below the heap.
   assert((intptr_t)base() <= ((intptr_t)_heap_address_range.start() - os::vm_page_size()) ||

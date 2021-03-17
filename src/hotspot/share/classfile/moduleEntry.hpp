@@ -115,10 +115,14 @@ public:
 
   ClassLoaderData* loader_data() const                 { return _loader_data; }
 
+#ifndef LEYDEN
+
   void set_loader_data(ClassLoaderData* cld) {
     assert(!cld->has_class_mirror_holder(), "Unexpected has_class_mirror_holder cld");
     _loader_data = cld;
   }
+
+#endif
 
   Symbol*          version() const                     { return _version; }
   void             set_version(Symbol* version);

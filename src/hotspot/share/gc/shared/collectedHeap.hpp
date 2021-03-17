@@ -446,12 +446,16 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   void print_heap_before_gc();
   void print_heap_after_gc();
 
+#ifndef LEYDEN
+
   // Registering and unregistering an nmethod (compiled code) with the heap.
   virtual void register_nmethod(nmethod* nm) = 0;
   virtual void unregister_nmethod(nmethod* nm) = 0;
   // Callback for when nmethod is about to be deleted.
   virtual void flush_nmethod(nmethod* nm) = 0;
   virtual void verify_nmethod(nmethod* nm) = 0;
+
+#endif
 
   void trace_heap_before_gc(const GCTracer* gc_tracer);
   void trace_heap_after_gc(const GCTracer* gc_tracer);

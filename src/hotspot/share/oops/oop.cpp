@@ -68,7 +68,6 @@ char* oopDesc::print_value_string() {
 }
 
 void oopDesc::print_value_on(outputStream* st) const {
-#ifndef LEYDEN
   oop obj = oop(this);
   if (java_lang_String::is_instance(obj)) {
     java_lang_String::print(obj, st);
@@ -76,7 +75,6 @@ void oopDesc::print_value_on(outputStream* st) const {
   } else {
     klass()->oop_print_value_on(obj, st);
   }
-#endif
 }
 
 

@@ -54,12 +54,14 @@ VMEntryWrapper::~VMEntryWrapper() {
   if (WalkStackALot) {
     InterfaceSupport::walk_stack();
   }
+#ifndef LEYDEN
   if (DeoptimizeALot || DeoptimizeRandom) {
     InterfaceSupport::deoptimizeAll();
   }
   if (ZombieALot) {
     InterfaceSupport::zombieAll();
   }
+#endif
   // do verification AFTER potential deoptimization
   if (VerifyStack) {
     InterfaceSupport::verify_stack();
@@ -167,8 +169,8 @@ void InterfaceSupport::walk_stack() {
 int deoptimizeAllCounter = 0;
 int zombieAllCounter = 0;
 
-void InterfaceSupport::zombieAll() {
 #ifndef LEYDEN
+void InterfaceSupport::zombieAll() {
   // This method is called by all threads when a thread make
   // transition to VM state (for example, runtime calls).
   // Divide number of calls by number of threads to avoid
@@ -180,11 +182,9 @@ void InterfaceSupport::zombieAll() {
     VMThread::execute(&op);
   }
   zombieAllCounter++;
-#endif
 }
 
 void InterfaceSupport::deoptimizeAll() {
-#ifndef LEYDEN
   // This method is called by all threads when a thread make
   // transition to VM state (for example, runtime calls).
   // Divide number of calls by number of threads to avoid
@@ -201,8 +201,8 @@ void InterfaceSupport::deoptimizeAll() {
     }
   }
   deoptimizeAllCounter++;
-#endif
 }
+#endif
 
 
 void InterfaceSupport::verify_stack() {

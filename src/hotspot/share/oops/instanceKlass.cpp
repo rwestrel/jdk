@@ -775,6 +775,7 @@ bool InstanceKlass::should_be_initialized() const {
 klassItable InstanceKlass::itable() const {
   return klassItable(const_cast<InstanceKlass*>(this));
 }
+
 void InstanceKlass::eager_initialize(Thread *thread) {
   if (!EagerInitialization) return;
 
@@ -2903,6 +2904,7 @@ const char* InstanceKlass::signature_name() const {
 }
 
 #ifndef LEYDEN
+
 ModuleEntry* InstanceKlass::module() const {
   // For an unsafe anonymous class return the host class' module
   if (is_unsafe_anonymous()) {
@@ -2910,6 +2912,7 @@ ModuleEntry* InstanceKlass::module() const {
     return unsafe_anonymous_host()->module();
   }
 
+#ifndef LEYDEN
   if (is_hidden() &&
       in_unnamed_package() &&
       class_loader_data()->has_class_mirror_holder()) {
@@ -2928,6 +2931,7 @@ ModuleEntry* InstanceKlass::module() const {
       return java_lang_Module::module_entry(module);
     }
   }
+#endif
 
   // Class is in a named package
   if (!in_unnamed_package()) {
@@ -2937,6 +2941,9 @@ ModuleEntry* InstanceKlass::module() const {
   // Class is in an unnamed package, return its loader's unnamed module
   return class_loader_data()->unnamed_module();
 }
+
+#endif
+#ifndef LEYDEN
 
 void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS) {
 

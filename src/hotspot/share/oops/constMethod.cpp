@@ -80,11 +80,8 @@ void ConstMethod::copy_stackmap_data(ClassLoaderData* loader_data,
   _stackmap_data = MetadataFactory::new_array<u1>(loader_data, length, CHECK);
   memcpy((void*)_stackmap_data->adr_at(0), (void*)sd, length);
 }
-#endif
 
 // Deallocate metadata fields associated with ConstMethod*
-#ifndef LEYDEN
-
 void ConstMethod::deallocate_contents(ClassLoaderData* loader_data) {
   if (stackmap_data() != NULL) {
     MetadataFactory::free_array<u1>(loader_data, stackmap_data());
@@ -415,9 +412,6 @@ void ConstMethod::copy_annotations_from(ClassLoaderData* loader_data, ConstMetho
     set_default_annotations(a);
   }
 }
-#endif
-
-#ifndef LEYDEN
 
 void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(ConstMethod): %p", this);

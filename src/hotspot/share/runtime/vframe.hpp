@@ -115,8 +115,9 @@ class javaVFrame: public vframe {
   virtual StackValueCollection*        locals()         const = 0;
   virtual StackValueCollection*        expressions()    const = 0;
   // the order returned by monitors() is from oldest -> youngest#4418568
+#endif
   virtual GrowableArray<MonitorInfo*>* monitors()       const = 0;
-
+#ifndef LEYDEN
   // Debugging support via JVMTI.
   // NOTE that this is not guaranteed to give correct results for compiled vframes.
   // Deoptimize first if necessary.

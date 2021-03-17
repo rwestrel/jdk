@@ -732,11 +732,13 @@ void CodeCache::blobs_do(CodeBlobClosure* f) {
     FOR_ALL_BLOBS(cb, *heap) {
       if (cb->is_alive()) {
         f->do_code_blob(cb);
+#ifndef LEYDEN
 #ifdef ASSERT
         if (cb->is_nmethod()) {
           Universe::heap()->verify_nmethod((nmethod*)cb);
         }
 #endif //ASSERT
+#endif
       }
     }
   }
