@@ -79,8 +79,6 @@ bool GCNotifier::has_event() {
   return first_request != NULL;
 }
 
-#ifndef LEYDEN
-
 static Handle getGcInfoBuilder(GCMemoryManager *gcManager,TRAPS) {
 
   Klass* gcMBeanKlass = Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(CHECK_NH);
@@ -91,18 +89,14 @@ static Handle getGcInfoBuilder(GCMemoryManager *gcManager,TRAPS) {
   JavaValue result(T_OBJECT);
   JavaCallArguments args(ih);
 
-#ifndef LEYDEN
   JavaCalls::call_virtual(&result,
                           gcMBeanKlass,
                           vmSymbols::getGcInfoBuilder_name(),
                           vmSymbols::getGcInfoBuilder_signature(),
                           &args,
                           CHECK_NH);
-#endif
   return Handle(THREAD,(oop)result.get_jobject());
 }
-
-#endif
 
 static Handle createGcInfo(GCMemoryManager *gcManager, GCStatInfo *gcStatInfo,TRAPS) {
 
@@ -144,19 +138,14 @@ static Handle createGcInfo(GCMemoryManager *gcManager, GCStatInfo *gcStatInfo,TR
 
   JavaCallArguments argsInt;
   argsInt.push_int(gcManager->num_gc_threads());
-#ifndef LEYDEN
   Handle extra_arg_val = JavaCalls::construct_new_instance(
                             vmClasses::Integer_klass(),
                             vmSymbols::int_void_signature(),
                             &argsInt,
                             CHECK_NH);
-#else
-  Handle extra_arg_val;
-#endif
 
   extra_array->obj_at_put(0,extra_arg_val());
 
-#ifndef LEYDEN
   InstanceKlass* gcInfoklass = Management::com_sun_management_GcInfo_klass(CHECK_NH);
 
   JavaCallArguments constructor_args(16);
@@ -173,9 +162,6 @@ static Handle createGcInfo(GCMemoryManager *gcManager, GCStatInfo *gcStatInfo,TR
                           vmSymbols::com_sun_management_GcInfo_constructor_signature(),
                           &constructor_args,
                           THREAD);
-#else
-  return Handle();
-#endif
 }
 
 void GCNotifier::sendNotification(TRAPS) {
@@ -210,17 +196,10 @@ void GCNotifier::sendNotificationInternal(TRAPS) {
     NotificationMark nm(request);
     Handle objGcInfo = createGcInfo(request->gcManager, request->gcStatInfo, CHECK);
 
-#ifndef LEYDEN
     Handle objName = java_lang_String::create_from_str(request->gcManager->name(), CHECK);
     Handle objAction = java_lang_String::create_from_str(request->gcAction, CHECK);
     Handle objCause = java_lang_String::create_from_str(request->gcCause, CHECK);
     InstanceKlass* gc_mbean_klass = Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(CHECK);
-#else
-    Handle objName;
-    Handle objAction;
-    Handle objCause;
-    InstanceKlass* gc_mbean_klass = NULL;
-#endif
 
     instanceOop gc_mbean = request->gcManager->get_memory_manager_instance(THREAD);
     instanceHandle gc_mbean_h(THREAD, gc_mbean);
@@ -237,14 +216,12 @@ void GCNotifier::sendNotificationInternal(TRAPS) {
     args.push_oop(objCause);
     args.push_oop(objGcInfo);
 
-#ifndef LEYDEN
     JavaCalls::call_virtual(&result,
                             gc_mbean_klass,
                             vmSymbols::createGCNotification_name(),
                             vmSymbols::createGCNotification_signature(),
                             &args,
                             CHECK);
-#endif
   }
 }
 

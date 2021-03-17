@@ -375,7 +375,6 @@ bool ObjectSynchronizer::quick_enter(oop obj, Thread* self,
 
 // Handle notifications when synchronizing on value based classes
 void ObjectSynchronizer::handle_sync_on_value_based_class(Handle obj, Thread* current) {
-#ifndef LEYDEN
   JavaThread* self = current->as_Java_thread();
 
   frame last_frame = self->last_frame();
@@ -383,12 +382,14 @@ void ObjectSynchronizer::handle_sync_on_value_based_class(Handle obj, Thread* cu
   // Don't decrement bcp if it points to the frame's first instruction.  This happens when
   // handle_sync_on_value_based_class() is called because of a synchronized method.  There
   // is no actual monitorenter instruction in the byte code in this case.
+#ifndef LEYDEN
   if (last_frame.is_interpreted_frame() &&
       (last_frame.interpreter_frame_method()->code_base() < last_frame.interpreter_frame_bcp())) {
     // adjust bcp to point back to monitorenter so that we print the correct line numbers
     last_frame.interpreter_frame_set_bcp(last_frame.interpreter_frame_bcp() - 1);
     bcp_was_adjusted = true;
   }
+#endif
 
   if (DiagnoseSyncOnValueBasedClasses == FATAL_EXIT) {
     ResourceMark rm(self);
@@ -420,6 +421,7 @@ void ObjectSynchronizer::handle_sync_on_value_based_class(Handle obj, Thread* cu
     }
   }
 
+#ifndef LEYDEN
   if (bcp_was_adjusted) {
     last_frame.interpreter_frame_set_bcp(last_frame.interpreter_frame_bcp() + 1);
   }
@@ -437,7 +439,6 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, TRAPS) {
     handle_sync_on_value_based_class(obj, THREAD);
   }
 
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     if (!SafepointSynchronize::is_at_safepoint()) {
       BiasedLocking::revoke(obj, THREAD);
@@ -445,7 +446,6 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, TRAPS) {
       BiasedLocking::revoke_at_safepoint(obj);
     }
   }
-#endif
 
   markWord mark = obj->mark();
   assert(!mark.has_bias_pattern(), "should not see bias pattern here");
@@ -547,12 +547,10 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, TRAPS) {
 //  5) lock lock2
 // NOTE: must use heavy weight monitor to handle complete_exit/reenter()
 intx ObjectSynchronizer::complete_exit(Handle obj, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   // The ObjectMonitor* can't be async deflated until ownership is
   // dropped inside exit() and the ObjectMonitor* must be !is_busy().
@@ -563,12 +561,10 @@ intx ObjectSynchronizer::complete_exit(Handle obj, TRAPS) {
 
 // NOTE: must use heavy weight monitor to handle complete_exit/reenter()
 void ObjectSynchronizer::reenter(Handle obj, intx recursions, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   // An async deflation can race after the inflate() call and before
   // reenter() -> enter() can make the ObjectMonitor busy. reenter() ->
@@ -591,12 +587,10 @@ void ObjectSynchronizer::jni_enter(Handle obj, TRAPS) {
   }
 
   // the current locking is from JNI instead of Java code
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
   THREAD->set_current_pending_monitor_is_from_java(false);
   // An async deflation can race after the inflate() call and before
   // enter() can make the ObjectMonitor busy. enter() returns false if
@@ -612,13 +606,11 @@ void ObjectSynchronizer::jni_enter(Handle obj, TRAPS) {
 
 // NOTE: must use heavy weight monitor to handle jni monitor exit
 void ObjectSynchronizer::jni_exit(oop obj, Thread* THREAD) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     Handle h_obj(THREAD, obj);
     BiasedLocking::revoke(h_obj, THREAD);
     obj = h_obj();
   }
-#endif
   assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
 
   // The ObjectMonitor* can't be async deflated until ownership is
@@ -656,12 +648,10 @@ ObjectLocker::~ObjectLocker() {
 //  Wait/Notify/NotifyAll
 // NOTE: must use heavy weight monitor to handle wait()
 int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
   if (millis < 0) {
     THROW_MSG_0(vmSymbols::java_lang_IllegalArgumentException(), "timeout value is negative");
   }
@@ -682,12 +672,10 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
 }
 
 void ObjectSynchronizer::wait_uninterruptibly(Handle obj, jlong millis, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
   if (millis < 0) {
     THROW_MSG(vmSymbols::java_lang_IllegalArgumentException(), "timeout value is negative");
   }
@@ -699,12 +687,10 @@ void ObjectSynchronizer::wait_uninterruptibly(Handle obj, jlong millis, TRAPS) {
 }
 
 void ObjectSynchronizer::notify(Handle obj, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   markWord mark = obj->mark();
   if (mark.has_locker() && THREAD->is_lock_owned((address)mark.locker())) {
@@ -718,12 +704,10 @@ void ObjectSynchronizer::notify(Handle obj, TRAPS) {
 
 // NOTE: see comment of notify()
 void ObjectSynchronizer::notifyall(Handle obj, TRAPS) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(obj, THREAD);
     assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   markWord mark = obj->mark();
   if (mark.has_locker() && THREAD->is_lock_owned((address)mark.locker())) {
@@ -869,7 +853,6 @@ static inline intptr_t get_next_hash(Thread* self, oop obj) {
 }
 
 intptr_t ObjectSynchronizer::FastHashCode(Thread* self, oop obj) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     // NOTE: many places throughout the JVM do not expect a safepoint
     // to be taken here. However, we only ever bias Java instances and all
@@ -889,7 +872,6 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* self, oop obj) {
       assert(!obj->mark().has_bias_pattern(), "biases should be revoked by now");
     }
   }
-#endif
 
   while (true) {
     ObjectMonitor* monitor = NULL;
@@ -1010,12 +992,10 @@ intptr_t ObjectSynchronizer::identity_hash_value_for(Handle obj) {
 
 bool ObjectSynchronizer::current_thread_holds_lock(JavaThread* thread,
                                                    Handle h_obj) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     BiasedLocking::revoke(h_obj, thread);
     assert(!h_obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   assert(thread == JavaThread::current(), "Can only be called on current thread");
   oop obj = h_obj();
@@ -1040,7 +1020,6 @@ bool ObjectSynchronizer::current_thread_holds_lock(JavaThread* thread,
 
 // FIXME: jvmti should call this
 JavaThread* ObjectSynchronizer::get_lock_owner(ThreadsList * t_list, Handle h_obj) {
-#ifndef LEYDEN
   if (UseBiasedLocking) {
     if (SafepointSynchronize::is_at_safepoint()) {
       BiasedLocking::revoke_at_safepoint(h_obj);
@@ -1049,7 +1028,6 @@ JavaThread* ObjectSynchronizer::get_lock_owner(ThreadsList * t_list, Handle h_ob
     }
     assert(!h_obj->mark().has_bias_pattern(), "biases should be revoked by now");
   }
-#endif
 
   oop obj = h_obj();
   address owner = NULL;

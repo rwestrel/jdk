@@ -37,11 +37,8 @@ class compiledVFrame: public javaVFrame {
   int                          bci()                const;
   bool                         should_reexecute()   const;
 
-#ifndef LEYDEN
-
   StackValueCollection*        locals()             const;
   StackValueCollection*        expressions()        const;
-#endif
   GrowableArray<MonitorInfo*>* monitors()           const;
 
   int                          vframe_id()          const { return _vframe_id; }

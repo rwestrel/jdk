@@ -393,8 +393,6 @@ Symbol* SignatureStream::find_symbol() {
   return name;
 }
 
-#endif
-#ifndef LEYDEN
 Klass* SignatureStream::as_klass(Handle class_loader, Handle protection_domain,
                                  FailureMode failure_mode, TRAPS) {
   if (!is_reference()) {
@@ -468,7 +466,6 @@ ResolvingSignatureStream::ResolvingSignatureStream(const Method* method)
 {
   initialize_load_origin(method->method_holder());
 }
-
 
 ResolvingSignatureStream::ResolvingSignatureStream(fieldDescriptor& field)
   : SignatureStream(field.signature(), false)

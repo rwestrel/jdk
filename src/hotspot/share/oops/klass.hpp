@@ -523,6 +523,9 @@ protected:
 #ifndef LEYDEN
 
   oop klass_holder() const { return class_loader_data()->holder_phantom(); }
+#else
+
+  oop klass_holder() const { return NULL; }
 
 #endif
 

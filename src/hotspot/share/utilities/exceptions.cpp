@@ -72,8 +72,6 @@ void ThreadShadow::clear_pending_exception() {
   _exception_line    = 0;
 }
 
-#ifndef LEYDEN
-
 void ThreadShadow::clear_pending_nonasync_exception() {
   // Do not clear probable async exceptions.
   if (!_pending_exception->is_a(vmClasses::ThreadDeath_klass()) &&
@@ -82,8 +80,6 @@ void ThreadShadow::clear_pending_nonasync_exception() {
     clear_pending_exception();
   }
 }
-
-#endif
 
 // Implementation of Exceptions
 
@@ -245,9 +241,7 @@ void Exceptions::throw_stack_overflow_exception(Thread* THREAD, const char* file
     exception = Handle(THREAD, e);  // fill_in_stack trace does gc
     assert(k->is_initialized(), "need to increase java_thread_min_stack_allowed calculation");
     if (StackTraceInThrowable) {
-#ifndef LEYDEN
       java_lang_Throwable::fill_in_stack_trace(exception, method);
-#endif
     }
     // Increment counter for hs_err file reporting
     Atomic::inc(&Exceptions::_stack_overflow_errors);
@@ -259,11 +253,9 @@ void Exceptions::throw_stack_overflow_exception(Thread* THREAD, const char* file
 }
 
 void Exceptions::throw_unsafe_access_internal_error(Thread* thread, const char* file, int line, const char* message) {
-#ifndef LEYDEN
   Handle h_exception = new_exception(thread, vmSymbols::java_lang_InternalError(), message);
   java_lang_InternalError::set_during_unsafe_access(h_exception());
   _throw(thread, file, line, h_exception, message);
-#endif
 }
 
 void Exceptions::fthrow(Thread* thread, const char* file, int line, Symbol* h_name, const char* format, ...) {
@@ -282,9 +274,6 @@ void Exceptions::fthrow(Thread* thread, const char* file, int line, Symbol* h_na
 Handle Exceptions::new_exception(Thread *thread, Symbol* name,
                                  Symbol* signature, JavaCallArguments *args,
                                  Handle h_loader, Handle h_protection_domain) {
-#ifdef LEYDEN
-  return Handle();
-#else
   assert(Universe::is_fully_initialized(),
     "cannot be called during initialization");
   assert(thread->is_Java_thread(), "can only be called by a Java thread");
@@ -293,16 +282,18 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
   Handle h_exception;
 
   // Resolve exception klass, and check for pending exception below.
+#ifndef LEYDEN
   Klass* klass = SystemDictionary::resolve_or_fail(name, h_loader, h_protection_domain, true, thread);
+#else
+  Klass* klass = NULL;
+#endif
 
   if (!thread->has_pending_exception()) {
     assert(klass != NULL, "klass must exist");
-#ifndef LEYDEN
     h_exception = JavaCalls::construct_new_instance(InstanceKlass::cast(klass),
                                 signature,
                                 args,
                                 thread);
-#endif
   }
 
   // Check if another exception was thrown in the process, if so rethrow that one
@@ -311,7 +302,6 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
     thread->clear_pending_exception();
   }
   return h_exception;
-#endif
 }
 
 // Creates an exception oop, calls the <init> method with the given signature.
@@ -325,7 +315,6 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
 
   // Future: object initializer should take a cause argument
   if (h_cause.not_null()) {
-#ifndef LEYDEN
     assert(h_cause->is_a(vmClasses::Throwable_klass()),
         "exception cause is not a subclass of java/lang/Throwable");
     JavaValue result1(T_OBJECT);
@@ -337,7 +326,6 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
                                       vmSymbols::throwable_throwable_signature(),
                                       &args1,
                                       thread);
-#endif
   }
 
   // Check if another exception was thrown in the process, if so rethrow that one
@@ -391,14 +379,10 @@ Handle Exceptions::new_exception(Thread* thread, Symbol* name,
     Handle msg;
     if (to_utf8_safe == safe_to_utf8) {
       // Make a java UTF8 string.
-#ifndef LEYDEN
       msg = java_lang_String::create_from_str(message, thread);
-#endif
     } else {
       // Make a java string keeping the encoding scheme of the original string.
-#ifndef LEYDEN
       msg = java_lang_String::create_from_platform_dependent_str(message, thread);
-#endif
     }
     if (thread->has_pending_exception()) {
       Handle exception(thread, thread->pending_exception());
@@ -516,6 +500,7 @@ void Exceptions::print_exception_counts_on_error(outputStream* st) {
     st->print_cr("LinkageErrors=%d", _linkage_errors);
   }
 }
+
 // Implementation of ExceptionMark
 
 ExceptionMark::ExceptionMark(Thread*& thread) {
@@ -565,19 +550,16 @@ void Exceptions::debug_check_abort(Handle exception, const char* message) {
 void Exceptions::debug_check_abort_helper(Handle exception, const char* message) {
   ResourceMark rm;
   if (message == NULL && exception->is_a(vmClasses::Throwable_klass())) {
-#ifndef LEYDEN
     oop msg = java_lang_Throwable::message(exception());
     if (msg != NULL) {
       message = java_lang_String::as_utf8_string(msg);
     }
-#endif
   }
   debug_check_abort(exception()->klass()->external_name(), message);
 }
 
 // for logging exceptions
 void Exceptions::log_exception(Handle exception, const char* message) {
-#ifndef LEYDEN
   ResourceMark rm;
   Symbol* detail_message = java_lang_Throwable::detail_message(exception());
   if (detail_message != NULL) {
@@ -590,5 +572,4 @@ void Exceptions::log_exception(Handle exception, const char* message) {
                          exception->print_value_string(),
                          message);
   }
-#endif
 }

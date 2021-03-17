@@ -52,7 +52,6 @@
 
 // ------------- compiledVFrame --------------
 
-#ifndef LEYDEN
 StackValueCollection* compiledVFrame::locals() const {
   // Natives has no scope
   if (scope() == NULL) return new StackValueCollection(0);
@@ -82,7 +81,7 @@ StackValueCollection* compiledVFrame::locals() const {
 
   return result;
 }
-
+#ifndef LEYDEN
 
 void compiledVFrame::set_locals(StackValueCollection* values) const {
 
@@ -182,7 +181,7 @@ void compiledVFrame::create_deferred_updates_after_object_deoptimization() {
     }
   }
 }
-
+#endif
 StackValueCollection* compiledVFrame::expressions() const {
   // Natives has no scope
   if (scope() == NULL) return new StackValueCollection(0);
@@ -212,7 +211,7 @@ StackValueCollection* compiledVFrame::expressions() const {
 
   return result;
 }
-#endif
+
 
 // The implementation of the following two methods was factorized into the
 // class StackValue because it is also used from within deoptimization.cpp for
@@ -225,6 +224,7 @@ StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
 BasicLock* compiledVFrame::resolve_monitor_lock(Location location) const {
   return StackValue::resolve_monitor_lock(&_fr, location);
 }
+
 
 GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
   // Natives has no scope
@@ -286,6 +286,7 @@ GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
   return result;
 }
 
+
 compiledVFrame::compiledVFrame(const frame* fr, const RegisterMap* reg_map, JavaThread* thread, CompiledMethod* nm)
 : javaVFrame(fr, reg_map, thread) {
   _scope  = NULL;
@@ -321,11 +322,7 @@ bool compiledVFrame::is_top() const {
 
 
 CompiledMethod* compiledVFrame::code() const {
-#ifndef LEYDEN
   return CodeCache::find_compiled(_fr.pc());
-#else
-  return NULL;
-#endif
 }
 
 Method* compiledVFrame::method() const {
@@ -336,9 +333,8 @@ Method* compiledVFrame::method() const {
     assert(nm->is_native_method(), "must be native");
     return nm->method();
   }
-  return scope()->method();
 #else
-  return NULL;
+  return scope()->method();
 #endif
 }
 

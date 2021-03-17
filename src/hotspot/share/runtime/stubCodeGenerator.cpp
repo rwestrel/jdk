@@ -35,21 +35,15 @@
 
 // Implementation of StubCodeDesc
 
-#ifndef LEYDEN
 StubCodeDesc* StubCodeDesc::_list = NULL;
 bool          StubCodeDesc::_frozen = false;
-#endif
 
 StubCodeDesc* StubCodeDesc::desc_for(address pc) {
-#ifndef LEYDEN
   StubCodeDesc* p = _list;
   while (p != NULL && !p->contains(pc)) {
     p = p->_next;
   }
   return p;
-#else
-  return NULL;
-#endif
 }
 
 #ifndef LEYDEN

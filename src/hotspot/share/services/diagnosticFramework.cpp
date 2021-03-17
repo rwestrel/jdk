@@ -464,7 +464,6 @@ void DCmdFactory::send_notification_internal(TRAPS) {
     Klass* k = Management::com_sun_management_internal_DiagnosticCommandImpl_klass(CHECK);
     InstanceKlass* dcmd_mbean_klass = InstanceKlass::cast(k);
 
-#ifndef LEYDEN
     JavaValue result(T_OBJECT);
     JavaCalls::call_static(&result,
             dcmd_mbean_klass,
@@ -474,16 +473,12 @@ void DCmdFactory::send_notification_internal(TRAPS) {
 
     instanceOop m = (instanceOop) result.get_jobject();
     instanceHandle dcmd_mbean_h(THREAD, m);
-#else
-    instanceHandle dcmd_mbean_h;
-#endif
 
     if (!dcmd_mbean_h->is_a(k)) {
       THROW_MSG(vmSymbols::java_lang_IllegalArgumentException(),
               "DiagnosticCommandImpl.getDiagnosticCommandMBean didn't return a DiagnosticCommandMBean instance");
     }
 
-#ifndef LEYDEN
     JavaValue result2(T_VOID);
     JavaCallArguments args2(dcmd_mbean_h);
 
@@ -493,7 +488,6 @@ void DCmdFactory::send_notification_internal(TRAPS) {
             vmSymbols::void_method_signature(),
             &args2,
             CHECK);
-#endif
   }
 }
 

@@ -607,9 +607,8 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
   return result;
 }
 
-#ifndef LEYDEN
-
 Symbol* java_lang_String::as_symbol(oop java_string) {
+#ifndef LEYDEN
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
@@ -624,9 +623,10 @@ Symbol* java_lang_String::as_symbol(oop java_string) {
     Symbol* sym = SymbolTable::new_symbol(base, length);
     return sym;
   }
-}
-
+#else
+  return NULL;
 #endif
+}
 
 Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
@@ -1853,7 +1853,6 @@ jlong java_lang_Thread::thread_id(oop java_thread) {
 oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field(_park_blocker_offset);
 }
-#ifndef LEYDEN
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
   JavaThreadStatus status = static_cast<JavaThreadStatus>(java_thread->int_field(_thread_status_offset));
   switch (status) {
@@ -1933,6 +1932,7 @@ bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
   return java_thread_group->bool_field(_daemon_offset) != 0;
 }
 
+#ifndef LEYDEN
 #define THREADGROUP_FIELDS_DO(macro) \
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
@@ -2013,7 +2013,6 @@ oop java_lang_Throwable::message(oop throwable) {
 
 
 // Return Symbol for detailed_message or NULL
-#ifndef LEYDEN
 
 Symbol* java_lang_Throwable::detail_message(oop throwable) {
   PreserveExceptionMark pm(Thread::current());
@@ -2024,7 +2023,6 @@ Symbol* java_lang_Throwable::detail_message(oop throwable) {
   return NULL;
 }
 
-#endif
 
 void java_lang_Throwable::set_message(oop throwable, oop value) {
   throwable->obj_field_put(_detailMessage_offset, value);
@@ -4953,7 +4951,7 @@ void java_lang_reflect_RecordComponent::set_annotations(oop element, oop value) 
 void java_lang_reflect_RecordComponent::set_typeAnnotations(oop element, oop value) {
   element->obj_field_put(_typeAnnotations_offset, value);
 }
-
+#endif
 // java_lang_InternalError
 int java_lang_InternalError::_during_unsafe_access_offset;
 
@@ -4965,6 +4963,7 @@ jboolean java_lang_InternalError::during_unsafe_access(oop internal_error) {
   return internal_error->bool_field(_during_unsafe_access_offset);
 }
 
+#ifndef LEYDEN
 void java_lang_InternalError::compute_offsets() {
   INTERNALERROR_INJECTED_FIELDS(INJECTED_FIELD_COMPUTE_OFFSET);
 }

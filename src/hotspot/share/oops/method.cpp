@@ -1448,8 +1448,6 @@ bool Method::should_not_be_cached() const {
  *  Returns true if this is one of the specially treated methods for
  *  security related stack walks (like Reflection.getCallerClass).
  */
-#ifndef LEYDEN
-
 bool Method::is_ignored_by_security_stack_walk() const {
   if (intrinsic_id() == vmIntrinsics::_invoke) {
     // This is Method.invoke() -- ignore it
@@ -1467,8 +1465,6 @@ bool Method::is_ignored_by_security_stack_walk() const {
 #endif
   return false;
 }
-
-#endif
 
 
 // Constant pool structure for invoke methods:

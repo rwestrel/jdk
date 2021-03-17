@@ -416,20 +416,14 @@ void xmlStream::method(Method* method) {
 }
 
 void xmlStream::method_text(Method* method) {
-#ifndef LEYDEN
   ResourceMark rm;
   assert_if_no_error(inside_attrs(), "printing attributes");
   if (method == NULL)  return;
-#ifndef LEYDEN
   text()->print("%s", method->method_holder()->external_name());
-#endif
   print_raw(" ");  // " " is easier for tools to parse than "::"
   method->name()->print_symbol_on(text());
   print_raw(" ");  // separator
-#ifndef LEYDEN
   method->signature()->print_symbol_on(text());
-#endif
-#endif
 }
 
 

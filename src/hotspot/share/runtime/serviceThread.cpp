@@ -170,12 +170,18 @@ void ServiceThread::service_thread_entry(JavaThread* jt, TRAPS) {
               (has_dcmd_notification_event = (!UseNotificationThread && DCmdFactory::has_pending_jmx_notification())) |
               (stringtable_work = StringTable::has_work()) |
               (symboltable_work = SymbolTable::has_work()) |
-              (resolved_method_table_work = ResolvedMethodTable::has_work()) |
+#ifndef LEYDEN
+(resolved_method_table_work = ResolvedMethodTable::has_work()) |
+#endif
               (thread_id_table_work = ThreadIdTable::has_work()) |
-              (protection_domain_table_work = SystemDictionary::pd_cache_table()->has_work()) |
+#ifndef LEYDEN
+(protection_domain_table_work = SystemDictionary::pd_cache_table()->has_work()) |
+#endif
               (oopstorage_work = OopStorage::has_cleanup_work_and_reset()) |
               (oop_handles_to_release = (_oop_handle_list != NULL)) |
-              (cldg_cleanup_work = ClassLoaderDataGraph::should_clean_metaspaces_and_reset()) |
+#ifndef LEYDEN
+(cldg_cleanup_work = ClassLoaderDataGraph::should_clean_metaspaces_and_reset()) |
+#endif
               (jvmti_tagmap_work = JvmtiTagMap::has_object_free_events_and_reset())
              ) == 0) {
         // Wait until notified that there is some work to do.
@@ -216,17 +222,21 @@ void ServiceThread::service_thread_entry(JavaThread* jt, TRAPS) {
       }
     }
 
+#ifndef LEYDEN
     if (resolved_method_table_work) {
       ResolvedMethodTable::do_concurrent_work(jt);
     }
+#endif
 
     if (thread_id_table_work) {
       ThreadIdTable::do_concurrent_work(jt);
     }
 
+#ifndef LEYDEN
     if (protection_domain_table_work) {
       SystemDictionary::pd_cache_table()->unlink();
     }
+#endif
 
     if (oopstorage_work) {
       cleanup_oopstorages();
@@ -236,9 +246,11 @@ void ServiceThread::service_thread_entry(JavaThread* jt, TRAPS) {
       release_oop_handles();
     }
 
+#ifndef LEYDEN
     if (cldg_cleanup_work) {
       ClassLoaderDataGraph::safepoint_and_clean_metaspaces();
     }
+#endif
 
     if (jvmti_tagmap_work) {
       JvmtiTagMap::flush_all_object_free_events();

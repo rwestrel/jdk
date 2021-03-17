@@ -102,7 +102,9 @@ class StubCodeDesc: public CHeapObj<mtCode> {
   address     end() const                        { return _end; }
 #ifndef LEYDEN
   int         size_in_bytes() const              { return _end - _begin; }
+#endif
   bool        contains(address pc) const         { return _begin <= pc && pc < _end; }
+#ifndef LEYDEN
   void        print_on(outputStream* st) const;
   void        print() const;
 #endif

@@ -217,6 +217,7 @@ bool UnsafeCopyMemory::contains_pc(address pc) {
   }
   return false;
 }
+
 address UnsafeCopyMemory::page_error_continue_pc(address pc) {
   for (int i = 0; i < UnsafeCopyMemory::_table_length; i++) {
     UnsafeCopyMemory* entry = &UnsafeCopyMemory::_table[i];

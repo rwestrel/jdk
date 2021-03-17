@@ -180,13 +180,9 @@ void VM_PrintJNI::doit() {
   JNIHandles::print_on(_out);
 }
 
-#ifndef LEYDEN
-
 void VM_PrintMetadata::doit() {
   metaspace::MetaspaceReporter::print_report(_out, _scale, _flags);
 }
-
-#endif
 
 VM_FindDeadlocks::~VM_FindDeadlocks() {
   if (_deadlocks != NULL) {
@@ -224,9 +220,6 @@ void VM_FindDeadlocks::doit() {
     }
   }
 }
-
-#ifndef LEYDEN
-
 
 VM_ThreadDump::VM_ThreadDump(ThreadDumpResult* result,
                              int max_depth,
@@ -345,7 +338,6 @@ void VM_ThreadDump::snapshot_thread(JavaThread* java_thread, ThreadConcurrentLoc
   snapshot->dump_stack_at_safepoint(_max_depth, _with_locked_monitors);
   snapshot->set_concurrent_locks(tcl);
 }
-#endif
 
 volatile bool VM_Exit::_vm_exited = false;
 Thread * volatile VM_Exit::_shutdown_thread = NULL;
@@ -473,9 +465,7 @@ void VM_Exit::doit() {
   // cleans up outputStream resources and PerfMemory resources.
   exit_globals();
 
-#ifndef LEYDEN
   LogConfiguration::finalize();
-#endif
 
   // Check for exit hook
   exit_hook_t exit_hook = Arguments::exit_hook();

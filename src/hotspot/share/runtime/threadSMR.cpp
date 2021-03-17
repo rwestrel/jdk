@@ -647,7 +647,6 @@ int ThreadsList::find_index_of_JavaThread(JavaThread *target) {
 }
 
 JavaThread* ThreadsList::find_JavaThread_from_java_tid(jlong java_tid) const {
-#ifndef LEYDEN
   ThreadIdTable::lazy_initialize(this);
   JavaThread* thread = ThreadIdTable::find_thread_by_tid(java_tid);
   if (thread == NULL) {
@@ -671,7 +670,6 @@ JavaThread* ThreadsList::find_JavaThread_from_java_tid(jlong java_tid) const {
   } else if (!thread->is_exiting()) {
     return thread;
   }
-#endif
   return NULL;
 }
 
@@ -739,7 +737,6 @@ ThreadsListHandle::~ThreadsListHandle() {
 // to the converted JavaThread * and true is returned. On error,
 // returns false.
 //
-#ifndef LEYDEN
 bool ThreadsListHandle::cv_internal_thread_to_JavaThread(jobject jthread,
                                                          JavaThread ** jt_pp,
                                                          oop * thread_oop_p) {
@@ -782,7 +779,6 @@ bool ThreadsListHandle::cv_internal_thread_to_JavaThread(jobject jthread,
   *jt_pp = java_thread;
   return true;
 }
-#endif
 
 void ThreadsSMRSupport::add_thread(JavaThread *thread){
   ThreadsList *new_list = ThreadsList::add_thread(get_java_thread_list(), thread);

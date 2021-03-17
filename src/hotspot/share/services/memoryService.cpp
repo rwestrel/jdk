@@ -210,15 +210,11 @@ Handle MemoryService::create_MemoryUsage_obj(MemoryUsage usage, TRAPS) {
   args.push_long(usage.committed_as_jlong());
   args.push_long(usage.max_size_as_jlong());
 
-#ifndef LEYDEN
   return JavaCalls::construct_new_instance(
                           ik,
                           vmSymbols::long_long_long_long_void_signature(),
                           &args,
                           CHECK_NH);
-#else
-  return Handle();
-#endif
 }
 
 TraceMemoryManagerStats::TraceMemoryManagerStats(GCMemoryManager* gc_memory_manager,

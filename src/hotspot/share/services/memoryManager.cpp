@@ -75,11 +75,7 @@ instanceOop MemoryManager::get_memory_manager_instance(TRAPS) {
     // Extra manager instances will just be gc'ed.
     Klass* k = Management::sun_management_ManagementFactoryHelper_klass(CHECK_NULL);
 
-#ifndef LEYDEN
     Handle mgr_name = java_lang_String::create_from_str(name(), CHECK_NULL);
-#else
-    Handle mgr_name;
-#endif
 
     JavaValue result(T_OBJECT);
     JavaCallArguments args;
@@ -105,14 +101,12 @@ instanceOop MemoryManager::get_memory_manager_instance(TRAPS) {
 
     InstanceKlass* ik = InstanceKlass::cast(k);
 
-#ifndef LEYDEN
     JavaCalls::call_static(&result,
                            ik,
                            method_name,
                            signature,
                            &args,
                            CHECK_NULL);
-#endif
 
     instanceOop m = (instanceOop) result.get_jobject();
     instanceHandle mgr(THREAD, m);

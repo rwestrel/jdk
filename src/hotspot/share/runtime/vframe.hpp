@@ -110,12 +110,9 @@ class javaVFrame: public vframe {
   virtual Method*                      method()         const = 0;
   virtual int                          bci()            const = 0;
 
-#ifndef LEYDEN
-
   virtual StackValueCollection*        locals()         const = 0;
   virtual StackValueCollection*        expressions()    const = 0;
   // the order returned by monitors() is from oldest -> youngest#4418568
-#endif
   virtual GrowableArray<MonitorInfo*>* monitors()       const = 0;
 #ifndef LEYDEN
   // Debugging support via JVMTI.
