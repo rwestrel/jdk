@@ -756,18 +756,23 @@ bool ClassLoaderData::is_system_class_loader_data() const {
 bool ClassLoaderData::is_platform_class_loader_data() const {
   return SystemDictionary::is_platform_class_loader(class_loader());
 }
-
+#endif
 // Returns true if the class loader for this class loader data is one of
 // the 3 builtin (boot application/system or platform) class loaders,
 // including a user-defined system class loader.  Note that if the class
 // loader data is for a non-strong hidden class or unsafe anonymous class then it may
 // get freed by a GC even if its class loader is one of these loaders.
 bool ClassLoaderData::is_builtin_class_loader_data() const {
+#ifndef LEYDEN
   return (is_boot_class_loader_data() ||
           SystemDictionary::is_system_class_loader(class_loader()) ||
           SystemDictionary::is_platform_class_loader(class_loader()));
+#else
+  return false;
+#endif
 }
 
+#ifndef LEYDEN
 // Returns true if this class loader data is a class loader data
 // that is not ever freed by a GC.  It must be the CLD for one of the builtin
 // class loaders and not the CLD for a non-strong hidden class or unsafe anonymous class.

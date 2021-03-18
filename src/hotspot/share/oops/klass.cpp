@@ -917,7 +917,6 @@ bool Klass::verify_vtable_index(int i) {
 //   <fully-qualified-external-class-name1> and <fully-qualified-external-class-name2>
 //                      are in module <module-name>[@<version>]
 //                      of loader <loader-name_and_id>[, parent loader <parent-loader-name_and_id>]
-#ifndef LEYDEN
 const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_parent_loader) const {
   assert(module() == class2->module(), "classes do not have the same module");
   const char* class1_name = external_name();
@@ -941,7 +940,6 @@ const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_p
 
   return joint_description;
 }
-#endif
 
 // Caller needs ResourceMark
 // class_in_module_of_loader provides a standard way to include
@@ -950,7 +948,6 @@ const char* Klass::joint_in_module_of_loader(const Klass* class2, bool include_p
 // Format:
 //   <fully-qualified-external-class-name> is in module <module-name>[@<version>]
 //                                         of loader <loader-name_and_id>[, parent loader <parent-loader-name_and_id>]
-#ifndef LEYDEN
 const char* Klass::class_in_module_of_loader(bool use_are, bool include_parent_loader) const {
   // 1. fully qualified external name of class
   const char* klass_name = external_name();
@@ -1042,4 +1039,3 @@ const char* Klass::class_in_module_of_loader(bool use_are, bool include_parent_l
 
   return class_description;
 }
-#endif

@@ -240,7 +240,6 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_bounded(oop obj, OopClosureType
   oop_oop_iterate_oop_maps_bounded<T>(obj, closure, mr);
 }
 
-#ifndef LEYDEN
 inline instanceOop InstanceKlass::allocate_instance(oop java_class, TRAPS) {
   Klass* k = java_lang_Class::as_Klass(java_class);
   if (k == NULL) {
@@ -252,6 +251,5 @@ inline instanceOop InstanceKlass::allocate_instance(oop java_class, TRAPS) {
   ik->initialize(CHECK_NULL);
   return ik->allocate_instance(THREAD);
 }
-#endif
 
 #endif // SHARE_OOPS_INSTANCEKLASS_INLINE_HPP

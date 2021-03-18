@@ -2035,8 +2035,6 @@ bool InstanceKlass::has_redefined_this_or_super() const {
 
 // lookup a method in the default methods list then in all transitive interfaces
 // Do NOT return private or static methods
-#ifndef LEYDEN
-
 Method* InstanceKlass::lookup_method_in_ordered_interfaces(Symbol* name,
                                                          Symbol* signature) const {
   Method* m = NULL;
@@ -2069,8 +2067,6 @@ Method* InstanceKlass::lookup_method_in_all_interfaces(Symbol* name,
   }
   return NULL;
 }
-
-#endif
 
 /* jni_id_for_impl for jfieldIds only */
 JNIid* InstanceKlass::jni_id_for_impl(int offset) {
@@ -3208,7 +3204,6 @@ jint InstanceKlass::jvmti_class_status() const {
   return result;
 }
 
-#ifndef LEYDEN
 Method* InstanceKlass::method_at_itable(Klass* holder, int index, TRAPS) {
   itableOffsetEntry* ioe = (itableOffsetEntry*)start_of_itable();
   int method_table_offset_in_words = ioe->offset()/wordSize;
@@ -3243,7 +3238,6 @@ Method* InstanceKlass::method_at_itable(Klass* holder, int index, TRAPS) {
   }
   return m;
 }
-#endif
 
 #if INCLUDE_JVMTI
 // update default_methods for redefineclasses for methods that are

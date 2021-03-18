@@ -90,8 +90,6 @@
 #include "utilities/events.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/vmError.hpp"
-
-#ifndef LEYDEN
 #if INCLUDE_JVMCI
 #include "jvmci/jvmciCompiler.hpp"
 #endif
@@ -179,6 +177,8 @@ extern LONG WINAPI topLevelExceptionFilter(_EXCEPTION_POINTERS* );
 
 // out-of-line helpers for class jfieldIDWorkaround:
 
+#ifndef LEYDEN
+
 bool jfieldIDWorkaround::is_valid_jfieldID(Klass* k, jfieldID id) {
   if (jfieldIDWorkaround::is_instance_jfieldID(k, id)) {
     uintptr_t as_uint = (uintptr_t) id;
@@ -199,6 +199,10 @@ bool jfieldIDWorkaround::is_valid_jfieldID(Klass* k, jfieldID id) {
   }
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 intptr_t jfieldIDWorkaround::encode_klass_hash(Klass* k, intptr_t offset) {
   if (offset <= small_offset_mask) {
@@ -226,6 +230,8 @@ intptr_t jfieldIDWorkaround::encode_klass_hash(Klass* k, intptr_t offset) {
     return 0;
   }
 }
+
+#endif
 
 bool jfieldIDWorkaround::klass_hash_ok(Klass* k, jfieldID id) {
   uintptr_t as_uint = (uintptr_t) id;
@@ -259,8 +265,10 @@ void jfieldIDWorkaround::verify_instance_jfieldID(Klass* k, jfieldID id) {
 #endif
     }
   }
+#ifndef LEYDEN
   guarantee(InstanceKlass::cast(k)->contains_field_offset(offset),
       "Bug in native code: jfieldID offset must address interior of object");
+#endif
 }
 
 // Implementation of JNI entries
@@ -301,9 +309,11 @@ JNI_END
 #endif
 
 
+
 DT_RETURN_MARK_DECL(FindClass, jclass
                     , HOTSPOT_JNI_FINDCLASS_RETURN(_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
   HOTSPOT_JNI_FINDCLASS_ENTRY(env, (char *)name);
 
@@ -354,10 +364,12 @@ JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
 
   return result;
 JNI_END
+#endif
 
 DT_RETURN_MARK_DECL(FromReflectedMethod, jmethodID
                     , HOTSPOT_JNI_FROMREFLECTEDMETHOD_RETURN((uintptr_t)_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jmethodID, jni_FromReflectedMethod(JNIEnv *env, jobject method))
   HOTSPOT_JNI_FROMREFLECTEDMETHOD_ENTRY(env, method);
 
@@ -385,10 +397,12 @@ JNI_ENTRY(jmethodID, jni_FromReflectedMethod(JNIEnv *env, jobject method))
   ret = m==NULL? NULL : m->jmethod_id();  // return NULL if reflected method deleted
   return ret;
 JNI_END
+#endif
 
 DT_RETURN_MARK_DECL(FromReflectedField, jfieldID
                     , HOTSPOT_JNI_FROMREFLECTEDFIELD_RETURN((uintptr_t)_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jfieldID, jni_FromReflectedField(JNIEnv *env, jobject field))
   HOTSPOT_JNI_FROMREFLECTEDFIELD_ENTRY(env, field);
 
@@ -424,11 +438,13 @@ JNI_ENTRY(jfieldID, jni_FromReflectedField(JNIEnv *env, jobject field))
   ret = jfieldIDWorkaround::to_instance_jfieldID(k1, offset);
   return ret;
 JNI_END
+#endif
 
 
 DT_RETURN_MARK_DECL(ToReflectedMethod, jobject
                     , HOTSPOT_JNI_TOREFLECTEDMETHOD_RETURN(_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jobject, jni_ToReflectedMethod(JNIEnv *env, jclass cls, jmethodID method_id, jboolean isStatic))
   HOTSPOT_JNI_TOREFLECTEDMETHOD_ENTRY(env, cls, (uintptr_t) method_id, isStatic);
 
@@ -446,6 +462,7 @@ JNI_ENTRY(jobject, jni_ToReflectedMethod(JNIEnv *env, jclass cls, jmethodID meth
   ret = JNIHandles::make_local(THREAD, reflection_method);
   return ret;
 JNI_END
+#endif
 
 DT_RETURN_MARK_DECL(GetSuperclass, jclass
                     , HOTSPOT_JNI_GETSUPERCLASS_RETURN(_ret_ref));
@@ -1054,6 +1071,8 @@ JNI_ENTRY_NO_PRESERVE(jboolean, jni_IsInstanceOf(JNIEnv *env, jobject obj, jclas
 JNI_END
 
 
+#ifndef LEYDEN
+
 static jmethodID get_method_id(JNIEnv *env, jclass clazz, const char *name_str,
                                const char *sig, bool is_static, TRAPS) {
   // %%%% This code should probably just call into a method in the LinkResolver
@@ -1124,6 +1143,7 @@ JNI_ENTRY(jmethodID, jni_GetStaticMethodID(JNIEnv *env, jclass clazz,
   HOTSPOT_JNI_GETSTATICMETHODID_RETURN((uintptr_t) ret);
   return ret;
 JNI_END
+#endif
 
 
 
@@ -1741,6 +1761,7 @@ JNI_END
 DT_RETURN_MARK_DECL(GetFieldID, jfieldID
                     , HOTSPOT_JNI_GETFIELDID_RETURN((uintptr_t)_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
           const char *name, const char *sig))
   HOTSPOT_JNI_GETFIELDID_ENTRY(env, clazz, (char *) name, (char *) sig);
@@ -1774,6 +1795,7 @@ JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
   ret = jfieldIDWorkaround::to_instance_jfieldID(k, fd.offset());
   return ret;
 JNI_END
+#endif
 
 
 JNI_ENTRY(jobject, jni_GetObjectField(JNIEnv *env, jobject obj, jfieldID fieldID))
@@ -1934,6 +1956,7 @@ DEFINE_SETFIELD(jdouble,  double, Double,  JVM_SIGNATURE_DOUBLE, d
 DT_RETURN_MARK_DECL(ToReflectedField, jobject
                     , HOTSPOT_JNI_TOREFLECTEDFIELD_RETURN(_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jobject, jni_ToReflectedField(JNIEnv *env, jclass cls, jfieldID fieldID, jboolean isStatic))
   HOTSPOT_JNI_TOREFLECTEDFIELD_ENTRY(env, cls, (uintptr_t) fieldID, isStatic);
   jobject ret = NULL;
@@ -1960,6 +1983,7 @@ JNI_ENTRY(jobject, jni_ToReflectedField(JNIEnv *env, jclass cls, jfieldID fieldI
   ret = JNIHandles::make_local(THREAD, reflected);
   return ret;
 JNI_END
+#endif
 
 
 //
@@ -1968,6 +1992,7 @@ JNI_END
 DT_RETURN_MARK_DECL(GetStaticFieldID, jfieldID
                     , HOTSPOT_JNI_GETSTATICFIELDID_RETURN((uintptr_t)_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jfieldID, jni_GetStaticFieldID(JNIEnv *env, jclass clazz,
           const char *name, const char *sig))
   HOTSPOT_JNI_GETSTATICFIELDID_ENTRY(env, clazz, (char *) name, (char *) sig);
@@ -2001,6 +2026,7 @@ JNI_ENTRY(jfieldID, jni_GetStaticFieldID(JNIEnv *env, jclass clazz,
   ret = jfieldIDWorkaround::to_static_jfieldID(id);
   return ret;
 JNI_END
+#endif
 
 
 JNI_ENTRY(jobject, jni_GetStaticObjectField(JNIEnv *env, jclass clazz, jfieldID fieldID))
@@ -2612,6 +2638,7 @@ DEFINE_SETSCALARARRAYREGION(T_DOUBLE,  jdouble,  Double,  double
 DT_RETURN_MARK_DECL(RegisterNatives, jint
                     , HOTSPOT_JNI_REGISTERNATIVES_RETURN(_ret_ref));
 
+#ifndef LEYDEN
 JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
                                     const JNINativeMethod *methods,
                                     jint nMethods))
@@ -2634,6 +2661,7 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
     oop cl = k->class_loader();
     InstanceKlass* ik = InstanceKlass::cast(k);
     // Check for a platform class
+#ifndef LEYDEN
     if ((cl ==  NULL || SystemDictionary::is_platform_class_loader(cl)) &&
         ik->module()->is_named()) {
       Klass* caller = thread->security_get_caller_class(1);
@@ -2641,6 +2669,7 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
       // issue a warning below.
       do_warning = (caller == NULL) || caller->class_loader() != cl;
     }
+#endif
   }
 
 
@@ -2678,8 +2707,10 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
   }
   return ret;
 JNI_END
+#endif
 
 
+#ifndef LEYDEN
 JNI_ENTRY(jint, jni_UnregisterNatives(JNIEnv *env, jclass clazz))
  HOTSPOT_JNI_UNREGISTERNATIVES_ENTRY(env, clazz);
   Klass* k   = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz));
@@ -2696,6 +2727,7 @@ JNI_ENTRY(jint, jni_UnregisterNatives(JNIEnv *env, jclass clazz))
  HOTSPOT_JNI_UNREGISTERNATIVES_RETURN(0);
   return 0;
 JNI_END
+#endif
 
 //
 // Monitor functions
@@ -2924,6 +2956,8 @@ static jmethodID directByteBufferConstructor = NULL;
 static jfieldID  directBufferAddressField    = NULL;
 static jfieldID  bufferCapacityField         = NULL;
 
+#ifndef LEYDEN
+
 static jclass lookupOne(JNIEnv* env, const char* name, TRAPS) {
   Handle loader;            // null (bootstrap) loader
   Handle protection_domain; // null protection domain
@@ -3089,7 +3123,7 @@ extern "C" jlong JNICALL jni_GetDirectBufferCapacity(JNIEnv *env, jobject buf)
   ret = env->GetIntField(buf, bufferCapacityField);
   return ret;
 }
-
+#endif
 
 JNI_LEAF(jint, jni_GetVersion(JNIEnv *env))
   HOTSPOT_JNI_GETVERSION_ENTRY(env);
@@ -3107,9 +3141,11 @@ JNI_LEAF(jint, jni_GetJavaVM(JNIEnv *env, JavaVM **vm))
 JNI_END
 
 
+#ifndef LEYDEN
 JNI_ENTRY(jobject, jni_GetModule(JNIEnv* env, jclass clazz))
   return Modules::get_module(clazz, THREAD);
 JNI_END
+#endif
 
 
 // Structure containing all jni functions
@@ -3124,20 +3160,31 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
 #ifndef LEYDEN
     jni_DefineClass,
-#else
-    NULL,
-#endif
     jni_FindClass,
+#else
+        NULL,
+        NULL,
+#endif
 
+#ifndef LEYDEN
     jni_FromReflectedMethod,
     jni_FromReflectedField,
 
     jni_ToReflectedMethod,
+#else
+        NULL,
+        NULL,
+        NULL,
+#endif
 
     jni_GetSuperclass,
     jni_IsAssignableFrom,
 
+#ifndef LEYDEN
     jni_ToReflectedField,
+#else
+        NULL,
+#endif
 
     jni_Throw,
     jni_ThrowNew,
@@ -3165,7 +3212,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_GetObjectClass,
     jni_IsInstanceOf,
 
+#ifndef LEYDEN
     jni_GetMethodID,
+#else
+        NULL,
+#endif
 
     jni_CallObjectMethod,
     jni_CallObjectMethodV,
@@ -3229,7 +3280,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_CallNonvirtualVoidMethodV,
     jni_CallNonvirtualVoidMethodA,
 
+#ifndef LEYDEN
     jni_GetFieldID,
+#else
+        NULL,
+#endif
 
     jni_GetObjectField,
     jni_GetBooleanField,
@@ -3251,7 +3306,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_SetFloatField,
     jni_SetDoubleField,
 
+#ifndef LEYDEN
     jni_GetStaticMethodID,
+#else
+        NULL,
+#endif
 
     jni_CallStaticObjectMethod,
     jni_CallStaticObjectMethodV,
@@ -3284,7 +3343,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_CallStaticVoidMethodV,
     jni_CallStaticVoidMethodA,
 
+#ifndef LEYDEN
     jni_GetStaticFieldID,
+#else
+        NULL,
+#endif
 
     jni_GetStaticObjectField,
     jni_GetStaticBooleanField,
@@ -3367,8 +3430,13 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_SetFloatArrayRegion,
     jni_SetDoubleArrayRegion,
 
+#ifndef LEYDEN
     jni_RegisterNatives,
     jni_UnregisterNatives,
+#else
+NULL,
+NULL,
+#endif
 
     jni_MonitorEnter,
     jni_MonitorExit,
@@ -3389,9 +3457,15 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     jni_ExceptionCheck,
 
+#ifndef LEYDEN
     jni_NewDirectByteBuffer,
     jni_GetDirectBufferAddress,
     jni_GetDirectBufferCapacity,
+#else
+NULL,
+NULL,
+NULL,
+#endif
 
     // New 1_6 features
 
@@ -3399,7 +3473,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     // Module features
 
+#ifndef LEYDEN
     jni_GetModule
+#else
+NULL
+#endif
 };
 
 
@@ -3417,6 +3495,8 @@ void copy_jni_function_table(const struct JNINativeInterface_ *new_jni_NativeInt
     Atomic::store(a++, *b++);
   }
 }
+
+#ifndef LEYDEN
 
 void quicken_jni_functions() {
   // Replace Get<Primitive>Field with fast versions
@@ -3456,6 +3536,8 @@ void quicken_jni_functions() {
     }
   }
 }
+
+#endif
 
 // Returns the function structure
 struct JNINativeInterface_* jni_functions() {
@@ -3507,12 +3589,9 @@ struct JavaVM_ main_vm = {&jni_InvokeInterface};
 enum { VERIFY_NONE, VERIFY_REMOTE, VERIFY_ALL };
 
 DT_RETURN_MARK_DECL(GetDefaultJavaVMInitArgs, jint
-, HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_RETURN(_ret_ref));
-
-#endif
+                    , HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_RETURN(_ret_ref));
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void *args_) {
-#ifndef LEYDEN
   HOTSPOT_JNI_GETDEFAULTJAVAVMINITARGS_ENTRY(args_);
   JDK1_1InitArgs *args = (JDK1_1InitArgs *)args_;
   jint ret = JNI_ERR;
@@ -3532,13 +3611,8 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void *args_) {
     args->javaStackSize = (jint)(ThreadStackSize * K);
   }
   return ret;
-#else
-  ShouldNotReachHere();
-  return 0;
-#endif
 }
 
-#ifndef LEYDEN
 DT_RETURN_MARK_DECL(CreateJavaVM, jint
                     , HOTSPOT_JNI_CREATEJAVAVM_RETURN(_ret_ref));
 
@@ -3632,8 +3706,10 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
     post_thread_start_event(thread);
 
+#ifndef LEYDEN
 #ifndef PRODUCT
     if (ReplayCompiles) ciReplay::replay(thread);
+#endif
 #endif
 
 #ifdef ASSERT
@@ -3681,10 +3757,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
 }
 
-#endif
-
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM **vm, void **penv, void *args) {
-#ifndef LEYDEN
   jint result = JNI_ERR;
   // On Windows, let CreateJavaVM run with SEH protection
 #if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
@@ -3697,15 +3770,9 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM **vm, void **penv, v
   }
 #endif
   return result;
-#else
-  ShouldNotReachHere();
-return 0;
-#endif
 }
 
-
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize bufLen, jsize *numVMs) {
-#ifndef LEYDEN
   HOTSPOT_JNI_GETCREATEDJAVAVMS_ENTRY((void **) vm_buf, bufLen, (uintptr_t *) numVMs);
 
   if (vm_created == 1) {
@@ -3715,13 +3782,9 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize
     if (numVMs != NULL) *numVMs = 0;
   }
   HOTSPOT_JNI_GETCREATEDJAVAVMS_RETURN(JNI_OK);
-#else
-  ShouldNotReachHere();
-#endif
   return JNI_OK;
 }
 
-#ifndef LEYDEN
 extern "C" {
 
 DT_RETURN_MARK_DECL(DestroyJavaVM, jint
@@ -4037,4 +4100,3 @@ const struct JNIInvokeInterface_ jni_InvokeInterface = {
     jni_GetEnv,
     jni_AttachCurrentThreadAsDaemon
 };
-#endif

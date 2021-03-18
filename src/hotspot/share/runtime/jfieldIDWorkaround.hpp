@@ -25,6 +25,8 @@
 #ifndef SHARE_RUNTIME_JFIELDIDWORKAROUND_HPP
 #define SHARE_RUNTIME_JFIELDIDWORKAROUND_HPP
 
+#if 1 //ndef LEYDEN
+
 class jfieldIDWorkaround: AllStatic {
   // This workaround is because JVMTI doesn't have distinct entry points
   // for methods that use static jfieldIDs and instance jfieldIDs.
@@ -160,5 +162,7 @@ class jfieldIDWorkaround: AllStatic {
     }
   }
 };
+
+#endif
 
 #endif // SHARE_RUNTIME_JFIELDIDWORKAROUND_HPP
