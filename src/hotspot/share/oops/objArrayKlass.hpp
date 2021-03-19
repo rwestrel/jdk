@@ -91,11 +91,7 @@ class ObjArrayKlass : public ArrayKlass {
   // Compute protection domain
   oop protection_domain() const { return bottom_klass()->protection_domain(); }
 
-#ifndef LEYDEN
-
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
-
-#endif
 
  private:
   // Either oop or narrowOop depending on UseCompressedOops.

@@ -34,7 +34,7 @@
 #include "utilities/hashtable.inline.hpp"
 #include "utilities/macros.hpp"
 #include <type_traits>
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 // The metadata hierarchy is separate from the oop hierarchy
   class MetaspaceObj;        // no C++ vtable

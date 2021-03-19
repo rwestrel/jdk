@@ -525,11 +525,7 @@ public:
   // clear entry points. Used by sharing code during dump time
   void unlink_method() NOT_CDS_RETURN;
 
-#ifndef LEYDEN
-
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
-
-#endif
   virtual MetaspaceObj::Type type() const { return MethodType; }
 
   // vtable index

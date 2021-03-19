@@ -181,9 +181,7 @@ void GenMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   GenCollectedHeap* gch = GenCollectedHeap::heap();
 
   // Need new claim bits before marking starts.
-#ifndef LEYDEN
   ClassLoaderDataGraph::clear_claimed_marks();
-#endif
 
   {
     StrongRootsScope srs(0);
@@ -193,11 +191,7 @@ void GenMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
                             ClassUnloading, // only strong roots if ClassUnloading
                                             // is enabled
                             &follow_root_closure,
-#ifndef LEYDEN
                             &follow_cld_closure);
-#else
-    NULL);
-#endif
   }
 
   // Process reference objects found during marking
@@ -277,10 +271,8 @@ void GenMarkSweep::mark_sweep_phase3() {
   // Adjust the pointers to reflect the new locations
   GCTraceTime(Info, gc, phases) tm("Phase 3: Adjust pointers", gc_timer());
 
-#ifndef LEYDEN
   // Need new claim bits for the pointer adjustment tracing.
   ClassLoaderDataGraph::clear_claimed_marks();
-#endif
 
   {
     StrongRootsScope srs(0);
@@ -289,11 +281,7 @@ void GenMarkSweep::mark_sweep_phase3() {
                             GenCollectedHeap::SO_AllCodeCache,
                             false, // all roots
                             &adjust_pointer_closure,
-#ifndef LEYDEN
                             &adjust_cld_closure);
-#else
-    NULL);
-#endif
   }
 
   gch->gen_process_weak_roots(&adjust_pointer_closure);

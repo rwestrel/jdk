@@ -55,15 +55,11 @@ void RecordComponent::deallocate_contents(ClassLoaderData* loader_data) {
 
 #endif
 
-#ifndef LEYDEN
-
 void RecordComponent::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(RecordComponent): %p", this);
   it->push(&_annotations);
   it->push(&_type_annotations);
 }
-
-#endif
 
 void RecordComponent::print_value_on(outputStream* st) const {
   st->print("RecordComponent(" INTPTR_FORMAT ")", p2i(this));

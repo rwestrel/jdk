@@ -152,6 +152,8 @@ class DictionaryEntry : public HashtableEntry<InstanceKlass*, mtClass> {
   ProtectionDomainEntry* pd_set() const            { return _pd_set; }
   void set_pd_set(ProtectionDomainEntry* new_head) {  _pd_set = new_head; }
 
+#ifndef LEYDEN
+
   // Tells whether the initiating class' protection domain can access the klass in this entry
   bool is_valid_protection_domain(Handle protection_domain) {
     if (!ProtectionDomainVerification) return true;
@@ -160,6 +162,8 @@ class DictionaryEntry : public HashtableEntry<InstanceKlass*, mtClass> {
          ? true
          : contains_protection_domain(protection_domain());
   }
+
+#endif
 
   void verify_protection_domain_set();
 

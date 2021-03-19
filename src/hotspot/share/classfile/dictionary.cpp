@@ -133,6 +133,7 @@ bool Dictionary::resize_if_needed() {
 }
 
 #ifndef LEYDEN
+
 bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   // Lock the pd_set list.  This lock cannot safepoint since the caller holds
   // a Dictionary entry, which can be moved if the Dictionary is resized.
@@ -169,7 +170,9 @@ bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   return false;
 }
 
+#endif
 
+#ifndef LEYDEN
 void DictionaryEntry::add_protection_domain(Dictionary* dict, Handle protection_domain) {
   assert_locked_or_safepoint(SystemDictionary_lock);
   if (!contains_protection_domain(protection_domain())) {
@@ -284,6 +287,8 @@ DictionaryEntry* Dictionary::get_entry(int index, unsigned int hash,
 }
 
 
+#ifndef LEYDEN
+
 InstanceKlass* Dictionary::find(unsigned int hash, Symbol* name,
                                 Handle protection_domain) {
   NoSafepointVerifier nsv;
@@ -296,6 +301,7 @@ InstanceKlass* Dictionary::find(unsigned int hash, Symbol* name,
     return NULL;
   }
 }
+#endif
 
 InstanceKlass* Dictionary::find_class(unsigned int hash,
                                       Symbol* name) {

@@ -79,8 +79,6 @@ typeArrayOop Annotations::make_java_array(AnnotationArray* annotations, TRAPS) {
   }
 }
 
-#ifndef LEYDEN
-
 void Annotations::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(Annotations): %p", this);
   it->push(&_class_annotations);
@@ -88,8 +86,6 @@ void Annotations::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_class_type_annotations);
   it->push(&_fields_type_annotations); // FIXME: need a test case where _fields_type_annotations != NULL
 }
-
-#endif
 
 void Annotations::print_value_on(outputStream* st) const {
   st->print("Annotations(" INTPTR_FORMAT ")", p2i(this));

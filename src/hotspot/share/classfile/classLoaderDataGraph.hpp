@@ -30,7 +30,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 
-#ifndef LEYDEN
+#if 1// ndef LEYDEN
 // GC root for walking class loader data created
 
 class ClassLoaderDataGraph : public AllStatic {

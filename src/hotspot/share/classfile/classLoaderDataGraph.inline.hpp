@@ -31,6 +31,8 @@
 #include "runtime/atomic.hpp"
 
 #ifndef LEYDEN
+#ifndef LEYDEN
+
 inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
   guarantee(loader() != NULL && oopDesc::is_oop(loader()), "Loader must be oop");
   // Gets the class loader data out of the java/lang/ClassLoader object, if non-null
@@ -41,6 +43,8 @@ inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
   }
   return ClassLoaderDataGraph::add(loader, false);
 }
+
+#endif
 
 size_t ClassLoaderDataGraph::num_instance_classes() {
   return _num_instance_classes;

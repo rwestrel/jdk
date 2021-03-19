@@ -370,22 +370,20 @@ Symbol* Method::klass_name() const {
   return method_holder()->name();
 }
 
-#ifndef LEYDEN
-
 void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(Method): %p", this);
 
   it->push(&_constMethod);
+#ifndef LEYDEN
   it->push(&_method_data);
   it->push(&_method_counters);
+#endif
 
   Method* this_ptr = this;
   it->push_method_entry(&this_ptr, (intptr_t*)&_i2i_entry);
   it->push_method_entry(&this_ptr, (intptr_t*)&_from_compiled_entry);
   it->push_method_entry(&this_ptr, (intptr_t*)&_from_interpreted_entry);
 }
-
-#endif
 
 // Attempt to return method to original state.  Clear any pointers
 // (to objects outside the shared spaces).  We won't be able to predict

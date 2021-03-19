@@ -534,8 +534,6 @@ void Klass::clean_weak_klass_links(bool unloading_occurred, bool clean_alive_kla
 }
 #endif
 
-#ifndef LEYDEN
-
 void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   if (log_is_enabled(Trace, cds)) {
     ResourceMark rm;
@@ -559,8 +557,6 @@ void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   }
 }
 
-#endif
-
 #ifndef LEYDEN
 
 void Klass::remove_unshareable_info() {
@@ -581,8 +577,6 @@ void Klass::remove_unshareable_info() {
   set_is_shared();
 }
 
-#endif
-
 void Klass::remove_java_mirror() {
   Arguments::assert_is_dumping_archive();
   if (log_is_enabled(Trace, cds, unshareable)) {
@@ -593,7 +587,6 @@ void Klass::remove_java_mirror() {
   clear_java_mirror_handle();
 }
 
-#ifndef LEYDEN
 void Klass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS) {
   assert(is_klass(), "ensure C++ vtable is restored");
   assert(is_shared(), "must be set");

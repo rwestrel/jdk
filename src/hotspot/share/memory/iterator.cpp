@@ -32,11 +32,9 @@
 
 DoNothingClosure do_nothing_cl;
 
-#ifndef LEYDEN
 void CLDToOopClosure::do_cld(ClassLoaderData* cld) {
   cld->oops_do(_oop_closure, _cld_claim);
 }
-#endif
 
 void ObjectToOopClosure::do_object(oop obj) {
   obj->oop_iterate(_cl);

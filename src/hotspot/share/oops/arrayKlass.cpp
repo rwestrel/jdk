@@ -171,8 +171,6 @@ jint ArrayKlass::jvmti_class_status() const {
   return JVMTI_CLASS_STATUS_ARRAY;
 }
 
-#ifndef LEYDEN
-
 void ArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   Klass::metaspace_pointers_do(it);
 
@@ -184,8 +182,6 @@ void ArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push((Klass**)&_lower_dimension);
 }
 
-#endif
-
 #ifndef LEYDEN
 void ArrayKlass::remove_unshareable_info() {
   Klass::remove_unshareable_info();
@@ -194,7 +190,6 @@ void ArrayKlass::remove_unshareable_info() {
     ak->remove_unshareable_info();
   }
 }
-#endif
 
 void ArrayKlass::remove_java_mirror() {
   Klass::remove_java_mirror();
@@ -204,7 +199,6 @@ void ArrayKlass::remove_java_mirror() {
   }
 }
 
-#ifndef LEYDEN
 void ArrayKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS) {
   assert(loader_data == ClassLoaderData::the_null_class_loader_data(), "array classes belong to null loader");
   Klass::restore_unshareable_info(loader_data, protection_domain, CHECK);

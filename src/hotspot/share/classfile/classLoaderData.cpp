@@ -81,6 +81,7 @@
 ClassLoaderData * ClassLoaderData::_the_null_class_loader_data = NULL;
 
 #ifndef LEYDEN
+#ifndef LEYDEN
 
  void ClassLoaderData::init_null_class_loader_data() {
   assert(_the_null_class_loader_data == NULL, "cannot initialize twice");
@@ -213,7 +214,7 @@ int ClassLoaderData::ChunkedHandleList::count() const {
   }
   return count;
 }
-
+#endif
 inline void ClassLoaderData::ChunkedHandleList::oops_do_chunk(OopClosure* f, Chunk* c, const juint size) {
   for (juint i = 0; i < size; i++) {
     if (c->_data[i] != NULL) {
@@ -232,7 +233,7 @@ void ClassLoaderData::ChunkedHandleList::oops_do(OopClosure* f) {
     }
   }
 }
-
+#ifndef LEYDEN
 class VerifyContainsOopClosure : public OopClosure {
   oop  _target;
   bool _found;
@@ -274,7 +275,7 @@ bool ClassLoaderData::ChunkedHandleList::owner_of(oop* oop_handle) {
   return false;
 }
 #endif // PRODUCT
-
+#endif
 void ClassLoaderData::clear_claim(int claim) {
   for (;;) {
     int old_claim = Atomic::load(&_claim);
@@ -287,7 +288,6 @@ void ClassLoaderData::clear_claim(int claim) {
     }
   }
 }
-
 bool ClassLoaderData::try_claim(int claim) {
   for (;;) {
     int old_claim = Atomic::load(&_claim);
@@ -300,6 +300,7 @@ bool ClassLoaderData::try_claim(int claim) {
     }
   }
 }
+#ifndef LEYDEN
 
 // Weak hidden and unsafe anonymous classes have their own ClassLoaderData that is marked to keep alive
 // while the class is being parsed, and if the class appears on the module fixup list.
@@ -321,7 +322,7 @@ void ClassLoaderData::dec_keep_alive() {
     _keep_alive--;
   }
 }
-
+#endif
 void ClassLoaderData::oops_do(OopClosure* f, int claim_value, bool clear_mod_oops) {
   if (claim_value != ClassLoaderData::_claim_none && !try_claim(claim_value)) {
     return;
@@ -334,7 +335,7 @@ void ClassLoaderData::oops_do(OopClosure* f, int claim_value, bool clear_mod_oop
 
   _handles.oops_do(f);
 }
-
+#ifndef LEYDEN
 void ClassLoaderData::classes_do(KlassClosure* klass_closure) {
   // Lock-free access requires load_acquire
   for (Klass* k = Atomic::load_acquire(&_klasses); k != NULL; k = k->next_link()) {
@@ -630,6 +631,7 @@ oop ClassLoaderData::holder_phantom() const {
     return NULL;
   }
 }
+#endif
 
 // Let the GC read the holder without keeping it alive.
 oop ClassLoaderData::holder_no_keepalive() const {
@@ -640,6 +642,7 @@ oop ClassLoaderData::holder_no_keepalive() const {
   }
 }
 
+#ifndef LEYDEN
 // Unloading support
 bool ClassLoaderData::is_alive() const {
   bool alive = keep_alive()         // null class loader and incomplete non-strong hidden class or unsafe anonymous class.
@@ -757,6 +760,7 @@ bool ClassLoaderData::is_platform_class_loader_data() const {
   return SystemDictionary::is_platform_class_loader(class_loader());
 }
 #endif
+#endif
 // Returns true if the class loader for this class loader data is one of
 // the 3 builtin (boot application/system or platform) class loaders,
 // including a user-defined system class loader.  Note that if the class
@@ -772,6 +776,7 @@ bool ClassLoaderData::is_builtin_class_loader_data() const {
 #endif
 }
 
+#ifndef LEYDEN
 #ifndef LEYDEN
 // Returns true if this class loader data is a class loader data
 // that is not ever freed by a GC.  It must be the CLD for one of the builtin
@@ -934,7 +939,7 @@ const char* ClassLoaderData::loader_name() const {
      return _class_loader_klass->external_name();
    }
 }
-
+#endif
 // Caller needs ResourceMark
 // Format of the _name_and_id is as follows:
 //   If the defining loader has a name explicitly set then '<loader-name>' @<id>
@@ -950,7 +955,7 @@ const char* ClassLoaderData::loader_name_and_id() const {
     return _class_loader_klass->external_name();
   }
 }
-
+#ifndef LEYDEN
 void ClassLoaderData::print_value_on(outputStream* out) const {
   if (!is_unloading() && class_loader() != NULL) {
     out->print("loader data: " INTPTR_FORMAT " for instance ", p2i(this));
@@ -1016,3 +1021,5 @@ bool ClassLoaderData::contains_klass(Klass* klass) {
   }
   return false;
 }
+
+#endif

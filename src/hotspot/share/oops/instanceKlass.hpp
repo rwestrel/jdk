@@ -1355,9 +1355,9 @@ public:
 #ifndef LEYDEN
 
   virtual void remove_unshareable_info();
+  virtual void remove_java_mirror();
 
 #endif
-  virtual void remove_java_mirror();
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, PackageEntry* pkg_entry, TRAPS);
   void init_shared_package_entry();
 
@@ -1372,11 +1372,7 @@ public:
   // JVMTI support
   jint jvmti_class_status() const;
 
-#ifndef LEYDEN
-
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
-
-#endif
 
  public:
   // Printing

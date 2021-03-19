@@ -412,11 +412,14 @@ void ConstMethod::copy_annotations_from(ClassLoaderData* loader_data, ConstMetho
     set_default_annotations(a);
   }
 }
+#endif
 
 void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(ConstMethod): %p", this);
 
+#ifndef LEYDEN
   it->push(&_constants);
+#endif
   it->push(&_stackmap_data);
   if (has_method_annotations()) {
     it->push(method_annotations_addr());
@@ -433,8 +436,6 @@ void ConstMethod::metaspace_pointers_do(MetaspaceClosure* it) {
   ConstMethod* this_ptr = this;
   it->push_method_entry(&this_ptr, (intptr_t*)&_adapter_trampoline);
 }
-
-#endif
 
 void ConstMethod::set_adapter_trampoline(AdapterHandlerEntry** trampoline) {
   Arguments::assert_is_dumping_archive();

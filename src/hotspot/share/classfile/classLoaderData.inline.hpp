@@ -32,24 +32,24 @@
 #include "oops/oopHandle.inline.hpp"
 #include "oops/weakHandle.inline.hpp"
 
-#if 1 //ndef LEYDEN
 inline oop ClassLoaderData::class_loader() const {
   assert(!_unloading, "This oop is not available to unloading class loader data");
   assert(_holder.is_null() || holder_no_keepalive() != NULL , "This class loader data holder must be alive");
   return _class_loader.resolve();
 }
 
+#ifndef LEYDEN
 inline bool ClassLoaderData::is_boot_class_loader_data() const {
   return this == _the_null_class_loader_data || class_loader() == NULL;
 }
-
+#endif
 inline ClassLoaderData* ClassLoaderData::class_loader_data_or_null(oop loader) {
   if (loader == NULL) {
     return ClassLoaderData::the_null_class_loader_data();
   }
   return java_lang_ClassLoader::loader_data_acquire(loader);
 }
-
+#ifndef LEYDEN
 inline ClassLoaderData* ClassLoaderData::class_loader_data(oop loader) {
   ClassLoaderData* loader_data = class_loader_data_or_null(loader);
   assert(loader_data != NULL, "Must be");

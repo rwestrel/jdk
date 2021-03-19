@@ -548,9 +548,9 @@ protected:
 #ifndef LEYDEN
 
   virtual void remove_unshareable_info();
+  virtual void remove_java_mirror();
 
 #endif
-  virtual void remove_java_mirror();
 
   bool is_unshareable_info_restored() const {
     assert(is_shared(), "use this for shared classes only");
@@ -689,11 +689,8 @@ protected:
 
   JFR_ONLY(DEFINE_TRACE_ID_METHODS;)
 
-#ifndef LEYDEN
-
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
-#endif
   virtual MetaspaceObj::Type type() const { return ClassType; }
 
   // Iff the class loader (or mirror for unsafe anonymous classes) is alive the

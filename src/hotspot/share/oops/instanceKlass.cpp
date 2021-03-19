@@ -2482,7 +2482,6 @@ void InstanceKlass::store_fingerprint(uint64_t fingerprint) {
   }
 }
 
-#ifndef LEYDEN
 void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   Klass::metaspace_pointers_do(it);
 
@@ -2493,7 +2492,9 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
 
   it->push(&_annotations);
   it->push((Klass**)&_array_klasses);
+#ifndef LEYDEN
   it->push(&_constants);
+#endif
   it->push(&_inner_classes);
 #if INCLUDE_JVMTI
   it->push(&_previous_versions);
@@ -2506,6 +2507,7 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_default_vtable_indices);
   it->push(&_fields);
 
+#ifndef LEYDEN
   if (itable_length() > 0) {
     itableOffsetEntry* ioe = (itableOffsetEntry*)start_of_itable();
     int method_table_offset_in_words = ioe->offset()/wordSize;
@@ -2523,12 +2525,14 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
       }
     }
   }
+#endif
 
   it->push(&_nest_members);
   it->push(&_permitted_subclasses);
   it->push(&_record_components);
 }
 
+#ifndef LEYDEN
 void InstanceKlass::remove_unshareable_info() {
   Klass::remove_unshareable_info();
 
@@ -2582,7 +2586,6 @@ void InstanceKlass::remove_unshareable_info() {
   init_shared_package_entry();
   _dep_context_last_cleaned = 0;
 }
-#endif
 
 void InstanceKlass::remove_java_mirror() {
   Klass::remove_java_mirror();
@@ -2614,7 +2617,6 @@ void InstanceKlass::init_shared_package_entry() {
 #endif
 }
 
-#ifndef LEYDEN
 void InstanceKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain,
                                              PackageEntry* pkg_entry, TRAPS) {
   // SystemDictionary::add_to_hierarchy() sets the init_state to loaded
@@ -2792,6 +2794,8 @@ void InstanceKlass::release_C_heap_structures_internal() {
 }
 #endif
 
+#ifndef LEYDEN
+
 void InstanceKlass::set_source_debug_extension(const char* array, int length) {
   if (array == NULL) {
     _source_debug_extension = NULL;
@@ -2809,6 +2813,8 @@ void InstanceKlass::set_source_debug_extension(const char* array, int length) {
     _source_debug_extension = sde;
   }
 }
+
+#endif
 
 const char* InstanceKlass::signature_name() const {
   int hash_len = 0;

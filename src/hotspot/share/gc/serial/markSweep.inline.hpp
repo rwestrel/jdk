@@ -58,7 +58,6 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 }
 
 
-#ifndef LEYDEN
 inline void MarkSweep::follow_klass(Klass* klass) {
   oop op = klass->class_loader_data()->holder_no_keepalive();
   MarkSweep::mark_and_push(&op);
@@ -67,16 +66,13 @@ inline void MarkSweep::follow_klass(Klass* klass) {
 inline void MarkSweep::follow_cld(ClassLoaderData* cld) {
   MarkSweep::follow_cld_closure.do_cld(cld);
 }
-#endif
 
 template <typename T>
 inline void MarkAndPushClosure::do_oop_work(T* p)            { MarkSweep::mark_and_push(p); }
 inline void MarkAndPushClosure::do_oop(oop* p)               { do_oop_work(p); }
 inline void MarkAndPushClosure::do_oop(narrowOop* p)         { do_oop_work(p); }
-#ifndef LEYDEN
 inline void MarkAndPushClosure::do_klass(Klass* k)           { MarkSweep::follow_klass(k); }
 inline void MarkAndPushClosure::do_cld(ClassLoaderData* cld) { MarkSweep::follow_cld(cld); }
-#endif
 
 template <class T> inline void MarkSweep::adjust_pointer(T* p) {
   T heap_oop = RawAccess<>::oop_load(p);
