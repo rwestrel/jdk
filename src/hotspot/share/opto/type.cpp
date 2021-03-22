@@ -4393,7 +4393,7 @@ bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool thi
     return false;
   }
 
-  if (klass_is_exact()) {
+  if (this_exact) {
     return _klass->is_subtype_of(other->_klass);
   }
 
