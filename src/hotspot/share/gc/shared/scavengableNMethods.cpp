@@ -87,7 +87,6 @@ public:
 
   bool ok() { return _ok; }
   virtual void do_oop(oop* p) {
-#ifndef LEYDEN
     if (*p == NULL || !_is_scavengable->do_object_b(*p)) {
       return;
     }
@@ -99,7 +98,6 @@ public:
     tty->print_cr("*** scavengable oop " PTR_FORMAT " found at " PTR_FORMAT " (offset %d)",
                   p2i(*p), p2i(p), (int)((intptr_t)p - (intptr_t)_nm));
     (*p)->print();
-#endif
   }
   virtual void do_oop(narrowOop* p) { ShouldNotReachHere(); }
 };

@@ -160,7 +160,6 @@ int klassVtable::initialize_from_super(Klass* super) {
 
 //
 // Revised lookup semantics   introduced 1.3 (Kestrel beta)
-#ifndef LEYDEN
 void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
 
   // Note:  Arrays can have intermediate array supers.  Use java_super to skip them.
@@ -277,7 +276,6 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
     NOT_PRODUCT(verify(tty, true));
   }
 }
-#endif
 
 // Returns true iff super_method can be overridden by a method in targetclassname
 // See JLS 3rd edition 8.4.6.1

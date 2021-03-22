@@ -142,7 +142,6 @@ Relocator::Relocator(const methodHandle& m, RelocatorListener* listener) {
 
 // size is the new size of the instruction at bci. Hence, if size is less than the current
 // instruction size, we will shrink the code.
-#ifndef LEYDEN
 methodHandle Relocator::insert_space_at(int bci, int size, u_char inst_buffer[], TRAPS) {
   _changes = new GrowableArray<ChangeItem*> (10);
   _changes->push(new ChangeWiden(bci, size, inst_buffer));
@@ -177,7 +176,6 @@ methodHandle Relocator::insert_space_at(int bci, int size, u_char inst_buffer[],
 
   return new_method;
 }
-#endif
 
 
 bool Relocator::handle_code_changes() {
@@ -453,7 +451,6 @@ void Relocator::adjust_local_var_table(int bci, int delta) {
 
 // Create a new array, copying the src array but adding a hole at
 // the specified location
-#ifndef LEYDEN
 static Array<u1>* insert_hole_at(ClassLoaderData* loader_data,
     size_t where, int hole_sz, Array<u1>* src) {
   Thread* THREAD = Thread::current();
@@ -468,11 +465,9 @@ static Array<u1>* insert_hole_at(ClassLoaderData* loader_data,
          src_addr + where, src->length() - where);
   return dst;
 }
-#endif
 
 // The width of instruction at "bci" is changing by "delta".  Adjust the stack
 // map frames.
-#ifndef LEYDEN
 void Relocator::adjust_stack_map_table(int bci, int delta) {
   if (method()->has_stackmap_table()) {
     Array<u1>* data = method()->stackmap_data();
@@ -568,7 +563,7 @@ void Relocator::adjust_stack_map_table(int bci, int delta) {
     method()->set_stackmap_data(data); // in case it has changed
   }
 }
-#endif
+
 
 bool Relocator::expand_code_array(int delta) {
   int length = MAX2(code_length() + delta, code_length() * (100+code_slop_pct()) / 100);

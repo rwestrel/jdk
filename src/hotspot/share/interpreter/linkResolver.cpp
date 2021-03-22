@@ -455,7 +455,6 @@ Method* LinkResolver::lookup_polymorphic_method(const LinkInfo& link_info,
   log_info(methodhandles)("lookup_polymorphic_method iid=%s %s.%s%s",
                           vmIntrinsics::name_at(iid), klass->external_name(),
                           name->as_C_string(), full_signature->as_C_string());
-#ifndef LEYDEN
   if ((klass == vmClasses::MethodHandle_klass() ||
        klass == vmClasses::VarHandle_klass()) &&
       iid != vmIntrinsics::_none) {
@@ -542,7 +541,6 @@ Method* LinkResolver::lookup_polymorphic_method(const LinkInfo& link_info,
       return result;
     }
   }
-#endif
   return NULL;
 }
 

@@ -55,12 +55,10 @@ MethodCounters::MethodCounters(const methodHandle& mh) :
   _backedge_mask = right_n_bits(CompilerConfig::scaled_freq_log(Tier0BackedgeNotifyFreqLog, scale)) << InvocationCounter::count_shift;
 }
 
-#ifndef LEYDEN
 MethodCounters* MethodCounters::allocate(const methodHandle& mh, TRAPS) {
   ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
   return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType, THREAD) MethodCounters(mh);
 }
-#endif
 
 void MethodCounters::clear_counters() {
   invocation_counter()->reset();

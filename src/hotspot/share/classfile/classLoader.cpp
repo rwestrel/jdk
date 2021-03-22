@@ -1025,6 +1025,7 @@ int ClassLoader::crc32(int crc, const char* buf, int len) {
   load_zip_library_if_needed();
   return (*Crc32)(crc, (const jbyte*)buf, len);
 }
+
 oop ClassLoader::get_system_package(const char* name, TRAPS) {
   // Look up the name in the boot loader's package entry table.
   if (name != NULL) {
@@ -1051,6 +1052,7 @@ oop ClassLoader::get_system_package(const char* name, TRAPS) {
   }
   return NULL;
 }
+
 objArrayOop ClassLoader::get_system_packages(TRAPS) {
   ResourceMark rm(THREAD);
   // List of pointers to PackageEntrys that have loaded classes.
