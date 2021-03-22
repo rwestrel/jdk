@@ -648,7 +648,6 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
         }
         m->name_and_sig_as_C_string(buf, buflen);
         st->print(" %s", buf);
-#ifndef LEYDEN
         ModuleEntry* module = m->method_holder()->module();
         if (module->is_named()) {
           module->name()->as_C_string(buf, buflen);
@@ -658,7 +657,6 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
             st->print("@%s", buf);
           }
         }
-#endif
         st->print(" (%d bytes) @ " PTR_FORMAT " [" PTR_FORMAT "+" INTPTR_FORMAT "]",
                   m->code_size(), p2i(_pc), p2i(_cb->code_begin()), _pc - _cb->code_begin());
 #if INCLUDE_JVMCI
@@ -1037,6 +1035,8 @@ void frame::oops_compiled_arguments_do(Symbol* signature, bool has_receiver, boo
 // register, both of which are saved in the local frame.  If not found
 // there, it must be an in-stack argument of the caller.
 // Note: caller.sp() points to callee-arguments
+#ifndef LEYDEN
+
 oop frame::retrieve_receiver(RegisterMap* reg_map) {
   frame caller = *this;
 
@@ -1051,6 +1051,8 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
   assert(Universe::heap()->is_in_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
   return r;
 }
+
+#endif
 
 
 BasicLock* frame::get_native_monitor() {

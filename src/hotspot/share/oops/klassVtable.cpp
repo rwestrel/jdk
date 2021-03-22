@@ -46,6 +46,8 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "utilities/copy.hpp"
 
+#ifndef LEYDEN
+
 inline InstanceKlass* klassVtable::ik() const {
   return InstanceKlass::cast(_klass);
 }
@@ -276,6 +278,7 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
     NOT_PRODUCT(verify(tty, true));
   }
 }
+
 
 // Returns true iff super_method can be overridden by a method in targetclassname
 // See JLS 3rd edition 8.4.6.1
@@ -1199,6 +1202,7 @@ int klassItable::assign_itable_indices_for_interface(InstanceKlass* klass, TRAPS
   assert(ime_num == method_count_for_interface(klass), "proper sizing");
   return ime_num;
 }
+#endif
 
 int klassItable::method_count_for_interface(InstanceKlass* interf) {
   assert(interf->is_interface(), "must be");
@@ -1225,6 +1229,7 @@ int klassItable::method_count_for_interface(InstanceKlass* interf) {
   return length;
 }
 
+#ifndef LEYDEN
 
 void klassItable::initialize_itable_for_interface(int method_table_offset, InstanceKlass* interf, bool checkconstraints, TRAPS) {
   assert(interf->is_interface(), "must be");
@@ -1313,6 +1318,7 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
     }
   }
 }
+
 
 #if INCLUDE_JVMTI
 // search the itable for uses of either obsolete or EMCP methods
@@ -1496,6 +1502,7 @@ void klassItable::setup_itable_offset_table(InstanceKlass* klass) {
   assert( (oop*)(ime) == v, "wrong offset calculation (2)");
 #endif
 }
+#endif
 
 void klassVtable::verify(outputStream* st, bool forced) {
   // make sure table is initialized
@@ -1572,6 +1579,7 @@ void vtableEntry::print() {
   }
 }
 
+#ifndef LEYDEN
 class VtableStats : AllStatic {
  public:
   static int no_klasses;                // # classes with vtables
@@ -1643,3 +1651,4 @@ void klassItable::print_statistics() {
 }
 
 #endif // PRODUCT
+#endif

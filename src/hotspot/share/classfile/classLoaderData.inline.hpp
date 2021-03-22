@@ -38,23 +38,20 @@ inline oop ClassLoaderData::class_loader() const {
   return _class_loader.resolve();
 }
 
-#ifndef LEYDEN
 inline bool ClassLoaderData::is_boot_class_loader_data() const {
   return this == _the_null_class_loader_data || class_loader() == NULL;
 }
-#endif
+
 inline ClassLoaderData* ClassLoaderData::class_loader_data_or_null(oop loader) {
   if (loader == NULL) {
     return ClassLoaderData::the_null_class_loader_data();
   }
   return java_lang_ClassLoader::loader_data_acquire(loader);
 }
-#ifndef LEYDEN
 inline ClassLoaderData* ClassLoaderData::class_loader_data(oop loader) {
   ClassLoaderData* loader_data = class_loader_data_or_null(loader);
   assert(loader_data != NULL, "Must be");
   return loader_data;
 }
 
-#endif
 #endif // SHARE_CLASSFILE_CLASSLOADERDATA_INLINE_HPP

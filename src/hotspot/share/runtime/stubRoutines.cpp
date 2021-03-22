@@ -58,6 +58,7 @@ BufferBlob* StubRoutines::_code2                                = NULL;
 address StubRoutines::_call_stub_return_address                 = NULL;
 #endif
 address StubRoutines::_call_stub_entry                          = NULL;
+
 address StubRoutines::_catch_exception_entry                    = NULL;
 #ifndef LEYDEN
 address StubRoutines::_forward_exception_entry                  = NULL;

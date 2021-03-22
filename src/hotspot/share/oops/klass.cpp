@@ -393,13 +393,9 @@ Klass* Klass::subklass(bool log) const {
        // create _next_sibling edges to dead data.
        chain = Atomic::load(&chain->_next_sibling))
   {
-#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
-#else
-    if (log) {
-#endif
       if (log_is_enabled(Trace, class, unload)) {
         ResourceMark rm;
         log_trace(class, unload)("unlinking class (subclass): %s", chain->external_name());
@@ -417,13 +413,9 @@ Klass* Klass::next_sibling(bool log) const {
        chain = Atomic::load(&chain->_next_sibling)) {
     // Only return alive klass, there may be stale klass
     // in this chain if cleaned concurrently.
-#ifndef LEYDEN
     if (chain->is_loader_alive()) {
       return chain;
     } else if (log) {
-#else
-    if (log) {
-#endif
       if (log_is_enabled(Trace, class, unload)) {
         ResourceMark rm;
         log_trace(class, unload)("unlinking class (sibling): %s", chain->external_name());
@@ -874,11 +866,7 @@ bool Klass::is_valid(Klass* k) {
   if (!Metaspace::contains(k)) return false;
 
   if (!Symbol::is_valid(k->name())) return false;
-#ifndef LEYDEN
   return ClassLoaderDataGraph::is_valid(k->class_loader_data());
-#else
-  return NULL;
-#endif
 }
 
 Method* Klass::method_at_vtable(int index)  {

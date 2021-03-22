@@ -74,7 +74,6 @@ void PackageEntry::add_qexport(ModuleEntry* m) {
   _qualified_exports->append_if_missing(m);
 }
 
-
 // If the module's loader, that an export is being established to, is
 // not the same loader as this module's and is not one of the 3 builtin
 // class loaders, then this package's export list must be walked at GC
@@ -97,10 +96,6 @@ void PackageEntry::set_export_walk_required(ClassLoaderData* m_loader_data) {
     }
   }
 }
-
-#endif
-
-#ifndef LEYDEN
 
 // Set the package's exported states based on the value of the ModuleEntry.
 void PackageEntry::set_exported(ModuleEntry* m) {

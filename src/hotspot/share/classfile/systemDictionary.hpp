@@ -30,7 +30,7 @@
 #include "runtime/signature.hpp"
 #include "utilities/vmEnums.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // The dictionary in each ClassLoaderData stores all loaded classes, either
 // initiatied by its class loader or defined by its class loader:
 //

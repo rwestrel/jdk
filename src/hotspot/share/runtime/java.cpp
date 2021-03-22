@@ -95,9 +95,8 @@
 #include "jfr/jfr.hpp"
 #endif
 
-GrowableArray<Method*>* collected_profiled_methods;
-
 #ifndef LEYDEN
+GrowableArray<Method*>* collected_profiled_methods;
 
 int compare_methods(Method** a, Method** b) {
   // %%% there can be 32-bit overflow here
@@ -105,21 +104,16 @@ int compare_methods(Method** a, Method** b) {
        - ((*a)->invocation_count() + (*a)->compiled_invocation_count());
 }
 
-#endif
-
 void collect_profiled_methods(Method* m) {
-#ifndef LEYDEN
   Thread* thread = Thread::current();
   methodHandle mh(thread, m);
   if ((m->method_data() != NULL) &&
       (PrintMethodData || CompilerOracle::should_print(mh))) {
     collected_profiled_methods->push(m);
   }
-#endif
 }
 
 void print_method_profiling_data() {
-#ifndef LEYDEN
   if (ProfileInterpreter COMPILER1_PRESENT(|| C1UpdateMethodData) &&
      (PrintMethodData || CompilerOracle::should_print_methods())) {
     ResourceMark rm;
@@ -149,15 +143,14 @@ void print_method_profiling_data() {
       tty->print_cr("Total MDO size: %d bytes", total_size);
     }
   }
-#endif
 }
-
+#endif
 
 #ifndef PRODUCT
 
+#ifndef LEYDEN
 // Statistics printing (method invocation histogram)
 
-#ifndef LEYDEN
 GrowableArray<Method*>* collected_invoked_methods;
 
 void collect_invoked_methods(Method* m) {
@@ -166,12 +159,9 @@ void collect_invoked_methods(Method* m) {
   }
 }
 
-#endif
 
 
 
-
-#ifndef LEYDEN
 void print_method_invocation_histogram() {
   ResourceMark rm;
   collected_invoked_methods = new GrowableArray<Method*>(1024);
@@ -216,7 +206,9 @@ void print_bytecode_count() {
     tty->print_cr("[BytecodeCounter::counter_value = %d]", BytecodeCounter::counter_value());
   }
 }
+
 #endif
+
 
 // General statistics printing (profiling ...)
 void print_statistics() {
@@ -224,13 +216,10 @@ void print_statistics() {
   if (MemProfiling) {
     MemProfiler::disengage();
   }
-#endif
 
-#ifndef LEYDEN
   if (CITime) {
     CompileBroker::print_times();
   }
-#endif
 
 #ifdef COMPILER1
   if ((PrintC1Statistics || LogVMOutput || LogCompilation) && UseCompiler) {
@@ -241,7 +230,6 @@ void print_statistics() {
   }
 #endif /* COMPILER1 */
 
-#ifndef LEYDEN
 #ifdef COMPILER2
   if ((PrintOptoStatistics || LogVMOutput || LogCompilation) && UseCompiler) {
     FlagSetting fs(DisplayVMOutput, DisplayVMOutput && PrintOptoStatistics);
@@ -272,21 +260,20 @@ void print_statistics() {
 #endif // COMPILER1
 #endif // INCLUDE_JVMCI
 #endif // COMPILER2
-#endif
 
   if (PrintAOTStatistics) {
     AOTLoader::print_statistics();
   }
 
-#ifndef LEYDEN
   if (PrintNMethodStatistics) {
     nmethod::print_statistics();
-    if (CountCompiledCalls) {
-      print_method_invocation_histogram();
-    }
-
-    print_method_profiling_data();
   }
+  if (CountCompiledCalls) {
+    print_method_invocation_histogram();
+  }
+
+  print_method_profiling_data();
+
   if (TimeOopMap) {
     GenerateOopMap::print_time();
   }
@@ -317,40 +304,31 @@ void print_statistics() {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
     CodeCache::print_internals();
   }
-#endif
 
-#ifndef LEYDEN
   if (PrintVtableStats) {
     klassVtable::print_statistics();
     klassItable::print_statistics();
-    if (VerifyOops && Verbose) {
-      tty->print_cr("+VerifyOops count: %d", StubRoutines::verify_oop_count());
-    }
-
-    print_bytecode_count();
   }
-#endif
+  if (VerifyOops && Verbose) {
+    tty->print_cr("+VerifyOops count: %d", StubRoutines::verify_oop_count());
+  }
+
+  print_bytecode_count();
 
   if (PrintSystemDictionaryAtExit) {
-#ifndef LEYDEN
     ResourceMark rm;
     MutexLocker mcld(ClassLoaderDataGraph_lock);
     SystemDictionary::print();
     ClassLoaderDataGraph::print();
-#endif
   }
 
-#ifndef LEYDEN
   if (LogTouchedMethods && PrintTouchedMethodsAtExit) {
     Method::print_touched_methods(tty);
   }
-#endif
 
-#ifndef LEYDEN
   if (PrintBiasedLockingStatistics) {
     BiasedLocking::print_counters();
   }
-#endif
 
   // Native memory tracking data
   if (PrintNMTStatistics) {
@@ -362,6 +340,7 @@ void print_statistics() {
   }
 
   ThreadsSMRSupport::log_statistics();
+#endif
 }
 
 #else // PRODUCT MODE STATISTICS
@@ -475,10 +454,8 @@ void before_exit(JavaThread* thread) {
   }
 
   // shut down the StatSampler task
-#ifndef LEYDEN
   StatSampler::disengage();
   StatSampler::destroy();
-#endif
 
   // Stop concurrent GC threads
   Universe::heap()->stop();
@@ -492,17 +469,15 @@ void before_exit(JavaThread* thread) {
     if (log.is_trace()) {
       LogStream ls_trace(log.trace());
       MutexLocker mcld(ClassLoaderDataGraph_lock);
-#ifndef LEYDEN
       ClassLoaderDataGraph::print_on(&ls_trace);
-#endif
     }
   }
-
 
 #ifndef LEYDEN
   if (PrintBytecodeHistogram) {
     BytecodeHistogram::print();
   }
+
 #ifdef LINUX
   if (DumpPerfMapAtExit) {
     CodeCache::write_perf_map();
@@ -517,7 +492,9 @@ void before_exit(JavaThread* thread) {
   // Always call even when there are not JVMTI environments yet, since environments
   // may be attached late and JVMTI must track phases of VM execution
   JvmtiExport::post_vm_death();
+#ifndef LEYDEN
   Threads::shutdown_vm_agents();
+#endif
 
   // Terminate the signal thread
   // Note: we don't wait until it actually dies.
@@ -537,7 +514,6 @@ void before_exit(JavaThread* thread) {
     BeforeExit_lock->notify_all();
   }
 
-#ifndef LEYDEN
   if (VerifyStringTableAtExit) {
     size_t fail_cnt = StringTable::verify_and_compare_entries();
     if (fail_cnt != 0) {
@@ -545,7 +521,7 @@ void before_exit(JavaThread* thread) {
       guarantee(fail_cnt == 0, "unexpected StringTable verification failures");
     }
   }
-#endif
+
   #undef BEFORE_EXIT_NOT_RUN
   #undef BEFORE_EXIT_RUNNING
   #undef BEFORE_EXIT_DONE
@@ -691,7 +667,6 @@ void vm_exit_during_initialization() {
 }
 
 void vm_exit_during_initialization(Handle exception) {
-#ifndef LEYDEN
   tty->print_cr("Error occurred during initialization of VM");
   // If there are exceptions on this thread it must be cleared
   // first and here. Any future calls to EXCEPTION_MARK requires
@@ -706,7 +681,6 @@ void vm_exit_during_initialization(Handle exception) {
 
   // Failure during initialization, we don't want to dump core
   vm_abort(false);
-#endif
 }
 
 void vm_exit_during_initialization(Symbol* ex, const char* message) {

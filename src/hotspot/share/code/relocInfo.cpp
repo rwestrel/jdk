@@ -116,13 +116,11 @@ void relocInfo::change_reloc_info_for_address(RelocIterator *itr, address pc, re
 void RelocIterator::initialize(CompiledMethod* nm, address begin, address limit) {
   initialize_misc();
 
-#ifndef LEYDEN
   if (nm == NULL && begin != NULL) {
     // allow nmethod to be deduced from beginning address
     CodeBlob* cb = CodeCache::find_blob(begin);
     nm = (cb != NULL) ? cb->as_compiled_method_or_null() : NULL;
   }
-#endif
   guarantee(nm != NULL, "must be able to deduce nmethod from other arguments");
 
   _code    = nm;

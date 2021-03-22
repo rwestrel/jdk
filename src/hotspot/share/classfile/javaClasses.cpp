@@ -235,7 +235,6 @@ void java_lang_String::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
-
 class CompactStringsFixup : public FieldClosure {
 private:
   bool _value;
@@ -608,7 +607,6 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
 }
 
 Symbol* java_lang_String::as_symbol(oop java_string) {
-#ifndef LEYDEN
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
@@ -623,9 +621,6 @@ Symbol* java_lang_String::as_symbol(oop java_string) {
     Symbol* sym = SymbolTable::new_symbol(base, length);
     return sym;
   }
-#else
-  return NULL;
-#endif
 }
 
 Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
@@ -1496,8 +1491,6 @@ void java_lang_Class::set_source_file(oop java_class, oop source_file) {
   java_class->obj_field_put(_source_file_offset, source_file);
 }
 
-#ifndef LEYDEN
-
 oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, BasicType type, TRAPS) {
   // This should be improved by adding a field at the Java level or by
   // introducing a new VM klass (see comment in ClassFileParser)
@@ -1513,8 +1506,6 @@ oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, Basic
 #endif
   return java_class;
 }
-
-#endif
 
 
 Klass* java_lang_Class::as_Klass_raw(oop java_class) {
@@ -1599,6 +1590,7 @@ const char* java_lang_Class::as_external_name(oop java_class) {
   }
   return name;
 }
+
 Klass* java_lang_Class::array_klass_acquire(oop java_class) {
   Klass* k = ((Klass*)java_class->metadata_field_acquire(_array_klass_offset));
   assert(k == NULL || k->is_klass() && k->is_array_klass(), "should be array klass");
@@ -1610,6 +1602,7 @@ void java_lang_Class::release_set_array_klass(oop java_class, Klass* klass) {
   assert(klass->is_klass() && klass->is_array_klass(), "should be array klass");
   java_class->release_metadata_field_put(_array_klass_offset, klass);
 }
+
 
 BasicType java_lang_Class::primitive_type(oop java_class) {
   assert(java_lang_Class::is_primitive(java_class), "just checking");
@@ -1624,6 +1617,7 @@ BasicType java_lang_Class::primitive_type(oop java_class) {
   assert(Universe::java_mirror(type) == java_class, "must be consistent");
   return type;
 }
+
 BasicType java_lang_Class::as_BasicType(oop java_class, Klass** reference_klass) {
   assert(java_lang_Class::is_instance(java_class), "must be a Class object");
   if (is_primitive(java_class)) {
@@ -1751,6 +1745,7 @@ JavaThread* java_lang_Thread::thread(oop java_thread) {
   return (JavaThread*)java_thread->address_field(_eetop_offset);
 }
 
+
 void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
   java_thread->address_field_put(_eetop_offset, (address)thread);
 }
@@ -1783,6 +1778,7 @@ void java_lang_Thread::set_name(oop java_thread, oop name) {
   java_thread->obj_field_put(_name_offset, name);
 }
 
+
 ThreadPriority java_lang_Thread::priority(oop java_thread) {
   return (ThreadPriority)java_thread->int_field(_priority_offset);
 }
@@ -1791,6 +1787,7 @@ ThreadPriority java_lang_Thread::priority(oop java_thread) {
 void java_lang_Thread::set_priority(oop java_thread, ThreadPriority priority) {
   java_thread->int_field_put(_priority_offset, priority);
 }
+
 
 oop java_lang_Thread::threadGroup(oop java_thread) {
   return java_thread->obj_field(_group_offset);
@@ -1860,6 +1857,7 @@ jlong java_lang_Thread::thread_id(oop java_thread) {
 oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field(_park_blocker_offset);
 }
+
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
   JavaThreadStatus status = static_cast<JavaThreadStatus>(java_thread->int_field(_thread_status_offset));
   switch (status) {
@@ -2020,7 +2018,6 @@ oop java_lang_Throwable::message(oop throwable) {
 
 
 // Return Symbol for detailed_message or NULL
-
 Symbol* java_lang_Throwable::detail_message(oop throwable) {
   PreserveExceptionMark pm(Thread::current());
   oop detailed_message = java_lang_Throwable::message(throwable);
@@ -2029,7 +2026,6 @@ Symbol* java_lang_Throwable::detail_message(oop throwable) {
   }
   return NULL;
 }
-
 
 void java_lang_Throwable::set_message(oop throwable, oop value) {
   throwable->obj_field_put(_detailMessage_offset, value);
@@ -2055,6 +2051,7 @@ void java_lang_Throwable::print(oop throwable, outputStream* st) {
     st->print(": %s", java_lang_String::as_utf8_string(msg));
   }
 }
+
 // After this many redefines, the stack trace is unreliable.
 const int MAX_VERSION = USHRT_MAX;
 
@@ -2311,7 +2308,6 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
   }
 
   char *module_name = NULL, *module_version = NULL;
-#ifndef LEYDEN
   ModuleEntry* module = holder->module();
   if (module->is_named()) {
     module_name = module->name()->as_C_string();
@@ -2321,7 +2317,6 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
       buf_len += (int)strlen(module_version);
     }
   }
-#endif
 
   // Allocate temporary buffer with extra space for formatting and line number
   char* buf = NEW_RESOURCE_ARRAY(char, buf_len + 64);
@@ -2339,11 +2334,7 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
   }
 
   // The method can be NULL if the requested class version is gone
-#ifndef LEYDEN
   Method* method = holder->method_with_orig_idnum(method_id, version);
-#else
-  Method* method = NULL;
-#endif
   if (!version_matches(method, version)) {
     strcat(buf, "Redefined)");
   } else {
@@ -2361,12 +2352,10 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
         // Neither sourcename nor linenumber
         sprintf(buf + (int)strlen(buf), "Unknown Source)");
       }
-#ifndef LEYDEN
       CompiledMethod* nm = method->code();
       if (WizardMode && nm != NULL) {
         sprintf(buf + (int)strlen(buf), "(nmethod " INTPTR_FORMAT ")", (intptr_t)nm);
       }
-#endif
     }
   }
 
@@ -2509,7 +2498,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       if (fr.is_interpreted_frame()) {
         address bcp = fr.interpreter_frame_bcp();
         method = fr.interpreter_frame_method();
-        bci = method->bci_from(bcp);
+        bci =  method->bci_from(bcp);
         fr = fr.sender(&map);
       } else {
 #else
@@ -2683,11 +2672,7 @@ void java_lang_Throwable::get_stack_trace_elements(Handle throwable,
     }
 
     InstanceKlass* holder = InstanceKlass::cast(java_lang_Class::as_Klass(bte._mirror()));
-#ifndef LEYDEN
     methodHandle method (THREAD, holder->method_with_orig_idnum(bte._method_id, bte._version));
-#else
-    methodHandle method;
-#endif
 
     java_lang_StackTraceElement::fill_in(stack_trace_element, holder,
                                          method,
@@ -2716,11 +2701,7 @@ bool java_lang_Throwable::get_top_method_and_bci(oop throwable, Method** method,
 
   InstanceKlass* holder = InstanceKlass::cast(java_lang_Class::as_Klass(bte._mirror()));
   assert(holder != NULL, "first element should be non-null");
-#ifndef LEYDEN
   Method* m = holder->method_with_orig_idnum(bte._method_id, bte._version);
-#else
-  Method* m = NULL;
-#endif
 
   // Original version is no longer available.
   if (m == NULL || !version_matches(m, bte._version)) {
@@ -2765,25 +2746,18 @@ void java_lang_StackTraceElement::fill_in(Handle element,
   java_lang_StackTraceElement::set_declaringClass(element(), classname);
   java_lang_StackTraceElement::set_declaringClassObject(element(), java_class());
 
-#ifndef LEYDEN
   oop loader = holder->class_loader();
   if (loader != NULL) {
     oop loader_name = java_lang_ClassLoader::name(loader);
     if (loader_name != NULL)
       java_lang_StackTraceElement::set_classLoaderName(element(), loader_name);
   }
-#endif
 
   // Fill in method name
-#ifndef LEYDEN
   oop methodname = StringTable::intern(name, CHECK);
-#else
-  oop methodname = NULL;
-#endif
   java_lang_StackTraceElement::set_methodName(element(), methodname);
 
   // Fill in module name and version
-#ifndef LEYDEN
   ModuleEntry* module = holder->module();
   if (module->is_named()) {
     oop module_name = StringTable::intern(module->name(), CHECK);
@@ -2796,7 +2770,6 @@ void java_lang_StackTraceElement::fill_in(Handle element,
     }
     java_lang_StackTraceElement::set_moduleVersion(element(), module_version);
   }
-#endif
 
   if (method() == NULL || !version_matches(method(), version)) {
     // The method was redefined, accurate line number information isn't available
@@ -2828,9 +2801,7 @@ void java_lang_StackTraceElement::decode_file_and_line(Handle java_class,
     // Class was not redefined. We can trust its cache if set,
     // else we have to initialize it.
     if (source_file == NULL) {
-#ifndef LEYDEN
       source_file = StringTable::intern(source, CHECK);
-#endif
       java_lang_Class::set_source_file(java_class(), source_file);
     }
   } else {
@@ -2895,9 +2866,8 @@ Method* java_lang_StackFrameInfo::get_method(Handle stackFrame, InstanceKlass* h
   return method;
 }
 
-#ifndef LEYDEN
-
 void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const methodHandle& method, int bci, TRAPS) {
+#ifndef LEYDEN
   // set Method* or mid/cpref
   HandleMark hm(THREAD);
   Handle mname(THREAD, stackFrame->obj_field(_memberName_offset));
@@ -2910,9 +2880,8 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   int version = method->constants()->version();
   assert((jushort)version == version, "version should be short");
   java_lang_StackFrameInfo::set_version(stackFrame(), (short)version);
-}
-
 #endif
+}
 
 void java_lang_StackFrameInfo::to_stack_trace_element(Handle stackFrame, Handle stack_trace_element, TRAPS) {
   ResourceMark rm(THREAD);
@@ -2938,12 +2907,12 @@ void java_lang_StackFrameInfo::set_bci(oop element, int value) {
   element->int_field_put(_bci_offset, value);
 }
 
-#ifndef LEYDEN
 int java_lang_LiveStackFrameInfo::_monitors_offset;
 int java_lang_LiveStackFrameInfo::_locals_offset;
 int java_lang_LiveStackFrameInfo::_operands_offset;
 int java_lang_LiveStackFrameInfo::_mode_offset;
 
+#ifndef LEYDEN
 #define LIVESTACKFRAMEINFO_FIELDS_DO(macro) \
   macro(_monitors_offset,   k, "monitors",    object_array_signature, false); \
   macro(_locals_offset,     k, "locals",      object_array_signature, false); \
@@ -2959,6 +2928,7 @@ void java_lang_LiveStackFrameInfo::compute_offsets() {
 void java_lang_LiveStackFrameInfo::serialize_offsets(SerializeClosure* f) {
   LIVESTACKFRAMEINFO_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
+#endif
 #endif
 
 void java_lang_LiveStackFrameInfo::set_monitors(oop element, oop value) {
@@ -2977,7 +2947,7 @@ void java_lang_LiveStackFrameInfo::set_mode(oop element, int value) {
   element->int_field_put(_mode_offset, value);
 }
 
-
+#ifndef LEYDEN
 // java_lang_AccessibleObject
 
 int java_lang_reflect_AccessibleObject::_override_offset;
@@ -3055,9 +3025,11 @@ Handle java_lang_reflect_Method::create(TRAPS) {
 oop java_lang_reflect_Method::clazz(oop reflect) {
   return reflect->obj_field(_clazz_offset);
 }
+
 void java_lang_reflect_Method::set_clazz(oop reflect, oop value) {
    reflect->obj_field_put(_clazz_offset, value);
 }
+
 int java_lang_reflect_Method::slot(oop reflect) {
   return reflect->int_field(_slot_offset);
 }
@@ -3427,13 +3399,14 @@ oop java_lang_reflect_Parameter::executable(oop param) {
 void java_lang_reflect_Parameter::set_executable(oop param, oop value) {
   param->obj_field_put(_executable_offset, value);
 }
-
+#endif
 // java_lang_Module
 
 int java_lang_Module::_loader_offset;
 int java_lang_Module::_name_offset;
 int java_lang_Module::_module_entry_offset;
 
+#ifndef LEYDEN
 Handle java_lang_Module::create(Handle loader, Handle module_name, TRAPS) {
   assert(Universe::is_fully_initialized(), "Need to find another solution to the reflection problem");
   return JavaCalls::construct_new_instance(vmClasses::Module_klass(),
@@ -3457,11 +3430,13 @@ void java_lang_Module::serialize_offsets(SerializeClosure* f) {
   MODULE_INJECTED_FIELDS(INJECTED_FIELD_SERIALIZE_OFFSET);
 }
 #endif
+#endif
 
 oop java_lang_Module::loader(oop module) {
   return module->obj_field(_loader_offset);
 }
 
+#ifndef LEYDEN
 void java_lang_Module::set_loader(oop module, oop value) {
   module->obj_field_put(_loader_offset, value);
 }
@@ -3473,6 +3448,7 @@ oop java_lang_Module::name(oop module) {
 void java_lang_Module::set_name(oop module, oop value) {
   module->obj_field_put(_name_offset, value);
 }
+#endif
 
 ModuleEntry* java_lang_Module::module_entry_raw(oop module) {
   assert(_module_entry_offset != 0, "Uninitialized module_entry_offset");
@@ -3485,6 +3461,7 @@ ModuleEntry* java_lang_Module::module_entry_raw(oop module) {
 
 ModuleEntry* java_lang_Module::module_entry(oop module) {
   ModuleEntry* module_entry = module_entry_raw(module);
+#ifndef LEYDEN
   if (module_entry == NULL) {
     // If the inject field containing the ModuleEntry* is null then return the
     // class loader's unnamed module.
@@ -3493,9 +3470,11 @@ ModuleEntry* java_lang_Module::module_entry(oop module) {
     ClassLoaderData* loader_cld = SystemDictionary::register_loader(h_loader);
     return loader_cld->unnamed_module();
   }
+#endif
   return module_entry;
 }
 
+#ifndef LEYDEN
 void java_lang_Module::set_module_entry(oop module, ModuleEntry* module_entry) {
   assert(_module_entry_offset != 0, "Uninitialized module_entry_offset");
   assert(module != NULL, "module can't be null");
@@ -4321,6 +4300,7 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   return result;
 }
 
+
 // Support for java_lang_ClassLoader
 
 int  java_lang_ClassLoader::_loader_data_offset;
@@ -4583,6 +4563,7 @@ void java_lang_StackTraceElement::set_fileName(oop element, oop value) {
 void java_lang_StackTraceElement::set_declaringClass(oop element, oop value) {
   element->obj_field_put(_declaringClass_offset, value);
 }
+
 void java_lang_StackTraceElement::set_methodName(oop element, oop value) {
   element->obj_field_put(_methodName_offset, value);
 }
@@ -4607,7 +4588,6 @@ void java_lang_StackTraceElement::set_declaringClassObject(oop element, oop valu
   element->obj_field_put(_declaringClassObject_offset, value);
 }
 
-#ifndef LEYDEN
 // java_lang_AssertionStatusDirectives
 
 int java_lang_AssertionStatusDirectives::_classes_offset;
@@ -4616,6 +4596,7 @@ int java_lang_AssertionStatusDirectives::_packages_offset;
 int java_lang_AssertionStatusDirectives::_packageEnabled_offset;
 int java_lang_AssertionStatusDirectives::_deflt_offset;
 
+#ifndef LEYDEN
 // Support for java Assertions - java_lang_AssertionStatusDirectives.
 #define ASSERTIONSTATUSDIRECTIVES_FIELDS_DO(macro) \
   macro(_classes_offset,        k, "classes",        string_array_signature, false); \
@@ -4633,6 +4614,7 @@ void java_lang_AssertionStatusDirectives::compute_offsets() {
 void java_lang_AssertionStatusDirectives::serialize_offsets(SerializeClosure* f) {
   ASSERTIONSTATUSDIRECTIVES_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
+#endif
 #endif
 
 void java_lang_AssertionStatusDirectives::set_classes(oop o, oop val) {
@@ -4655,7 +4637,7 @@ void java_lang_AssertionStatusDirectives::set_deflt(oop o, bool val) {
   o->bool_field_put(_deflt_offset, val);
 }
 
-
+#ifndef LEYDEN
 // Support for intrinsification of java.nio.Buffer.checkIndex
 
 int java_nio_Buffer::_limit_offset;

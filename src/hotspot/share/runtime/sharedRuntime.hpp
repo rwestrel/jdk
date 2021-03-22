@@ -232,12 +232,18 @@ class SharedRuntime: AllStatic {
     assert(_ic_miss_blob!= NULL, "oops");
     return _ic_miss_blob->entry_point();
   }
+#endif
 
   static address get_handle_wrong_method_stub() {
+#ifndef LEYDEN
     assert(_wrong_method_blob!= NULL, "oops");
     return _wrong_method_blob->entry_point();
+#else
+    return NULL;
+#endif
   }
 
+#ifndef LEYDEN
   static address get_handle_wrong_method_abstract_stub() {
     assert(_wrong_method_abstract_blob!= NULL, "oops");
     return _wrong_method_abstract_blob->entry_point();

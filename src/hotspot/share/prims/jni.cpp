@@ -199,10 +199,6 @@ bool jfieldIDWorkaround::is_valid_jfieldID(Klass* k, jfieldID id) {
   }
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 intptr_t jfieldIDWorkaround::encode_klass_hash(Klass* k, intptr_t offset) {
   if (offset <= small_offset_mask) {
@@ -2661,7 +2657,6 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
     oop cl = k->class_loader();
     InstanceKlass* ik = InstanceKlass::cast(k);
     // Check for a platform class
-#ifndef LEYDEN
     if ((cl ==  NULL || SystemDictionary::is_platform_class_loader(cl)) &&
         ik->module()->is_named()) {
       Klass* caller = thread->security_get_caller_class(1);
@@ -2669,7 +2664,6 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
       // issue a warning below.
       do_warning = (caller == NULL) || caller->class_loader() != cl;
     }
-#endif
   }
 
 

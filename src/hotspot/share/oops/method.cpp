@@ -677,10 +677,6 @@ bool Method::is_vanilla_constructor() const {
   return true;
 }
 
-#endif
-
-
-#ifndef LEYDEN
 
 bool Method::compute_has_loops_flag() {
   BytecodeStream bcs(methodHandle(Thread::current(), this));
@@ -878,7 +874,6 @@ bool Method::needs_clinit_barrier() const {
   return is_static() && !method_holder()->is_initialized();
 }
 
-
 objArrayHandle Method::resolved_checked_exceptions_impl(Method* method, TRAPS) {
   int length = method->checked_exceptions_length();
   if (length == 0) {  // common case
@@ -952,9 +947,7 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   }
   return is_klass_loaded_by_klass_index(klass_index);
 }
-#endif
 
-#ifndef LEYDEN
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
   assert(!is_method_handle_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
@@ -1296,9 +1289,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // ONLY USE the h_method now as make_adapter may have blocked
 
 }
-#endif
 
-#ifndef LEYDEN
 address Method::make_adapters(const methodHandle& mh, TRAPS) {
   // Adapters for compiled code are made eagerly here.  They are fairly
   // small (generally < 100 bytes) and quick to make (and cached and shared)
@@ -1324,6 +1315,7 @@ address Method::make_adapters(const methodHandle& mh, TRAPS) {
   }
   return adapter->get_c2i_entry();
 }
+
 void Method::restore_unshareable_info(TRAPS) {
   assert(is_method() && is_valid_method(this), "ensure C++ vtable is restored");
 
@@ -1344,9 +1336,6 @@ address Method::from_compiled_entry_no_trampoline() const {
   }
 }
 
-#endif
-
-#ifndef LEYDEN
 // The verified_code_entry() must be called when a invoke is resolved
 // on this method.
 
@@ -1359,6 +1348,7 @@ address Method::verified_code_entry() {
   assert(_from_compiled_entry != NULL, "must be set");
   return _from_compiled_entry;
 }
+#endif
 
 // Check that if an nmethod ref exists, it has a backlink to this or no backlink at all
 // (could be racing a deopt).
@@ -1369,6 +1359,7 @@ bool Method::check_code() const {
   return code == NULL || (code->method() == NULL) || (code->method() == (Method*)this && !code->is_osr_method());
 }
 
+#ifndef LEYDEN
 // Install compiled code.  Instantly it can execute.
 void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   assert_lock_strong(CompiledMethod_lock);
@@ -1396,9 +1387,7 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   if (!mh->is_method_handle_intrinsic())
     mh->_from_interpreted_entry = mh->get_i2c_entry();
 }
-#endif
 
-#ifndef LEYDEN
 
 bool Method::is_overridden_in(Klass* k) const {
   InstanceKlass* ik = InstanceKlass::cast(k);
@@ -1494,10 +1483,7 @@ bool Method::has_member_arg() const {
           MethodHandles::has_member_arg(iid));
 }
 
-#endif
-
 // Make an instance of a signature-polymorphic internal MH primitive.
-#ifndef LEYDEN
 methodHandle Method::make_method_handle_intrinsic(vmIntrinsics::ID iid,
                                                          Symbol* signature,
                                                          TRAPS) {
@@ -1688,9 +1674,7 @@ methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code
   newcm->copy_annotations_from(loader_data, cm, CHECK_(methodHandle()));
   return newm;
 }
-#endif
 
-#ifndef LEYDEN
 vmSymbolID Method::klass_id_for_intrinsics(const Klass* holder) {
   // if loader is not the default loader (i.e., != NULL), we can't know the intrinsics
   // because we are not loading from core libraries
@@ -1705,9 +1689,7 @@ vmSymbolID Method::klass_id_for_intrinsics(const Klass* holder) {
   Symbol* klass_name = ik->name();
   return vmSymbols::find_sid(klass_name);
 }
-#endif
 
-#ifndef LEYDEN
 void Method::init_intrinsic_id() {
   assert(_intrinsic_id == static_cast<int>(vmIntrinsics::_none), "do this just once");
   const uintptr_t max_id_uint = right_n_bits((int)(sizeof(_intrinsic_id) * BitsPerByte));
@@ -1779,6 +1761,7 @@ void Method::init_intrinsic_id() {
     return;
   }
 }
+
 bool Method::load_signature_classes(const methodHandle& m, TRAPS) {
   if (!THREAD->can_call_java()) {
     // There is nothing useful this routine can do from within the Compile thread.
@@ -1826,7 +1809,6 @@ bool Method::has_unloaded_classes_in_signature(const methodHandle& m, TRAPS) {
 
 // Exposed so field engineers can debug VM
 void Method::print_short_name(outputStream* st) {
-#ifndef LEYDEN
   ResourceMark rm;
 #ifdef PRODUCT
   st->print(" %s::", method_holder()->external_name());
@@ -1835,6 +1817,7 @@ void Method::print_short_name(outputStream* st) {
 #endif
   name()->print_symbol_on(st);
   if (WizardMode) signature()->print_symbol_on(st);
+#ifndef LEYDEN
   else if (MethodHandles::is_signature_polymorphic(intrinsic_id()))
     MethodHandles::print_as_basic_type_signature_on(st, signature());
 #endif
@@ -1871,13 +1854,10 @@ void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_compa
   }
 }
 
-#endif
-
 //-----------------------------------------------------------------------------------
 // Non-product code unless JVM/TI needs it
 
 #if !defined(PRODUCT) || INCLUDE_JVMTI
-#ifndef LEYDEN
 class SignatureTypePrinter : public SignatureTypeNames {
  private:
   outputStream* _st;
@@ -1918,11 +1898,9 @@ void Method::print_name(outputStream* st) {
     st->print(")");
   }
 }
-#endif
 #endif // !PRODUCT || INCLUDE_JVMTI
 
 
-#ifndef LEYDEN
 void Method::print_codes_on(outputStream* st) const {
   print_codes_on(0, code_size(), st);
 }
@@ -2067,10 +2045,6 @@ int Method::backedge_count() {
            ((mdo != NULL) ? mdo->backedge_counter()->count() : 0);
   }
 }
-
-#endif
-
-#ifndef LEYDEN
 
 int Method::highest_comp_level() const {
   const MethodCounters* mcs = method_counters();
@@ -2437,14 +2411,15 @@ void Method::print_jmethod_ids(const ClassLoaderData* loader_data, outputStream*
 #ifndef PRODUCT
 
 void Method::print_on(outputStream* st) const {
-#ifndef LEYDEN
   ResourceMark rm;
   assert(is_method(), "must be method");
   st->print_cr("%s", internal_name());
   st->print_cr(" - this oop:          " INTPTR_FORMAT, p2i(this));
   st->print   (" - method holder:     "); method_holder()->print_value_on(st); st->cr();
   st->print   (" - constants:         " INTPTR_FORMAT " ", p2i(constants()));
+#ifndef LEYDEN
   constants()->print_value_on(st); st->cr();
+#endif
   st->print   (" - access:            0x%x  ", access_flags().as_int()); access_flags().print_on(st); st->cr();
   st->print   (" - name:              ");    name()->print_value_on(st); st->cr();
   st->print   (" - signature:         ");    signature()->print_value_on(st); st->cr();
@@ -2452,18 +2427,22 @@ void Method::print_on(outputStream* st) const {
   st->print_cr(" - max locals:        %d",   max_locals());
   st->print_cr(" - size of params:    %d",   size_of_parameters());
   st->print_cr(" - method size:       %d",   method_size());
+#ifndef LEYDEN
   if (intrinsic_id() != vmIntrinsics::_none)
     st->print_cr(" - intrinsic id:      %d %s", vmIntrinsics::as_int(intrinsic_id()), vmIntrinsics::name_at(intrinsic_id()));
   if (highest_comp_level() != CompLevel_none)
     st->print_cr(" - highest level:     %d", highest_comp_level());
+#endif
   st->print_cr(" - vtable index:      %d",   _vtable_index);
   st->print_cr(" - i2i entry:         " INTPTR_FORMAT, p2i(interpreter_entry()));
   st->print(   " - adapters:          ");
+#ifndef LEYDEN
   AdapterHandlerEntry* a = ((Method*)this)->adapter();
   if (a == NULL)
     st->print_cr(INTPTR_FORMAT, p2i(a));
   else
     a->print_adapter_on(st);
+#endif
   st->print_cr(" - compiled entry     " INTPTR_FORMAT, p2i(from_compiled_entry()));
   st->print_cr(" - code size:         %d",   code_size());
   if (code_size() != 0) {
@@ -2477,11 +2456,13 @@ void Method::print_on(outputStream* st) const {
   if (checked_exceptions_length() > 0) {
     CheckedExceptionElement* table = checked_exceptions_start();
     st->print_cr(" - checked ex start:  " INTPTR_FORMAT, p2i(table));
+#ifndef LEYDEN
     if (Verbose) {
       for (int i = 0; i < checked_exceptions_length(); i++) {
         st->print_cr("   - throws %s", constants()->printable_name_at(table[i].class_cp_index));
       }
     }
+#endif
   }
   if (has_linenumber_table()) {
     u_char* table = compressed_linenumber_table();
@@ -2497,6 +2478,7 @@ void Method::print_on(outputStream* st) const {
   if (localvariable_table_length() > 0) {
     LocalVariableTableElement* table = localvariable_table_start();
     st->print_cr(" - localvar start:    " INTPTR_FORMAT, p2i(table));
+#ifndef LEYDEN
     if (Verbose) {
       for (int i = 0; i < localvariable_table_length(); i++) {
         int bci = table[i].start_bci;
@@ -2507,6 +2489,7 @@ void Method::print_on(outputStream* st) const {
         st->print_cr("   - %s %s bci=%d len=%d slot=%d", desc, name, bci, len, slot);
       }
     }
+#endif
   }
   if (code() != NULL) {
     st->print   (" - compiled code: ");
@@ -2516,7 +2499,6 @@ void Method::print_on(outputStream* st) const {
     st->print_cr(" - native function:   " INTPTR_FORMAT, p2i(native_function()));
     st->print_cr(" - signature handler: " INTPTR_FORMAT, p2i(signature_handler()));
   }
-#endif
 }
 
 #ifndef LEYDEN
@@ -2535,7 +2517,6 @@ void Method::print_linkage_flags(outputStream* st) {
 #endif //PRODUCT
 
 void Method::print_value_on(outputStream* st) const {
-#ifndef LEYDEN
   assert(is_method(), "must be method");
   st->print("%s", internal_name());
   print_address_on(st);
@@ -2548,7 +2529,6 @@ void Method::print_value_on(outputStream* st) const {
   if (WizardMode) st->print("#%d", _vtable_index);
   if (WizardMode) st->print("[%d,%d]", size_of_parameters(), max_locals());
   if (WizardMode && code() != NULL) st->print(" ((nmethod*)%p)", code());
-#endif
 }
 
 #ifndef LEYDEN

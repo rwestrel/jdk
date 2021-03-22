@@ -41,9 +41,7 @@
 
 namespace metaspace {
 
-#ifndef LEYDEN
-
-    static const char* describe_spacetype(Metaspace::MetaspaceType st) {
+static const char* describe_spacetype(Metaspace::MetaspaceType st) {
   const char* s = NULL;
   switch (st) {
     case Metaspace::StandardMetaspaceType: s = "Standard"; break;
@@ -54,8 +52,6 @@ namespace metaspace {
   }
   return s;
 }
-
-#endif
 
 static void print_vs(outputStream* out, size_t scale) {
   const size_t reserved_nc = RunningCounters::reserved_words_nonclass();
@@ -181,7 +177,6 @@ void MetaspaceReporter::print_basic_report(outputStream* out, size_t scale) {
 }
 
 void MetaspaceReporter::print_report(outputStream* out, size_t scale, int flags) {
-#ifndef LEYDEN
   if (!Metaspace::initialized()) {
     out->print_cr("Metaspace not yet initialized.");
     return;
@@ -192,18 +187,14 @@ void MetaspaceReporter::print_report(outputStream* out, size_t scale, int flags)
   const bool print_by_spacetype = (flags & (int)Option::BreakDownBySpaceType) > 0;
 
   // Some report options require walking the class loader data graph.
-#ifndef LEYDEN
   metaspace::PrintCLDMetaspaceInfoClosure cl(out, scale, print_loaders, print_classes, print_by_chunktype);
-#endif
   if (print_loaders) {
     out->cr();
     out->print_cr("Usage per loader:");
     out->cr();
   }
 
-#ifndef LEYDEN
   ClassLoaderDataGraph::loaded_cld_do(&cl); // collect data and optionally print
-#endif
 
   // Print totals, broken up by space type.
   if (print_by_spacetype) {
@@ -375,7 +366,6 @@ void MetaspaceReporter::print_report(outputStream* out, size_t scale, int flags)
   out->cr();
 
   DEBUG_ONLY(MetaspaceUtils::verify();)
-#endif
 } // MetaspaceUtils::print_report()
 
 } // namespace metaspace

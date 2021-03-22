@@ -602,9 +602,9 @@ void CodeBlob::print_value_on(outputStream* st) const {
 }
 
 void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const {
-#ifndef LEYDEN
   if (is_buffer_blob()) {
     // the interpreter is generated into a buffer blob
+#ifndef LEYDEN
     InterpreterCodelet* i = Interpreter::codelet_containing(addr);
     if (i != NULL) {
       st->print_cr(INTPTR_FORMAT " is at code_begin+%d in an Interpreter codelet", p2i(addr), (int)(addr - i->code_begin()));
@@ -621,6 +621,7 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
       st->print_cr(INTPTR_FORMAT " is at code_begin+%d in an AdapterHandler", p2i(addr), (int)(addr - code_begin()));
       AdapterHandlerLibrary::print_handler_on(st, this);
     }
+#endif
     // the stubroutines are generated into a buffer blob
     StubCodeDesc* d = StubCodeDesc::desc_for(addr);
     if (d != NULL) {
@@ -633,11 +634,13 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
       st->print_cr(INTPTR_FORMAT " is pointing to an (unnamed) stub routine", p2i(addr));
       return;
     }
+#ifndef LEYDEN
     // the InlineCacheBuffer is using stubs generated into a buffer blob
     if (InlineCacheBuffer::contains(addr)) {
       st->print_cr(INTPTR_FORMAT " is pointing into InlineCacheBuffer", p2i(addr));
       return;
     }
+#endif
     VtableStub* v = VtableStubs::stub_containing(addr);
     if (v != NULL) {
       st->print_cr(INTPTR_FORMAT " is at entry_point+%d in a vtable stub", p2i(addr), (int)(addr - v->entry_point()));
@@ -646,6 +649,7 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
       return;
     }
   }
+#ifndef LEYDEN
   if (is_nmethod()) {
     nmethod* nm = (nmethod*)this;
     ResourceMark rm;
@@ -659,9 +663,9 @@ void CodeBlob::dump_for_addr(address addr, outputStream* st, bool verbose) const
     nm->print_nmethod(verbose);
     return;
   }
+#endif
   st->print_cr(INTPTR_FORMAT " is at code_begin+%d in ", p2i(addr), (int)(addr - code_begin()));
   print_on(st);
-#endif
 }
 
 void RuntimeBlob::verify() {

@@ -108,10 +108,7 @@ bool vmClasses::resolve(vmClassID id, TRAPS) {
   return ((*klassp) != NULL);
 }
 
-#endif
-
 void vmClasses::resolve_until(vmClassID limit_id, vmClassID &start_id, TRAPS) {
-#ifndef LEYDEN
   assert((int)start_id <= (int)limit_id, "IDs are out of order!");
   for (auto id : EnumRange<vmClassID>{start_id, limit_id}) { // (inclusive start, exclusive end)
     resolve(id, CHECK);
@@ -119,11 +116,9 @@ void vmClasses::resolve_until(vmClassID limit_id, vmClassID &start_id, TRAPS) {
 
   // move the starting value forward to the limit:
   start_id = limit_id;
-#endif
 }
 
 void vmClasses::resolve_all(TRAPS) {
-#ifndef LEYDEN
   assert(!Object_klass_loaded(), "well-known classes should only be initialized once");
 
   // Create the ModuleEntry for java.base.  This call needs to be done here,
@@ -223,7 +218,6 @@ void vmClasses::resolve_all(TRAPS) {
     }
   }
 #endif
-#endif
 }
 
 #if INCLUDE_CDS
@@ -260,6 +254,7 @@ void vmClasses::resolve_shared_class(InstanceKlass* klass, ClassLoaderData* load
 }
 
 #endif // INCLUDE_CDS
+#endif
 
 // Tells if a given klass is a box (wrapper class, such as java.lang.Integer).
 // If so, returns the basic type it holds.  If not, returns T_OBJECT.

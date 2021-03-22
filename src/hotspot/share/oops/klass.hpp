@@ -696,11 +696,7 @@ protected:
   // Iff the class loader (or mirror for unsafe anonymous classes) is alive the
   // Klass is considered alive. This is safe to call before the CLD is marked as
   // unloading, and hence during concurrent class unloading.
-#ifndef LEYDEN
-
   bool is_loader_alive() const { return class_loader_data()->is_alive(); }
-
-#endif
 
   void clean_subklass();
 

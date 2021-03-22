@@ -151,6 +151,8 @@ jint init_globals() {
   vtableStubs_init();
   InlineCacheBuffer_init();
   compilerOracle_init();
+  dependencyContext_init();
+
   if (!compileBroker_init()) {
     return JNI_EINVAL;
   }
@@ -187,10 +189,8 @@ void exit_globals() {
     perfMemory_exit();
     SafepointTracing::statistics_exit_log();
     if (PrintStringTableStatistics) {
-#ifndef LEYDEN
       SymbolTable::dump(tty);
       StringTable::dump(tty);
-#endif
     }
     ostream_exit();
   }

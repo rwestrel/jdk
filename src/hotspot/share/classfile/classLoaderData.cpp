@@ -333,7 +333,6 @@ void ClassLoaderData::oops_do(OopClosure* f, int claim_value, bool clear_mod_oop
 
   _handles.oops_do(f);
 }
-#ifndef LEYDEN
 void ClassLoaderData::classes_do(KlassClosure* klass_closure) {
   // Lock-free access requires load_acquire
   for (Klass* k = Atomic::load_acquire(&_klasses); k != NULL; k = k->next_link()) {
@@ -342,6 +341,7 @@ void ClassLoaderData::classes_do(KlassClosure* klass_closure) {
   }
 }
 
+#ifndef LEYDEN
 void ClassLoaderData::classes_do(void f(Klass * const)) {
   // Lock-free access requires load_acquire
   for (Klass* k = Atomic::load_acquire(&_klasses); k != NULL; k = k->next_link()) {
@@ -603,6 +603,7 @@ Dictionary* ClassLoaderData::create_dictionary() {
   }
   return new Dictionary(this, size, resizable);
 }
+#endif
 
 // Tell the GC to keep this klass alive while iterating ClassLoaderDataGraph
 oop ClassLoaderData::holder_phantom() const {
@@ -617,7 +618,6 @@ oop ClassLoaderData::holder_phantom() const {
     return NULL;
   }
 }
-#endif
 
 // Let the GC read the holder without keeping it alive.
 oop ClassLoaderData::holder_no_keepalive() const {
@@ -628,7 +628,6 @@ oop ClassLoaderData::holder_no_keepalive() const {
   }
 }
 
-#ifndef LEYDEN
 // Unloading support
 bool ClassLoaderData::is_alive() const {
   bool alive = keep_alive()         // null class loader and incomplete non-strong hidden class or unsafe anonymous class.
@@ -637,6 +636,7 @@ bool ClassLoaderData::is_alive() const {
   return alive;
 }
 
+#ifndef LEYDEN
 class ReleaseKlassClosure: public KlassClosure {
 private:
   size_t  _instance_class_released;
@@ -726,7 +726,7 @@ ClassLoaderData::~ClassLoaderData() {
     _name_and_id->decrement_refcount();
   }
 }
-
+#endif
 // Returns true if this class loader data is for the app class loader
 // or a user defined system class loader.  (Note that the class loader
 // data may have a Class holder.)
@@ -739,23 +739,18 @@ bool ClassLoaderData::is_system_class_loader_data() const {
 bool ClassLoaderData::is_platform_class_loader_data() const {
   return SystemDictionary::is_platform_class_loader(class_loader());
 }
-#endif
+
 // Returns true if the class loader for this class loader data is one of
 // the 3 builtin (boot application/system or platform) class loaders,
 // including a user-defined system class loader.  Note that if the class
 // loader data is for a non-strong hidden class or unsafe anonymous class then it may
 // get freed by a GC even if its class loader is one of these loaders.
 bool ClassLoaderData::is_builtin_class_loader_data() const {
-#ifndef LEYDEN
   return (is_boot_class_loader_data() ||
           SystemDictionary::is_system_class_loader(class_loader()) ||
           SystemDictionary::is_platform_class_loader(class_loader()));
-#else
-  return false;
-#endif
 }
 
-#ifndef LEYDEN
 // Returns true if this class loader data is a class loader data
 // that is not ever freed by a GC.  It must be the CLD for one of the builtin
 // class loaders and not the CLD for a non-strong hidden class or unsafe anonymous class.
@@ -763,6 +758,7 @@ bool ClassLoaderData::is_permanent_class_loader_data() const {
   return is_builtin_class_loader_data() && !has_class_mirror_holder();
 }
 
+#ifndef LEYDEN
 ClassLoaderMetaspace* ClassLoaderData::metaspace_non_null() {
   // If the metaspace has not been allocated, create a new one.  Might want
   // to create smaller arena for Reflection class loaders also.
@@ -958,6 +954,7 @@ void ClassLoaderData::print_on(outputStream* out) const {
 #endif // PRODUCT
 
 void ClassLoaderData::print() const { print_on(tty); }
+#endif
 
 void ClassLoaderData::verify() {
   assert_locked_or_safepoint(_metaspace_lock);
@@ -987,5 +984,3 @@ bool ClassLoaderData::contains_klass(Klass* klass) {
   }
   return false;
 }
-
-#endif

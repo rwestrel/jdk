@@ -2345,23 +2345,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     // -verbose:[class/module/gc/jni]
     if (match_option(option, "-verbose", &tail)) {
       if (!strcmp(tail, ":class") || !strcmp(tail, "")) {
-#ifndef LEYDEN
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(class, load));
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(class, unload));
-#endif
       } else if (!strcmp(tail, ":module")) {
-#ifndef LEYDEN
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(module, load));
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(module, unload));
-#endif
       } else if (!strcmp(tail, ":gc")) {
-#ifndef LEYDEN
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(gc));
-#endif
       } else if (!strcmp(tail, ":jni")) {
-#ifndef LEYDEN
         LogConfiguration::configure_stdout(LogLevel::Debug, true, LOG_TAGS(jni, resolve));
-#endif
       }
     // -da / -ea / -disableassertions / -enableassertions
     // These accept an optional class/package name separated by a colon, e.g.,
@@ -2369,21 +2361,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     } else if (match_option(option, user_assertion_options, &tail, true)) {
       bool enable = option->optionString[1] == 'e';     // char after '-' is 'e'
       if (*tail == '\0') {
-#ifndef LEYDEN
         JavaAssertions::setUserClassDefault(enable);
-#endif
       } else {
         assert(*tail == ':', "bogus match by match_option()");
-#ifndef LEYDEN
         JavaAssertions::addOption(tail + 1, enable);
-#endif
       }
     // -dsa / -esa / -disablesystemassertions / -enablesystemassertions
     } else if (match_option(option, system_assertion_options, &tail, false)) {
       bool enable = option->optionString[1] == 'e';     // char after '-' is 'e'
-#ifndef LEYDEN
       JavaAssertions::setSystemClassDefault(enable);
-#endif
     // -bootclasspath:
     } else if (match_option(option, "-Xbootclasspath:", &tail)) {
         jio_fprintf(defaultStream::output_stream(),
@@ -2774,24 +2760,16 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
       bool ret = false;
       if (strcmp(tail, ":help") == 0) {
         fileStream stream(defaultStream::output_stream());
-#ifndef LEYDEN
         LogConfiguration::print_command_line_help(&stream);
-#endif
         vm_exit(0);
       } else if (strcmp(tail, ":disable") == 0) {
-#ifndef LEYDEN
         LogConfiguration::disable_logging();
-#endif
         ret = true;
       } else if (*tail == '\0') {
-#ifndef LEYDEN
         ret = LogConfiguration::parse_command_line_arguments();
-#endif
         assert(ret, "-Xlog without arguments should never fail to parse");
       } else if (*tail == ':') {
-#ifndef LEYDEN
         ret = LogConfiguration::parse_command_line_arguments(tail + 1);
-#endif
       }
       if (ret == false) {
         jio_fprintf(defaultStream::error_stream(),
@@ -2984,9 +2962,7 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     if (FLAG_SET_CMDLINE(RequireSharedSpaces, true) != JVMFlag::SUCCESS) {
       return JNI_EINVAL;
     }
-#ifndef LEYDEN
     LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(class, path));
-#endif
   }
 
   fix_appclasspath();
@@ -3807,13 +3783,9 @@ bool Arguments::handle_deprecated_print_gc_flags() {
 
     LogTarget(Error, logging) target;
     LogStream errstream(target);
-#ifndef LEYDEN
     return LogConfiguration::parse_log_arguments(_gc_log_filename, gc_conf, NULL, NULL, &errstream);
-#endif
   } else if (PrintGC || PrintGCDetails) {
-#ifndef LEYDEN
     LogConfiguration::configure_stdout(LogLevel::Info, !PrintGCDetails, LOG_TAGS(gc));
-#endif
   }
   return true;
 }
@@ -3880,8 +3852,8 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
     return code;
   }
 
-#ifndef LEYDEN
   // Parse the options in the /java.base/jdk/internal/vm/options resource, if present
+#ifndef LEYDEN
   char *vmoptions = ClassLoader::lookup_vm_options();
   if (vmoptions != NULL) {
     code = parse_options_buffer("vm options resource", vmoptions, strlen(vmoptions), &initial_vm_options_args);
@@ -4028,9 +4000,7 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
       log_is_enabled(Info, cds)) {
     warning("Shared spaces are not supported in this VM");
     FLAG_SET_DEFAULT(UseSharedSpaces, false);
-#ifndef LEYDEN
     LogConfiguration::configure_stdout(LogLevel::Off, true, LOG_TAGS(cds));
-#endif
   }
   no_shared_spaces("CDS Disabled");
 #endif // INCLUDE_CDS
@@ -4160,9 +4130,7 @@ jint Arguments::apply_ergo() {
 
   if (FLAG_IS_CMDLINE(DiagnoseSyncOnValueBasedClasses)) {
     if (DiagnoseSyncOnValueBasedClasses == ObjectSynchronizer::LOG_WARNING && !log_is_enabled(Info, valuebasedclasses)) {
-#ifndef LEYDEN
       LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(valuebasedclasses));
-#endif
     }
   }
   return JNI_OK;

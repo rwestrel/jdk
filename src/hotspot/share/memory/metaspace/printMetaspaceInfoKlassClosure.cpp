@@ -48,12 +48,14 @@ void PrintMetaspaceInfoKlassClosure::do_klass(Klass* k) {
   ResourceMark rm;
   _out->print("  %s", k->external_name());
 
+#ifndef LEYDEN
   // Special treatment for generated core reflection accessor classes: print invocation target.
   if (ReflectionAccessorImplKlassHelper::is_generated_accessor(k)) {
     _out->print(" (invokes: ");
     ReflectionAccessorImplKlassHelper::print_invocation_target(_out, k);
     _out->print(")");
   }
+#endif
 }
 
 } // namespace metaspace

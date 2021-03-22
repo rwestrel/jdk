@@ -199,9 +199,11 @@ void ServiceThread::service_thread_entry(JavaThread* jt, TRAPS) {
       StringTable::do_concurrent_work(jt);
     }
 
+#ifndef LEYDEN
     if (symboltable_work) {
       SymbolTable::do_concurrent_work(jt);
     }
+#endif
 
     if (has_jvmti_events) {
       _jvmti_event->post();

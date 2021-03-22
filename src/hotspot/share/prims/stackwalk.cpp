@@ -164,8 +164,6 @@ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream& stream,
   return frames_decoded;
 }
 
-#ifndef LEYDEN
-
 // Fill in the LiveStackFrameInfo at the given index in frames_array
 void LiveFrameStream::fill_frame(int index, objArrayHandle  frames_array,
                                  const methodHandle& method, TRAPS) {
@@ -173,10 +171,6 @@ void LiveFrameStream::fill_frame(int index, objArrayHandle  frames_array,
   Handle stackFrame(THREAD, frames_array->obj_at(index));
   fill_live_stackframe(stackFrame, method, CHECK);
 }
-
-#endif
-
-#ifndef LEYDEN
 
 // Fill in the StackFrameInfo at the given index in frames_array
 void JavaFrameStream::fill_frame(int index, objArrayHandle  frames_array,
@@ -189,8 +183,6 @@ void JavaFrameStream::fill_frame(int index, objArrayHandle  frames_array,
     frames_array->obj_at_put(index, method->method_holder()->java_mirror());
   }
 }
-
-#endif
 
 // Create and return a LiveStackFrame.PrimitiveSlot (if needed) for the
 // StackValue at the given index. 'type' is expected to be T_INT, T_LONG,
@@ -288,18 +280,12 @@ objArrayHandle LiveFrameStream::monitors_to_object_array(GrowableArray<MonitorIn
   return array_h;
 }
 
-#ifndef LEYDEN
-
 // Fill StackFrameInfo with bci and initialize memberName
 void BaseFrameStream::fill_stackframe(Handle stackFrame, const methodHandle& method, TRAPS) {
   java_lang_StackFrameInfo::set_method_and_bci(stackFrame, method, bci(), THREAD);
 }
 
-#endif
-
 // Fill LiveStackFrameInfo with locals, monitors, and expressions
-#ifndef LEYDEN
-
 void LiveFrameStream::fill_live_stackframe(Handle stackFrame,
                                            const methodHandle& method, TRAPS) {
   fill_stackframe(stackFrame, method, CHECK);
@@ -333,8 +319,6 @@ void LiveFrameStream::fill_live_stackframe(Handle stackFrame,
     java_lang_LiveStackFrameInfo::set_mode(stackFrame(), mode);
   }
 }
-
-#endif
 
 // Begins stack walking.
 //

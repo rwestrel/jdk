@@ -274,6 +274,7 @@ void ClassLoaderDataGraph::cld_do(CLDClosure* cl) {
     cl->do_cld(cld);
   }
 }
+#endif
 
 void ClassLoaderDataGraph::roots_cld_do(CLDClosure* strong, CLDClosure* weak) {
   assert_locked_or_safepoint_weak(ClassLoaderDataGraph_lock);
@@ -285,6 +286,7 @@ void ClassLoaderDataGraph::roots_cld_do(CLDClosure* strong, CLDClosure* weak) {
   }
 }
 
+#ifndef LEYDEN
 void ClassLoaderDataGraph::always_strong_cld_do(CLDClosure* cl) {
   assert_locked_or_safepoint_weak(ClassLoaderDataGraph_lock);
   if (ClassUnloading) {
@@ -316,7 +318,7 @@ LockedClassesDo::~LockedClassesDo() {
   }
 }
 
-
+#endif
 // Iterating over the CLDG needs to be locked because
 // unloading can remove entries concurrently soon.
 class ClassLoaderDataGraphIterator : public StackObj {
@@ -356,7 +358,7 @@ void ClassLoaderDataGraph::loaded_cld_do(CLDClosure* cl) {
     cl->do_cld(cld);
   }
 }
-
+#ifndef LEYDEN
 // These functions assume that the caller has locked the ClassLoaderDataGraph_lock
 // if they are not calling the function from a safepoint.
 void ClassLoaderDataGraph::classes_do(KlassClosure* klass_closure) {
@@ -426,6 +428,7 @@ void ClassLoaderDataGraph::classes_unloading_do(void f(Klass* const)) {
     cld->classes_do(f);
   }
 }
+#endif
 
 #define FOR_ALL_DICTIONARY(X)   ClassLoaderDataGraphIterator iter; \
                                 while (ClassLoaderData* X = iter.get_next()) \
@@ -439,6 +442,7 @@ void ClassLoaderDataGraph::dictionary_classes_do(void f(InstanceKlass*)) {
   }
 }
 
+#ifndef LEYDEN
 // Only walks the classes defined in this class loader.
 void ClassLoaderDataGraph::dictionary_classes_do(void f(InstanceKlass*, TRAPS), TRAPS) {
   FOR_ALL_DICTIONARY(cld) {
@@ -483,6 +487,7 @@ bool ClassLoaderDataGraph::contains_loader_data(ClassLoaderData* loader_data) {
   return false;
 }
 #endif // PRODUCT
+#endif
 
 bool ClassLoaderDataGraph::is_valid(ClassLoaderData* loader_data) {
   DEBUG_ONLY( if (!VMError::is_error_reported()) { assert_locked_or_safepoint(ClassLoaderDataGraph_lock); } )
@@ -499,6 +504,7 @@ bool ClassLoaderDataGraph::is_valid(ClassLoaderData* loader_data) {
   return false;
 }
 
+#ifndef LEYDEN
 // Move class loader data from main list to the unloaded list for unloading
 // and deallocation later.
 bool ClassLoaderDataGraph::do_unloading() {
@@ -666,6 +672,7 @@ Klass* ClassLoaderDataGraphKlassIteratorAtomic::next_klass() {
   assert(head == NULL, "head is " PTR_FORMAT ", expected not null:", p2i(head));
   return NULL;
 }
+#endif
 
 void ClassLoaderDataGraph::verify() {
   ClassLoaderDataGraphIterator iter;
@@ -692,4 +699,3 @@ void ClassLoaderDataGraph::print_on(outputStream * const out) {
 
 void ClassLoaderDataGraph::print() { print_on(tty); }
 
-#endif

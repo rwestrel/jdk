@@ -30,8 +30,6 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
 
-#ifndef LEYDEN
-#ifndef LEYDEN
 
 inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
   guarantee(loader() != NULL && oopDesc::is_oop(loader()), "Loader must be oop");
@@ -41,10 +39,14 @@ inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
   if (loader_data) {
      return loader_data;
   }
+#ifndef LEYDEN
   return ClassLoaderDataGraph::add(loader, false);
+#else
+  return NULL;
+#endif
 }
 
-#endif
+#ifndef LinkageError
 
 size_t ClassLoaderDataGraph::num_instance_classes() {
   return _num_instance_classes;

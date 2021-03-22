@@ -72,7 +72,6 @@
 #include "opto/compile.hpp"
 #include "opto/node.hpp"
 #endif
-#endif
 
 // Helper class for printing in CodeCache
 class CodeBlob_sizes {
@@ -125,7 +124,6 @@ class CodeBlob_sizes {
     total_size       += cb->size();
     header_size      += cb->header_size();
     relocation_size  += cb->relocation_size();
-#ifndef LEYDEN
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod_or_null();
       code_size        += nm->insts_size();
@@ -136,33 +134,34 @@ class CodeBlob_sizes {
       scopes_data_size += nm->scopes_data_size();
       scopes_pcs_size  += nm->scopes_pcs_size();
     } else {
-#endif
       code_size        += cb->code_size();
-#ifndef LEYDEN
     }
-#endif
   }
 };
-
+#endif
 // Iterate over all CodeHeaps
 #define FOR_ALL_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _heaps->begin(); heap != _heaps->end(); ++heap)
+#ifndef LEYDEN
 #define FOR_ALL_NMETHOD_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _nmethod_heaps->begin(); heap != _nmethod_heaps->end(); ++heap)
+#endif
 #define FOR_ALL_ALLOCABLE_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _allocable_heaps->begin(); heap != _allocable_heaps->end(); ++heap)
-
 // Iterate over all CodeBlobs (cb) on the given CodeHeap
 #define FOR_ALL_BLOBS(cb, heap) for (CodeBlob* cb = first_blob(heap); cb != NULL; cb = next_blob(heap, cb))
 
+#ifndef LEYDEN
 address CodeCache::_low_bound = 0;
 address CodeCache::_high_bound = 0;
 int CodeCache::_number_of_nmethods_with_dependencies = 0;
 ExceptionCache* volatile CodeCache::_exception_cache_purge_list = NULL;
-
+#endif
 // Initialize arrays of CodeHeap subsets
 GrowableArray<CodeHeap*>* CodeCache::_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
+#ifndef LEYDEN
 GrowableArray<CodeHeap*>* CodeCache::_compiled_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
 GrowableArray<CodeHeap*>* CodeCache::_nmethod_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
+#endif
 GrowableArray<CodeHeap*>* CodeCache::_allocable_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
-
+#ifndef LEYDEN
 void CodeCache::check_heap_sizes(size_t non_nmethod_size, size_t profiled_size, size_t non_profiled_size, size_t cache_size, bool all_set) {
   size_t total_size = non_nmethod_size + profiled_size + non_profiled_size;
   // Prepare error message
@@ -205,13 +204,11 @@ void CodeCache::initialize_heaps() {
   const int c1_count = CompilationPolicy::c1_count();
   code_buffers_size += c1_count * Compiler::code_buffer_size();
 #endif
-#ifndef LEYDEN
 #ifdef COMPILER2
   // C2 scratch buffers (see Compile::init_scratch_buffer_blob())
   const int c2_count = CompilationPolicy::c2_count();
   // Initial size of constant table (this may be increased if a compiled method needs more space)
   code_buffers_size += c2_count * C2Compiler::initial_code_buffer_size();
-#endif
 #endif
 
   // Increase default non_nmethod_size to account for compiler buffers
@@ -357,7 +354,6 @@ ReservedCodeSpace CodeCache::reserve_heap_memory(size_t size) {
 
 // Heaps available for allocation
 bool CodeCache::heap_available(int code_blob_type) {
-#ifndef LEYDEN
   if (!SegmentedCodeCache) {
     // No segmentation: use a single code heap
     return (code_blob_type == CodeBlobType::All);
@@ -372,9 +368,6 @@ bool CodeCache::heap_available(int code_blob_type) {
     return (code_blob_type == CodeBlobType::NonNMethod) ||
            (code_blob_type == CodeBlobType::MethodNonProfiled);
   }
-#else
-  return false;
-#endif
 }
 
 const char* CodeCache::get_code_heap_flag_name(int code_blob_type) {
@@ -440,6 +433,8 @@ void CodeCache::add_heap(ReservedSpace rs, const char* name, int code_blob_type)
   MemoryService::add_code_heap_memory_pool(heap, name);
 }
 
+#endif
+
 CodeHeap* CodeCache::get_code_heap_containing(void* start) {
   FOR_ALL_HEAPS(heap) {
     if ((*heap)->contains(start)) {
@@ -475,6 +470,8 @@ CodeBlob* CodeCache::first_blob(CodeHeap* heap) {
   return (CodeBlob*)heap->first();
 }
 
+#ifndef LEYDEN
+
 CodeBlob* CodeCache::first_blob(int code_blob_type) {
   if (heap_available(code_blob_type)) {
     return first_blob(get_code_heap(code_blob_type));
@@ -483,12 +480,15 @@ CodeBlob* CodeCache::first_blob(int code_blob_type) {
   }
 }
 
+#endif
+
 CodeBlob* CodeCache::next_blob(CodeHeap* heap, CodeBlob* cb) {
   assert_locked_or_safepoint(CodeCache_lock);
   assert(heap != NULL, "heap is null");
   return (CodeBlob*)heap->next(cb);
 }
 
+#ifndef LEYDEN
 /**
  * Do not seize the CodeCache lock here--if the caller has not
  * already done so, we are going to lose bigtime, since the code
@@ -496,8 +496,6 @@ CodeBlob* CodeCache::next_blob(CodeHeap* heap, CodeBlob* cb) {
  * run the constructor for the CodeBlob subclass he is busy
  * instantiating.
  */
-#ifndef LEYDEN
-
 CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_failure, int orig_code_blob_type) {
   // Possibly wakes up the sweeper thread.
   NMethodSweeper::report_allocation(code_blob_type);
@@ -627,7 +625,6 @@ void CodeCache::commit(CodeBlob* cb) {
 }
 
 #endif
-
 bool CodeCache::contains(void *p) {
   // S390 uses contains() in current_frame(), which is used before
   // code cache initialization if NativeMemoryTracking=detail is set.
@@ -640,10 +637,11 @@ bool CodeCache::contains(void *p) {
   }
   return false;
 }
-
+#ifndef LEYDEN
 bool CodeCache::contains(nmethod *nm) {
   return contains((void *)nm);
 }
+#endif
 
 // This method is safe to call without holding the CodeCache_lock, as long as a dead CodeBlob is not
 // looked up (i.e., one that has been marked for deletion). It only depends on the _segmap to contain
@@ -667,7 +665,7 @@ CodeBlob* CodeCache::find_blob_unsafe(void* start) {
   }
   return NULL;
 }
-
+#ifndef LEYDEN
 nmethod* CodeCache::find_nmethod(void* start) {
   CodeBlob* cb = find_blob(start);
   assert(cb->is_nmethod(), "did not find an nmethod");
@@ -682,8 +680,6 @@ void CodeCache::blobs_do(void f(CodeBlob* nm)) {
     }
   }
 }
-
-#ifndef LEYDEN
 
 void CodeCache::nmethods_do(void f(nmethod* nm)) {
   assert_locked_or_safepoint(CodeCache_lock);
@@ -702,8 +698,6 @@ void CodeCache::metadata_do(MetadataClosure* f) {
   AOTLoader::metadata_do(f);
 }
 
-#endif
-
 int CodeCache::alignment_unit() {
   return (int)_heaps->first()->alignment_unit();
 }
@@ -711,8 +705,6 @@ int CodeCache::alignment_unit() {
 int CodeCache::alignment_offset() {
   return (int)_heaps->first()->alignment_offset();
 }
-
-#ifndef LEYDEN
 
 // Mark nmethods for unloading if they contain otherwise unreachable oops.
 void CodeCache::do_unloading(BoolObjectClosure* is_alive, bool unloading_occurred) {
@@ -724,27 +716,21 @@ void CodeCache::do_unloading(BoolObjectClosure* is_alive, bool unloading_occurre
   }
 }
 
-#endif
-
 void CodeCache::blobs_do(CodeBlobClosure* f) {
   assert_locked_or_safepoint(CodeCache_lock);
   FOR_ALL_ALLOCABLE_HEAPS(heap) {
     FOR_ALL_BLOBS(cb, *heap) {
       if (cb->is_alive()) {
         f->do_code_blob(cb);
-#ifndef LEYDEN
 #ifdef ASSERT
         if (cb->is_nmethod()) {
           Universe::heap()->verify_nmethod((nmethod*)cb);
         }
 #endif //ASSERT
-#endif
       }
     }
   }
 }
-
-#ifndef LEYDEN
 
 void CodeCache::verify_clean_inline_caches() {
 #ifdef ASSERT
@@ -774,7 +760,6 @@ void CodeCache::verify_icholder_relocations() {
          CompiledICHolder::live_count(), "must agree");
 #endif
 }
-
 
 // Defer freeing of concurrently cleaned ExceptionCache entries until
 // after a global handshake operation.
@@ -840,8 +825,6 @@ void CodeCache::verify_oops() {
   }
 }
 
-#endif
-
 int CodeCache::blob_count(int code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->blob_count() : 0;
@@ -890,6 +873,7 @@ address CodeCache::high_bound(int code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? (address)heap->high_boundary() : NULL;
 }
+#endif
 
 size_t CodeCache::capacity() {
   size_t cap = 0;
@@ -898,7 +882,7 @@ size_t CodeCache::capacity() {
   }
   return cap;
 }
-
+#ifndef LEYDEN
 size_t CodeCache::unallocated_capacity(int code_blob_type) {
   CodeHeap* heap = get_code_heap(code_blob_type);
   return (heap != NULL) ? heap->unallocated_capacity() : 0;
@@ -966,10 +950,8 @@ void icache_init();
 
 void CodeCache::initialize() {
   assert(CodeCacheSegmentSize >= (uintx)CodeEntryAlignment, "CodeCacheSegmentSize must be large enough to align entry points");
-#ifndef LEYDEN
 #ifdef COMPILER2
   assert(CodeCacheSegmentSize >= (uintx)OptoLoopAlignment,  "CodeCacheSegmentSize must be large enough to align inner loops");
-#endif
 #endif
   assert(CodeCacheSegmentSize >= sizeof(jdouble),    "CodeCacheSegmentSize must be large enough to align constants");
   // This was originally just a check of the alignment, causing failure, instead, round
@@ -989,11 +971,9 @@ void CodeCache::initialize() {
     add_heap(rs, "CodeCache", CodeBlobType::All);
   }
 
-#ifndef LEYDEN
   // Initialize ICache flush mechanism
   // This service is needed for os::register_code_area
   icache_init();
-#endif
 
   // Give OS a chance to register generated code area.
   // This is used on Windows 64 bit platforms to register
@@ -1013,8 +993,6 @@ int CodeCache::number_of_nmethods_with_dependencies() {
   return _number_of_nmethods_with_dependencies;
 }
 
-#ifndef LEYDEN
-
 void CodeCache::clear_inline_caches() {
   assert_locked_or_safepoint(CodeCache_lock);
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
@@ -1031,12 +1009,8 @@ void CodeCache::cleanup_inline_caches() {
   }
 }
 
-#endif
-
 // Keeps track of time spent for checking dependencies
 NOT_PRODUCT(static elapsedTimer dependentCheckTime;)
-
-#ifndef LEYDEN
 
 int CodeCache::mark_for_deoptimization(KlassDepChange& changes) {
   MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
@@ -1069,13 +1043,12 @@ int CodeCache::mark_for_deoptimization(KlassDepChange& changes) {
 }
 
 #endif
-
 CompiledMethod* CodeCache::find_compiled(void* start) {
   CodeBlob *cb = find_blob(start);
   assert(cb == NULL || cb->is_compiled(), "did not find an compiled_method");
   return (CompiledMethod*)cb;
 }
-
+#ifndef LEYDEN
 bool CodeCache::is_far_target(address target) {
 #if INCLUDE_AOT
   return NativeCall::is_far_call(_low_bound,  target) ||
@@ -1197,8 +1170,6 @@ void CodeCache::flush_evol_dependents() {
 }
 #endif // INCLUDE_JVMTI
 
-#ifndef LEYDEN
-
 // Mark methods for deopt (if safe or possible).
 void CodeCache::mark_all_nmethods_for_deoptimization() {
   MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
@@ -1264,9 +1235,7 @@ void CodeCache::flush_dependents_on_method(const methodHandle& m_h) {
     Deoptimization::deoptimize_all_marked();
   }
 }
-
 #endif
-
 void CodeCache::verify() {
   assert_locked_or_safepoint(CodeCache_lock);
   FOR_ALL_HEAPS(heap) {
@@ -1278,7 +1247,7 @@ void CodeCache::verify() {
     }
   }
 }
-
+#ifndef LEYDEN
 // A CodeHeap is full. Print out warning and report event.
 PRAGMA_DIAG_PUSH
 PRAGMA_FORMAT_NONLITERAL_IGNORED
@@ -1324,13 +1293,11 @@ void CodeCache::report_codemem_full(int code_blob_type, bool print) {
       tty->print("%s", s.as_string());
     }
 
-#ifndef LEYDEN
     if (heap->full_count() == 0) {
       if (PrintCodeHeapAnalytics) {
         CompileBroker::print_heapinfo(tty, "all", 4096); // details, may be a lot!
       }
     }
-#endif
   }
 
   heap->report_full();
@@ -1382,7 +1349,6 @@ void CodeCache::print_trace(const char* event, CodeBlob* cb, int size) {
 }
 
 void CodeCache::print_internals() {
-#ifndef LEYDEN
   int nmethodCount = 0;
   int runtimeStubCount = 0;
   int adapterCount = 0;
@@ -1484,7 +1450,6 @@ void CodeCache::print_internals() {
 
   FREE_C_HEAP_ARRAY(int, buckets);
   print_memory_overhead();
-#endif
 }
 
 #endif // !PRODUCT
@@ -1546,7 +1511,7 @@ void CodeCache::print() {
 
 #endif // !PRODUCT
 }
-
+#endif
 void CodeCache::print_summary(outputStream* st, bool detailed) {
   int full_count = 0;
   FOR_ALL_HEAPS(heap_iterator) {
@@ -1573,10 +1538,10 @@ void CodeCache::print_summary(outputStream* st, bool detailed) {
   }
 
   if (detailed) {
+#ifndef LEYDEN
     st->print_cr(" total_blobs=" UINT32_FORMAT " nmethods=" UINT32_FORMAT
                        " adapters=" UINT32_FORMAT,
                        blob_count(), nmethod_count(), adapter_count());
-#ifndef LEYDEN
     st->print_cr(" compilation: %s", CompileBroker::should_compile_new_jobs() ?
                  "enabled" : Arguments::mode() == Arguments::_int ?
                  "disabled (interpreter mode)" :
@@ -1588,9 +1553,8 @@ void CodeCache::print_summary(outputStream* st, bool detailed) {
     st->print_cr(" full_count=%d", full_count);
   }
 }
-
-void CodeCache::print_codelist(outputStream* st) {
 #ifndef LEYDEN
+void CodeCache::print_codelist(outputStream* st) {
   MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
 
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
@@ -1603,7 +1567,6 @@ void CodeCache::print_codelist(outputStream* st) {
                  method_name,
                  (intptr_t)cm->header_begin(), (intptr_t)cm->code_begin(), (intptr_t)cm->code_end());
   }
-#endif
 }
 
 void CodeCache::print_layout(outputStream* st) {
@@ -1619,7 +1582,6 @@ void CodeCache::log_state(outputStream* st) {
             unallocated_capacity());
 }
 
-#ifndef LEYDEN
 #ifdef LINUX
 void CodeCache::write_perf_map() {
   MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
@@ -1647,9 +1609,7 @@ void CodeCache::write_perf_map() {
   }
 }
 #endif // LINUX
-#endif
 
-#ifndef LEYDEN
 //---<  BEGIN  >--- CodeHeap State Analytics.
 
 void CodeCache::aggregate(outputStream *out, size_t granularity) {

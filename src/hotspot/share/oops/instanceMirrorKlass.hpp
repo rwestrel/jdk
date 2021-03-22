@@ -29,7 +29,7 @@
 #include "oops/instanceKlass.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/macros.hpp"
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class ClassFileParser;
 

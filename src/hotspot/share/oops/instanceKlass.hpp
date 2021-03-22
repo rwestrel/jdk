@@ -833,18 +833,16 @@ public:
   InstanceKlass* previous_versions() const { return NULL; }
 #endif
 
-#ifndef LEYDEN
-
   InstanceKlass* get_klass_version(int version) {
+#ifndef LEYDEN
     for (InstanceKlass* ik = this; ik != NULL; ik = ik->previous_versions()) {
       if (ik->constants()->version() == version) {
         return ik;
       }
     }
+#endif
     return NULL;
   }
-
-#endif
 
   bool has_been_redefined() const {
     return (_misc_flags & _misc_has_been_redefined) != 0;

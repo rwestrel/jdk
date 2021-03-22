@@ -119,11 +119,7 @@ void MemProfiler::do_trace() {
     fprintf(_log_fp, "%6.1f,%5d," SIZE_FORMAT_W(5) "," UINTX_FORMAT_W(6) "," UINTX_FORMAT_W(6) ",",
             os::elapsedTime(),
             jtiwh.length(),
-#ifndef LEYDEN
             ClassLoaderDataGraph::num_instance_classes(),
-#else
-            (size_t)0,
-#endif
             Universe::heap()->used() / K,
             Universe::heap()->capacity() / K);
   }

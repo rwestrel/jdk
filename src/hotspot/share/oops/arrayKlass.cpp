@@ -100,12 +100,9 @@ ArrayKlass::ArrayKlass(Symbol* name, KlassID id) :
     JFR_ONLY(INIT_ID(this);)
 }
 
-#endif
-
 
 // Initialization of vtables and mirror object is done separatly from base_create_array_klass,
 // since a GC can happen. At this point all instance variables of the ArrayKlass must be setup.
-#ifndef LEYDEN
 void ArrayKlass::complete_create_array_klass(ArrayKlass* k, Klass* super_klass, ModuleEntry* module_entry, TRAPS) {
   k->initialize_supers(super_klass, NULL, CHECK);
   k->vtable().initialize_vtable(false, CHECK);

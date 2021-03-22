@@ -85,7 +85,6 @@ bool ModuleEntry::should_show_version() {
     const char* loc = location()->as_C_string();
     ClassLoaderData* cld = loader_data();
 
-#ifndef LEYDEN
     assert(!cld->has_class_mirror_holder(), "module's cld should have a ClassLoader holder not a Class holder");
     if ((cld->is_the_null_class_loader_data() || cld->is_platform_class_loader_data()) &&
         (strncmp(loc, "jrt:/java.", 10) == 0)) {
@@ -95,7 +94,6 @@ bool ModuleEntry::should_show_version() {
         cld->is_permanent_class_loader_data() && (strncmp(loc, "jrt:/jdk.", 9) == 0)) {
       return false;
     }
-#endif
   }
   return true;
 }
@@ -119,15 +117,17 @@ oop ModuleEntry::shared_protection_domain() {
   return _shared_pd.resolve();
 }
 
+#ifndef LEYDEN
+
 // Set the shared ProtectionDomain atomically
 void ModuleEntry::set_shared_protection_domain(ClassLoaderData *loader_data,
                                                Handle pd_h) {
   // Create a handle for the shared ProtectionDomain and save it atomically.
   // init_handle_locked checks if someone beats us setting the _shared_pd cache.
-#ifndef LEYDEN
   loader_data->init_handle_locked(_shared_pd, pd_h);
-#endif
 }
+
+#endif
 
 // Returns true if this module can read module m
 bool ModuleEntry::can_read(ModuleEntry* m) const {
@@ -149,13 +149,11 @@ bool ModuleEntry::can_read(ModuleEntry* m) const {
   // At the same time, another thread can instrument the module classes by
   // injecting dependencies that require the default read edges for resolution.
   if (this->has_default_read_edges() && !m->is_named()) {
-#ifndef LEYDEN
     ClassLoaderData* cld = m->loader_data();
     assert(!cld->has_class_mirror_holder(), "module's cld should have a ClassLoader holder not a Class holder");
     if (cld->is_the_null_class_loader_data() || cld->is_system_class_loader_data()) {
       return true; // default read edge
     }
-#endif
   }
   if (!has_reads_list()) {
     return false;
@@ -197,7 +195,6 @@ void ModuleEntry::add_read(ModuleEntry* m) {
 void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
   assert(is_named(), "Cannot call set_read_walk_required on unnamed module");
   assert_locked_or_safepoint(Module_lock);
-#ifndef LEYDEN
   if (!_must_walk_reads &&
       loader_data() != m_loader_data &&
       !m_loader_data->is_builtin_class_loader_data()) {
@@ -208,7 +205,6 @@ void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
                         (name() != NULL) ? name()->as_C_string() : UNNAMED_MODULE);
     }
   }
-#endif
 }
 
 // Set whether the module is open, i.e. all its packages are unqualifiedly exported
@@ -244,14 +240,12 @@ void ModuleEntry::purge_reads() {
     for (int idx = len - 1; idx >= 0; idx--) {
       ModuleEntry* module_idx = _reads->at(idx);
       ClassLoaderData* cld_idx = module_idx->loader_data();
-#ifndef LEYDEN
       if (cld_idx->is_unloading()) {
         _reads->delete_at(idx);
       } else {
         // Update the need to walk this module's reads based on live modules
         set_read_walk_required(cld_idx);
       }
-#endif
     }
   }
 }
@@ -321,13 +315,11 @@ ModuleEntry* ModuleEntry::new_unnamed_module_entry(Handle module_handle, ClassLo
   // Unnamed modules can read all other unnamed modules.
   entry->set_can_read_all_unnamed();
 
-#ifndef LEYDEN
   if (!module_handle.is_null()) {
     entry->set_module(cld->add_handle(module_handle));
   }
 
   entry->set_loader_data(cld);
-#endif
   entry->_is_open = true;
 
   JFR_ONLY(INIT_ID(entry);)
@@ -604,13 +596,11 @@ ModuleEntry* ModuleEntryTable::new_entry(unsigned int hash, Handle module_handle
     entry->set_can_read_all_unnamed();
   }
 
-#ifndef LEYDEN
   if (!module_handle.is_null()) {
     entry->set_module(loader_data->add_handle(module_handle));
   }
 
   entry->set_loader_data(loader_data);
-#endif
   entry->set_version(version);
   entry->set_location(location);
   entry->set_is_open(is_open);
@@ -633,10 +623,6 @@ void ModuleEntryTable::add_entry(int index, ModuleEntry* new_entry) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
   Hashtable<Symbol*, mtModule>::add_entry(index, (HashtableEntry<Symbol*, mtModule>*)new_entry);
 }
-
-#endif
-
-#ifndef LEYDEN
 
 // Create an entry in the class loader's module_entry_table.  It is the
 // caller's responsibility to ensure that the entry has not already been
@@ -709,10 +695,6 @@ void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, 
   java_lang_Module::set_module_entry(module_handle(), jb_module);
 }
 
-#endif
-
-#ifndef LEYDEN
-
 // Within java.lang.Class instances there is a java.lang.Module field that must
 // be set with the defining module.  During startup, prior to java.base's definition,
 // classes needing their module field set are added to the fixup_module_list.
@@ -768,11 +750,7 @@ void ModuleEntry::print(outputStream* st) {
                p2i(this),
                name() == NULL ? UNNAMED_MODULE : name()->as_C_string(),
                p2i(module()),
-#ifndef LEYDEN
-          loader_data()->loader_name_and_id(),
-#else
-"",
-#endif
+               loader_data()->loader_name_and_id(),
                version() != NULL ? version()->as_C_string() : "NULL",
                location() != NULL ? location()->as_C_string() : "NULL",
                BOOL_TO_STR(!can_read_all_unnamed()), p2i(next()));

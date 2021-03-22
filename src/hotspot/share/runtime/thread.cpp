@@ -933,10 +933,8 @@ static const char* get_java_version(TRAPS) {
     return NULL;
   }
 }
-#endif
 
 // extract the JRE name from java.lang.VersionProps.java_runtime_name
-#ifndef LEYDEN
 static const char* get_java_runtime_name(TRAPS) {
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
@@ -957,10 +955,8 @@ static const char* get_java_runtime_name(TRAPS) {
     return NULL;
   }
 }
-#endif
 
 // extract the JRE version from java.lang.VersionProps.java_runtime_version
-#ifndef LEYDEN
 static const char* get_java_runtime_version(TRAPS) {
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
@@ -981,10 +977,8 @@ static const char* get_java_runtime_version(TRAPS) {
     return NULL;
   }
 }
-#endif
 
 // extract the JRE vendor version from java.lang.VersionProps.VENDOR_VERSION
-#ifndef LEYDEN
 static const char* get_java_runtime_vendor_version(TRAPS) {
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
@@ -1005,10 +999,8 @@ static const char* get_java_runtime_vendor_version(TRAPS) {
     return NULL;
   }
 }
-#endif
 
 // extract the JRE vendor VM bug URL from java.lang.VersionProps.VENDOR_URL_VM_BUG
-#ifndef LEYDEN
 static const char* get_java_runtime_vendor_vm_bug_url(TRAPS) {
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
@@ -1034,7 +1026,6 @@ static const char* get_java_runtime_vendor_vm_bug_url(TRAPS) {
 // General purpose hook into Java code, run once when the VM is initialized.
 // The Java library method itself may be changed independently from the VM.
 static void call_postVMInitHook(TRAPS) {
-#ifndef LEYDEN
   Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_vm_PostVMInitHook(), THREAD);
   if (klass != NULL) {
     JavaValue result(T_VOID);
@@ -1042,7 +1033,6 @@ static void call_postVMInitHook(TRAPS) {
                            vmSymbols::void_method_signature(),
                            CHECK);
   }
-#endif
 }
 
 // Initialized by VMThread at vm_global_init
@@ -1593,9 +1583,7 @@ JavaThread::JavaThread() :
   _SleepEvent(ParkEvent::Allocate(this))
 {
 
-#ifndef LEYDEN
   set_jni_functions(jni_functions());
-#endif
 
 #if INCLUDE_JVMCI
   assert(_jvmci._implicit_exception_pc == nullptr, "must be");
@@ -2633,11 +2621,9 @@ void JavaThread::deoptimize() {
     trace_frames();
   }
 }
-#endif
 
 
 // Make zombies
-#ifndef LEYDEN
 void JavaThread::make_zombies() {
   for (StackFrameStream fst(this, true /* update */, true /* process_frames */); !fst.is_done(); fst.next()) {
     if (fst.current()->can_be_deoptimized()) {
@@ -2919,6 +2905,7 @@ const char* JavaThread::get_thread_name_string(char* buf, int buflen) const {
 }
 
 void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
+
   assert(Threads_lock->owner() == Thread::current(), "must have threads lock");
   assert(NoPriority <= prio && prio <= MaxPriority, "sanity check");
   // Link Java Thread object <-> C++ Thread
@@ -3576,9 +3563,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 
   // Launch -agentlib/-agentpath and converted -Xrun agents
+#ifndef LEYDEN
   if (Arguments::init_agents_at_startup()) {
     create_vm_init_agents();
   }
+#endif
 
   // Initialize Threads state
   _number_of_threads = 0;
@@ -3729,12 +3718,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     }
   }
 
+#ifndef LEYDEN
   // Launch -Xrun agents
   // Must be done in the JVMTI live phase so that for backward compatibility the JDWP
   // back-end can launch with -Xdebug -Xrunjdwp.
   if (!EagerXrunInit && Arguments::init_libraries_at_startup()) {
     create_vm_init_libraries();
   }
+#endif
 
   Chunk::start_chunk_pool_cleaner_task();
 
@@ -3998,11 +3989,12 @@ void Threads::convert_vm_init_libraries_to_agents() {
   }
 }
 
+#ifndef LEYDEN
+
 // Create agents for -agentlib:  -agentpath:  and converted -Xrun
 // Invokes Agent_OnLoad
 // Called very early -- before JavaThreads exist
 void Threads::create_vm_init_agents() {
-#ifndef LEYDEN
   extern struct JavaVM_ main_vm;
   AgentLibrary* agent;
 
@@ -4034,7 +4026,6 @@ void Threads::create_vm_init_agents() {
   }
 
   JvmtiExport::enter_primordial_phase();
-#endif
 }
 
 extern "C" {
@@ -4042,7 +4033,6 @@ extern "C" {
 }
 
 void Threads::shutdown_vm_agents() {
-#ifndef LEYDEN
   // Send any Agent_OnUnload notifications
   const char *on_unload_symbols[] = AGENT_ONUNLOAD_SYMBOLS;
   size_t num_symbol_entries = ARRAY_SIZE(on_unload_symbols);
@@ -4064,13 +4054,11 @@ void Threads::shutdown_vm_agents() {
       (*unload_entry)(&main_vm);
     }
   }
-#endif
 }
 
 // Called for after the VM is initialized for -Xrun libraries which have not been converted to agent libraries
 // Invokes JVM_OnLoad
 void Threads::create_vm_init_libraries() {
-#ifndef LEYDEN
   extern struct JavaVM_ main_vm;
   AgentLibrary* agent;
 
@@ -4090,13 +4078,12 @@ void Threads::create_vm_init_libraries() {
       vm_exit_during_initialization("Could not find JVM_OnLoad function in -Xrun library", agent->name());
     }
   }
-#endif
 }
+#endif
 
 
 // Last thread running calls java.lang.Shutdown.shutdown()
 void JavaThread::invoke_shutdown_hooks() {
-#ifndef LEYDEN
   HandleMark hm(this);
 
   // Link all classes for dynamic CDS dumping before vm exit.
@@ -4130,7 +4117,6 @@ void JavaThread::invoke_shutdown_hooks() {
                            THREAD);
   }
   CLEAR_PENDING_EXCEPTION;
-#endif
 }
 
 // Threads::destroy_vm() is normally called from jni_DestroyJavaVM() when
@@ -4645,12 +4631,15 @@ void Threads::print_on_error(outputStream* st, Thread* current, char* buf,
   }
   st->cr();
 
+#ifndef LEYDEN
   st->print_cr("Threads with active compile tasks:");
   print_threads_compiling(st, buf, buflen);
+#endif
 }
 
-void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, bool short_form) {
 #ifndef LEYDEN
+
+void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, bool short_form) {
   ALL_JAVA_THREADS(thread) {
     if (thread->is_Compiler_thread()) {
       CompilerThread* ct = (CompilerThread*) thread;
@@ -4667,8 +4656,9 @@ void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, b
       }
     }
   }
-#endif
 }
+
+#endif
 
 
 // Ad-hoc mutual exclusion primitives: SpinLock

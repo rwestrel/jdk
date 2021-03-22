@@ -113,8 +113,6 @@ ReferenceArgumentCount::ReferenceArgumentCount(Symbol* signature)
   do_parameters_on(this);  // non-virtual template execution
 }
 
-#if 1 //ndef LEYDEN
-
 void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   // See if we fingerprinted this method already
   if (_method != NULL) {
@@ -173,8 +171,6 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
     _method->constMethod()->set_fingerprint(_fingerprint);
   }
 }
-
-#endif
 
 // Implementation of SignatureStream
 
@@ -328,8 +324,6 @@ static const int jl_len = 10, object_len = 6, jl_object_len = jl_len + object_le
 static const char jl_str[] = "java/lang/";
 
 #ifdef ASSERT
-#ifndef LEYDEN
-
 static bool signature_symbols_sane() {
   static bool done;
   if (done)  return true;
@@ -346,13 +340,9 @@ static bool signature_symbols_sane() {
          "sanity");
   return true;
 }
-
-#endif
 #endif //ASSERT
 
 // returns a symbol; the caller is responsible for decrementing it
-#ifndef LEYDEN
-
 Symbol* SignatureStream::find_symbol() {
   // Create a symbol from for string _begin _end
   int begin = raw_symbol_begin();
@@ -393,6 +383,7 @@ Symbol* SignatureStream::find_symbol() {
   return name;
 }
 
+#ifndef LEYDEN
 Klass* SignatureStream::as_klass(Handle class_loader, Handle protection_domain,
                                  FailureMode failure_mode, TRAPS) {
   if (!is_reference()) {

@@ -221,10 +221,6 @@ static void trace_class_resolution_impl(Klass* to_class, TRAPS) {
   }
 }
 
-#endif
-
-#ifndef LEYDEN
-
 void trace_class_resolution(Klass* to_class) {
   EXCEPTION_MARK;
   trace_class_resolution_impl(to_class, THREAD);
@@ -552,7 +548,6 @@ JVM_END
 // java.lang.StackWalker //////////////////////////////////////////////////////
 
 
-#ifndef LEYDEN
 JVM_ENTRY(jobject, JVM_CallStackWalk(JNIEnv *env, jobject stackStream, jlong mode,
                                      jint skip_frames, jint frame_count, jint start_index,
                                      jobjectArray frames))
@@ -597,7 +592,6 @@ JVM_ENTRY(jint, JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, 
   return StackWalk::fetchNextBatch(stackStream_h, mode, anchor, frame_count,
                                    start_index, frames_array_h, THREAD);
 JVM_END
-#endif
 
 // java.lang.Object ///////////////////////////////////////////////
 
@@ -775,9 +769,7 @@ JVM_ENTRY(jclass, JVM_FindClassFromBootLoader(JNIEnv* env,
   }
   return (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
 JVM_END
-#endif
 
-#ifndef LEYDEN
 // Find a class with this name in this loader, using the caller's protection domain.
 JVM_ENTRY(jclass, JVM_FindClassFromCaller(JNIEnv* env, const char* name,
                                           jboolean init, jobject loader,
@@ -808,9 +800,7 @@ JVM_ENTRY(jclass, JVM_FindClassFromCaller(JNIEnv* env, const char* name,
   }
   return result;
 JVM_END
-#endif
 
-#ifndef LEYDEN
 // Currently only called from the old verifier.
 JVM_ENTRY(jclass, JVM_FindClassFromClass(JNIEnv *env, const char *name,
                                          jboolean init, jclass from))
@@ -847,9 +837,6 @@ JVM_ENTRY(jclass, JVM_FindClassFromClass(JNIEnv *env, const char *name,
 
   return result;
 JVM_END
-#endif
-
-#ifndef LEYDEN
 
 // common code for JVM_DefineClass() and JVM_DefineClassWithSource()
 static jclass jvm_define_class_common(const char *name,
@@ -1030,15 +1017,10 @@ static jclass jvm_lookup_define_class(jclass lookup, const char *name,
   return (jclass) JNIHandles::make_local(THREAD, defined_k->java_mirror());
 }
 
-#endif
-
-#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_DefineClass(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsize len, jobject pd))
   return jvm_define_class_common(name, loader, buf, len, pd, NULL, THREAD);
 JVM_END
-#endif
 
-#ifndef LEYDEN
 /*
  * Define a class with the specified lookup class.
  *  lookup:  Lookup class
@@ -1061,16 +1043,12 @@ JVM_ENTRY(jclass, JVM_LookupDefineClass(JNIEnv *env, jclass lookup, const char *
 
   return jvm_lookup_define_class(lookup, name, buf, len, pd, initialize, flags, classData, THREAD);
 JVM_END
-#endif
 
-#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_DefineClassWithSource(JNIEnv *env, const char *name, jobject loader, const jbyte *buf, jsize len, jobject pd, const char *source))
 
   return jvm_define_class_common(name, loader, buf, len, pd, source, THREAD);
 JVM_END
-#endif
 
-#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_FindLoadedClass(JNIEnv *env, jobject loader, jstring name))
   ResourceMark rm(THREAD);
 
@@ -1115,11 +1093,9 @@ JVM_ENTRY(jclass, JVM_FindLoadedClass(JNIEnv *env, jobject loader, jstring name)
   return (k == NULL) ? NULL :
             (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
 JVM_END
-#endif
 
 // Module support //////////////////////////////////////////////////////////////////////////////
 
-#ifndef LEYDEN
 JVM_ENTRY(void, JVM_DefineModule(JNIEnv *env, jobject module, jboolean is_open, jstring version,
                                  jstring location, jobjectArray packages))
   Modules::define_module(module, is_open, version, location, packages, CHECK);
@@ -1457,10 +1433,8 @@ JVM_ENTRY(jobjectArray, JVM_GetDeclaredClasses(JNIEnv *env, jclass ofClass))
 
   return (jobjectArray)JNIHandles::make_local(THREAD, result());
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 JVM_ENTRY(jclass, JVM_GetDeclaringClass(JNIEnv *env, jclass ofClass))
 {
   // ofClass is a reference to a java_lang_Class object.
@@ -1481,9 +1455,7 @@ JVM_ENTRY(jclass, JVM_GetDeclaringClass(JNIEnv *env, jclass ofClass))
   return (jclass) JNIHandles::make_local(THREAD, outer_klass->java_mirror());
 }
 JVM_END
-#endif
 
-#ifndef LEYDEN
 JVM_ENTRY(jstring, JVM_GetSimpleBinaryName(JNIEnv *env, jclass cls))
 {
   oop mirror = JNIHandles::resolve_non_null(cls);
@@ -1507,9 +1479,7 @@ JVM_ENTRY(jstring, JVM_GetSimpleBinaryName(JNIEnv *env, jclass cls))
   return NULL;
 }
 JVM_END
-#endif
 
-#ifndef LEYDEN
 JVM_ENTRY(jstring, JVM_GetClassSignature(JNIEnv *env, jclass cls))
   assert (cls != NULL, "illegal class");
   JvmtiVMObjectAllocEventCollector oam;
@@ -1648,9 +1618,6 @@ JVM_ENTRY(jbyteArray, JVM_GetFieldTypeAnnotations(JNIEnv *env, jobject field))
 
   return (jbyteArray) JNIHandles::make_local(THREAD, Annotations::make_java_array(fd.type_annotations(), THREAD));
 JVM_END
-#endif
-
-#ifndef LEYDEN
 
 static void bounds_check(const constantPoolHandle& cp, jint index, TRAPS) {
   if (!cp->is_within_bounds(index)) {
@@ -1658,9 +1625,6 @@ static void bounds_check(const constantPoolHandle& cp, jint index, TRAPS) {
   }
 }
 
-#endif
-
-#ifndef LEYDEN
 JVM_ENTRY(jobjectArray, JVM_GetMethodParameters(JNIEnv *env, jobject method))
 {
   // method is a handle to a java.lang.reflect.Method object
@@ -1711,11 +1675,9 @@ JVM_ENTRY(jobjectArray, JVM_GetMethodParameters(JNIEnv *env, jobject method))
   }
 }
 JVM_END
-#endif
 
 // New (JDK 1.4) reflection implementation /////////////////////////////////////
 
-#ifndef LEYDEN
 JVM_ENTRY(jobjectArray, JVM_GetClassDeclaredFields(JNIEnv *env, jclass ofClass, jboolean publicOnly))
 {
   JvmtiVMObjectAllocEventCollector oam;
@@ -1814,9 +1776,6 @@ JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
   return NULL;
 }
 JVM_END
-#endif
-
-#ifndef LEYDEN
 
 static bool select_method(const methodHandle& method, bool want_constructor) {
   if (want_constructor) {
@@ -1825,10 +1784,6 @@ static bool select_method(const methodHandle& method, bool want_constructor) {
     return  (!method->is_initializer() && !method->is_overpass());
   }
 }
-
-#endif
-
-#ifndef LEYDEN
 
 static jobjectArray get_class_declared_methods_helper(
                                   JNIEnv *env,
@@ -1900,9 +1855,6 @@ static jobjectArray get_class_declared_methods_helper(
   return (jobjectArray) JNIHandles::make_local(THREAD, result());
 }
 
-#endif
-
-#ifndef LEYDEN
 JVM_ENTRY(jobjectArray, JVM_GetClassDeclaredMethods(JNIEnv *env, jclass ofClass, jboolean publicOnly))
 {
   return get_class_declared_methods_helper(env, ofClass, publicOnly,
@@ -2037,9 +1989,7 @@ JVM_ENTRY(jobjectArray, JVM_GetNestMembers(JNIEnv* env, jclass current))
   }
 }
 JVM_END
-#endif
 
-#ifndef LEYDEN
 JVM_ENTRY(jobjectArray, JVM_GetPermittedSubclasses(JNIEnv* env, jclass current))
 {
   oop mirror = JNIHandles::resolve_non_null(current);
@@ -2100,11 +2050,9 @@ JVM_ENTRY(jobjectArray, JVM_GetPermittedSubclasses(JNIEnv* env, jclass current))
   }
 }
 JVM_END
-#endif
 
 // Constant pool access //////////////////////////////////////////////////////////
 
-#ifndef LEYDEN
 JVM_ENTRY(jobject, JVM_GetClassConstantPool(JNIEnv *env, jclass cls))
 {
   JvmtiVMObjectAllocEventCollector oam;
@@ -2122,10 +2070,8 @@ JVM_ENTRY(jobject, JVM_GetClassConstantPool(JNIEnv *env, jclass cls))
   return NULL;
 }
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 JVM_ENTRY(jint, JVM_ConstantPoolGetSize(JNIEnv *env, jobject obj, jobject unused))
 {
   constantPoolHandle cp = constantPoolHandle(THREAD, reflect_ConstantPool::get_cp(JNIHandles::resolve_non_null(obj)));
@@ -2426,11 +2372,9 @@ JVM_ENTRY(jbyte, JVM_ConstantPoolGetTagAt(JNIEnv *env, jobject obj, jobject unus
   return result;
 }
 JVM_END
-#endif
 
 // Assertion support. //////////////////////////////////////////////////////////
 
-#ifndef LEYDEN
 JVM_ENTRY(jboolean, JVM_DesiredAssertionStatus(JNIEnv *env, jclass unused, jclass cls))
   assert(cls != NULL, "bad class");
 
@@ -2448,10 +2392,8 @@ JVM_ENTRY(jboolean, JVM_DesiredAssertionStatus(JNIEnv *env, jclass unused, jclas
   return JavaAssertions::enabled(name, system_class);
 
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 // Return a new AssertionStatusDirectives object with the fields filled in with
 // command-line assertion arguments (i.e., -ea, -da).
 JVM_ENTRY(jobject, JVM_AssertionStatusDirectives(JNIEnv *env, jclass unused))
@@ -2494,10 +2436,8 @@ JVM_ENTRY(void, JVM_GetClassCPTypes(JNIEnv *env, jclass cls, unsigned char *type
     }
   }
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 JVM_ENTRY(jint, JVM_GetClassCPEntriesCount(JNIEnv *env, jclass cls))
   Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls));
   k = JvmtiThreadState::class_to_verify_considering_redefinition(k, thread);
@@ -2678,10 +2618,8 @@ JVM_ENTRY(const char*, JVM_GetCPFieldNameUTF(JNIEnv *env, jclass cls, jint cp_in
   ShouldNotReachHere();
   return NULL;
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 JVM_ENTRY(const char*, JVM_GetCPMethodNameUTF(JNIEnv *env, jclass cls, jint cp_index))
   Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls));
   k = JvmtiThreadState::class_to_verify_considering_redefinition(k, thread);
@@ -2916,6 +2854,7 @@ void jio_print(const char* s, size_t len) {
 }
 
 } // Extern C
+
 // java.lang.Thread //////////////////////////////////////////////////////////////////////////////
 
 // In most of the JVM thread support functions we need to access the
@@ -3442,10 +3381,8 @@ JVM_ENTRY(jvalue, JVM_GetPrimitiveArrayElement(JNIEnv *env, jobject arr, jint in
   }
   return value;
 JVM_END
-#endif
 
 
-#ifndef LEYDEN
 JVM_ENTRY(void, JVM_SetArrayElement(JNIEnv *env, jobject arr, jint index, jobject val))
   arrayOop a = check_array(env, arr, false, CHECK);
   oop box = JNIHandles::resolve(val);
@@ -3607,12 +3544,9 @@ jclass find_class_from_class_loader(JNIEnv* env, Symbol* name, jboolean init,
   return (jclass) JNIHandles::make_local(THREAD, klass->java_mirror());
 }
 
-#endif
-
 
 // Method ///////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef LEYDEN
 JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jobjectArray args0))
   Handle method_handle;
   if (thread->stack_overflow_state()->stack_available((address) &method_handle) >= JVMInvokeMethodSlack) {

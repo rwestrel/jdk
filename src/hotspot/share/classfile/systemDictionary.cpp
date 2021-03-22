@@ -106,6 +106,8 @@ const int _invoke_method_size     = 139;                     // number of entrie
 // Hashtable holding placeholders for classes being loaded.
 const int _placeholder_table_size = 1009;
 PlaceholderTable* _placeholders   = NULL;
+
+#ifndef LEYDEN
 static PlaceholderTable*   placeholders() { return _placeholders; }
 
 // ----------------------------------------------------------------------------
@@ -137,17 +139,23 @@ void SystemDictionary::compute_java_loaders(TRAPS) {
 
   _java_platform_loader = OopHandle(Universe::vm_global(), (oop)result.get_jobject());
 }
+#endif
 
 ClassLoaderData* SystemDictionary::register_loader(Handle class_loader, bool create_mirror_cld) {
+#ifndef LEYDEN
   if (create_mirror_cld) {
     // Add a new class loader data to the graph.
     return ClassLoaderDataGraph::add(class_loader, true);
   } else {
+#endif
     return (class_loader() == NULL) ? ClassLoaderData::the_null_class_loader_data() :
                                       ClassLoaderDataGraph::find_or_create(class_loader);
+#ifndef LEYDEN
   }
+#endif
 }
 
+#ifndef LEYDEN
 // ----------------------------------------------------------------------------
 // Parallel class loading check
 
@@ -165,6 +173,7 @@ bool SystemDictionary::is_parallelDefine(Handle class_loader) {
    }
    return false;
 }
+#endif
 
 // Returns true if the passed class loader is the builtin application class loader
 // or a custom system class loader. A customer system class loader can be
@@ -185,6 +194,7 @@ bool SystemDictionary::is_platform_class_loader(oop class_loader) {
   return (class_loader->klass() == vmClasses::jdk_internal_loader_ClassLoaders_PlatformClassLoader_klass());
 }
 
+#ifndef LEYDEN
 Handle SystemDictionary::compute_loader_lock_object(Thread* thread, Handle class_loader) {
   // If class_loader is NULL or parallelCapable, the JVM doesn't acquire a lock while loading.
   if (is_parallelCapable(class_loader)) {
@@ -230,6 +240,7 @@ void verify_dictionary_entry(Symbol* class_name, InstanceKlass* k) {
   assert(kk == k, "should be present in dictionary");
 }
 #endif
+#endif
 
 static void handle_resolution_exception(Symbol* class_name, bool throw_error, TRAPS) {
   if (HAS_PENDING_EXCEPTION) {
@@ -254,7 +265,6 @@ static void handle_resolution_exception(Symbol* class_name, bool throw_error, TR
     THROW_MSG(vmSymbols::java_lang_ClassNotFoundException(), class_name->as_C_string());
   }
 }
-
 // Forwards to resolve_or_null
 
 Klass* SystemDictionary::resolve_or_fail(Symbol* class_name, Handle class_loader, Handle protection_domain,
@@ -322,6 +332,7 @@ Klass* SystemDictionary::resolve_array_class_or_null(Symbol* class_name,
   return k;
 }
 
+#ifndef LEYDEN
 
 // Must be called for any super-class or super-interface resolution
 // during class definition to allow class circularity checking
@@ -658,7 +669,7 @@ void SystemDictionary::post_class_load_event(EventClassLoad* event, const Instan
   event->set_initiatingClassLoader(init_cld);
   event->commit();
 }
-
+#endif
 
 // Be careful when modifying this code: once you have run
 // placeholders()->find_and_add(PlaceholderTable::LOAD_INSTANCE),
@@ -694,6 +705,7 @@ InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
     if (probe != NULL) return probe;
   }
 
+#ifndef LEYDEN
   // Non-bootstrap class loaders will call out to class loader and
   // define via jvm/jni_DefineClass which will acquire the
   // class loader object lock to protect against multiple threads
@@ -902,9 +914,12 @@ InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
   validate_protection_domain(loaded_class, class_loader, protection_domain, CHECK_NULL);
 
   return loaded_class;
+#else
+  return NULL;
+#endif
 }
 
-
+#ifndef LEYDEN
 // This routine does not lock the system dictionary.
 //
 // Since readers don't hold a lock, we must make sure that system
@@ -2645,3 +2660,5 @@ int SystemDictionaryDCmd::num_arguments() {
     return 0;
   }
 }
+
+#endif

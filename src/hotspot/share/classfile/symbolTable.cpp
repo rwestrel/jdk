@@ -96,6 +96,7 @@ static volatile bool _lookup_shared_first = false;
 
 // Static arena for symbols that are not deallocated
 Arena* SymbolTable::_arena = NULL;
+
 static uint64_t _alt_hash_seed = 0;
 #ifndef LEYDEN
 static inline void log_trace_symboltable_helper(Symbol* sym, const char* msg) {
@@ -161,7 +162,6 @@ public:
 };
 
 #ifndef LEYDEN
-#ifndef LEYDEN
 
 static size_t ceil_log2(size_t value) {
   size_t ret;
@@ -183,10 +183,6 @@ void SymbolTable::create_table ()  {
     _arena = new (mtSymbol) Arena(mtSymbol, symbol_alloc_arena_size);
   }
 }
-
-#endif
-
-#ifndef LEYDEN
 
 void SymbolTable::delete_symbol(Symbol* sym) {
   if (sym->is_permanent()) {
@@ -257,8 +253,6 @@ Symbol* SymbolTable::allocate_symbol(const char* name, int len, bool c_heap) {
   }
   return sym;
 }
-
-#endif
 
 class SymbolsDo : StackObj {
   SymbolClosure *_cl;
@@ -341,20 +335,20 @@ Symbol* SymbolTable::lookup_common(const char* name,
   return sym;
 }
 
-#ifndef LEYDEN
-#ifndef LEYDEN
-
 Symbol* SymbolTable::new_symbol(const char* name, int len) {
   unsigned int hash = hash_symbol(name, len, _alt_hash);
   Symbol* sym = lookup_common(name, len, hash);
+#ifndef LEYDEN
   if (sym == NULL) {
     sym = do_add_if_needed(name, len, hash, true);
   }
+#endif
   assert(sym->refcount() != 0, "lookup should have incremented the count");
   assert(sym->equals(name, len), "symbol must be properly initialized");
   return sym;
 }
 
+#ifndef LEYDEN
 Symbol* SymbolTable::new_symbol(const Symbol* sym, int begin, int end) {
   assert(begin <= end && end <= sym->utf8_length(), "just checking");
   assert(sym->refcount() != 0, "require a valid symbol");
@@ -367,8 +361,6 @@ Symbol* SymbolTable::new_symbol(const Symbol* sym, int begin, int end) {
   }
   return found;
 }
-
-#endif
 #endif
 
 class SymbolTableLookup : StackObj {
@@ -427,12 +419,11 @@ Symbol* SymbolTable::do_lookup(const char* name, int len, uintx hash) {
   assert((sym == NULL) || sym->refcount() != 0, "found dead symbol");
   return sym;
 }
+
 Symbol* SymbolTable::lookup_only(const char* name, int len, unsigned int& hash) {
   hash = hash_symbol(name, len, _alt_hash);
   return lookup_common(name, len, hash);
 }
-#ifndef LEYDEN
-#ifndef LEYDEN
 
 // Suggestion: Push unicode-based lookup all the way into the hashing
 // and probing logic, so there is no need for convert_to_utf8 until
@@ -452,8 +443,6 @@ Symbol* SymbolTable::new_symbol(const jchar* name, int utf16_length) {
   }
 }
 
-#endif
-#endif
 Symbol* SymbolTable::lookup_only_unicode(const jchar* name, int utf16_length,
                                          unsigned int& hash) {
   int utf8_length = UNICODE::utf8_length((jchar*) name, utf16_length);
@@ -470,7 +459,6 @@ Symbol* SymbolTable::lookup_only_unicode(const jchar* name, int utf16_length,
   }
 }
 
-#ifndef LEYDEN
 #ifndef LEYDEN
 
 void SymbolTable::new_symbols(ClassLoaderData* loader_data, const constantPoolHandle& cp,
@@ -538,7 +526,7 @@ Symbol* SymbolTable::new_permanent_symbol(const char* name) {
 }
 
 #endif
-#endif
+
 struct SizeFunc : StackObj {
   size_t operator()(Symbol** value) {
     assert(value != NULL, "expected valid value");
@@ -559,7 +547,7 @@ void SymbolTable::print_table_statistics(outputStream* st,
   SizeFunc sz;
   _local_table->statistics_to(Thread::current(), sz, st, table_name);
 }
-#ifndef LEYDEN
+
 // Verification
 class VerifySymbols : StackObj {
 public:
@@ -580,7 +568,7 @@ void SymbolTable::verify() {
     log_info(symboltable)("verify unavailable at this moment");
   }
 }
-#endif
+
 // Dumping
 class DumpSymbol : StackObj {
   Thread* _thr;
@@ -759,9 +747,8 @@ void SymbolTable::check_concurrent_work() {
     trigger_cleanup();
   }
 }
-#endif
+
 void SymbolTable::do_concurrent_work(JavaThread* jt) {
-#ifndef LEYDEN
   double load_factor = get_load_factor();
   log_debug(symboltable, perf)("Concurrent work, live factor: %g", load_factor);
   // We prefer growing, since that also removes dead items
@@ -771,10 +758,7 @@ void SymbolTable::do_concurrent_work(JavaThread* jt) {
     clean_dead_entries(jt);
   }
   _has_work = false;
-#endif
 }
-#ifndef LEYDEN
-#ifndef LEYDEN
 
 // Rehash
 bool SymbolTable::do_rehash() {
@@ -799,10 +783,6 @@ bool SymbolTable::do_rehash() {
 
   return true;
 }
-
-#endif
-
-#ifndef LEYDEN
 
 void SymbolTable::rehash_table() {
   static bool rehashed = false;
@@ -835,8 +815,6 @@ void SymbolTable::rehash_table() {
 
   _needs_rehashing = false;
 }
-
-#endif
 
 //---------------------------------------------------------------------------
 // Non-product code
@@ -921,9 +899,7 @@ SymboltableDCmd::SymboltableDCmd(outputStream* output, bool heap) :
                                  DCmdWithParser(output, heap),
   _verbose("-verbose", "Dump the content of each symbol in the table",
            "BOOLEAN", false, "false") {
-#ifndef LEYDEN
   _dcmdparser.add_dcmd_option(&_verbose);
-#endif
 }
 
 void SymboltableDCmd::execute(DCmdSource source, TRAPS) {
@@ -933,18 +909,14 @@ void SymboltableDCmd::execute(DCmdSource source, TRAPS) {
 }
 
 int SymboltableDCmd::num_arguments() {
-#ifndef LEYDEN
   ResourceMark rm;
   SymboltableDCmd* dcmd = new SymboltableDCmd(NULL, false);
   if (dcmd != NULL) {
     DCmdMark mark(dcmd);
     return dcmd->_dcmdparser.num_arguments();
   } else {
-#endif
     return 0;
-#ifndef LEYDEN
   }
-#endif
 }
 
 #endif

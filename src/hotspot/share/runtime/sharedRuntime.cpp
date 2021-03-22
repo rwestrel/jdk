@@ -878,11 +878,7 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
             // Instead of throwing the abstract method error here directly, we re-resolve
             // and will throw the AbstractMethodError during resolve. As a result, we'll
             // get a more detailed error message.
-#ifndef LEYDEN
             return SharedRuntime::get_handle_wrong_method_stub();
-#else
-            return NULL;
-#endif
           } else {
             Events::log_exception(thread, "NullPointerException at vtable entry " INTPTR_FORMAT, p2i(pc));
             // Assert that the signal comes from the expected location in stub code.
@@ -1078,13 +1074,12 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
       (char *) sig->bytes(), sig->utf8_length());
   return 0;
 JRT_END
-#endif
+
 
 // Finds receiver, CallInfo (i.e. receiver method), and calling bytecode)
 // for a call current in progress, i.e., arguments has been pushed on stack
 // put callee has not been invoked yet.  Used by: resolve virtual/static,
 // vtable updates, etc.  Caller frame must be compiled.
-#ifndef LEYDEN
 Handle SharedRuntime::find_callee_info(JavaThread* thread, Bytecodes::Code& bc, CallInfo& callinfo, TRAPS) {
   ResourceMark rm(THREAD);
 
@@ -1919,11 +1914,11 @@ address SharedRuntime::handle_unsafe_access(JavaThread* thread, address next_pc)
   return next_pc;
 }
 
+#ifndef LEYDEN
 #ifdef ASSERT
 void SharedRuntime::check_member_name_argument_is_last_argument(const methodHandle& method,
                                                                 const BasicType* sig_bt,
                                                                 const VMRegPair* regs) {
-#ifndef LEYDEN
   ResourceMark rm;
   const int total_args_passed = method->size_of_parameters();
   const VMRegPair*    regs_with_member_name = regs;
@@ -1941,12 +1936,10 @@ void SharedRuntime::check_member_name_argument_is_last_argument(const methodHand
     assert(a->value() == b->value(), "register allocation mismatch: a=" INTX_FORMAT ", b=" INTX_FORMAT, a->value(), b->value());
   }
   assert(regs_with_member_name[member_arg_pos].first()->is_valid(), "bad member arg");
-#endif
 }
 #endif
 
 bool SharedRuntime::should_fixup_call_destination(address destination, address entry_point, address caller_pc, Method* moop, CodeBlob* cb) {
-#ifndef LEYDEN
   if (destination != entry_point) {
     CodeBlob* callee = CodeCache::find_blob(destination);
     // callee == cb seems weird. It means calling interpreter thru stub.
@@ -1974,7 +1967,6 @@ bool SharedRuntime::should_fixup_call_destination(address destination, address e
       tty->print_cr(" to " INTPTR_FORMAT, p2i(entry_point));
     }
   }
-#endif
   return false;
 }
 
@@ -1984,7 +1976,6 @@ bool SharedRuntime::should_fixup_call_destination(address destination, address e
 // where we went int -> i2c -> c2i and so the caller could in fact be
 // interpreted. If the caller is compiled we attempt to patch the caller
 // so he no longer calls into the interpreter.
-#ifndef LEYDEN
 JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address caller_pc))
   Method* moop(method);
 
@@ -2261,7 +2252,6 @@ class MethodArityHistogram {
   static int _max_size;                       // max. arg size seen
 
   static void add_method_to_histogram(nmethod* nm) {
-#ifndef LEYDEN
     Method* method = (nm == NULL) ? NULL : nm->method();
     if ((method != NULL) && nm->is_alive()) {
       ArgumentCount args(method->signature());
@@ -2275,7 +2265,6 @@ class MethodArityHistogram {
       _max_arity = MAX2(_max_arity, arity);
       _max_size  = MAX2(_max_size, argsize);
     }
-#endif
   }
 
   void print_histogram_helper(int n, int* histo, const char* name) {
@@ -2997,7 +2986,6 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     nm->post_compiled_method_load_event();
   }
 }
-#endif
 
 // -------------------------------------------------------------------------
 // Java-Java calling convention
@@ -3007,19 +2995,14 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
 // For a given signature, return the VMReg for parameter 0.
 VMReg SharedRuntime::name_for_receiver() {
   VMRegPair regs;
-#ifndef LEYDEN
   BasicType sig_bt = T_OBJECT;
   (void) java_calling_convention(&sig_bt, &regs, 1);
   // Return argument 0 register.  In the LP64 build pointers
   // take 2 registers, but the VM wants only the 'main' name.
-#endif
   return regs.first();
 }
 
 VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, bool has_appendix, int* arg_size) {
-#ifdef LEYDEN
-  return NULL;
-#else
   // This method is returning a data structure allocating as a
   // ResourceObject, so do not put any ResourceMarks in here.
 
@@ -3068,7 +3051,6 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
   // results
   *arg_size = cnt;
   return regs;
-#endif
 }
 
 // OSR Migration Code
@@ -3085,7 +3067,6 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
 //
 // All of this is done NOT at any Safepoint, nor is any safepoint or GC allowed.
 
-#ifndef LEYDEN
 JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   // During OSR migration, we unwind the interpreted frame and replace it with a compiled
   // frame. The stack watermark code below ensures that the interpreted frame is processed

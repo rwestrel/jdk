@@ -1677,9 +1677,6 @@ NamedCounter* OptoRuntime::new_named_counter(JVMState* youngest_jvms, NamedCount
   return c;
 }
 
-#endif
-
-#ifndef LEYDEN
 int trace_exception_counter = 0;
 static void trace_exception(outputStream* st, oop exception_oop, address exception_pc, const char* msg) {
   trace_exception_counter++;

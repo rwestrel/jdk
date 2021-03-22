@@ -359,11 +359,9 @@ int CompiledMethod::verify_icholder_relocations() {
 
   return count;
 }
-#endif
 
 // Method that knows how to preserve outgoing arguments at call. This method must be
 // called with a frame corresponding to a Java invoke
-#ifndef LEYDEN
 void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f) {
   if (method() != NULL && !method()->is_native()) {
     address pc = fr.pc();
@@ -386,9 +384,7 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
     fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
   }
 }
-#endif
 
-#ifndef LEYDEN
 Method* CompiledMethod::attached_method(address call_instr) {
   assert(code_contains(call_instr), "not part of the nmethod");
   RelocIterator iter(this, call_instr, call_instr + 1);

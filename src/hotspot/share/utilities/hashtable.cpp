@@ -332,7 +332,7 @@ template class BasicHashtable<mtServiceability>;
 template void BasicHashtable<mtClass>::verify_table<DictionaryEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<ModuleEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<PackageEntry>(char const*);
-#ifndef LEYDEN
 template void BasicHashtable<mtClass>::verify_table<ProtectionDomainCacheEntry>(char const*);
+#ifndef LEYDEN
 template void BasicHashtable<mtClass>::verify_table<PlaceholderEntry>(char const*);
 #endif
