@@ -121,6 +121,7 @@ void CodeBuffer::initialize(csize_t code_size, csize_t locs_size) {
   debug_only(verify_section_allocation();)
 }
 
+
 CodeBuffer::~CodeBuffer() {
   verify_section_allocation();
 
@@ -151,7 +152,6 @@ CodeBuffer::~CodeBuffer() {
   ResourceObj::set_allocation_type((address)(&_default_oop_recorder), at);
 #endif
 }
-
 
 void CodeBuffer::initialize_oop_recorder(OopRecorder* r) {
   assert(_oop_recorder == &_default_oop_recorder && _default_oop_recorder.is_unused(), "do this once");
@@ -289,9 +289,7 @@ address CodeSection::target(Label& L, address branch_pc) {
     return branch_pc;
   }
 }
-#endif
 
-#ifndef LEYDEN
 void CodeSection::relocate(address at, relocInfo::relocType rtype, int format, jint method_index) {
   RelocationHolder rh;
   switch (rtype) {
@@ -584,10 +582,8 @@ void CodeBuffer::finalize_oop_references(const methodHandle& mh) {
     oop_recorder()->find_index((jobject)thread->handle_area()->allocate_handle(oops.at(i)));
   }
 }
-#endif
 
 
-#ifndef LEYDEN
 
 csize_t CodeBuffer::total_offset_of(const CodeSection* cs) const {
   csize_t size_so_far = 0;
@@ -710,9 +706,6 @@ csize_t CodeBuffer::copy_relocations_to(CodeBlob* dest) const {
   return buf_offset;
 }
 
-#endif
-
-#ifndef LEYDEN
 void CodeBuffer::copy_code_to(CodeBlob* dest_blob) {
 #ifndef PRODUCT
   if (PrintNMethods && (WizardMode || Verbose)) {
@@ -739,14 +732,12 @@ void CodeBuffer::copy_code_to(CodeBlob* dest_blob) {
   // Flush generated code
   ICache::invalidate_range(dest_blob->code_begin(), dest_blob->code_size());
 }
-#endif
 
 // Move all my code into another code buffer.  Consult applicable
 // relocs to repair embedded addresses.  The layout in the destination
 // CodeBuffer is different to the source CodeBuffer: the destination
 // CodeBuffer gets the final layout (consts, insts, stubs in order of
 // ascending address).
-#ifndef LEYDEN
 void CodeBuffer::relocate_code_to(CodeBuffer* dest) const {
   address dest_end = dest->_total_start + dest->_total_size;
   address dest_filled = NULL;
@@ -946,9 +937,7 @@ void CodeBuffer::expand(CodeSection* which_cs, csize_t amount) {
   }
 #endif //PRODUCT
 }
-#endif
 
-#ifndef LEYDEN
 void CodeBuffer::take_over_code_from(CodeBuffer* cb) {
   // Must already have disposed of the old blob somehow.
   assert(blob() == NULL, "must be empty");
@@ -964,9 +953,7 @@ void CodeBuffer::take_over_code_from(CodeBuffer* cb) {
   // Make sure the old cb won't try to use it or free it.
   DEBUG_ONLY(cb->_blob = (BufferBlob*)badAddress);
 }
-#endif
 
-#ifndef LEYDEN
 void CodeBuffer::verify_section_allocation() {
   address tstart = _total_start;
   if (tstart == badAddress)  return;  // smashed by set_blob(NULL)

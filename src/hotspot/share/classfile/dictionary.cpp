@@ -170,9 +170,7 @@ bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   return false;
 }
 
-#endif
 
-#ifndef LEYDEN
 void DictionaryEntry::add_protection_domain(Dictionary* dict, Handle protection_domain) {
   assert_locked_or_safepoint(SystemDictionary_lock);
   if (!contains_protection_domain(protection_domain())) {
@@ -544,7 +542,6 @@ void DictionaryEntry::verify() {
 }
 
 void Dictionary::verify() {
-#ifndef LEYDEN
   guarantee(number_of_entries() >= 0, "Verify of dictionary failed");
 
   ClassLoaderData* cld = loader_data();
@@ -559,5 +556,4 @@ void Dictionary::verify() {
   stringStream tempst;
   tempst.print("System Dictionary for %s class loader", cld->loader_name_and_id());
   verify_table<DictionaryEntry>(tempst.as_string());
-#endif
 }

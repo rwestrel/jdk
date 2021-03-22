@@ -329,9 +329,7 @@ template class BasicHashtable<mtCompiler>;
 template class BasicHashtable<mtTracing>;
 template class BasicHashtable<mtServiceability>;
 
-#ifndef LEYDEN
 template void BasicHashtable<mtClass>::verify_table<DictionaryEntry>(char const*);
-#endif
 template void BasicHashtable<mtModule>::verify_table<ModuleEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<PackageEntry>(char const*);
 #ifndef LEYDEN

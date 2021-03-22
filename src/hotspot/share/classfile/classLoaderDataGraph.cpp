@@ -152,8 +152,6 @@ void ClassLoaderDataGraph::adjust_saved_class(Klass* klass) {
   return static_klass_iterator.adjust_saved_class(klass);
 }
 
-#ifndef LEYDEN
-
 void ClassLoaderDataGraph::clean_deallocate_lists(bool walk_previous_versions) {
   assert(SafepointSynchronize::is_at_safepoint(), "must only be called at safepoint");
   uint loaders_processed = 0;
@@ -196,7 +194,6 @@ void ClassLoaderDataGraph::walk_metadata_and_clean_metaspaces() {
   clean_deallocate_lists(walk_all_metadata);
 }
 #endif
-#endif
 
 // GC root of class loader data created.
 ClassLoaderData* volatile ClassLoaderDataGraph::_head = NULL;
@@ -206,7 +203,6 @@ bool ClassLoaderDataGraph::_should_clean_deallocate_lists = false;
 bool ClassLoaderDataGraph::_safepoint_cleanup_needed = false;
 bool ClassLoaderDataGraph::_metaspace_oom = false;
 
-#ifndef LEYDEN
 #ifndef LEYDEN
 
 // Add a new class loader data node to the list.  Assign the newly created
@@ -256,10 +252,6 @@ ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool has_clas
   return cld;
 }
 
-#endif
-
-#ifndef LEYDEN
-
 ClassLoaderData* ClassLoaderDataGraph::add(Handle loader, bool has_class_mirror_holder) {
   MutexLocker ml(ClassLoaderDataGraph_lock);
   ClassLoaderData* loader_data = add_to_graph(loader, has_class_mirror_holder);
@@ -273,8 +265,6 @@ void ClassLoaderDataGraph::cld_unloading_do(CLDClosure* cl) {
     cl->do_cld(cld);
   }
 }
-
-#endif
 
 // These are functions called by the GC, which require all of the CLDs, including the
 // unloading ones.
@@ -509,8 +499,6 @@ bool ClassLoaderDataGraph::is_valid(ClassLoaderData* loader_data) {
   return false;
 }
 
-#ifndef LEYDEN
-
 // Move class loader data from main list to the unloaded list for unloading
 // and deallocation later.
 bool ClassLoaderDataGraph::do_unloading() {
@@ -552,10 +540,6 @@ bool ClassLoaderDataGraph::do_unloading() {
 
   return seen_dead_loader;
 }
-
-#endif
-
-#ifndef LEYDEN
 
 // There's at least one dead class loader.  Purge refererences of healthy module
 // reads lists and package export lists to modules belonging to dead loaders.
@@ -624,8 +608,6 @@ int ClassLoaderDataGraph::resize_dictionaries() {
   }
   return resized;
 }
-
-#endif
 
 ClassLoaderDataGraphKlassIteratorAtomic::ClassLoaderDataGraphKlassIteratorAtomic()
     : _next_klass(NULL) {

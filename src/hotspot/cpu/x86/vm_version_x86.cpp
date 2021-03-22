@@ -1584,9 +1584,7 @@ void VM_Version::get_processor_features() {
     OptimizeFill = false;
   }
 #endif // COMPILER2
-#endif
 
-#ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchInstr)) {
     if (AllocatePrefetchInstr == 3 && !supports_3dnow_prefetch()) {
       FLAG_SET_DEFAULT(AllocatePrefetchInstr, 0);
@@ -1595,7 +1593,6 @@ void VM_Version::get_processor_features() {
     }
   }
 #endif
-
   // Allocation prefetch settings
   intx cache_line_size = prefetch_data_size();
 #ifndef LEYDEN
@@ -1603,9 +1600,7 @@ void VM_Version::get_processor_features() {
       (cache_line_size > AllocatePrefetchStepSize)) {
     FLAG_SET_DEFAULT(AllocatePrefetchStepSize, cache_line_size);
   }
-#endif
 
-#ifndef LEYDEN
   if ((AllocatePrefetchDistance == 0) && (AllocatePrefetchStyle != 0)) {
     assert(!FLAG_IS_DEFAULT(AllocatePrefetchDistance), "default value should not be 0");
     if (!FLAG_IS_DEFAULT(AllocatePrefetchStyle)) {
@@ -1613,9 +1608,7 @@ void VM_Version::get_processor_features() {
     }
     FLAG_SET_DEFAULT(AllocatePrefetchStyle, 0);
   }
-#endif
 
-#ifndef LEYDEN
   if (FLAG_IS_DEFAULT(AllocatePrefetchDistance)) {
     bool use_watermark_prefetch = (AllocatePrefetchStyle == 2);
     FLAG_SET_DEFAULT(AllocatePrefetchDistance, allocate_prefetch_distance(use_watermark_prefetch));
@@ -1747,7 +1740,6 @@ void VM_Version::get_processor_features() {
 }
 
 void VM_Version::print_platform_virtualization_info(outputStream* st) {
-#ifndef LEYDEN
   VirtualizationType vrt = VM_Version::get_detected_virtualization();
   if (vrt == XenHVM) {
     st->print_cr("Xen hardware-assisted virtualization detected");
@@ -1761,7 +1753,6 @@ void VM_Version::print_platform_virtualization_info(outputStream* st) {
   } else if (vrt == HyperVRole) {
     st->print_cr("Hyper-V role detected");
   }
-#endif
 }
 
 bool VM_Version::use_biased_locking() {
