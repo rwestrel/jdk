@@ -26,9 +26,14 @@
 #define SHARE_OPTO_RUNTIME_HPP
 
 #include "code/codeBlob.hpp"
+
+#ifndef LEYDEN
+
 #include "opto/machnode.hpp"
 #include "opto/optoreg.hpp"
 #include "opto/type.hpp"
+
+#endif
 #include "runtime/biasedLocking.hpp"
 #include "runtime/rtmLocking.hpp"
 #include "runtime/deoptimization.hpp"
@@ -123,12 +128,18 @@ class RTMLockingNamedCounter : public NamedCounter {
   RTMLockingCounters* counters() { return &_counters; }
 };
 
+#ifndef LEYDEN
+
 typedef const TypeFunc*(*TypeFunc_generator)();
+
+#endif
 
 class OptoRuntime : public AllStatic {
   friend class Matcher;  // allow access to stub names
 
  private:
+#ifndef LEYDEN
+
   // define stubs
   static address generate_stub(ciEnv* ci_env, TypeFunc_generator gen, address C_function, const char *name, int is_fancy_jump, bool pass_tls, bool save_arguments, bool return_pc);
 
@@ -149,6 +160,7 @@ class OptoRuntime : public AllStatic {
 
   static address _slow_arraycopy_Java;
   static address _register_finalizer_Java;
+#endif
 
   //
   // Implementation of runtime methods
@@ -190,14 +202,15 @@ private:
   static void deoptimize_caller_frame     (JavaThread *thread, bool doit);
   static bool is_deoptimized_caller_frame (JavaThread *thread);
 
+#ifndef LEYDEN
   // CodeBlob support
   // ===================================================================
 
   static ExceptionBlob*       _exception_blob;
   static void generate_exception_blob();
-
+#endif
   static void register_finalizer(oopDesc* obj, JavaThread* thread);
-
+#ifndef LEYDEN
  public:
 
   static bool is_callee_saved_register(MachRegisterNumbers reg);
@@ -315,7 +328,6 @@ private:
   // Dtrace support
   static const TypeFunc* dtrace_method_entry_exit_Type();
   static const TypeFunc* dtrace_object_alloc_Type();
-
  private:
  static NamedCounter * volatile _named_counters;
 
@@ -326,6 +338,7 @@ private:
 
  // dumps all the named counters
  static void          print_named_counters();
+#endif
 
 };
 

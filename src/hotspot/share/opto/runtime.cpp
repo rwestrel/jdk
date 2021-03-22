@@ -49,6 +49,9 @@
 #include "oops/objArrayKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
+
+#ifndef LEYDEN
+
 #include "opto/ad.hpp"
 #include "opto/addnode.hpp"
 #include "opto/callnode.hpp"
@@ -59,8 +62,12 @@
 #include "opto/memnode.hpp"
 #include "opto/mulnode.hpp"
 #include "opto/output.hpp"
+#endif
 #include "opto/runtime.hpp"
+#ifndef LEYDEN
 #include "opto/subnode.hpp"
+
+#endif
 #include "prims/jvmtiExport.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/frame.inline.hpp"
@@ -89,6 +96,7 @@
 
 
 
+#ifndef LEYDEN
 // Compiled code entry points
 address OptoRuntime::_new_instance_Java                           = NULL;
 address OptoRuntime::_new_array_Java                              = NULL;
@@ -108,7 +116,7 @@ address OptoRuntime::_slow_arraycopy_Java                         = NULL;
 address OptoRuntime::_register_finalizer_Java                     = NULL;
 
 ExceptionBlob* OptoRuntime::_exception_blob;
-
+#endif
 // This should be called in an assertion at the start of OptoRuntime routines
 // which are entered from compiled code (all of them)
 #ifdef ASSERT
@@ -121,7 +129,7 @@ static bool check_compiled_frame(JavaThread* thread) {
 }
 #endif // ASSERT
 
-
+#ifndef LEYDEN
 #define gen(env, var, type_func_gen, c_func, fancy_jump, pass_tls, save_arg_regs, return_pc) \
   var = generate_stub(env, type_func_gen, CAST_FROM_FN_PTR(address, c_func), #var, fancy_jump, pass_tls, save_arg_regs, return_pc); \
   if (var == NULL) { return false; }
@@ -183,7 +191,7 @@ const char* OptoRuntime::stub_name(address entry) {
   return "runtime stub";
 #endif
 }
-
+#endif
 
 //=============================================================================
 // Opto compiler runtime routines
@@ -224,7 +232,9 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thre
     // fetch the oop from TLS after any possible GC.
   }
 
-  deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#ifndef LEYDEN
+    deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   JRT_BLOCK_END;
 
   // inform GC that we won't do card marks for initializing writes.
@@ -261,7 +271,9 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_C(Klass* array_type, int len, JavaT
   // is that we return an oop, but we can block on exit from this routine and
   // a GC can trash the oop in C's return register.  The generated stub will
   // fetch the oop from TLS after any possible GC.
-  deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#ifndef LEYDEN
+    deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(result);
   JRT_BLOCK_END;
 
@@ -289,7 +301,9 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_nozero_C(Klass* array_type, int len
   // is that we return an oop, but we can block on exit from this routine and
   // a GC can trash the oop in C's return register.  The generated stub will
   // fetch the oop from TLS after any possible GC.
-  deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#ifndef LEYDEN
+    deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(result);
   JRT_BLOCK_END;
 
@@ -298,6 +312,7 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_nozero_C(Klass* array_type, int len
   SharedRuntime::on_slowpath_allocation_exit(thread);
 
   oop result = thread->vm_result();
+#ifndef LEYDEN
   if ((len > 0) && (result != NULL) &&
       is_deoptimized_caller_frame(thread)) {
     // Zero array here if the caller is deoptimized.
@@ -313,6 +328,7 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_nozero_C(Klass* array_type, int len
     // Optimized zeroing.
     Copy::fill_to_aligned_words(obj+aligned_hs, size-aligned_hs);
   }
+#endif
 
 JRT_END
 
@@ -330,7 +346,9 @@ JRT_ENTRY(void, OptoRuntime::multianewarray2_C(Klass* elem_type, int len1, int l
   dims[1] = len2;
   Handle holder(THREAD, elem_type->klass_holder()); // keep the klass alive
   oop obj = ArrayKlass::cast(elem_type)->multi_allocate(2, dims, THREAD);
+#ifndef LEYDEN
   deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(obj);
 JRT_END
 
@@ -347,7 +365,9 @@ JRT_ENTRY(void, OptoRuntime::multianewarray3_C(Klass* elem_type, int len1, int l
   dims[2] = len3;
   Handle holder(THREAD, elem_type->klass_holder()); // keep the klass alive
   oop obj = ArrayKlass::cast(elem_type)->multi_allocate(3, dims, THREAD);
+#ifndef LEYDEN
   deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(obj);
 JRT_END
 
@@ -365,7 +385,9 @@ JRT_ENTRY(void, OptoRuntime::multianewarray4_C(Klass* elem_type, int len1, int l
   dims[3] = len4;
   Handle holder(THREAD, elem_type->klass_holder()); // keep the klass alive
   oop obj = ArrayKlass::cast(elem_type)->multi_allocate(4, dims, THREAD);
+#ifndef LEYDEN
   deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(obj);
 JRT_END
 
@@ -384,7 +406,9 @@ JRT_ENTRY(void, OptoRuntime::multianewarray5_C(Klass* elem_type, int len1, int l
   dims[4] = len5;
   Handle holder(THREAD, elem_type->klass_holder()); // keep the klass alive
   oop obj = ArrayKlass::cast(elem_type)->multi_allocate(5, dims, THREAD);
+#ifndef LEYDEN
   deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(obj);
 JRT_END
 
@@ -402,7 +426,9 @@ JRT_ENTRY(void, OptoRuntime::multianewarrayN_C(Klass* elem_type, arrayOopDesc* d
 
   Handle holder(THREAD, elem_type->klass_holder()); // keep the klass alive
   oop obj = ArrayKlass::cast(elem_type)->multi_allocate(len, c_dims, THREAD);
+#ifndef LEYDEN
   deoptimize_caller_frame(thread, HAS_PENDING_EXCEPTION);
+#endif
   thread->set_vm_result(obj);
 JRT_END
 
@@ -445,6 +471,8 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::monitor_notifyAll_C(oopDesc* obj, JavaThread 
   ObjectSynchronizer::notifyall(h_obj, CHECK);
   JRT_BLOCK_END;
 JRT_END
+
+#ifndef LEYDEN
 
 const TypeFunc *OptoRuntime::new_instance_Type() {
   // create input type (domain)
@@ -1223,9 +1251,13 @@ bool OptoRuntime::is_callee_saved_register(MachRegisterNumbers reg) {
   return false;
 }
 
+#endif
+
 //-----------------------------------------------------------------------
 // Exceptions
 //
+
+#ifndef LEYDEN
 
 static void trace_exception(outputStream* st, oop exception_oop, address exception_pc, const char* msg);
 
@@ -1345,6 +1377,8 @@ JRT_ENTRY_NO_ASYNC(address, OptoRuntime::handle_exception_C_helper(JavaThread* t
 
 JRT_END
 
+#endif
+
 // We are entering here from exception_blob
 // If there is a compiled exception handler in this method, we will continue there;
 // otherwise we will unwind the stack and continue at the caller of top frame method
@@ -1362,18 +1396,21 @@ address OptoRuntime::handle_exception_C(JavaThread* thread) {
   debug_only(NoHandleMark __hm;)
   nmethod* nm = NULL;
   address handler_address = NULL;
+#ifndef LEYDEN
   {
     // Enter the VM
 
     ResetNoHandleMark rnhm;
     handler_address = handle_exception_C_helper(thread, nm);
   }
+#endif
 
   // Back in java: Use no oops, DON'T safepoint
 
   // Now check to see if the handler we are returning is in a now
   // deoptimized frame
 
+#ifndef LEYDEN
   if (nm != NULL) {
     RegisterMap map(thread, false);
     frame caller = thread->last_frame().sender(&map);
@@ -1384,6 +1421,7 @@ address OptoRuntime::handle_exception_C(JavaThread* thread) {
       handler_address = SharedRuntime::deopt_blob()->unpack_with_exception();
     }
   }
+#endif
   return handler_address;
 }
 
@@ -1431,6 +1469,8 @@ address OptoRuntime::rethrow_C(oopDesc* exception, JavaThread* thread, address r
   return SharedRuntime::raw_exception_handler_for_return_address(thread, ret_pc);
 }
 
+
+#ifndef LEYDEN
 
 const TypeFunc *OptoRuntime::rethrow_Type() {
   // create input type (domain)
@@ -1527,6 +1567,8 @@ const TypeFunc *OptoRuntime::dtrace_object_alloc_Type() {
   return TypeFunc::make(domain,range);
 }
 
+#endif
+
 
 JRT_ENTRY_NO_ASYNC(void, OptoRuntime::register_finalizer(oopDesc* obj, JavaThread* thread))
   assert(oopDesc::is_oop(obj), "must be a valid oop");
@@ -1536,6 +1578,7 @@ JRT_END
 
 //-----------------------------------------------------------------------------
 
+#ifndef LEYDEN
 NamedCounter * volatile OptoRuntime::_named_counters = NULL;
 
 //
@@ -1634,6 +1677,9 @@ NamedCounter* OptoRuntime::new_named_counter(JVMState* youngest_jvms, NamedCount
   return c;
 }
 
+#endif
+
+#ifndef LEYDEN
 int trace_exception_counter = 0;
 static void trace_exception(outputStream* st, oop exception_oop, address exception_pc, const char* msg) {
   trace_exception_counter++;
@@ -1656,3 +1702,5 @@ static void trace_exception(outputStream* st, oop exception_oop, address excepti
 
   st->print_raw_cr(tempst.as_string());
 }
+
+#endif
