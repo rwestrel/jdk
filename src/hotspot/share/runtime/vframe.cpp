@@ -375,6 +375,7 @@ static void stack_expressions(StackValueCollection* result,
     result->add(sv);
   }
 }
+
 StackValueCollection* interpretedVFrame::locals() const {
   return stack_data(false);
 }

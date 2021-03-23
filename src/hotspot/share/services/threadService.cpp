@@ -327,11 +327,7 @@ Handle ThreadService::dump_stack_traces(GrowableArray<instanceHandle>* threads,
   // Allocate the resulting StackTraceElement[][] object
 
   ResourceMark rm(THREAD);
-#ifndef LEYDEN
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_StackTraceElement_array(), true, CHECK_NH);
-#else
-  Klass* k = NULL;
-#endif
   ObjArrayKlass* ik = ObjArrayKlass::cast(k);
   objArrayOop r = oopFactory::new_objArray(ik, num_threads, CHECK_NH);
   objArrayHandle result_obj(THREAD, r);

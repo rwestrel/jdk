@@ -338,6 +338,7 @@ Method* compiledVFrame::method() const {
 #endif
 }
 
+
 int compiledVFrame::bci() const {
   int raw = raw_bci();
   return raw == SynchronizationEntryBCI ? 0 : raw;

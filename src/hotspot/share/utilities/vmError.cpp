@@ -690,7 +690,7 @@ void VMError::report(outputStream* st, bool _verbose) {
 #ifndef LEYDEN
   STEP("printing current compile task")
 
-  if (_verbose && _thread && _thread->is_Compiler_thread()) {
+     if (_verbose && _thread && _thread->is_Compiler_thread()) {
         CompilerThread* t = (CompilerThread*)_thread;
         if (t->task()) {
            st->cr();

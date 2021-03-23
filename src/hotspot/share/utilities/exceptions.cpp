@@ -282,11 +282,7 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
   Handle h_exception;
 
   // Resolve exception klass, and check for pending exception below.
-#ifndef LEYDEN
   Klass* klass = SystemDictionary::resolve_or_fail(name, h_loader, h_protection_domain, true, thread);
-#else
-  Klass* klass = NULL;
-#endif
 
   if (!thread->has_pending_exception()) {
     assert(klass != NULL, "klass must exist");
