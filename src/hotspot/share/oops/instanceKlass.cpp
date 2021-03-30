@@ -782,7 +782,7 @@ void InstanceKlass::eager_initialize(Thread *thread) {
     eager_initialize_impl();
   }
 }
-
+#endif
 // JVMTI spec thinks there are signers and protection domain in the
 // instanceKlass.  These accessors pretend these fields are there.
 // The hprof specification also thinks these fields are in InstanceKlass.
@@ -790,7 +790,7 @@ oop InstanceKlass::protection_domain() const {
   // return the protection_domain from the mirror
   return java_lang_Class::protection_domain(java_mirror());
 }
-
+#ifndef LEYDEN
 // To remove these from requires an incompatible change and CCC request.
 objArrayOop InstanceKlass::signers() const {
   // return the signers from the mirror
@@ -1237,7 +1237,6 @@ void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS)
     set_init_state(state);
   }
 }
-#endif
 
 Klass* InstanceKlass::implementor() const {
   Klass* volatile* k = adr_implementor();
@@ -1393,6 +1392,7 @@ bool InstanceKlass::is_same_or_direct_interface(Klass *k) const {
   }
   return false;
 }
+#endif
 
 objArrayOop InstanceKlass::allocate_objArray(int n, int length, TRAPS) {
   check_array_allocation_length(length, arrayOopDesc::max_array_length(T_OBJECT), CHECK_NULL);
@@ -1436,6 +1436,7 @@ instanceHandle InstanceKlass::allocate_instance_handle(TRAPS) {
 }
 
 #ifndef LEYDEN
+
 void InstanceKlass::check_valid_for_instantiation(bool throwError, TRAPS) {
   if (is_interface() || is_abstract()) {
     ResourceMark rm(THREAD);
@@ -1449,6 +1450,7 @@ void InstanceKlass::check_valid_for_instantiation(bool throwError, TRAPS) {
   }
 }
 
+#endif
 Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
   // Need load-acquire for lock-free read
   if (array_klasses_acquire() == NULL) {
@@ -1461,11 +1463,13 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
       MutexLocker ma(THREAD, MultiArray_lock);
 
       // Check if update has already taken place
+#ifndef LEYDEN
       if (array_klasses() == NULL) {
         ObjArrayKlass* k = ObjArrayKlass::allocate_objArray_klass(class_loader_data(), 1, this, CHECK_NULL);
         // use 'release' to pair with lock-free load
         release_set_array_klasses(k);
       }
+#endif
     }
   }
   // _this will always be set at this point
@@ -1479,9 +1483,10 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* InstanceKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, 1, THREAD);
 }
-#endif
 
 static int call_class_initializer_counter = 0;   // for debugging
+
+#ifndef LEYDEN
 
 Method* InstanceKlass::class_initializer() const {
   Method* clinit = find_method(
@@ -1493,14 +1498,12 @@ Method* InstanceKlass::class_initializer() const {
 }
 
 void InstanceKlass::call_class_initializer(TRAPS) {
-#ifndef LEYDEN
   if (ReplayCompiles &&
       (ReplaySuppressInitializers == 1 ||
        (ReplaySuppressInitializers >= 2 && class_loader() != NULL))) {
     // Hide the existence of the initializer for the purpose of replaying the compile
     return;
   }
-#endif
 
   methodHandle h_method(THREAD, class_initializer());
   assert(!is_initialized(), "we cannot initialize twice");
@@ -1519,7 +1522,7 @@ void InstanceKlass::call_class_initializer(TRAPS) {
   }
 }
 
-#ifndef LEYDEN
+
 void InstanceKlass::mask_for(const methodHandle& method, int bci,
   InterpreterOopMap* entry_for) {
   // Lazily create the _oop_map_cache at first request
@@ -1635,7 +1638,7 @@ bool InstanceKlass::find_field_from_offset(int offset, bool is_static, fieldDesc
   }
   return false;
 }
-#endif
+
 
 void InstanceKlass::methods_do(void f(Method* method)) {
   // Methods aren't stable until they are loaded.  This can be read outside
@@ -1652,7 +1655,7 @@ void InstanceKlass::methods_do(void f(Method* method)) {
   }
 }
 
-#ifndef LEYDEN
+
 void InstanceKlass::do_local_static_fields(FieldClosure* cl) {
   for (JavaFieldStream fs(this); !fs.done(); fs.next()) {
     if (fs.access_flags().is_static()) {
@@ -1707,7 +1710,7 @@ void InstanceKlass::do_nonstatic_fields(FieldClosure* cl) {
   }
   FREE_C_HEAP_ARRAY(int, fields_sorted);
 }
-#endif
+
 
 void InstanceKlass::array_klasses_do(void f(Klass* k, TRAPS), TRAPS) {
   if (array_klasses() != NULL)
@@ -1718,6 +1721,7 @@ void InstanceKlass::array_klasses_do(void f(Klass* k)) {
   if (array_klasses() != NULL)
     array_klasses()->array_klasses_do(f);
 }
+#endif
 
 #ifdef ASSERT
 static int linear_search(const Array<Method*>* methods,
@@ -1963,6 +1967,7 @@ int InstanceKlass::find_method_index(const Array<Method*>* methods,
   return -1;
 }
 
+#ifndef LEYDEN
 int InstanceKlass::find_method_by_name(const Symbol* name, int* end) const {
   return find_method_by_name(methods(), name, end);
 }
@@ -1981,7 +1986,7 @@ int InstanceKlass::find_method_by_name(const Array<Method*>* methods,
   }
   return -1;
 }
-
+#endif
 // uncached_lookup_method searches both the local class methods array and all
 // superclasses methods arrays, skipping any overpass methods in superclasses,
 // and possibly skipping private methods.
@@ -2005,7 +2010,7 @@ Method* InstanceKlass::uncached_lookup_method(const Symbol* name,
   }
   return NULL;
 }
-
+#ifndef LEYDEN
 #ifdef ASSERT
 // search through class hierarchy and return true if this class or
 // one of the superclasses was redefined
@@ -2019,6 +2024,7 @@ bool InstanceKlass::has_redefined_this_or_super() const {
   }
   return false;
 }
+#endif
 #endif
 
 // lookup a method in the default methods list then in all transitive interfaces
@@ -2093,6 +2099,8 @@ u2 InstanceKlass::enclosing_method_data(int offset) const {
   return inner_class_list->at(index + offset);
 }
 
+#ifndef LEYDEN
+
 void InstanceKlass::set_enclosing_method_indices(u2 class_index,
                                                  u2 method_index) {
   Array<jushort>* inner_class_list = inner_classes();
@@ -2106,8 +2114,6 @@ void InstanceKlass::set_enclosing_method_indices(u2 class_index,
       index + enclosing_method_method_index_offset, method_index);
   }
 }
-
-#ifndef LEYDEN
 
 // Lookup or create a jmethodID.
 // This code is called by the VMThread and JavaThreads so the
@@ -2324,14 +2330,11 @@ jmethodID InstanceKlass::jmethod_id_or_null(Method* method) {
   return id;
 }
 
-#endif
-
 inline DependencyContext InstanceKlass::dependencies() {
   DependencyContext dep_context(&_dep_context, &_dep_context_last_cleaned);
   return dep_context;
 }
 
-#ifndef LEYDEN
 int InstanceKlass::mark_dependent_nmethods(KlassDepChange& changes) {
   return dependencies().mark_dependent_nmethods(changes);
 }
@@ -2397,7 +2400,6 @@ void InstanceKlass::clean_method_data() {
     }
   }
 }
-#endif
 
 bool InstanceKlass::supers_have_passed_fingerprint_checks() {
   if (java_super() != NULL && !java_super()->has_passed_fingerprint_check()) {
@@ -2470,6 +2472,7 @@ void InstanceKlass::store_fingerprint(uint64_t fingerprint) {
   }
 }
 
+#endif
 void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   Klass::metaspace_pointers_do(it);
 
@@ -2479,8 +2482,8 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   }
 
   it->push(&_annotations);
-  it->push((Klass**)&_array_klasses);
 #ifndef LEYDEN
+  it->push((Klass**)&_array_klasses);
   it->push(&_constants);
 #endif
   it->push(&_inner_classes);
@@ -2491,6 +2494,7 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_default_methods);
   it->push(&_local_interfaces);
   it->push(&_transitive_interfaces);
+#ifndef LEYDEN
   it->push(&_method_ordering);
   it->push(&_default_vtable_indices);
   it->push(&_fields);
@@ -2514,6 +2518,7 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   }
 
   it->push(&_nest_members);
+#endif
   it->push(&_permitted_subclasses);
   it->push(&_record_components);
 }
@@ -2797,8 +2802,6 @@ void InstanceKlass::set_source_debug_extension(const char* array, int length) {
   }
 }
 
-#endif
-
 const char* InstanceKlass::signature_name() const {
   int hash_len = 0;
   char hash_buf[40];
@@ -2845,6 +2848,7 @@ const char* InstanceKlass::signature_name() const {
   return dest;
 }
 
+#endif
 ModuleEntry* InstanceKlass::module() const {
   // For an unsafe anonymous class return the host class' module
   if (is_unsafe_anonymous()) {
@@ -3140,7 +3144,7 @@ InstanceKlass* InstanceKlass::compute_enclosing_class(bool* inner_is_member, TRA
   Reflection::check_for_inner_class(outer_klass, this, *inner_is_member, CHECK_NULL);
   return outer_klass;
 }
-
+#endif
 jint InstanceKlass::compute_modifier_flags(TRAPS) const {
   jint access = access_flags().as_int();
 
@@ -3154,7 +3158,11 @@ jint InstanceKlass::compute_modifier_flags(TRAPS) const {
 
     // only look at classes that are already loaded
     // since we are looking for the flags for our self.
+#ifndef LEYDEN
     Symbol* inner_name = constants()->klass_name_at(ioff);
+#else
+    Symbol* inner_name = NULL;
+#endif
     if (name() == inner_name) {
       // This is really a member class.
       access = iter.inner_access_flags();
@@ -3164,9 +3172,7 @@ jint InstanceKlass::compute_modifier_flags(TRAPS) const {
   // Remember to strip ACC_SUPER bit
   return (access & (~JVM_ACC_SUPER)) & JVM_ACC_WRITTEN_FLAGS;
 }
-
-#endif
-
+#ifndef LEYDEN
 jint InstanceKlass::jvmti_class_status() const {
   jint result = 0;
 
@@ -3183,6 +3189,8 @@ jint InstanceKlass::jvmti_class_status() const {
   }
   return result;
 }
+
+#endif
 
 Method* InstanceKlass::method_at_itable(Klass* holder, int index, TRAPS) {
   itableOffsetEntry* ioe = (itableOffsetEntry*)start_of_itable();
@@ -3390,6 +3398,8 @@ static const char* state_names[] = {
   "allocated", "loaded", "linked", "being_initialized", "fully_initialized", "initialization_error"
 };
 
+#ifndef LEYDEN
+
 static void print_vtable(intptr_t* start, int len, outputStream* st) {
   for (int i = 0; i < len; i++) {
     intptr_t e = start[i];
@@ -3542,13 +3552,19 @@ void InstanceKlass::print_on(outputStream* st) const {
   st->cr();
 }
 
+#endif
+
 #endif //PRODUCT
+
+#ifndef LEYDEN
 
 void InstanceKlass::print_value_on(outputStream* st) const {
   assert(is_klass(), "must be klass");
   if (Verbose || WizardMode)  access_flags().print_on(st);
   name()->print_value_on(st);
 }
+
+#endif
 
 #ifndef PRODUCT
 #ifndef LEYDEN
@@ -3562,7 +3578,6 @@ void FieldPrinter::do_field(fieldDescriptor* fd) {
      _st->cr();
    }
 }
-#endif
 
 
 void InstanceKlass::oop_print_on(oop obj, outputStream* st) {
@@ -3620,7 +3635,11 @@ bool InstanceKlass::verify_itable_index(int i) {
   return true;
 }
 
+#endif
+
 #endif //PRODUCT
+
+#ifndef LEYDEN
 
 void InstanceKlass::oop_print_value_on(oop obj, outputStream* st) {
   st->print("a ");
@@ -3685,7 +3704,6 @@ const char* InstanceKlass::internal_name() const {
   return external_name();
 }
 
-#ifndef LEYDEN
 void InstanceKlass::print_class_load_logging(ClassLoaderData* loader_data,
                                              const ModuleEntry* module_entry,
                                              const ClassFileStream* cfs) const {
@@ -3797,6 +3815,7 @@ class VerifyFieldClosure: public BasicOopIterateClosure {
 };
 
 void InstanceKlass::verify_on(outputStream* st) {
+#ifndef LEYDEN
 #ifndef PRODUCT
   // Avoid redundant verifies, this really should be in product.
   if (_verify_count == Universe::verify_count()) return;
@@ -3916,12 +3935,15 @@ void InstanceKlass::verify_on(outputStream* st) {
   if (anonymous_host != NULL) {
     guarantee(anonymous_host->is_klass(), "should be klass");
   }
+#endif
 }
 
 void InstanceKlass::oop_verify_on(oop obj, outputStream* st) {
   Klass::oop_verify_on(obj, st);
+#ifndef LEYDEN
   VerifyFieldClosure blk;
   obj->oop_iterate(&blk);
+#endif
 }
 
 
@@ -3975,8 +3997,6 @@ void JNIid::verify(Klass* holder) {
   }
 }
 
-#endif
-
 void InstanceKlass::set_init_state(ClassState state) {
 #ifdef ASSERT
   bool good_state = is_shared() ? (_init_state <= state)
@@ -3986,6 +4006,8 @@ void InstanceKlass::set_init_state(ClassState state) {
   assert(_init_thread == NULL, "should be cleared before state change");
   _init_state = (u1)state;
 }
+
+#endif
 
 #if INCLUDE_JVMTI
 
@@ -4290,7 +4312,7 @@ unsigned char * InstanceKlass::get_cached_class_file_bytes() {
   return VM_RedefineClasses::get_cached_class_file_bytes(_cached_class_file);
 }
 #endif
-
+#ifndef LEYDEN
 void InstanceKlass::log_to_classlist(const ClassFileStream* stream) const {
 #if INCLUDE_CDS
   if (ClassListWriter::is_enabled()) {
@@ -4345,3 +4367,5 @@ void InstanceKlass::log_to_classlist(const ClassFileStream* stream) const {
   }
 #endif // INCLUDE_CDS
 }
+
+#endif

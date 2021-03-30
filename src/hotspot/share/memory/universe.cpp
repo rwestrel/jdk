@@ -337,7 +337,6 @@ void Universe::genesis(TRAPS) {
 
 #ifndef LEYDEN
     vmSymbols::initialize(CHECK);
-    vmSymbols::initialize(CHECK);
     SystemDictionary::initialize(CHECK);
 #endif
     // Create string constants
@@ -394,8 +393,10 @@ void Universe::genesis(TRAPS) {
   // ordinary object arrays, _objectArrayKlass will be loaded when
   // SystemDictionary::initialize(CHECK); is run. See the extra check
   // for Object_klass_loaded in objArrayKlassKlass::allocate_objArray_klass_impl.
+#ifndef LEYDEN
   _objectArrayKlassObj = InstanceKlass::
     cast(vmClasses::Object_klass())->array_klass(1, CHECK);
+#endif
   // OLD
   // Add the class to the class hierarchy manually to make sure that
   // its vtable is initialized after core bootstrapping is completed.

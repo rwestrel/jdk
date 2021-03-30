@@ -279,7 +279,6 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
   }
 }
 
-
 // Returns true iff super_method can be overridden by a method in targetclassname
 // See JLS 3rd edition 8.4.6.1
 // Assumes name-signature match
@@ -1319,7 +1318,6 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
   }
 }
 
-
 #if INCLUDE_JVMTI
 // search the itable for uses of either obsolete or EMCP methods
 void klassItable::adjust_method_entries(bool * trace_name_printed) {
@@ -1505,6 +1503,7 @@ void klassItable::setup_itable_offset_table(InstanceKlass* klass) {
 #endif
 
 void klassVtable::verify(outputStream* st, bool forced) {
+#ifndef LEYDEN
   // make sure table is initialized
   if (!Universe::is_fully_initialized()) return;
 #ifndef PRODUCT
@@ -1530,6 +1529,7 @@ void klassVtable::verify(outputStream* st, bool forced) {
       verify_against(st, &vt, i);
     }
   }
+#endif
 }
 
 void klassVtable::verify_against(outputStream* st, klassVtable* vt, int index) {

@@ -32,38 +32,40 @@
 // It contains the type and size of the elements
 
 class TypeArrayKlass : public ArrayKlass {
-  friend class VMStructs;
+#ifndef LEYDEN
 
+  friend class VMStructs;
+#endif
  public:
   static const KlassID ID = TypeArrayKlassID;
 
  private:
   jint _max_length;            // maximum number of elements allowed in an array
 
+#ifndef LEYDEN
   // Constructor
   TypeArrayKlass(BasicType type, Symbol* name);
-#ifndef LEYDEN
   static TypeArrayKlass* allocate(ClassLoaderData* loader_data, BasicType type, Symbol* name, TRAPS);
 #endif
  public:
+#ifndef LEYDEN
   TypeArrayKlass() {} // For dummy objects.
-
+#endif
   // instance variables
   jint max_length()                     { return _max_length; }
+#ifndef LEYDEN
   void set_max_length(jint m)           { _max_length = m;    }
-
+#endif
   // testers
   DEBUG_ONLY(bool is_typeArray_klass_slow() const  { return true; })
-
-  // klass allocation
 #ifndef LEYDEN
+  // klass allocation
   static TypeArrayKlass* create_klass(BasicType type, const char* name_str,
                                TRAPS);
   static TypeArrayKlass* create_klass(BasicType type, TRAPS) {
     return create_klass(type, external_name(type), THREAD);
   }
 #endif
-
   int oop_size(oop obj) const;
 
   // Allocation
@@ -98,12 +100,10 @@ class TypeArrayKlass : public ArrayKlass {
 
  protected:
   // Find n'th dimensional array
-#ifndef LEYDEN
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
  public:
   static TypeArrayKlass* cast(Klass* k) {
@@ -114,7 +114,7 @@ class TypeArrayKlass : public ArrayKlass {
     assert(k->is_typeArray_klass(), "cast to TypeArrayKlass");
     return static_cast<const TypeArrayKlass*>(k);
   }
-
+#ifndef LEYDEN
   // Naming
   static const char* external_name(BasicType type);
 
@@ -136,9 +136,12 @@ class TypeArrayKlass : public ArrayKlass {
 
  public:
   const char* internal_name() const;
-
+#endif
   ModuleEntry* module() const;
+#ifndef LEYDEN
   PackageEntry* package() const;
+
+#endif
 };
 
 #endif // SHARE_OOPS_TYPEARRAYKLASS_HPP

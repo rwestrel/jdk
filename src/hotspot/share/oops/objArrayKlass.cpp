@@ -313,7 +313,7 @@ void ObjArrayKlass::copy_array(arrayOop s, int src_pos, arrayOop d,
 }
 
 
-#ifndef LEYDEN
+
 Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 
   assert(dimension() <= n, "check order of chain");
@@ -331,6 +331,7 @@ Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
       MutexLocker mu(THREAD, MultiArray_lock);
 
       // Check if another thread beat us
+#ifndef LEYDEN
       if (higher_dimension() == NULL) {
 
         // Create multi-dim klass object and link them together
@@ -342,6 +343,7 @@ Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
         release_set_higher_dimension(ak);
         assert(ak->is_objArray_klass(), "incorrect initialization of ObjArrayKlass");
       }
+#endif
     }
   }
 
@@ -356,7 +358,8 @@ Klass* ObjArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* ObjArrayKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, dimension() +  1, THREAD);
 }
-#endif
+
+#ifndef LEYDEN
 
 bool ObjArrayKlass::can_be_primary_super_slow() const {
   if (!bottom_klass()->can_be_primary_super())
@@ -394,6 +397,7 @@ GrowableArray<Klass*>* ObjArrayKlass::compute_secondary_supers(int num_extra_slo
 void ObjArrayKlass::initialize(TRAPS) {
   bottom_klass()->initialize(THREAD);  // dispatches to either InstanceKlass or TypeArrayKlass
 }
+#endif
 
 void ObjArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   ArrayKlass::metaspace_pointers_do(it);
@@ -421,7 +425,7 @@ ModuleEntry* ObjArrayKlass::module() const {
   // The array is defined in the module of its bottom class
   return bottom_klass()->module();
 }
-
+#ifndef LEYDEN
 PackageEntry* ObjArrayKlass::package() const {
   assert(bottom_klass() != NULL, "ObjArrayKlass returned unexpected NULL bottom_klass");
   return bottom_klass()->package();
@@ -486,7 +490,7 @@ const char* ObjArrayKlass::internal_name() const {
   return external_name();
 }
 
-
+#endif
 // Verification
 
 void ObjArrayKlass::verify_on(outputStream* st) {

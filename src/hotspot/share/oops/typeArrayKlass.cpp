@@ -174,7 +174,6 @@ void TypeArrayKlass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos
 }
 
 // create a klass of array holding typeArrays
-#ifndef LEYDEN
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
   int dim = dimension();
   assert(dim <= n, "check order of chain");
@@ -191,6 +190,7 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
       // Atomic create higher dimension and link into list
       MutexLocker mu(THREAD, MultiArray_lock);
 
+#ifndef LEYDEN
       if (higher_dimension() == NULL) {
         Klass* oak = ObjArrayKlass::allocate_objArray_klass(
               class_loader_data(), dim + 1, this, CHECK_NULL);
@@ -200,6 +200,7 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
         release_set_higher_dimension(h_ak);
         assert(h_ak->is_objArray_klass(), "incorrect initialization of ObjArrayKlass");
       }
+#endif
     }
   }
 
@@ -214,14 +215,13 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, dimension() +  1, THREAD);
 }
-#endif
 
 int TypeArrayKlass::oop_size(oop obj) const {
   assert(obj->is_typeArray(),"must be a type array");
   typeArrayOop t = typeArrayOop(obj);
   return t->object_size();
 }
-
+#ifndef LEYDEN
 void TypeArrayKlass::initialize(TRAPS) {
   // Nothing to do. Having this function is handy since objArrayKlasses can be
   // initialized by calling initialize on their bottom_klass, see ObjArrayKlass::initialize
@@ -354,12 +354,14 @@ void TypeArrayKlass::oop_print_on(oop obj, outputStream* st) {
 const char* TypeArrayKlass::internal_name() const {
   return Klass::external_name();
 }
-
+#endif
 // A TypeArrayKlass is an array of a primitive type, its defining module is java.base
 ModuleEntry* TypeArrayKlass::module() const {
   return ModuleEntryTable::javabase_moduleEntry();
 }
-
+#ifndef LEYDEN
 PackageEntry* TypeArrayKlass::package() const {
   return NULL;
 }
+
+#endif

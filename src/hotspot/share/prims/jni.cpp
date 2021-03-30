@@ -1601,6 +1601,8 @@ DEFINE_CALLSTATICMETHOD(jdouble,  Double,  T_DOUBLE
                         , HOTSPOT_JNI_CALLSTATICDOUBLEMETHOD_ENTRY(env, cls, (uintptr_t)methodID),
                         HOTSPOT_JNI_CALLSTATICDOUBLEMETHOD_RETURN());
 
+#ifndef LEYDEN
+
 #define DEFINE_CALLSTATICMETHODV(ResultType, Result, Tag \
                                 , EntryProbe, ResultProbe) \
 \
@@ -1625,6 +1627,33 @@ JNI_ENTRY(ResultType, \
   ret = jvalue.get_##ResultType(); \
   return ret;\
 JNI_END
+
+#else
+#define DEFINE_CALLSTATICMETHODV(ResultType, Result, Tag \
+                                , EntryProbe, ResultProbe) \
+\
+  DT_RETURN_MARK_DECL_FOR(Result, CallStatic##Result##MethodV, ResultType \
+                          , ResultProbe);                               \
+\
+JNI_ENTRY(ResultType, \
+          jni_CallStatic##Result##MethodV(JNIEnv *env, jclass cls, jmethodID methodID, va_list args)) \
+\
+  EntryProbe; \
+  ResultType ret = 0;\
+  DT_RETURN_MARK_FOR(Result, CallStatic##Result##MethodV, ResultType, \
+                     (const ResultType&)ret);\
+\
+  JavaValue jvalue(Tag); \
+  JNI_ArgumentPusherVaArg ap(methodID, args); \
+  /* Make sure class is initialized before trying to invoke its method */ \
+  Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls)); \
+  jni_invoke_static(env, &jvalue, NULL, JNI_STATIC, methodID, &ap, CHECK_0); \
+  va_end(args); \
+  ret = jvalue.get_##ResultType(); \
+  return ret;\
+JNI_END
+
+#endif
 
 // the runtime type of subword integral basic types is integer
 DEFINE_CALLSTATICMETHODV(jboolean, Boolean, T_BOOLEAN
@@ -2290,6 +2319,7 @@ JNI_END
 // Object Array Operations
 //
 
+#ifndef LEYDEN
 DT_RETURN_MARK_DECL(NewObjectArray, jobjectArray
                     , HOTSPOT_JNI_NEWOBJECTARRAY_RETURN(_ret_ref));
 
@@ -2310,6 +2340,7 @@ JNI_ENTRY(jobjectArray, jni_NewObjectArray(JNIEnv *env, jsize length, jclass ele
   ret = (jobjectArray) JNIHandles::make_local(THREAD, result);
   return ret;
 JNI_END
+#endif
 
 DT_RETURN_MARK_DECL(GetObjectArrayElement, jobject
                     , HOTSPOT_JNI_GETOBJECTARRAYELEMENT_RETURN(_ret_ref));
@@ -2701,10 +2732,8 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
   }
   return ret;
 JNI_END
-#endif
 
 
-#ifndef LEYDEN
 JNI_ENTRY(jint, jni_UnregisterNatives(JNIEnv *env, jclass clazz))
  HOTSPOT_JNI_UNREGISTERNATIVES_ENTRY(env, clazz);
   Klass* k   = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz));
@@ -3375,7 +3404,11 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     jni_GetArrayLength,
 
+#ifndef LEYDEN
     jni_NewObjectArray,
+#else
+        NULL,
+#endif
     jni_GetObjectArrayElement,
     jni_SetObjectArrayElement,
 

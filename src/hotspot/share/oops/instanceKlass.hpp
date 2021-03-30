@@ -74,6 +74,8 @@ class InterpreterOopMap;
 class PackageEntry;
 class ModuleEntry;
 
+#ifndef LEYDEN
+
 // This is used in iterators below.
 class FieldClosure: public StackObj {
 public:
@@ -91,6 +93,7 @@ class FieldPrinter: public FieldClosure {
    void do_field(fieldDescriptor* fd);
 };
 #endif  // !PRODUCT
+#endif
 
 // Describes where oops are located in instances of this klass.
 class OopMapBlock {
@@ -129,8 +132,9 @@ class OopMapBlock {
   int  _offset;
   uint _count;
 };
-
+#ifndef LEYDEN
 struct JvmtiCachedClassFileData;
+#endif
 
 class InstanceKlass: public Klass {
   friend class VMStructs;
@@ -140,13 +144,14 @@ class InstanceKlass: public Klass {
 
  public:
   static const KlassID ID = InstanceKlassID;
-
+#ifndef LEYDEN
  protected:
   InstanceKlass(const ClassFileParser& parser, unsigned kind, KlassID id = ID);
 
  public:
   InstanceKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
 
+#endif
   // See "The Java Virtual Machine Specification" section 2.16.2-5 for a detailed description
   // of the class loading & initialization procedure, and the use of the states.
   enum ClassState {
@@ -161,20 +166,22 @@ class InstanceKlass: public Klass {
  private:
 #ifndef LEYDEN
   static InstanceKlass* allocate_instance_klass(const ClassFileParser& parser, TRAPS);
-#endif
 
  protected:
   // If you add a new field that points to any metaspace object, you
   // must add this field to InstanceKlass::metaspace_pointers_do().
 
+#endif
   // Annotations for this class
   Annotations*    _annotations;
   // Package this class is defined in
   PackageEntry*   _package_entry;
   // Array classes holding elements of this class.
   ObjArrayKlass* volatile _array_klasses;
+#ifndef LEYDEN
   // Constant pool for this class.
   ConstantPool* _constants;
+#endif
   // The InnerClasses attribute and EnclosingMethod attribute. The
   // _inner_classes is an array of shorts. If the class has InnerClasses
   // attribute, then the _inner_classes array begins with 4-tuples of shorts
@@ -187,12 +194,12 @@ class InstanceKlass: public Klass {
   // and EnclosingMethod attributes the _inner_classes array length is
   // number_of_inner_classes * 4 + enclosing_method_attribute_size.
   Array<jushort>* _inner_classes;
-
+#ifndef LEYDEN
   // The NestMembers attribute. An array of shorts, where each is a
   // class info index for the class that is a nest member. This data
   // has not been validated.
   Array<jushort>* _nest_members;
-
+#endif
   // Resolved nest-host klass: either true nest-host or self if we are not
   // nested, or an error occurred resolving or validating the nominated
   // nest-host. Can also be set directly by JDK API's that establish nest
@@ -206,7 +213,7 @@ class InstanceKlass: public Klass {
 
   // The contents of the Record attribute.
   Array<RecordComponent*>* _record_components;
-
+#ifndef LEYDEN
   // the source debug extension for this klass, NULL if not specified.
   // Specified as UTF-8 string without terminating zero byte in the classfile,
   // it is stored in the instanceklass as a NULL-terminated UTF-8 string
@@ -215,9 +222,11 @@ class InstanceKlass: public Klass {
   // Number of heapOopSize words used by non-static fields in this klass
   // (including inherited fields but after header_size()).
   int             _nonstatic_field_size;
+#endif
   int             _static_field_size;    // number words used by static fields (oop and non-oop) in this klass
 
   int             _nonstatic_oop_map_size;// size in words of nonstatic oop map blocks
+#ifndef LEYDEN
   int             _itable_len;           // length of Java itable (in words)
 
   // The NestHost attribute. The class info index for the class
@@ -226,7 +235,9 @@ class InstanceKlass: public Klass {
   u2              _this_class_index;              // constant pool entry
 
   u2              _static_oop_field_count;// number of static oop fields in this klass
+#endif
   u2              _java_fields_count;    // The number of declared Java fields
+#ifndef LEYDEN
 
   volatile u2     _idnum_allocated_count;         // JNI/JVMTI: increments with the addition of methods, old ids don't change
 
@@ -237,6 +248,7 @@ class InstanceKlass: public Klass {
   // Class states are defined as ClassState (see above).
   // Place the _init_state here to utilize the unused 2-byte after
   // _idnum_allocated_count.
+#endif
   u1              _init_state;                    // state of class
 
   // This can be used to quickly discriminate among the four kinds of
@@ -268,14 +280,18 @@ class InstanceKlass: public Klass {
     _misc_is_being_redefined                  = 1 << 14, // used for locking redefinition
     _misc_has_contended_annotations           = 1 << 15  // has @Contended annotation
   };
+#ifndef LEYDEN
   u2 shared_loader_type_bits() const {
     return _misc_is_shared_boot_class|_misc_is_shared_platform_class|_misc_is_shared_app_class;
   }
+#endif
   u2              _misc_flags;           // There is more space in access_flags for more flags.
-
+#ifndef LEYDEN
   Thread*         _init_thread;          // Pointer to current thread doing initialization (to handle recursive initialization)
   OopMapCache*    volatile _oop_map_cache;   // OopMapCache for all methods in the klass (allocated lazily)
+#endif
   JNIid*          _jni_ids;              // First JNI identifier for static fields in this class
+#ifndef LEYDEN
   jmethodID*      volatile _methods_jmethod_ids;  // jmethodIDs corresponding to method_idnum, or NULL if none
   nmethodBucket*  volatile _dep_context;          // packed DependencyContext structure
   uint64_t        volatile _dep_context_last_cleaned;
@@ -294,7 +310,7 @@ class InstanceKlass: public Klass {
 #endif
 
   NOT_PRODUCT(int _verify_count;)  // to avoid redundant verifies
-
+#endif
   // Method array.
   Array<Method*>* _methods;
   // Default Method Array, concrete methods inherited from interfaces
@@ -303,6 +319,7 @@ class InstanceKlass: public Klass {
   Array<InstanceKlass*>* _local_interfaces;
   // Interfaces (InstanceKlass*s) this class implements transitively.
   Array<InstanceKlass*>* _transitive_interfaces;
+#ifndef LEYDEN
   // Int array containing the original order of method in the class file (for JVMTI).
   Array<int>*     _method_ordering;
   // Int array containing the vtable_indices for default_methods
@@ -345,10 +362,12 @@ class InstanceKlass: public Klass {
   //
 
   friend class SystemDictionary;
+#endif
 
   static bool _disable_method_binary_search;
 
  public:
+#ifndef LEYDEN
   // The three BUILTIN class loader types
   bool is_shared_boot_class() const {
     return (_misc_flags & _misc_is_shared_boot_class) != 0;
@@ -386,8 +405,9 @@ class InstanceKlass: public Klass {
   // field sizes
   int nonstatic_field_size() const         { return _nonstatic_field_size; }
   void set_nonstatic_field_size(int size)  { _nonstatic_field_size = size; }
-
+#endif
   int static_field_size() const            { return _static_field_size; }
+#ifndef LEYDEN
   void set_static_field_size(int size)     { _static_field_size = size; }
 
   int static_oop_field_count() const       { return (int)_static_oop_field_count; }
@@ -396,45 +416,48 @@ class InstanceKlass: public Klass {
   // Java itable
   int  itable_length() const               { return _itable_len; }
   void set_itable_length(int len)          { _itable_len = len; }
-
+#endif
   // array klasses
   ObjArrayKlass* array_klasses() const     { return _array_klasses; }
   inline ObjArrayKlass* array_klasses_acquire() const; // load with acquire semantics
+#ifndef LEYDEN
   void set_array_klasses(ObjArrayKlass* k) { _array_klasses = k; }
   inline void release_set_array_klasses(ObjArrayKlass* k); // store with release semantics
-
+#endif
   // methods
   Array<Method*>* methods() const          { return _methods; }
+#ifndef LEYDEN
   void set_methods(Array<Method*>* a)      { _methods = a; }
+#endif
   Method* method_with_idnum(int idnum);
   Method* method_with_orig_idnum(int idnum);
   Method* method_with_orig_idnum(int idnum, int version);
 
+#ifndef LEYDEN
   // method ordering
   Array<int>* method_ordering() const     { return _method_ordering; }
   void set_method_ordering(Array<int>* m) { _method_ordering = m; }
-#ifndef LEYDEN
   void copy_method_ordering(const intArray* m, TRAPS);
 #endif
-
   // default_methods
   Array<Method*>* default_methods() const  { return _default_methods; }
+#ifndef LEYDEN
   void set_default_methods(Array<Method*>* a) { _default_methods = a; }
 
   // default method vtable_indices
   Array<int>* default_vtable_indices() const { return _default_vtable_indices; }
   void set_default_vtable_indices(Array<int>* v) { _default_vtable_indices = v; }
-#ifndef LEYDEN
   Array<int>* create_new_default_vtable_indices(int len, TRAPS);
 #endif
-
   // interfaces
   Array<InstanceKlass*>* local_interfaces() const          { return _local_interfaces; }
+#ifndef LEYDEN
   void set_local_interfaces(Array<InstanceKlass*>* a)      {
     guarantee(_local_interfaces == NULL || a == NULL, "Just checking");
     _local_interfaces = a; }
-
+#endif
   Array<InstanceKlass*>* transitive_interfaces() const     { return _transitive_interfaces; }
+#ifndef LEYDEN
   void set_transitive_interfaces(Array<InstanceKlass*>* a) {
     guarantee(_transitive_interfaces == NULL || a == NULL, "Just checking");
     _transitive_interfaces = a;
@@ -442,13 +465,9 @@ class InstanceKlass: public Klass {
 
  private:
   friend class fieldDescriptor;
-
-#ifndef LEYDEN
-
   FieldInfo* field(int index) const { return FieldInfo::from_field_array(_fields, index); }
 
 #endif
-
  public:
 #ifndef LEYDEN
 
@@ -458,19 +477,20 @@ class InstanceKlass: public Klass {
   Symbol* field_signature   (int index) const { return field(index)->signature(constants()); }
 
 #endif
-
   // Number of Java declared fields
   int java_fields_count() const           { return (int)_java_fields_count; }
 
+#ifndef LEYDEN
   Array<u2>* fields() const            { return _fields; }
   void set_fields(Array<u2>* f, u2 java_fields_count) {
     guarantee(_fields == NULL || f == NULL, "Just checking");
     _fields = f;
     _java_fields_count = java_fields_count;
   }
-
+#endif
   // inner classes
   Array<u2>* inner_classes() const       { return _inner_classes; }
+#ifndef LEYDEN
   void set_inner_classes(Array<u2>* f)   { _inner_classes = f; }
 
   // nest members
@@ -488,8 +508,9 @@ class InstanceKlass: public Klass {
   void set_record_components(Array<RecordComponent*>* record_components) {
     _record_components = record_components;
   }
+#endif
   bool is_record() const;
-
+#ifndef LEYDEN
   // permitted subclasses
   Array<u2>* permitted_subclasses() const     { return _permitted_subclasses; }
   void set_permitted_subclasses(Array<u2>* s) { _permitted_subclasses = s; }
@@ -497,20 +518,24 @@ class InstanceKlass: public Klass {
 private:
   // Called to verify that k is a member of this nest - does not look at k's nest-host
   bool has_nest_member(InstanceKlass* k, TRAPS) const;
-
+#endif
 public:
+#ifndef LEYDEN
   // Used to construct informative IllegalAccessError messages at a higher level,
   // if there was an issue resolving or validating the nest host.
   // Returns NULL if there was no error.
   const char* nest_host_error(TRAPS);
+#endif
   // Returns nest-host class, resolving and validating it if needed.
   // Returns NULL if resolution is not possible from the calling context.
   InstanceKlass* nest_host(TRAPS);
   // Check if this klass is a nestmate of k - resolves this nest-host and k's
   bool has_nestmate_access_to(InstanceKlass* k, TRAPS);
+#ifndef LEYDEN
 
   // Called to verify that k is a permitted subclass of this class
   bool has_as_permitted_subclass(const InstanceKlass* k) const;
+#endif
 
   enum InnerClassAttributeOffset {
     // From http://mirror.eng/products/jdk/1.1/docs/guide/innerclasses/spec/innerclasses.doc10.html#18814
@@ -526,12 +551,13 @@ public:
     enclosing_method_method_index_offset = 1,
     enclosing_method_attribute_size = 2
   };
-
+#ifndef LEYDEN
   // package
   PackageEntry* package() const     { return _package_entry; }
+#endif
   ModuleEntry* module() const;
-
   bool in_unnamed_package() const   { return (_package_entry == NULL); }
+#ifndef LEYDEN
   void set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS);
   // If the package for the InstanceKlass is in the boot loader's package entry
   // table then sets the classpath_index field so that
@@ -555,21 +581,23 @@ public:
   static void check_prohibited_package(Symbol* class_name,
                                        ClassLoaderData* loader_data,
                                        TRAPS);
+#endif
  public:
   // initialization state
   bool is_loaded() const                   { return _init_state >= loaded; }
   bool is_linked() const                   { return _init_state >= linked; }
   bool is_initialized() const              { return _init_state == fully_initialized; }
+#ifndef LEYDEN
   bool is_not_initialized() const          { return _init_state <  being_initialized; }
   bool is_being_initialized() const        { return _init_state == being_initialized; }
   bool is_in_error_state() const           { return _init_state == initialization_error; }
   bool is_reentrant_initialization(Thread *thread)  { return thread == _init_thread; }
   ClassState  init_state()                 { return (ClassState)_init_state; }
   bool is_rewritten() const                { return (_misc_flags & _misc_rewritten) != 0; }
-
+#endif
   // is this a sealed class
   bool is_sealed() const;
-
+#ifndef LEYDEN
   // defineClass specified verification
   bool should_verify_class() const         {
     return (_misc_flags & _misc_should_verify_class) != 0;
@@ -585,25 +613,23 @@ public:
   // marking
   bool is_marked_dependent() const         { return _is_marked_dependent; }
   void set_is_marked_dependent(bool value) { _is_marked_dependent = value; }
-
+#endif
   // initialization (virtuals from Klass)
   bool should_be_initialized() const;  // means that initialize should be called
 #ifndef LEYDEN
   void initialize(TRAPS);
   void link_class(TRAPS);
   bool link_class_or_fail(TRAPS); // returns false on failure
-#endif
   void rewrite_class(TRAPS);
   void link_methods(TRAPS);
   Method* class_initializer() const;
 
   // set the class to initialized if no static initializer is present
-#ifndef LEYDEN
   void eager_initialize(Thread *thread);
 #endif
-
   // reference type
   ReferenceType reference_type() const     { return (ReferenceType)_reference_type; }
+#ifndef LEYDEN
   void set_reference_type(ReferenceType t) {
     assert(t == (u1)t, "overflow");
     _reference_type = (u1)t;
@@ -615,8 +641,6 @@ public:
 
   static ByteSize reference_type_offset() { return in_ByteSize(offset_of(InstanceKlass, _reference_type)); }
 
-#ifndef LEYDEN
-
   // find local field, returns true if found
   bool find_local_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
   // find field in direct superinterfaces, returns the interface in which the field is defined
@@ -626,13 +650,13 @@ public:
   // find instance or static fields according to JVM spec 5.4.3.2, returns the klass in which the field is defined
   Klass* find_field(Symbol* name, Symbol* sig, bool is_static, fieldDescriptor* fd) const;
 
-#endif
-
   // find a non-static or static field given its offset within the class.
   bool contains_field_offset(int offset);
-
+#endif
   bool find_local_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
+#ifndef LEYDEN
   bool find_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
+#endif
 
  private:
   inline static int quick_search(const Array<Method*>* methods, const Symbol* name);
@@ -685,7 +709,6 @@ public:
                                  OverpassLookupMode overpass_mode,
                                  PrivateLookupMode private_mode = PrivateLookupMode::find) const;
 
-
   // lookup a method in all the interfaces that this class implements
   // (returns NULL if not found)
   Method* lookup_method_in_all_interfaces(Symbol* name, Symbol* signature, DefaultsLookupMode defaults_mode) const;
@@ -694,6 +717,7 @@ public:
   // (returns NULL if not found)
   Method* lookup_method_in_ordered_interfaces(Symbol* name, Symbol* signature) const;
 
+#ifndef LEYDEN
   // Find method indices by name.  If a method with the specified name is
   // found the index to the first method is returned, and 'end' is filled in
   // with the index of first non-name-matching method.  If no method is found
@@ -705,23 +729,22 @@ public:
   // constant pool
   ConstantPool* constants() const        { return _constants; }
   void set_constants(ConstantPool* c)    { _constants = c; }
-
-#ifndef LEYDEN
-
+#endif
   // protection domain
   oop protection_domain() const;
-
-#endif
-
+#ifndef LEYDEN
   // signers
   objArrayOop signers() const;
-
+#endif
   // host class
   inline InstanceKlass* unsafe_anonymous_host() const;
+#ifndef LEYDEN
   inline void set_unsafe_anonymous_host(const InstanceKlass* host);
+#endif
   bool is_unsafe_anonymous() const                {
     return (_misc_flags & _misc_is_unsafe_anonymous) != 0;
   }
+#ifndef LEYDEN
   void set_is_unsafe_anonymous(bool value)        {
     if (value) {
       _misc_flags |= _misc_is_unsafe_anonymous;
@@ -740,7 +763,7 @@ public:
       _misc_flags &= ~_misc_is_contended;
     }
   }
-
+#endif
   // source file name
 #ifndef LEYDEN
 
@@ -754,21 +777,9 @@ public:
   u2 source_file_name_index() const              { return _constants->source_file_name_index(); }
   void set_source_file_name_index(u2 sourcefile_index) { _constants->set_source_file_name_index(sourcefile_index); }
 
-#endif
-
   // minor and major version numbers of class file
-  u2 minor_version() const                 {
-#ifndef LEYDEN
-    return _constants->minor_version();
-#else
-    return 0;
-#endif
-  }
-
-#ifndef LEYDEN
-
+  u2 minor_version() const                 { return _constants->minor_version(); }
   void set_minor_version(u2 minor_version) { _constants->set_minor_version(minor_version); }
-
 #endif
   u2 major_version() const                 {
 #ifndef LEYDEN
@@ -782,8 +793,6 @@ public:
 
   void set_major_version(u2 major_version) { _constants->set_major_version(major_version); }
 
-#endif
-
   // source debug extension
   const char* source_debug_extension() const { return _source_debug_extension; }
   void set_source_debug_extension(const char* array, int length);
@@ -792,9 +801,11 @@ public:
   static int nonstatic_oop_map_size(unsigned int oop_map_count) {
     return oop_map_count * OopMapBlock::size_in_words();
   }
+#endif
   unsigned int nonstatic_oop_map_count() const {
     return _nonstatic_oop_map_size / OopMapBlock::size_in_words();
   }
+#ifndef LEYDEN
   int nonstatic_oop_map_size() const { return _nonstatic_oop_map_size; }
   void set_nonstatic_oop_map_size(int words) {
     _nonstatic_oop_map_size = words;
@@ -832,7 +843,7 @@ public:
 #else
   InstanceKlass* previous_versions() const { return NULL; }
 #endif
-
+#endif
   InstanceKlass* get_klass_version(int version) {
 #ifndef LEYDEN
     for (InstanceKlass* ik = this; ik != NULL; ik = ik->previous_versions()) {
@@ -843,7 +854,7 @@ public:
 #endif
     return NULL;
   }
-
+#ifndef LEYDEN
   bool has_been_redefined() const {
     return (_misc_flags & _misc_has_been_redefined) != 0;
   }
@@ -889,7 +900,7 @@ private:
   void set_kind(unsigned kind) {
     _kind = (u1)kind;
   }
-
+#endif
   bool is_kind(unsigned desired) const {
     return _kind == (u1)desired;
   }
@@ -901,6 +912,7 @@ public:
   bool is_reference_instance_klass() const    { return is_kind(_kind_reference); }
   bool is_mirror_instance_klass() const       { return is_kind(_kind_mirror); }
   bool is_class_loader_instance_klass() const { return is_kind(_kind_class_loader); }
+#ifndef LEYDEN
 
 #if INCLUDE_JVMTI
 
@@ -974,14 +986,10 @@ public:
   void set_initial_method_idnum(u2 value)             { _idnum_allocated_count = value; }
 
   // generics support
-#ifndef LEYDEN
-
   Symbol* generic_signature() const                   { return _constants->generic_signature(); }
   u2 generic_signature_index() const                  { return _constants->generic_signature_index(); }
   void set_generic_signature_index(u2 sig_index)      { _constants->set_generic_signature_index(sig_index); }
-
 #endif
-
   u2 enclosing_method_data(int offset) const;
   u2 enclosing_method_class_index() const {
     return enclosing_method_data(enclosing_method_class_index_offset);
@@ -989,6 +997,7 @@ public:
   u2 enclosing_method_method_index() {
     return enclosing_method_data(enclosing_method_method_index_offset);
   }
+#ifndef LEYDEN
   void set_enclosing_method_indices(u2 class_index,
                                     u2 method_index);
 
@@ -1006,19 +1015,24 @@ public:
   // annotations support
   Annotations* annotations() const          { return _annotations; }
   void set_annotations(Annotations* anno)   { _annotations = anno; }
-
+#endif
   AnnotationArray* class_annotations() const {
     return (_annotations != NULL) ? _annotations->class_annotations() : NULL;
   }
+#ifndef LEYDEN
   Array<AnnotationArray*>* fields_annotations() const {
     return (_annotations != NULL) ? _annotations->fields_annotations() : NULL;
   }
+#endif
   AnnotationArray* class_type_annotations() const {
     return (_annotations != NULL) ? _annotations->class_type_annotations() : NULL;
   }
+#ifndef LEYDEN
   Array<AnnotationArray*>* fields_type_annotations() const {
     return (_annotations != NULL) ? _annotations->fields_type_annotations() : NULL;
   }
+#endif
+
   // allocation
   instanceOop allocate_instance(TRAPS);
   static instanceOop allocate_instance(oop cls, TRAPS);
@@ -1030,13 +1044,11 @@ public:
   // Helper function
   static instanceOop register_finalizer(instanceOop i, TRAPS);
 
-  // Check whether reflection/jni/jvm code is allowed to instantiate this class;
-  // if not, throw either an Error or an Exception.
 #ifndef LEYDEN
 
+  // Check whether reflection/jni/jvm code is allowed to instantiate this class;
+  // if not, throw either an Error or an Exception.
   virtual void check_valid_for_instantiation(bool throwError, TRAPS);
-
-#endif
 
   // initialization
   void call_class_initializer(TRAPS);
@@ -1046,12 +1058,12 @@ public:
   OopMapCache* oop_map_cache()               { return _oop_map_cache; }
   void set_oop_map_cache(OopMapCache *cache) { _oop_map_cache = cache; }
   void mask_for(const methodHandle& method, int bci, InterpreterOopMap* entry);
-
+#endif
   // JNI identifier support (for static fields - for jni performance)
   JNIid* jni_ids()                               { return _jni_ids; }
   void set_jni_ids(JNIid* ids)                   { _jni_ids = ids; }
   JNIid* jni_id_for(int offset);
-
+#ifndef LEYDEN
   // maintenance of deoptimization dependencies
   inline DependencyContext dependencies();
   int  mark_dependent_nmethods(KlassDepChange& changes);
@@ -1101,11 +1113,12 @@ public:
   GrowableArray<Klass*>* compute_secondary_supers(int num_extra_slots,
                                                   Array<InstanceKlass*>* transitive_interfaces);
   bool can_be_primary_super_slow() const;
+#endif
   int oop_size(oop obj)  const             { return size_helper(); }
   // slow because it's a virtual call and used for verifying the layout_helper.
   // Using the layout_helper bits, we can call is_instance_klass without a virtual call.
   DEBUG_ONLY(bool is_instance_klass_slow() const      { return true; })
-
+#ifndef LEYDEN
   // Iterators
   void do_local_static_fields(FieldClosure* cl);
   void do_nonstatic_fields(FieldClosure* cl); // including inherited fields
@@ -1114,7 +1127,7 @@ public:
   void methods_do(void f(Method* method));
   void array_klasses_do(void f(Klass* k));
   void array_klasses_do(void f(Klass* k, TRAPS), TRAPS);
-
+#endif
   static InstanceKlass* cast(Klass* k) {
     return const_cast<InstanceKlass*>(cast(const_cast<const Klass*>(k)));
   }
@@ -1131,7 +1144,7 @@ public:
 
   // Sizing (in words)
   static int header_size()            { return sizeof(InstanceKlass)/wordSize; }
-
+#ifndef LEYDEN
   static int size(int vtable_length, int itable_length,
                   int nonstatic_oop_map_size,
                   bool is_interface, bool is_unsafe_anonymous, bool has_stored_fingerprint) {
@@ -1151,6 +1164,7 @@ public:
                                                has_stored_fingerprint());
   }
 
+#endif
   inline intptr_t* start_of_itable() const;
   inline intptr_t* end_of_itable() const;
   inline int itable_offset_in_words() const;
@@ -1161,13 +1175,14 @@ public:
 
   inline Klass* volatile* adr_implementor() const;
   inline InstanceKlass** adr_unsafe_anonymous_host() const;
+#ifndef LEYDEN
   inline address adr_fingerprint() const;
-
+#endif
   // Use this to return the size of an instance in heap words:
   int size_helper() const {
     return layout_helper_to_size_helper(layout_helper());
   }
-
+#ifndef LEYDEN
   // This bit is initialized in classFileParser.cpp.
   // It is false under any of the following conditions:
   //  - the class is abstract (including any interface)
@@ -1180,8 +1195,11 @@ public:
 
   // Java itable
   klassItable itable() const;        // return klassItable wrapper
+#endif
+
   Method* method_at_itable(Klass* holder, int index, TRAPS);
 
+#ifndef LEYDEN
 #if INCLUDE_JVMTI
   void adjust_default_methods(bool* trace_name_printed);
 #endif // INCLUDE_JVMTI
@@ -1207,20 +1225,12 @@ public:
 
   // The constant pool is on stack if any of the methods are executing or
   // referenced by handles.
-#ifndef LEYDEN
-
   bool on_stack() const { return _constants->on_stack(); }
-
-#endif
 
   // callbacks for actions during class unloading
   static void unload_class(InstanceKlass* ik);
 
-#ifndef LEYDEN
-
   virtual void release_C_heap_structures();
-
-#endif
 
   // Naming
   const char* signature_name() const;
@@ -1228,7 +1238,7 @@ public:
   // Oop fields (and metadata) iterators
   //
   // The InstanceKlass iterators also visits the Object's klass.
-
+#endif
   // Forward iteration
  public:
   // Iterate over all oop fields in the oop maps.
@@ -1273,8 +1283,7 @@ public:
   // Iterate over all oop fields in one oop map.
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_oop_map_bounded(OopMapBlock* map, oop obj, OopClosureType* closure, MemRegion mr);
-
-
+#ifndef LEYDEN
  public:
   u2 idnum_allocated_count() const      { return _idnum_allocated_count; }
 
@@ -1299,30 +1308,25 @@ public:
   // cannot lock it (like the mirror).
   // It has to be an object not a Mutex because it's held through java calls.
   oop init_lock() const;
+#endif
 private:
+#ifndef LEYDEN
   void fence_and_clear_init_lock();
 
-#ifndef LEYDEN
   bool link_class_impl                           (TRAPS);
-#endif
   bool verify_code                               (TRAPS);
   void initialize_impl                           (TRAPS);
-#ifndef LEYDEN
   void initialize_super_interfaces               (TRAPS);
-#endif
-#ifndef LEYDEN
   void eager_initialize_impl                     ();
 #endif
   /* jni_id_for_impl for jfieldID only */
   JNIid* jni_id_for_impl                         (int offset);
 
   // Returns the array class for the n'th dimension
-#ifndef LEYDEN
   Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
   // find a local method (returns NULL if not found)
   Method* find_method_impl(const Symbol* name,
@@ -1337,7 +1341,7 @@ private:
                                   OverpassLookupMode overpass_mode,
                                   StaticLookupMode static_mode,
                                   PrivateLookupMode private_mode);
-
+#ifndef LEYDEN
   // Free CHeap allocated fields.
   void release_C_heap_structures_internal();
 
@@ -1350,28 +1354,23 @@ private:
   void log_to_classlist(const ClassFileStream* cfs) const;
 public:
   // CDS support - remove and restore oops from metadata. Oops are not shared.
-#ifndef LEYDEN
-
   virtual void remove_unshareable_info();
   virtual void remove_java_mirror();
-
-#endif
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, PackageEntry* pkg_entry, TRAPS);
   void init_shared_package_entry();
-
-#ifndef LEYDEN
-
+#endif
   // jvm support
   jint compute_modifier_flags(TRAPS) const;
 
-#endif
-
 public:
+#ifndef LEYDEN
   // JVMTI support
   jint jvmti_class_status() const;
+#endif
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
+#ifndef LEYDEN
  public:
   // Printing
 #ifndef PRODUCT
@@ -1390,17 +1389,22 @@ public:
 #endif
 
   const char* internal_name() const;
-
+#endif
   // Verification
   void verify_on(outputStream* st);
 
   void oop_verify_on(oop obj, outputStream* st);
 
+#ifndef LEYDEN
   // Logging
   void print_class_load_logging(ClassLoaderData* loader_data,
                                 const ModuleEntry* module_entry,
                                 const ClassFileStream* cfs) const;
+
+#endif
 };
+
+#ifndef LEYDEN
 
 // for adding methods
 // UNSET_IDNUM return means no more ids available
@@ -1411,7 +1415,7 @@ inline u2 InstanceKlass::next_method_idnum() {
     return _idnum_allocated_count++;
   }
 }
-
+#endif
 
 /* JNIid class for jfieldIDs only */
 class JNIid: public CHeapObj<mtClass> {

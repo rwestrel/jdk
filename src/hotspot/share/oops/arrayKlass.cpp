@@ -40,6 +40,8 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/handles.inline.hpp"
 
+#ifndef LEYDEN
+
 int ArrayKlass::static_size(int header_size) {
   // size of an array klass object
   assert(header_size <= InstanceKlass::header_size(), "bad header size");
@@ -58,19 +60,19 @@ InstanceKlass* ArrayKlass::java_super() const {
   return vmClasses::Object_klass();
 }
 
-
+#endif
 oop ArrayKlass::multi_allocate(int rank, jint* sizes, TRAPS) {
   ShouldNotReachHere();
   return NULL;
 }
-
+#ifndef LEYDEN
 // find field according to JVM spec 5.4.3.2, returns the klass in which the field is defined
 Klass* ArrayKlass::find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const {
   // There are no fields in an array klass but look to the super class (Object)
   assert(super(), "super klass must be present");
   return super()->find_field(name, sig, fd);
 }
-
+#endif
 Method* ArrayKlass::uncached_lookup_method(const Symbol* name,
                                            const Symbol* signature,
                                            OverpassLookupMode overpass_mode,
@@ -115,7 +117,6 @@ void ArrayKlass::complete_create_array_klass(ArrayKlass* k, Klass* super_klass, 
   oop module = (module_entry != NULL) ? module_entry->module() : (oop)NULL;
   java_lang_Class::create_mirror(k, Handle(THREAD, k->class_loader()), Handle(THREAD, module), Handle(), Handle(), CHECK);
 }
-#endif
 
 GrowableArray<Klass*>* ArrayKlass::compute_secondary_supers(int num_extra_slots,
                                                             Array<InstanceKlass*>* transitive_interfaces) {
@@ -126,6 +127,7 @@ GrowableArray<Klass*>* ArrayKlass::compute_secondary_supers(int num_extra_slots,
   set_secondary_supers(Universe::the_array_interfaces_array());
   return NULL;
 }
+#endif
 
 objArrayOop ArrayKlass::allocate_arrayArray(int n, int length, TRAPS) {
   check_array_allocation_length(length, arrayOopDesc::max_array_length(T_ARRAY), CHECK_NULL);
@@ -138,6 +140,7 @@ objArrayOop ArrayKlass::allocate_arrayArray(int n, int length, TRAPS) {
   return o;
 }
 
+#ifndef LEYDEN
 void ArrayKlass::array_klasses_do(void f(Klass* k, TRAPS), TRAPS) {
   Klass* k = this;
   // Iterate over this array klass and all higher dimensions
@@ -155,19 +158,19 @@ void ArrayKlass::array_klasses_do(void f(Klass* k)) {
     k = ArrayKlass::cast(k)->higher_dimension();
   }
 }
-
+#endif
 // JVM support
 
 jint ArrayKlass::compute_modifier_flags(TRAPS) const {
   return JVM_ACC_ABSTRACT | JVM_ACC_FINAL | JVM_ACC_PUBLIC;
 }
-
+#ifndef LEYDEN
 // JVMTI support
 
 jint ArrayKlass::jvmti_class_status() const {
   return JVMTI_CLASS_STATUS_ARRAY;
 }
-
+#endif
 void ArrayKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   Klass::metaspace_pointers_do(it);
 
@@ -206,7 +209,6 @@ void ArrayKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handle p
     ak->restore_unshareable_info(loader_data, protection_domain, CHECK);
   }
 }
-#endif
 
 // Printing
 
@@ -234,6 +236,8 @@ void ArrayKlass::oop_print_on(oop obj, outputStream* st) {
 void ArrayKlass::verify_on(outputStream* st) {
   Klass::verify_on(st);
 }
+
+#endif
 
 void ArrayKlass::oop_verify_on(oop obj, outputStream* st) {
   guarantee(obj->is_array(), "must be array");

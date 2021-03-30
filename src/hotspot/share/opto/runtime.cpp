@@ -213,11 +213,13 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thre
   // These checks are cheap to make and support reflective allocation.
   int lh = klass->layout_helper();
   if (Klass::layout_helper_needs_slow_path(lh) || !InstanceKlass::cast(klass)->is_initialized()) {
+#ifndef LEYDEN
     Handle holder(THREAD, klass->klass_holder()); // keep the klass alive
     klass->check_valid_for_instantiation(false, THREAD);
     if (!HAS_PENDING_EXCEPTION) {
       InstanceKlass::cast(klass)->initialize(THREAD);
     }
+#endif
   }
 
   if (!HAS_PENDING_EXCEPTION) {

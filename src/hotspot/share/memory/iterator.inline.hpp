@@ -38,9 +38,9 @@
 #include "oops/typeArrayKlass.inline.hpp"
 #include "utilities/debug.hpp"
 
-// Defaults to strong claiming.
 #ifndef LEYDEN
 
+// Defaults to strong claiming.
 inline MetadataVisitingOopIterateClosure::MetadataVisitingOopIterateClosure(ReferenceDiscoverer* rd) :
     ClaimMetadataVisitingOopIterateClosure(ClassLoaderData::_claim_strong, rd) {}
 
@@ -136,8 +136,6 @@ inline bool Devirtualizer::do_metadata(OopClosureType* closure) {
 
 // Implementation of the non-virtual do_klass dispatch.
 
-#ifndef LEYDEN
-
 template <typename Receiver, typename Base, typename OopClosureType>
 static typename EnableIf<IsSame<Receiver, Base>::value, void>::type
 call_do_klass(void (Receiver::*)(Klass*), void (Base::*)(Klass*), OopClosureType* closure, Klass* k) {
@@ -169,14 +167,10 @@ call_do_cld(void (Receiver::*)(ClassLoaderData*), void (Base::*)(ClassLoaderData
   closure->OopClosureType::do_cld(cld);
 }
 
-#endif
-
-#ifndef LEYDEN
 template <typename OopClosureType>
 void Devirtualizer::do_cld(OopClosureType* closure, ClassLoaderData* cld) {
   call_do_cld(&OopClosureType::do_cld, &OopIterateClosure::do_cld, closure, cld);
 }
-#endif
 
 // Dispatch table implementation for *Klass::oop_oop_iterate
 //
@@ -256,9 +250,11 @@ private:
 
     Table(){
       set_init_function<InstanceKlass>();
-      set_init_function<InstanceRefKlass>();
 #ifndef LEYDEN
+      set_init_function<InstanceRefKlass>();
+#endif
       set_init_function<InstanceMirrorKlass>();
+#ifndef LEYDEN
       set_init_function<InstanceClassLoaderKlass>();
 #endif
       set_init_function<ObjArrayKlass>();
@@ -318,9 +314,11 @@ private:
 
     Table(){
       set_init_function<InstanceKlass>();
-      set_init_function<InstanceRefKlass>();
 #ifndef LEYDEN
+      set_init_function<InstanceRefKlass>();
+#endif
       set_init_function<InstanceMirrorKlass>();
+#ifndef LEYDEN
       set_init_function<InstanceClassLoaderKlass>();
 #endif
       set_init_function<ObjArrayKlass>();

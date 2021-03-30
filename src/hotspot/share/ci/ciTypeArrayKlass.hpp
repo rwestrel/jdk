@@ -27,6 +27,8 @@
 
 #include "ci/ciArrayKlass.hpp"
 
+#ifndef LEYDEN
+
 // ciTypeArrayKlass
 //
 // This class represents a Klass* in the HotSpot virtual machine
@@ -62,5 +64,7 @@ public:
     return this;
   }
 };
+
+#endif
 
 #endif // SHARE_CI_CITYPEARRAYKLASS_HPP

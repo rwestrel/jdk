@@ -32,9 +32,11 @@
 // ObjArrayKlass is the klass for objArrays
 
 class ObjArrayKlass : public ArrayKlass {
+#ifndef LEYDEN
+
   friend class VMStructs;
   friend class JVMCIVMStructs;
-
+#endif
  public:
   static const KlassID ID = ObjArrayKlassID;
 
@@ -43,26 +45,29 @@ class ObjArrayKlass : public ArrayKlass {
   // must add this field to ObjArrayKlass::metaspace_pointers_do().
   Klass* _element_klass;            // The klass of the elements of this array type
   Klass* _bottom_klass;             // The one-dimensional type (InstanceKlass or TypeArrayKlass)
-
+#ifndef LEYDEN
   // Constructor
   ObjArrayKlass(int n, Klass* element_klass, Symbol* name);
-#ifndef LEYDEN
   static ObjArrayKlass* allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, TRAPS);
 #endif
  public:
+#ifndef LEYDEN
   // For dummy objects
   ObjArrayKlass() {}
-
+#endif
   // Instance variables
   Klass* element_klass() const      { return _element_klass; }
+#ifndef LEYDEN
   void set_element_klass(Klass* k)  { _element_klass = k; }
   Klass** element_klass_addr()      { return &_element_klass; }
-
+#endif
   Klass* bottom_klass() const       { return _bottom_klass; }
+#ifndef LEYDEN
   void set_bottom_klass(Klass* k)   { _bottom_klass = k; }
   Klass** bottom_klass_addr()       { return &_bottom_klass; }
-
+#endif
   ModuleEntry* module() const;
+#ifndef LEYDEN
   PackageEntry* package() const;
 
   // Compiler/Interpreter offset
@@ -72,16 +77,16 @@ class ObjArrayKlass : public ArrayKlass {
   bool can_be_primary_super_slow() const;
   GrowableArray<Klass*>* compute_secondary_supers(int num_extra_slots,
                                                   Array<InstanceKlass*>* transitive_interfaces);
+#endif
   DEBUG_ONLY(bool is_objArray_klass_slow()  const  { return true; })
   int oop_size(oop obj) const;
 
-  // Allocation
 #ifndef LEYDEN
+  // Allocation
   static ObjArrayKlass* allocate_objArray_klass(ClassLoaderData* loader_data,
                                                 int n, Klass* element_klass, TRAPS);
 
 #endif
-
   objArrayOop allocate(int length, TRAPS);
   oop multi_allocate(int rank, jint* sizes, TRAPS);
 
@@ -100,13 +105,12 @@ class ObjArrayKlass : public ArrayKlass {
                arrayOop d, size_t dst_offset,
                int length, TRAPS);
  protected:
-#ifndef LEYDEN
+
   // Returns the ObjArrayKlass for n'th dimension.
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type.
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
  public:
 
@@ -119,13 +123,14 @@ class ObjArrayKlass : public ArrayKlass {
     return static_cast<const ObjArrayKlass*>(k);
   }
 
+#ifndef LEYDEN
   // Sizing
   static int header_size()                { return sizeof(ObjArrayKlass)/wordSize; }
   int size() const                        { return ArrayKlass::static_size(header_size()); }
 
   // Initialization (virtual from Klass)
   void initialize(TRAPS);
-
+#endif
   // Oop fields (and metadata) iterators
   //
   // The ObjArrayKlass iterators also visits the Object's klass.
@@ -162,7 +167,7 @@ class ObjArrayKlass : public ArrayKlass {
  public:
   // JVM support
   jint compute_modifier_flags(TRAPS) const;
-
+#ifndef LEYDEN
  public:
   // Printing
   void print_on(outputStream* st) const;
@@ -174,7 +179,7 @@ class ObjArrayKlass : public ArrayKlass {
 #endif //PRODUCT
 
   const char* internal_name() const;
-
+#endif
   // Verification
   void verify_on(outputStream* st);
 

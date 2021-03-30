@@ -47,6 +47,7 @@ class ClassFileParser;
 // and the pending list lock object in the same class is notified.
 
 
+#ifndef LEYDEN
 class InstanceRefKlass: public InstanceKlass {
   friend class InstanceKlass;
  public:
@@ -137,5 +138,6 @@ class InstanceRefKlass: public InstanceKlass {
   // Verification
   void oop_verify_on(oop obj, outputStream* st);
 };
+#endif
 
 #endif // SHARE_OOPS_INSTANCEREFKLASS_HPP

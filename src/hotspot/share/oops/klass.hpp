@@ -136,17 +136,20 @@ class Klass : public Metadata {
   Klass*      _secondary_super_cache;
   // Array of all secondary supertypes
   Array<Klass*>* _secondary_supers;
+#ifndef LEYDEN
   // Ordered list of all primary supertypes
   Klass*      _primary_supers[_primary_super_limit];
+#endif
   // java/lang/Class instance mirroring this class
   OopHandle   _java_mirror;
   // Superclass
   Klass*      _super;
+#ifndef LEYDEN
   // First subclass (NULL if none); _subklass->next_sibling() is next one
   Klass* volatile _subklass;
   // Sibling link (or NULL); links all subklasses of a klass
   Klass* volatile _next_sibling;
-
+#endif
   // All klasses loaded by a class loader are chained through these links
   Klass*      _next_link;
 
@@ -157,14 +160,15 @@ class Klass : public Metadata {
   jint        _modifier_flags;  // Processed access flags, for use by Class.getModifiers.
   AccessFlags _access_flags;    // Access flags. The class/interface distinction is stored here.
 
+#ifndef LEYDEN
   JFR_ONLY(DEFINE_TRACE_ID_FIELD;)
-
+#endif
   // Biased locking implementation and statistics
   // (the 64-bit chunk goes first, to avoid some fragmentation)
   jlong    _last_biased_lock_bulk_revocation_time;
   markWord _prototype_header;   // Used when biased locking is both enabled and disabled for this type
   jint     _biased_lock_revocation_count;
-
+#ifndef LEYDEN
 private:
   // This is an index into FileMapHeader::_shared_path_table[], to
   // associate this class with the JAR file where it's loaded from during
@@ -182,17 +186,17 @@ private:
 #endif
 
   CDS_JAVA_HEAP_ONLY(int _archived_mirror_index;)
-
+#endif
 protected:
-
+#ifndef LEYDEN
   // Constructor
   Klass(KlassID id);
+#endif
   Klass() : _id(KlassID(-1)) { assert(DumpSharedSpaces || UseSharedSpaces, "only for cds"); }
 
 #ifndef LEYDEN
   void* operator new(size_t size, ClassLoaderData* loader_data, size_t word_size, TRAPS) throw();
 #endif
-
  public:
   int id() { return _id; }
 
@@ -207,27 +211,29 @@ protected:
   // to implement that. NB: the _super of "[Ljava/lang/Integer;" is "[Ljava/lang/Number;"
   // If this is not what your code expects, you're probably looking for Klass::java_super().
   Klass* super() const               { return _super; }
+#ifndef LEYDEN
   void set_super(Klass* k)           { _super = k; }
 
   // initializes _super link, _primary_supers & _secondary_supers arrays
-#ifndef LEYDEN
   void initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interfaces, TRAPS);
-#endif
 
   // klass-specific helper for initializing _secondary_supers
   virtual GrowableArray<Klass*>* compute_secondary_supers(int num_extra_slots,
                                                           Array<InstanceKlass*>* transitive_interfaces);
-
+#endif
   // java_super is the Java-level super type as specified by Class.getSuperClass.
   virtual InstanceKlass* java_super() const  { return NULL; }
 
   juint    super_check_offset() const  { return _super_check_offset; }
+#ifndef LEYDEN
   void set_super_check_offset(juint o) { _super_check_offset = o; }
 
   Klass* secondary_super_cache() const     { return _secondary_super_cache; }
+#endif
   void set_secondary_super_cache(Klass* k) { _secondary_super_cache = k; }
 
   Array<Klass*>* secondary_supers() const { return _secondary_supers; }
+#ifndef LEYDEN
   void set_secondary_supers(Array<Klass*>* k) { _secondary_supers = k; }
 
   // Return the element of the _super chain of the given depth.
@@ -258,9 +264,10 @@ protected:
       return d;
     }
   }
-
+#endif
   // java mirror
   oop java_mirror() const;
+#ifndef LEYDEN
   oop java_mirror_no_keepalive() const;
   void set_java_mirror(Handle m);
 
@@ -273,13 +280,15 @@ protected:
   // Set java mirror OopHandle to NULL for CDS
   // This leaves the OopHandle in the CLD, but that's ok, you can't release them.
   void clear_java_mirror_handle() { _java_mirror = OopHandle(); }
-
+#endif
   // modifier flags
   jint modifier_flags() const          { return _modifier_flags; }
+#ifndef LEYDEN
   void set_modifier_flags(jint flags)  { _modifier_flags = flags; }
-
+#endif
   // size helper
   int layout_helper() const            { return _layout_helper; }
+#ifndef LEYDEN
   void set_layout_helper(int lh)       { _layout_helper = lh; }
 
   // Note: for instances layout_helper() may include padding.
@@ -293,11 +302,14 @@ protected:
   void append_to_sibling_list();           // add newly created receiver to superklass' subklass list
 
   void set_next_link(Klass* k) { _next_link = k; }
+#endif
   Klass* next_link() const { return _next_link; }   // The next klass defined by the class loader.
+#ifndef LEYDEN
   Klass** next_link_addr() { return &_next_link; }
-
+#endif
   // class loader data
   ClassLoaderData* class_loader_data() const               { return _class_loader_data; }
+#ifndef LEYDEN
   void set_class_loader_data(ClassLoaderData* loader_data) {  _class_loader_data = loader_data; }
 
   int shared_classpath_index() const   {
@@ -337,29 +349,32 @@ protected:
     NOT_CDS(return false;)
   }
 
-
+#endif
   // Obtain the module or package for this class
   virtual ModuleEntry* module() const = 0;
+#ifndef LEYDEN
   virtual PackageEntry* package() const = 0;
 
  protected:                                // internal accessors
   void     set_subklass(Klass* s);
   void     set_next_sibling(Klass* s);
-
+#endif
  public:
-
+#ifndef LEYDEN
   // Compiler support
   static ByteSize super_offset()                 { return in_ByteSize(offset_of(Klass, _super)); }
   static ByteSize super_check_offset_offset()    { return in_ByteSize(offset_of(Klass, _super_check_offset)); }
   static ByteSize primary_supers_offset()        { return in_ByteSize(offset_of(Klass, _primary_supers)); }
+#endif
   static ByteSize secondary_super_cache_offset() { return in_ByteSize(offset_of(Klass, _secondary_super_cache)); }
+#ifndef LEYDEN
   static ByteSize secondary_supers_offset()      { return in_ByteSize(offset_of(Klass, _secondary_supers)); }
   static ByteSize java_mirror_offset()           { return in_ByteSize(offset_of(Klass, _java_mirror)); }
   static ByteSize class_loader_data_offset()     { return in_ByteSize(offset_of(Klass, _class_loader_data)); }
   static ByteSize modifier_flags_offset()        { return in_ByteSize(offset_of(Klass, _modifier_flags)); }
   static ByteSize layout_helper_offset()         { return in_ByteSize(offset_of(Klass, _layout_helper)); }
   static ByteSize access_flags_offset()          { return in_ByteSize(offset_of(Klass, _access_flags)); }
-
+#endif
   // Unpacking layout_helper:
   static const int _lh_neutral_value           = 0;  // neutral non-array non-instance value
   static const int _lh_instance_slow_path_bit  = 0x01;
@@ -448,12 +463,13 @@ protected:
   }
   // Out-of-line version computes everything based on the etype:
   static jint array_layout_helper(BasicType etype);
-
+#ifndef LEYDEN
   // What is the maximum number of primary superclasses any klass can have?
   static juint primary_super_limit()         { return _primary_super_limit; }
 
   // vtables
   klassVtable vtable() const;
+#endif
   int vtable_length() const { return _vtable_len; }
 
   // subclass check
@@ -474,6 +490,8 @@ protected:
 
   bool search_secondary_supers(Klass* k) const;
 
+#ifndef LEYDEN
+
   // Find LCA in class hierarchy
   Klass *LCA( Klass *k );
 
@@ -481,14 +499,17 @@ protected:
   // if not, throw either an Error or an Exception.
   virtual void check_valid_for_instantiation(bool throwError, TRAPS);
 
+#endif
   // array copying
   virtual void  copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int length, TRAPS);
+#ifndef LEYDEN
 
   // tells if the class should be initialized
   virtual bool should_be_initialized() const    { return false; }
   // initializes the klass
   virtual void initialize(TRAPS);
   virtual Klass* find_field(Symbol* name, Symbol* signature, fieldDescriptor* fd) const;
+#endif
   virtual Method* uncached_lookup_method(const Symbol* name, const Symbol* signature,
                                          OverpassLookupMode overpass_mode,
                                          PrivateLookupMode = PrivateLookupMode::find) const;
@@ -516,14 +537,7 @@ protected:
   // pointer has been "peeked" and then must be kept alive before it may
   // be used safely.  All uses of klass_holder need to apply the appropriate barriers,
   // except during GC.
-#ifndef LEYDEN
-
   oop klass_holder() const { return class_loader_data()->holder_phantom(); }
-#else
-
-  oop klass_holder() const { return NULL; }
-
-#endif
 
  protected:
   virtual Klass* array_klass_impl(bool or_null, int rank, TRAPS);
@@ -531,26 +545,25 @@ protected:
 
   // Error handling when length > max_length or length < 0
   static void check_array_allocation_length(int length, int max_length, TRAPS);
-
+#ifndef LEYDEN
   void set_vtable_length(int len) { _vtable_len= len; }
-
+#endif
   vtableEntry* start_of_vtable() const;
+#ifndef LEYDEN
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS);
+#endif
  public:
   Method* method_at_vtable(int index);
 
   static ByteSize vtable_start_offset();
+#ifndef LEYDEN
   static ByteSize vtable_length_offset() {
     return byte_offset_of(Klass, _vtable_len);
   }
 
   // CDS support - remove and restore oops from metadata. Oops are not shared.
-#ifndef LEYDEN
-
   virtual void remove_unshareable_info();
   virtual void remove_java_mirror();
-
-#endif
 
   bool is_unshareable_info_restored() const {
     assert(is_shared(), "use this for shared classes only");
@@ -563,7 +576,7 @@ protected:
       return true;
     }
   }
-
+#endif
  public:
   // ALL FUNCTIONS BELOW THIS POINT ARE DISPATCHED FROM AN OOP
   // These functions describe behavior for the oop not the KLASS.
@@ -571,27 +584,29 @@ protected:
   // actual oop size of obj in memory
   virtual int oop_size(oop obj) const = 0;
 
+#ifndef LEYDEN
   // Size of klass in word size.
   virtual int size() const = 0;
-
+#endif
   // Returns the Java name for a class (Resource allocated)
   // For arrays, this returns the name of the element with a leading '['.
   // For classes, this returns the name with the package separators
   //     turned into '.'s.
   const char* external_name() const;
+#ifndef LEYDEN
   // Returns the name for a class (Resource allocated) as the class
   // would appear in a signature.
   // For arrays, this returns the name of the element with a leading '['.
   // For classes, this returns the name with a leading 'L' and a trailing ';'
   //     and the package separators as '/'.
   virtual const char* signature_name() const;
-
+#endif
   const char* joint_in_module_of_loader(const Klass* class2, bool include_parent_loader = false) const;
   const char* class_in_module_of_loader(bool use_are = false, bool include_parent_loader = false) const;
-
+#ifndef LEYDEN
   // Returns "interface", "abstract class" or "class".
   const char* external_kind() const;
-
+#endif
   // type testing operations
 #ifdef ASSERT
  protected:
@@ -629,16 +644,21 @@ protected:
 
   // Access flags
   AccessFlags access_flags() const         { return _access_flags;  }
+#ifndef LEYDEN
   void set_access_flags(AccessFlags flags) { _access_flags = flags; }
 
   bool is_public() const                { return _access_flags.is_public(); }
+#endif
   bool is_final() const                 { return _access_flags.is_final(); }
   bool is_interface() const             { return _access_flags.is_interface(); }
+#ifndef LEYDEN
   bool is_abstract() const              { return _access_flags.is_abstract(); }
   bool is_super() const                 { return _access_flags.is_super(); }
   bool is_synthetic() const             { return _access_flags.is_synthetic(); }
   void set_is_synthetic()               { _access_flags.set_is_synthetic(); }
+#endif
   bool has_finalizer() const            { return _access_flags.has_finalizer(); }
+#ifndef LEYDEN
   bool has_final_method() const         { return _access_flags.has_final_method(); }
   void set_has_finalizer()              { _access_flags.set_has_finalizer(); }
   void set_has_final_method()           { _access_flags.set_has_final_method(); }
@@ -648,21 +668,22 @@ protected:
   void set_has_miranda_methods()        { _access_flags.set_has_miranda_methods(); }
   bool is_shared() const                { return access_flags().is_shared_class(); } // shadows MetaspaceObj::is_shared)()
   void set_is_shared()                  { _access_flags.set_is_shared_class(); }
+#endif
   bool is_hidden() const                { return access_flags().is_hidden_class(); }
-  void set_is_hidden()                  { _access_flags.set_is_hidden_class(); }
-
 #ifndef LEYDEN
-
+  void set_is_hidden()                  { _access_flags.set_is_hidden_class(); }
   bool is_non_strong_hidden() const     { return access_flags().is_hidden_class() &&
                                           class_loader_data()->has_class_mirror_holder(); }
 
 #endif
   bool is_value_based()                 { return _access_flags.is_value_based_class(); }
+#ifndef LEYDEN
   void set_is_value_based()             { _access_flags.set_is_value_based_class(); }
-
+#endif
   bool is_cloneable() const;
+#ifndef LEYDEN
   void set_is_cloneable();
-
+#endif
   // Biased locking support
   // Note: the prototype header is always set up to be at least the
   // prototype markWord. If biased locking is enabled it may further be
@@ -686,11 +707,12 @@ protected:
   void set_biased_lock_revocation_count(int val) { _biased_lock_revocation_count = (jint) val; }
   jlong last_biased_lock_bulk_revocation_time() { return _last_biased_lock_bulk_revocation_time; }
   void  set_last_biased_lock_bulk_revocation_time(jlong cur_time) { _last_biased_lock_bulk_revocation_time = cur_time; }
-
+#ifndef LEYDEN
   JFR_ONLY(DEFINE_TRACE_ID_METHODS;)
-
+#endif
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
+#ifndef LEYDEN
   virtual MetaspaceObj::Type type() const { return ClassType; }
 
   // Iff the class loader (or mirror for unsafe anonymous classes) is alive the
@@ -710,28 +732,29 @@ protected:
   // Return self, except for abstract classes with exactly 1
   // implementor.  Then return the 1 concrete implementation.
   Klass *up_cast_abstract();
-
+#endif
   // klass name
   Symbol* name() const                   { return _name; }
+#ifndef LEYDEN
   void set_name(Symbol* n);
 
   virtual void release_C_heap_structures();
-
+#endif
  public:
   // jvm support
   virtual jint compute_modifier_flags(TRAPS) const;
-
+#ifndef LEYDEN
   // JVMTI support
   virtual jint jvmti_class_status() const;
 
   // Printing
   virtual void print_on(outputStream* st) const;
-
+#endif
   virtual void oop_print_value_on(oop obj, outputStream* st);
   virtual void oop_print_on      (oop obj, outputStream* st);
-
+#ifndef LEYDEN
   virtual const char* internal_name() const = 0;
-
+#endif
   // Verification
   virtual void verify_on(outputStream* st);
   void verify() { verify_on(tty); }

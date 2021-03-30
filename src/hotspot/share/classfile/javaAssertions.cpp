@@ -95,6 +95,8 @@ void JavaAssertions::addOption(const char* name, bool enable) {
   *head = new OptionList(name_copy, enable, *head);
 }
 
+#ifndef LEYDEN
+
 oop JavaAssertions::createAssertionStatusDirectives(TRAPS) {
   Symbol* asd_sym = vmSymbols::java_lang_AssertionStatusDirectives();
   Klass* k = SystemDictionary::resolve_or_fail(asd_sym, true, CHECK_NULL);
@@ -125,6 +127,8 @@ oop JavaAssertions::createAssertionStatusDirectives(TRAPS) {
   java_lang_AssertionStatusDirectives::set_deflt(h(), userClassDefault());
   return h();
 }
+
+#endif
 
 void JavaAssertions::fillJavaArrays(const OptionList* p, int len,
 objArrayHandle names, typeArrayHandle enabled, TRAPS) {

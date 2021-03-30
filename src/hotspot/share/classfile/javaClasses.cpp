@@ -2717,9 +2717,11 @@ oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, TRA
   // Allocate java.lang.StackTraceElement instance
   InstanceKlass* k = vmClasses::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
+#ifndef LEYDEN
   if (k->should_be_initialized()) {
     k->initialize(CHECK_NULL);
   }
+#endif
 
   Handle element = k->allocate_instance_handle(CHECK_NULL);
 
@@ -4289,7 +4291,9 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   assert(_isPrivileged_offset != 0, "offsets should have been initialized");
   assert(_isAuthorized_offset != 0, "offsets should have been initialized");
   // Ensure klass is initialized
+#ifndef LEYDEN
   vmClasses::AccessControlContext_klass()->initialize(CHECK_NULL);
+#endif
   // Allocate result
   oop result = vmClasses::AccessControlContext_klass()->allocate_instance(CHECK_NULL);
   // Fill in values
@@ -4587,6 +4591,7 @@ void java_lang_StackTraceElement::set_classLoaderName(oop element, oop value) {
 void java_lang_StackTraceElement::set_declaringClassObject(oop element, oop value) {
   element->obj_field_put(_declaringClassObject_offset, value);
 }
+
 
 // java_lang_AssertionStatusDirectives
 

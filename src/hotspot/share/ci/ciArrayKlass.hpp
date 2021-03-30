@@ -27,6 +27,8 @@
 
 #include "ci/ciKlass.hpp"
 
+#ifndef LEYDEN
+
 // ciArrayKlass
 //
 // This class, and its subclasses represent Klass*s in the
@@ -58,5 +60,7 @@ public:
 
   static ciArrayKlass* make(ciType* element_type);
 };
+
+#endif
 
 #endif // SHARE_CI_CIARRAYKLASS_HPP

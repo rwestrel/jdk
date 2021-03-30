@@ -27,6 +27,8 @@
 
 #include "ci/ciArrayKlass.hpp"
 
+#ifndef LEYDEN
+
 // ciObjArrayKlass
 //
 // This class represents a Klass* in the HotSpot virtual machine
@@ -76,5 +78,7 @@ public:
 
   virtual ciKlass* exact_klass();
 };
+
+#endif
 
 #endif // SHARE_CI_CIOBJARRAYKLASS_HPP

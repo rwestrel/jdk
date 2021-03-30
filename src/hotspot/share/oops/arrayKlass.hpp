@@ -40,47 +40,53 @@ class ArrayKlass: public Klass {
   int      _dimension;         // This is n'th-dimensional array.
   Klass* volatile _higher_dimension;  // Refers the (n+1)'th-dimensional array (if present).
   Klass* volatile _lower_dimension;   // Refers the (n-1)'th-dimensional array (if present).
-
+#ifndef LEYDEN
  protected:
   // Constructors
   // The constructor with the Symbol argument does the real array
   // initialization, the other is a dummy
   ArrayKlass(Symbol* name, KlassID id);
   ArrayKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for cds"); }
-
+#endif
  public:
   // Testing operation
   DEBUG_ONLY(bool is_array_klass_slow() const { return true; })
 
   // Instance variables
   int dimension() const                 { return _dimension;      }
+#ifndef LEYDEN
   void set_dimension(int dimension)     { _dimension = dimension; }
-
+#endif
   Klass* higher_dimension() const     { return _higher_dimension; }
   inline Klass* higher_dimension_acquire() const; // load with acquire semantics
-  void set_higher_dimension(Klass* k) { _higher_dimension = k; }
-  inline void release_set_higher_dimension(Klass* k); // store with release semantics
+#ifndef LEYDEN
 
+  void set_higher_dimension(Klass* k) { _higher_dimension = k; }
+
+#endif
+  inline void release_set_higher_dimension(Klass* k); // store with release semantics
   Klass* lower_dimension() const      { return _lower_dimension; }
+#ifndef LEYDEN
   void set_lower_dimension(Klass* k)  { _lower_dimension = k; }
 
   // offset of first element, including any padding for the sake of alignment
   int  array_header_in_bytes() const    { return layout_helper_header_size(layout_helper()); }
+#endif
   int  log2_element_size() const        { return layout_helper_log2_element_size(layout_helper()); }
   // type of elements (T_OBJECT for both oop arrays and array-arrays)
   BasicType element_type() const        { return layout_helper_element_type(layout_helper()); }
-
+#ifndef LEYDEN
   virtual InstanceKlass* java_super() const;
-
+#endif
   // Allocation
   // Sizes points to the first dimension of the array, subsequent dimensions
   // are always in higher memory.  The callers of these set that up.
   virtual oop multi_allocate(int rank, jint* sizes, TRAPS);
   objArrayOop allocate_arrayArray(int n, int length, TRAPS);
-
+#ifndef LEYDEN
   // find field according to JVM spec 5.4.3.2, returns the klass in which the field is defined
   Klass* find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
-
+#endif
   // Lookup operations
   Method* uncached_lookup_method(const Symbol* name,
                                  const Symbol* signature,
@@ -95,37 +101,32 @@ class ArrayKlass: public Klass {
     assert(k->is_array_klass(), "cast to ArrayKlass");
     return static_cast<const ArrayKlass*>(k);
   }
-
+#ifndef LEYDEN
   GrowableArray<Klass*>* compute_secondary_supers(int num_extra_slots,
                                                   Array<InstanceKlass*>* transitive_interfaces);
 
   // Sizing
   static int static_size(int header_size);
-
+#endif
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
+#ifndef LEYDEN
   // Iterators
   void array_klasses_do(void f(Klass* k));
   void array_klasses_do(void f(Klass* k, TRAPS), TRAPS);
 
   // Return a handle.
-#ifndef LEYDEN
   static void     complete_create_array_klass(ArrayKlass* k, Klass* super_klass, ModuleEntry* module, TRAPS);
 #endif
-
   // jvm support
   jint compute_modifier_flags(TRAPS) const;
-
+#ifndef LEYDEN
   // JVMTI support
   jint jvmti_class_status() const;
 
   // CDS support - remove and restore oops from metadata. Oops are not shared.
-#ifndef LEYDEN
-
   virtual void remove_unshareable_info();
   virtual void remove_java_mirror();
-
-#endif
   void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, TRAPS);
 
   // Printing
@@ -136,7 +137,7 @@ class ArrayKlass: public Klass {
 
   // Verification
   void verify_on(outputStream* st);
-
+#endif
   void oop_verify_on(oop obj, outputStream* st);
 };
 

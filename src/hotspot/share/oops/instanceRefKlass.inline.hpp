@@ -36,36 +36,30 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
+
 template <typename T, class OopClosureType, class Contains>
 void InstanceRefKlass::do_referent(oop obj, OopClosureType* closure, Contains& contains) {
-#ifndef LEYDEN
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr_raw(obj);
   if (contains(referent_addr)) {
     Devirtualizer::do_oop(closure, referent_addr);
   }
-#endif
 }
 
 template <typename T, class OopClosureType, class Contains>
 void InstanceRefKlass::do_discovered(oop obj, OopClosureType* closure, Contains& contains) {
-#ifndef LEYDEN
   T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr_raw(obj);
   if (contains(discovered_addr)) {
     Devirtualizer::do_oop(closure, discovered_addr);
   }
-#endif
 }
 
 static inline oop load_referent(oop obj, ReferenceType type) {
-#ifndef LEYDEN
   if (type == REF_PHANTOM) {
     return HeapAccess<ON_PHANTOM_OOP_REF | AS_NO_KEEPALIVE>::oop_load(java_lang_ref_Reference::referent_addr_raw(obj));
   } else {
     return HeapAccess<ON_WEAK_OOP_REF | AS_NO_KEEPALIVE>::oop_load(java_lang_ref_Reference::referent_addr_raw(obj));
   }
-#else
-  return NULL;
-#endif
 }
 
 template <typename T, class OopClosureType>
@@ -188,7 +182,6 @@ void InstanceRefKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure,
 #ifdef ASSERT
 template <typename T>
 void InstanceRefKlass::trace_reference_gc(const char *s, oop obj) {
-#ifndef LEYDEN
   T* referent_addr   = (T*) java_lang_ref_Reference::referent_addr_raw(obj);
   T* discovered_addr = (T*) java_lang_ref_Reference::discovered_addr_raw(obj);
 
@@ -202,8 +195,8 @@ void InstanceRefKlass::trace_reference_gc(const char *s, oop obj) {
   }
   log_develop_trace(gc, ref)("     discovered_addr/* " PTR_FORMAT " / " PTR_FORMAT,
       p2i(discovered_addr), p2i((oop)HeapAccess<AS_NO_KEEPALIVE>::oop_load(discovered_addr)));
-#endif
 }
+#endif
 #endif
 
 #endif // SHARE_OOPS_INSTANCEREFKLASS_INLINE_HPP

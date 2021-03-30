@@ -34,18 +34,18 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
+#ifndef LEYDEN
+
 template <typename T, class OopClosureType>
 inline void InstanceClassLoaderKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
   InstanceKlass::oop_oop_iterate<T>(obj, closure);
 
   if (Devirtualizer::do_metadata(closure)) {
-#ifndef LEYDEN
     ClassLoaderData* cld = java_lang_ClassLoader::loader_data_raw(obj);
     // cld can be null if we have a non-registered class loader.
     if (cld != NULL) {
       Devirtualizer::do_cld(closure, cld);
     }
-#endif
   }
 }
 
@@ -63,15 +63,15 @@ inline void InstanceClassLoaderKlass::oop_oop_iterate_bounded(oop obj, OopClosur
 
   if (Devirtualizer::do_metadata(closure)) {
     if (mr.contains(obj)) {
-#ifndef LEYDEN
       ClassLoaderData* cld = java_lang_ClassLoader::loader_data_raw(obj);
       // cld can be null if we have a non-registered class loader.
       if (cld != NULL) {
         Devirtualizer::do_cld(closure, cld);
       }
-#endif
     }
   }
 }
+
+#endif
 
 #endif // SHARE_OOPS_INSTANCECLASSLOADERKLASS_INLINE_HPP

@@ -48,6 +48,8 @@ inline InstanceKlass* InstanceKlass::unsafe_anonymous_host() const {
     return *hk;
   }
 }
+#ifndef LEYDEN
+
 
 inline void InstanceKlass::set_unsafe_anonymous_host(const InstanceKlass* host) {
   assert(is_unsafe_anonymous(), "not unsafe anonymous");
@@ -57,16 +59,25 @@ inline void InstanceKlass::set_unsafe_anonymous_host(const InstanceKlass* host) 
     *addr = host;
   }
 }
-
+#endif
 inline intptr_t* InstanceKlass::start_of_itable()   const { return (intptr_t*)start_of_vtable() + vtable_length(); }
+
+#ifndef LEYDEN
+
 inline intptr_t* InstanceKlass::end_of_itable()     const { return start_of_itable() + itable_length(); }
+
+#endif
 
 inline int InstanceKlass::itable_offset_in_words() const { return start_of_itable() - (intptr_t*)this; }
 
 inline oop InstanceKlass::static_field_base_raw() { return java_mirror(); }
 
 inline OopMapBlock* InstanceKlass::start_of_nonstatic_oop_maps() const {
+#ifndef LEYDEN
   return (OopMapBlock*)(start_of_itable() + itable_length());
+#else
+  return NULL;
+#endif
 }
 
 inline Klass** InstanceKlass::end_of_nonstatic_oop_maps() const {
@@ -94,6 +105,7 @@ inline InstanceKlass** InstanceKlass::adr_unsafe_anonymous_host() const {
     return NULL;
   }
 }
+#ifndef LEYDEN
 
 inline address InstanceKlass::adr_fingerprint() const {
   if (has_stored_fingerprint()) {
@@ -112,11 +124,11 @@ inline address InstanceKlass::adr_fingerprint() const {
     return NULL;
   }
 }
-
+#endif
 inline ObjArrayKlass* InstanceKlass::array_klasses_acquire() const {
   return Atomic::load_acquire(&_array_klasses);
 }
-
+#ifndef LEYDEN
 inline void InstanceKlass::release_set_array_klasses(ObjArrayKlass* k) {
   Atomic::release_store(&_array_klasses, k);
 }
@@ -128,7 +140,7 @@ inline jmethodID* InstanceKlass::methods_jmethod_ids_acquire() const {
 inline void InstanceKlass::release_set_methods_jmethod_ids(jmethodID* jmeths) {
   Atomic::release_store(&_methods_jmethod_ids, jmeths);
 }
-
+#endif
 // The iteration over the oops in objects is a hot path in the GC code.
 // By force inlining the following functions, we get similar GC performance
 // as the previous macro based implementation.
@@ -210,11 +222,9 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_oop_maps_bounded(oop obj, OopCl
 
 template <typename T, class OopClosureType>
 ALWAYSINLINE void InstanceKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
-#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
-#endif
 
   oop_oop_iterate_oop_maps<T>(obj, closure);
 }
@@ -229,13 +239,11 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_reverse(oop obj, OopClosureType
 
 template <typename T, class OopClosureType>
 ALWAYSINLINE void InstanceKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
-#ifndef LEYDEN
   if (Devirtualizer::do_metadata(closure)) {
     if (mr.contains(obj)) {
       Devirtualizer::do_klass(closure, this);
     }
   }
-#endif
 
   oop_oop_iterate_oop_maps_bounded<T>(obj, closure, mr);
 }
@@ -247,8 +255,10 @@ inline instanceOop InstanceKlass::allocate_instance(oop java_class, TRAPS) {
     THROW_(vmSymbols::java_lang_InstantiationException(), NULL);
   }
   InstanceKlass* ik = cast(k);
+#ifndef LEYDEN
   ik->check_valid_for_instantiation(false, CHECK_NULL);
   ik->initialize(CHECK_NULL);
+#endif
   return ik->allocate_instance(THREAD);
 }
 

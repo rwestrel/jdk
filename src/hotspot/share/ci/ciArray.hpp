@@ -32,6 +32,8 @@
 #include "oops/objArrayOop.hpp"
 #include "oops/typeArrayOop.hpp"
 
+#ifndef LEYDEN
+
 // ciArray
 //
 // This class represents an arrayOop in the HotSpot virtual
@@ -71,5 +73,7 @@ public:
   // What kind of ciObject is this?
   bool is_array()        { return true; }
 };
+
+#endif
 
 #endif // SHARE_CI_CIARRAY_HPP

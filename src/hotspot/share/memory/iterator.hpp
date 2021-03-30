@@ -370,9 +370,7 @@ class Devirtualizer {
  public:
   template <typename OopClosureType, typename T> static void do_oop(OopClosureType* closure, T* p);
   template <typename OopClosureType>             static void do_klass(OopClosureType* closure, Klass* k);
-#ifndef LEYDEN
   template <typename OopClosureType>             static void do_cld(OopClosureType* closure, ClassLoaderData* cld);
-#endif
   template <typename OopClosureType>             static bool do_metadata(OopClosureType* closure);
 };
 

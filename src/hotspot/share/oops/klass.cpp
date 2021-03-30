@@ -61,7 +61,6 @@ void Klass::set_java_mirror(Handle m) {
   assert(_java_mirror.is_empty(), "should only be used to initialize mirror");
   _java_mirror = class_loader_data()->add_handle(m);
 }
-#endif
 
 oop Klass::java_mirror_no_keepalive() const {
   return _java_mirror.peek();
@@ -70,12 +69,12 @@ oop Klass::java_mirror_no_keepalive() const {
 void Klass::replace_java_mirror(oop mirror) {
   _java_mirror.replace(mirror);
 }
-
+#endif
 bool Klass::is_cloneable() const {
   return _access_flags.is_cloneable_fast() ||
          is_subtype_of(vmClasses::Cloneable_klass());
 }
-
+#ifndef LEYDEN
 void Klass::set_is_cloneable() {
   if (name() == vmSymbols::java_lang_invoke_MemberName()) {
     assert(is_final(), "no subclasses allowed");
@@ -87,7 +86,6 @@ void Klass::set_is_cloneable() {
   }
 }
 
-#ifndef LEYDEN
 void Klass::set_name(Symbol* n) {
   _name = n;
   if (_name != NULL) _name->increment_refcount();
@@ -97,7 +95,6 @@ void Klass::set_name(Symbol* n) {
   }
 }
 #endif
-
 bool Klass::is_subclass_of(const Klass* k) const {
   // Run up the super chain and check
   if (this == k) return true;
@@ -110,11 +107,11 @@ bool Klass::is_subclass_of(const Klass* k) const {
   }
   return false;
 }
-
+#ifndef LEYDEN
 void Klass::release_C_heap_structures() {
   if (_name != NULL) _name->decrement_refcount();
 }
-
+#endif
 bool Klass::search_secondary_supers(Klass* k) const {
   // Put some extra logic here out-of-line, before the search proper.
   // This cuts down the size of the inline method.
@@ -132,7 +129,6 @@ bool Klass::search_secondary_supers(Klass* k) const {
   }
   return false;
 }
-
 #ifndef LEYDEN
 
 // Return self, except for abstract classes with exactly 1
@@ -147,8 +143,6 @@ Klass *Klass::up_cast_abstract() {
   }
   return r;                   // Return the 1 concrete class
 }
-
-#endif
 
 // Find LCA in class hierarchy
 Klass *Klass::LCA( Klass *k2 ) {
@@ -168,6 +162,7 @@ void Klass::check_valid_for_instantiation(bool throwError, TRAPS) {
             : vmSymbols::java_lang_InstantiationException(), external_name());
 }
 
+#endif
 
 void Klass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int length, TRAPS) {
   ResourceMark rm(THREAD);
@@ -176,7 +171,7 @@ void Klass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int len
             err_msg("arraycopy: source type %s is not an array", s->klass()->external_name()));
 }
 
-
+#ifndef LEYDEN
 void Klass::initialize(TRAPS) {
   ShouldNotReachHere();
 }
@@ -190,7 +185,7 @@ Klass* Klass::find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const {
   ShouldNotReachHere();
   return NULL;
 }
-
+#endif
 Method* Klass::uncached_lookup_method(const Symbol* name, const Symbol* signature,
                                       OverpassLookupMode overpass_mode,
                                       PrivateLookupMode private_mode) const {
@@ -207,7 +202,6 @@ Method* Klass::uncached_lookup_method(const Symbol* name, const Symbol* signatur
 void* Klass::operator new(size_t size, ClassLoaderData* loader_data, size_t word_size, TRAPS) throw() {
   return Metaspace::allocate(loader_data, word_size, MetaspaceObj::ClassType, THREAD);
 }
-#endif
 
 // "Normal" instantiation is preceeded by a MetaspaceObj allocation
 // which zeros out memory - calloc equivalent.
@@ -221,7 +215,7 @@ Klass::Klass(KlassID id) : _id(id),
   _primary_supers[0] = this;
   set_super_check_offset(in_bytes(primary_supers_offset()));
 }
-
+#endif
 jint Klass::array_layout_helper(BasicType etype) {
   assert(etype >= T_BOOLEAN && etype <= T_OBJECT, "valid etype");
   // Note that T_ARRAY is not allowed here.
@@ -241,7 +235,7 @@ jint Klass::array_layout_helper(BasicType etype) {
 
   return lh;
 }
-
+#ifndef LEYDEN
 bool Klass::can_be_primary_super_slow() const {
   if (super() == NULL)
     return true;
@@ -251,7 +245,6 @@ bool Klass::can_be_primary_super_slow() const {
     return true;
 }
 
-#ifndef LEYDEN
 void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interfaces, TRAPS) {
   if (k == NULL) {
     set_super(NULL);
@@ -364,7 +357,6 @@ void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interf
     set_secondary_supers(s2);
   }
 }
-#endif
 
 GrowableArray<Klass*>* Klass::compute_secondary_supers(int num_extra_slots,
                                                        Array<InstanceKlass*>* transitive_interfaces) {
@@ -425,7 +417,6 @@ Klass* Klass::next_sibling(bool log) const {
   return NULL;
 }
 
-#ifndef LEYDEN
 void Klass::set_subklass(Klass* s) {
   assert(s != this, "sanity check");
   Atomic::release_store(&_subklass, s);
@@ -525,7 +516,6 @@ void Klass::clean_weak_klass_links(bool unloading_occurred, bool clean_alive_kla
   }
 }
 #endif
-
 void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   if (log_is_enabled(Trace, cds)) {
     ResourceMark rm;
@@ -535,12 +525,16 @@ void Klass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_name);
   it->push(&_secondary_super_cache);
   it->push(&_secondary_supers);
+#ifndef LEYDEN
   for (int i = 0; i < _primary_super_limit; i++) {
     it->push(&_primary_supers[i]);
   }
+#endif
   it->push(&_super);
+#ifndef LEYDEN
   it->push((Klass**)&_subklass);
   it->push((Klass**)&_next_sibling);
+#endif
   it->push(&_next_link);
 
   vtableEntry* vt = start_of_vtable();
@@ -641,7 +635,6 @@ void Klass::restore_unshareable_info(ClassLoaderData* loader_data, Handle protec
     java_lang_Class::create_mirror(this, loader, module_handle, protection_domain, Handle(), CHECK);
   }
 }
-#endif
 
 #if INCLUDE_CDS_JAVA_HEAP
 oop Klass::archived_java_mirror() {
@@ -662,7 +655,7 @@ void Klass::set_archived_java_mirror(oop m) {
   _archived_mirror_index = HeapShared::append_root(m);
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
-
+#endif
 Klass* Klass::array_klass_or_null(int rank) {
   EXCEPTION_MARK;
   // No exception can be thrown by array_klass_impl when called with or_null == true.
@@ -746,7 +739,7 @@ const char* Klass::external_name() const {
   if (name() == NULL)  return "<unknown>";
   return name()->as_klass_external_name();
 }
-
+#ifndef LEYDEN
 const char* Klass::signature_name() const {
   if (name() == NULL)  return "<unknown>";
   if (is_objArray_klass() && ObjArrayKlass::cast(this)->bottom_klass()->is_hidden()) {
@@ -769,7 +762,7 @@ const char* Klass::external_kind() const {
   if (is_abstract()) return "abstract class";
   return "class";
 }
-
+#endif
 // Unless overridden, modifier_flags is 0.
 jint Klass::compute_modifier_flags(TRAPS) const {
   return 0;
@@ -778,7 +771,7 @@ jint Klass::compute_modifier_flags(TRAPS) const {
 int Klass::atomic_incr_biased_lock_revocation_count() {
   return (int) Atomic::add(&_biased_lock_revocation_count, 1);
 }
-
+#ifndef LEYDEN
 // Unless overridden, jvmti_class_status has no flags set.
 jint Klass::jvmti_class_status() const {
   return 0;
@@ -794,11 +787,12 @@ void Klass::print_on(outputStream* st) const {
   print_address_on(st);
   st->cr();
 }
-
+#endif
 #define BULLET  " - "
 
 // Caller needs ResourceMark
 void Klass::oop_print_on(oop obj, outputStream* st) {
+#ifndef LEYDEN
   // print title
   st->print_cr("%s ", internal_name());
   obj->print_address_on(st);
@@ -815,19 +809,23 @@ void Klass::oop_print_on(oop obj, outputStream* st) {
   st->print(BULLET"klass: ");
   obj->klass()->print_value_on(st);
   st->cr();
+#endif
 }
 
 void Klass::oop_print_value_on(oop obj, outputStream* st) {
+#ifndef LEYDEN
   // print title
   ResourceMark rm;              // Cannot print in debug mode without this
   st->print("%s", internal_name());
   obj->print_address_on(st);
+#endif
 }
 
 // Verification
 
 void Klass::verify_on(outputStream* st) {
 
+#ifndef LEYDEN
   // This can be expensive, but it is worth checking that this klass is actually
   // in the CLD graph but not in production.
   assert(Metaspace::contains((address)this), "Should be");
@@ -851,6 +849,7 @@ void Klass::verify_on(outputStream* st) {
   if (java_mirror_no_keepalive() != NULL) {
     guarantee(oopDesc::is_oop(java_mirror_no_keepalive()), "should be instance");
   }
+#endif
 }
 
 void Klass::oop_verify_on(oop obj, outputStream* st) {

@@ -31,6 +31,8 @@
 #include "ci/ciSymbol.hpp"
 #include "oops/instanceKlass.hpp"
 
+#ifndef LEYDEN
+
 // ciInstanceKlass
 //
 // This class represents a Klass* in the HotSpot virtual machine
@@ -304,5 +306,7 @@ public:
   bool debug_stable_field_at(int offset);
 #endif
 };
+
+#endif
 
 #endif // SHARE_CI_CIINSTANCEKLASS_HPP

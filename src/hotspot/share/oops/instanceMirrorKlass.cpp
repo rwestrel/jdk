@@ -36,7 +36,10 @@
 #include "runtime/handles.inline.hpp"
 #include "utilities/macros.hpp"
 
+
+#ifndef LEYDEN
 int InstanceMirrorKlass::_offset_of_static_fields = 0;
+#endif
 
 int InstanceMirrorKlass::instance_size(Klass* k) {
   if (k != NULL && k->is_instance_klass()) {
@@ -59,6 +62,7 @@ int InstanceMirrorKlass::oop_size(oop obj) const {
   return java_lang_Class::oop_size_raw(obj);
 }
 
+#ifndef LEYDEN
 int InstanceMirrorKlass::compute_static_oop_field_count(oop obj) {
   Klass* k = java_lang_Class::as_Klass(obj);
   if (k != NULL && k->is_instance_klass()) {
@@ -71,4 +75,5 @@ int InstanceMirrorKlass::compute_static_oop_field_count(oop obj) {
 void InstanceMirrorKlass::serialize_offsets(SerializeClosure* f) {
   f->do_u4((u4*)&_offset_of_static_fields);
 }
+#endif
 #endif

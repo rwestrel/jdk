@@ -29,7 +29,6 @@
 #include "oops/instanceKlass.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/macros.hpp"
-#if 1 //ndef LEYDEN
 
 class ClassFileParser;
 
@@ -42,6 +41,8 @@ class ClassFileParser;
 
 
 class InstanceMirrorKlass: public InstanceKlass {
+#ifndef LEYDEN
+
   friend class VMStructs;
   friend class InstanceKlass;
 
@@ -52,9 +53,11 @@ class InstanceMirrorKlass: public InstanceKlass {
   static int _offset_of_static_fields;
 
   InstanceMirrorKlass(const ClassFileParser& parser) : InstanceKlass(parser, InstanceKlass::_kind_mirror, ID) {}
-
+#endif
  public:
+#ifndef LEYDEN
   InstanceMirrorKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
+#endif
 
   static InstanceMirrorKlass* cast(Klass* k) {
     return const_cast<InstanceMirrorKlass*>(cast(const_cast<const Klass*>(k)));
@@ -68,6 +71,7 @@ class InstanceMirrorKlass: public InstanceKlass {
   // Returns the size of the instance including the extra static fields.
   virtual int oop_size(oop obj) const;
 
+#ifndef LEYDEN
   // Static field offset is an offset into the Heap, should be converted by
   // based on UseCompressedOop for traversal
   static HeapWord* start_of_static_fields(oop obj) {
@@ -86,12 +90,13 @@ class InstanceMirrorKlass: public InstanceKlass {
 
   int compute_static_oop_field_count(oop obj);
 
+#endif
   // Given a Klass return the size of the instance
   int instance_size(Klass* k);
 
   // allocation
   instanceOop allocate_instance(Klass* k, TRAPS);
-
+#ifndef LEYDEN
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
   // Oop fields (and metadata) iterators
@@ -122,7 +127,8 @@ class InstanceMirrorKlass: public InstanceKlass {
   // Iterate over the static fields.
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_statics_bounded(oop obj, OopClosureType* closure, MemRegion mr);
-};
 #endif
+};
+
 #endif // SHARE_OOPS_INSTANCEMIRRORKLASS_HPP
 

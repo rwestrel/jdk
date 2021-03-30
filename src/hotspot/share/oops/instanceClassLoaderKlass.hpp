@@ -36,6 +36,7 @@ class ClassFileParser;
 // walked and dependent class loaders are kept alive.  I thought we walked
 // the list later?
 
+#ifndef LEYDEN
 class InstanceClassLoaderKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
@@ -67,5 +68,7 @@ public:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 };
+
+#endif
 
 #endif // SHARE_OOPS_INSTANCECLASSLOADERKLASS_HPP

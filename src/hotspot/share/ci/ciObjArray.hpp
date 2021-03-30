@@ -29,6 +29,8 @@
 #include "ci/ciClassList.hpp"
 #include "oops/objArrayOop.hpp"
 
+#ifndef LEYDEN
+
 // ciObjArray
 //
 // This class represents a ObjArrayOop in the HotSpot virtual
@@ -51,5 +53,7 @@ public:
 
   ciObject* obj_at(int index);
 };
+
+#endif
 
 #endif // SHARE_CI_CIOBJARRAY_HPP

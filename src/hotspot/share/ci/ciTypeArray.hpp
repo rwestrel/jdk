@@ -29,6 +29,8 @@
 #include "ci/ciClassList.hpp"
 #include "oops/typeArrayOop.hpp"
 
+#ifndef LEYDEN
+
 // ciTypeArray
 //
 // This class represents a typeArrayOop in the HotSpot virtual
@@ -58,5 +60,7 @@ public:
   jbyte byte_at(int index);
 
 };
+
+#endif
 
 #endif // SHARE_CI_CITYPEARRAY_HPP

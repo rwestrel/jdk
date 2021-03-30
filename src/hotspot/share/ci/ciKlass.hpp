@@ -28,6 +28,8 @@
 #include "ci/ciType.hpp"
 #include "oops/klass.hpp"
 
+#ifndef LEYDEN
+
 // ciKlass
 //
 // This class and its subclasses represent Klass*s in the
@@ -130,5 +132,7 @@ public:
 
   const char* external_name() const;
 };
+
+#endif
 
 #endif // SHARE_CI_CIKLASS_HPP
