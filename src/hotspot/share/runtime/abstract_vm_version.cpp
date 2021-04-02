@@ -127,10 +127,7 @@ const char* Abstract_VM_Version::vm_info_string() {
     case Arguments::_int:
       return UseSharedSpaces ? "interpreted mode, sharing" : "interpreted mode";
     case Arguments::_mixed:
-    case Arguments::_comp:
-      ShouldNotReachHere();
 #ifndef LEYDEN
-#if HAS_COMPILER
       if (UseSharedSpaces) {
         if (UseAOT) {
           return "mixed mode, aot, sharing";
@@ -153,7 +150,6 @@ const char* Abstract_VM_Version::vm_info_string() {
          return UseSharedSpaces ? "compiled mode, emulated-client, sharing" : "compiled mode, emulated-client";
       }
       return UseSharedSpaces ? "compiled mode, sharing" : "compiled mode";
-#endif
 #endif
   }
   ShouldNotReachHere();

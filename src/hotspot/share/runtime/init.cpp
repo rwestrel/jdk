@@ -156,7 +156,6 @@ jint init_globals() {
   if (!compileBroker_init()) {
     return JNI_EINVAL;
   }
-  dependencyContext_init();
 #endif
 #if INCLUDE_JVMCI
   if (EnableJVMCI) {

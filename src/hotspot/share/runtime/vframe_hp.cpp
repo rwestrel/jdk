@@ -333,9 +333,8 @@ Method* compiledVFrame::method() const {
     assert(nm->is_native_method(), "must be native");
     return nm->method();
   }
-#else
-  return scope()->method();
 #endif
+  return scope()->method();
 }
 
 
