@@ -226,6 +226,11 @@ void java_lang_String::compute_offsets() {
   STRING_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 
   _initialized = true;
+  extern LeydenStaticData leydenStaticData;
+  leydenStaticData.java_lang_String___value_offset = _value_offset;
+  leydenStaticData.java_lang_String___hash_offset = _hash_offset;
+  leydenStaticData.java_lang_String___hashIsZero_offset = _hashIsZero_offset;
+  leydenStaticData.java_lang_String___coder_offset = _coder_offset;
 }
 
 #if INCLUDE_CDS
@@ -2729,9 +2734,13 @@ oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, TRA
   // Allocate java.lang.StackTraceElement instance
   InstanceKlass* k = vmClasses::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
+#ifndef LEYDEN
   if (k->should_be_initialized()) {
     k->initialize(CHECK_NULL);
   }
+#else
+  assert(k->is_initialized(), "");
+#endif
 
   Handle element = k->allocate_instance_handle(CHECK_NULL);
 
@@ -4311,7 +4320,11 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   assert(_isPrivileged_offset != 0, "offsets should have been initialized");
   assert(_isAuthorized_offset != 0, "offsets should have been initialized");
   // Ensure klass is initialized
+#ifndef LEYDEN
   vmClasses::AccessControlContext_klass()->initialize(CHECK_NULL);
+#else
+  assert(vmClasses::AccessControlContext_klass()->is_initialized(), "");
+#endif
   // Allocate result
   oop result = vmClasses::AccessControlContext_klass()->allocate_instance(CHECK_NULL);
   // Fill in values

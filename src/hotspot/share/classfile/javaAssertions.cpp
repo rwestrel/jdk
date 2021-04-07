@@ -99,7 +99,11 @@ oop JavaAssertions::createAssertionStatusDirectives(TRAPS) {
   Symbol* asd_sym = vmSymbols::java_lang_AssertionStatusDirectives();
   Klass* k = SystemDictionary::resolve_or_fail(asd_sym, true, CHECK_NULL);
   InstanceKlass* asd_klass = InstanceKlass::cast(k);
+#ifndef LEYDEN
   asd_klass->initialize(CHECK_NULL);
+#else
+  assert(asd_klass->is_initialized(), "");
+#endif
   Handle h = asd_klass->allocate_instance_handle(CHECK_NULL);
 
   int len;

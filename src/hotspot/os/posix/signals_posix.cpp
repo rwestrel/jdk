@@ -521,7 +521,9 @@ public:
 #error who are you?
 #endif
 
+#ifndef LEYDEN
 extern "C" JNIEXPORT
+#endif
 int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
                           void* ucVoid, int abort_if_unrecognized)
 {

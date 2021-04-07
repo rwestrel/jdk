@@ -142,6 +142,7 @@ public:
 // For UseCompressedClassPointers.
 class CompressedKlassPointers : public AllStatic {
   friend class VMStructs;
+  friend class Threads;
 
   static NarrowPtrStruct _narrow_klass;
 

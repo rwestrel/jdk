@@ -69,6 +69,7 @@ class ClassLoaderMetaspace;
 
 class ClassLoaderData : public CHeapObj<mtClass> {
   friend class VMStructs;
+  friend class Threads;
 
  private:
   class ChunkedHandleList {

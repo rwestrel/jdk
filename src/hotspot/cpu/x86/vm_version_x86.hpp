@@ -32,6 +32,7 @@
 class VM_Version : public Abstract_VM_Version {
   friend class VMStructs;
   friend class JVMCIVMStructs;
+  friend class Threads;
 
  public:
   // cpuid result register layouts.  These are all unions of a uint32_t

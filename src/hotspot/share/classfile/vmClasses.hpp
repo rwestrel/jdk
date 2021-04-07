@@ -37,6 +37,7 @@ class MetaspaceClosure;
 
 class vmClasses : AllStatic {
   friend class VMStructs;
+  friend class Threads;
 
   static vmClassID check_id(vmClassID id) {
     assert((int)id >= (int)vmClassID::FIRST && (int)id < (int)vmClassID::LIMIT, "oob");

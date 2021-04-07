@@ -39,6 +39,7 @@ class ClassFileParser;
 class InstanceClassLoaderKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
+  friend class Threads;
 public:
   static const KlassID ID = InstanceClassLoaderKlassID;
 
@@ -46,7 +47,11 @@ private:
   InstanceClassLoaderKlass(const ClassFileParser& parser) : InstanceKlass(parser, InstanceKlass::_kind_class_loader, ID) {}
 
 public:
-  InstanceClassLoaderKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
+  InstanceClassLoaderKlass() {
+#if 0
+    assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS");
+#endif
+  }
 
   // Oop fields (and metadata) iterators
   //

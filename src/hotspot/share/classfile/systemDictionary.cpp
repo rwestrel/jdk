@@ -923,6 +923,7 @@ InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
 
   return loaded_class;
 #else
+  ShouldNotReachHere();
   return NULL;
 #endif
 }

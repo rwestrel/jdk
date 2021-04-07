@@ -40,6 +40,8 @@ class ClassLoaderDataGraph : public AllStatic {
   friend class ClassLoaderDataGraphKlassIteratorStatic;
   friend class ClassLoaderDataGraphIterator;
   friend class VMStructs;
+  friend class Threads;
+
  private:
   // All CLDs (except the null CLD) can be reached by walking _head->_next->...
   static ClassLoaderData* volatile _head;

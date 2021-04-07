@@ -88,8 +88,12 @@ class ObjArrayKlass : public ArrayKlass {
   // Copying
   void  copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int length, TRAPS);
 
+#if 1 //ndef LEYDEN
+
   // Compute protection domain
   oop protection_domain() const { return bottom_klass()->protection_domain(); }
+
+#endif
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
@@ -100,13 +104,11 @@ class ObjArrayKlass : public ArrayKlass {
                arrayOop d, size_t dst_offset,
                int length, TRAPS);
  protected:
-#ifndef LEYDEN
   // Returns the ObjArrayKlass for n'th dimension.
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type.
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
  public:
 
@@ -123,8 +125,12 @@ class ObjArrayKlass : public ArrayKlass {
   static int header_size()                { return sizeof(ObjArrayKlass)/wordSize; }
   int size() const                        { return ArrayKlass::static_size(header_size()); }
 
+#ifndef LEYDEN
+
   // Initialization (virtual from Klass)
   void initialize(TRAPS);
+
+#endif
 
   // Oop fields (and metadata) iterators
   //

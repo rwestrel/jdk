@@ -216,7 +216,11 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thre
     Handle holder(THREAD, klass->klass_holder()); // keep the klass alive
     klass->check_valid_for_instantiation(false, THREAD);
     if (!HAS_PENDING_EXCEPTION) {
+#ifndef LEYDEN
       InstanceKlass::cast(klass)->initialize(THREAD);
+#else
+      assert(InstanceKlass::cast(klass)->is_initialized(), "");
+#endif
     }
   }
 

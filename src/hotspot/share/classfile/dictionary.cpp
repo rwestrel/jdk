@@ -136,6 +136,8 @@ bool Dictionary::resize_if_needed() {
 }
 #endif
 
+#if 1 //ndef LEYDEN
+
 bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   // Lock the pd_set list.  This lock cannot safepoint since the caller holds
   // a Dictionary entry, which can be moved if the Dictionary is resized.
@@ -171,6 +173,8 @@ bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   }
   return false;
 }
+
+#endif
 
 #ifndef LEYDEN
 void DictionaryEntry::add_protection_domain(Dictionary* dict, Handle protection_domain) {

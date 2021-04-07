@@ -237,6 +237,9 @@ class Arguments : AllStatic {
     _int,       // corresponds to -Xint
     _mixed,     // corresponds to -Xmixed
     _comp       // corresponds to -Xcomp
+#ifdef LEYDEN
+    , _leyden
+#endif
   };
 
   enum ArgsRange {

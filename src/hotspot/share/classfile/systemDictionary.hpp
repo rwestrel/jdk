@@ -179,7 +179,7 @@ class SystemDictionary : AllStatic {
                                                            Handle class_loader,
                                                            TRAPS);
 
-  static void classes_do(MetaspaceClosure* it);
+  // static void classes_do(MetaspaceClosure* it);
   // Iterate over all methods in all klasses
 
   static void methods_do(void f(Method*));

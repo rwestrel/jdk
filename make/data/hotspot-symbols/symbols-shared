@@ -32,3 +32,4 @@ JNI_GetCreatedJavaVMs
 JNI_GetDefaultJavaVMInitArgs
 JVM_FindClassFromBootLoader
 JVM_InitAgentProperties
+leydenStaticData

@@ -98,6 +98,7 @@ class java_lang_Object : AllStatic {
 // Interface to java.lang.String objects
 
 class java_lang_String : AllStatic {
+  friend class Threads;
  private:
   static int _value_offset;
   static int _hash_offset;
@@ -482,6 +483,7 @@ class java_lang_ThreadGroup : AllStatic {
 class java_lang_Throwable: AllStatic {
   friend class BacktraceBuilder;
   friend class BacktraceIterator;
+  friend class Threads;
 
  private:
   // Trace constants

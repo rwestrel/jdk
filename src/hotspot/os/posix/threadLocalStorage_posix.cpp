@@ -58,7 +58,8 @@ Thread* ThreadLocalStorage::thread() {
   // the initialization process, which is using Thread::current without
   // checking TLS is initialized - see java.cpp vm_exit
   assert(_initialized, "TLS not initialized yet!");
-  return (Thread*) pthread_getspecific(_thread_key); // may be NULL
+  Thread* res = (Thread*) pthread_getspecific(_thread_key); // may be NULL
+  return res;
 }
 
 void ThreadLocalStorage::set_thread(Thread* current) {

@@ -84,6 +84,7 @@ class Universe: AllStatic {
   friend class Metaspace;
   friend class MetaspaceShared;
   friend class vmClasses;
+  friend class Threads;
 
   friend jint  universe_init();
   friend void  universe2_init();
@@ -376,6 +377,45 @@ class Universe: AllStatic {
 
   // Compiler support
   static int base_vtable_size()               { return _base_vtable_size; }
+};
+
+#include "classfile/vmClassID.hpp"
+#include "oops/compressedOops.hpp"
+#include "oops/symbol.hpp"
+#include "classfile/vmSymbols.hpp"
+
+struct LeydenStaticData {
+  void* VM_Version__get_cpu_info_stub;
+  void* VM_Version__detect_virt_stub;
+  address VM_Version___cpuinfo_segv_addr;
+  address VM_Version___cpuinfo_cont_addr;
+  int java_lang_String___value_offset;
+  int java_lang_String___hash_offset;
+  int java_lang_String___hashIsZero_offset;
+  int java_lang_String___coder_offset;
+  int java_lang_String___initialized;
+  InstanceKlass* vmClasses___klasses[static_cast<int>(vmClassID::LIMIT)];
+  InstanceKlass* vmClasses___box_klasses[T_VOID+1];
+  NarrowPtrStruct CompressedKlassPointers___narrow_klass;
+  size_t CompressedKlassPointers___range;
+  Klass* Universe___typeArrayKlassObjs[T_LONG+1];
+  Klass* Universe___objectArrayKlassObj;
+  Array<Klass*>*  Universe___the_array_interfaces_array;
+  ClassLoaderData* volatile ClassLoaderDataGraph___head;
+  int java_lang_Throwable___backtrace_offset;
+  int java_lang_Throwable___detailMessage_offset;
+  int java_lang_Throwable___stackTrace_offset;
+  int java_lang_Throwable___depth_offset;
+  int java_lang_Throwable___static_unassigned_stacktrace_offset;
+  Symbol* Symbol___vm_symbols[vmSymbols::number_of_symbols()];
+  ClassLoaderData* ClassLoaderData___the_null_class_loader_data;
+
+  uintptr_t InstanceKlass_vtbl;
+  uintptr_t TypeArrayKlass_vtbl;
+  uintptr_t ObjArrayKlass_vtbl;
+  uintptr_t InstanceClassLoaderKlass_vtbl;
+  uintptr_t InstanceMirrorKlass_vtbl;
+  uintptr_t InstanceRefKlass_vtbl;
 };
 
 #endif // SHARE_MEMORY_UNIVERSE_HPP

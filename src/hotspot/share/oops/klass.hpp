@@ -78,6 +78,7 @@ class vtableEntry;
 class Klass : public Metadata {
   friend class VMStructs;
   friend class JVMCIVMStructs;
+  friend class Threads;
  protected:
   // If you add a new field that points to any metaspace object, you
   // must add this field to Klass::metaspace_pointers_do().
@@ -187,7 +188,11 @@ protected:
 
   // Constructor
   Klass(KlassID id);
-  Klass() : _id(KlassID(-1)) { assert(DumpSharedSpaces || UseSharedSpaces, "only for cds"); }
+  Klass() : _id(KlassID(-1)) {
+#if 0
+    assert(DumpSharedSpaces || UseSharedSpaces, "only for cds");
+#endif
+  }
 
 #ifndef LEYDEN
   void* operator new(size_t size, ClassLoaderData* loader_data, size_t word_size, TRAPS) throw();
@@ -487,7 +492,11 @@ protected:
   // tells if the class should be initialized
   virtual bool should_be_initialized() const    { return false; }
   // initializes the klass
+#ifndef LEYDEN
+
   virtual void initialize(TRAPS);
+
+#endif
   virtual Klass* find_field(Symbol* name, Symbol* signature, fieldDescriptor* fd) const;
   virtual Method* uncached_lookup_method(const Symbol* name, const Symbol* signature,
                                          OverpassLookupMode overpass_mode,
@@ -508,7 +517,11 @@ protected:
   Klass* array_klass_or_null(int rank);
   Klass* array_klass_or_null();
 
+#if 1//ndef LEYDEN
+
   virtual oop protection_domain() const = 0;
+
+#endif
 
   oop class_loader() const;
 

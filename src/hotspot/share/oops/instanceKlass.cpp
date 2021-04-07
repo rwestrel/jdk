@@ -782,7 +782,7 @@ void InstanceKlass::eager_initialize(Thread *thread) {
     eager_initialize_impl();
   }
 }
-
+#endif
 // JVMTI spec thinks there are signers and protection domain in the
 // instanceKlass.  These accessors pretend these fields are there.
 // The hprof specification also thinks these fields are in InstanceKlass.
@@ -790,7 +790,7 @@ oop InstanceKlass::protection_domain() const {
   // return the protection_domain from the mirror
   return java_lang_Class::protection_domain(java_mirror());
 }
-
+#ifndef LEYDEN
 // To remove these from requires an incompatible change and CCC request.
 objArrayOop InstanceKlass::signers() const {
   // return the signers from the mirror
@@ -1448,10 +1448,11 @@ void InstanceKlass::check_valid_for_instantiation(bool throwError, TRAPS) {
               : vmSymbols::java_lang_IllegalAccessException(), external_name());
   }
 }
-
+#endif
 Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
   // Need load-acquire for lock-free read
   if (array_klasses_acquire() == NULL) {
+#ifndef LEYDEN
     if (or_null) return NULL;
 
     ResourceMark rm(THREAD);
@@ -1467,6 +1468,9 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
         release_set_array_klasses(k);
       }
     }
+#else
+    ShouldNotReachHere();
+#endif
   }
   // _this will always be set at this point
   ObjArrayKlass* oak = array_klasses();
@@ -1479,7 +1483,6 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* InstanceKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, 1, THREAD);
 }
-#endif
 
 static int call_class_initializer_counter = 0;   // for debugging
 

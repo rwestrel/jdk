@@ -768,6 +768,7 @@ jint universe_init() {
 
   Universe::initialize_tlab();
 
+#ifndef LEYDEN
   Metaspace::global_initialize();
 
   // Initialize performance counters for metaspaces
@@ -775,7 +776,7 @@ jint universe_init() {
   CompressedClassSpaceCounters::initialize_performance_counters();
 
   AOTLoader::universe_init();
-
+#endif
   // Checks 'AfterMemoryInit' constraints.
   if (!JVMFlagLimit::check_all_constraints(JVMFlagConstraintPhase::AfterMemoryInit)) {
     return JNI_EINVAL;
@@ -845,7 +846,6 @@ void Universe::initialize_tlab() {
 }
 
 ReservedHeapSpace Universe::reserve_heap(size_t heap_size, size_t alignment) {
-
   assert(alignment <= Arguments::conservative_max_heap_alignment(),
          "actual alignment " SIZE_FORMAT " must be within maximum heap alignment " SIZE_FORMAT,
          alignment, Arguments::conservative_max_heap_alignment());
@@ -997,7 +997,6 @@ bool universe_post_init() {
     Universe::_delayed_stack_overflow_error_message = OopHandle(Universe::vm_global(), instance);
   }
 
-#ifndef LEYDEN
   // Setup preallocated NullPointerException
   // (this is currently used for a cheap & dirty solution in compiler exception handling)
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_NullPointerException(), true, CHECK_false);
@@ -1012,14 +1011,15 @@ bool universe_post_init() {
 
   // Virtual Machine Error for when we get into a situation we can't resolve
   k = vmClasses::VirtualMachineError_klass();
+#ifndef LEYDEN
   bool linked = InstanceKlass::cast(k)->link_class_or_fail(CHECK_false);
   if (!linked) {
      tty->print_cr("Unable to link/verify VirtualMachineError class");
      return false; // initialization failed
   }
+#endif
   instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
   Universe::_virtual_machine_error_instance = OopHandle(Universe::vm_global(), instance);
-#endif
 
   Handle msg = java_lang_String::create_from_str("/ by zero", CHECK_false);
   java_lang_Throwable::set_message(Universe::arithmetic_exception_instance(), msg());

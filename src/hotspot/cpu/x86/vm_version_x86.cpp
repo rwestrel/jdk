@@ -62,7 +62,6 @@ extern "C" {
 static get_cpu_info_stub_t get_cpu_info_stub = NULL;
 static detect_virt_stub_t detect_virt_stub = NULL;
 
-
 #ifndef LEYDEN
 
 class VM_Version_StubGenerator: public StubCodeGenerator {
@@ -84,7 +83,7 @@ class VM_Version_StubGenerator: public StubCodeGenerator {
     Label sef_cpuid, ext_cpuid, ext_cpuid1, ext_cpuid5, ext_cpuid7, ext_cpuid8, done, wrapup;
     Label legacy_setup, save_restore_except, legacy_save_restore, start_simd_check;
 
-    StubCodeMark mark(this, "VM_Version", "get_cpu_info_stub");
+    StubCodeMark mark(this, "VM_Version", "VM_Version__get_cpu_info_stub");
 #   define __ _masm->
 
     address start = __ pc();
@@ -576,7 +575,7 @@ class VM_Version_StubGenerator: public StubCodeGenerator {
 #   undef __
   }
   address generate_detect_virt() {
-    StubCodeMark mark(this, "VM_Version", "detect_virt_stub");
+    StubCodeMark mark(this, "VM_Version", "VM_Version__detect_virt_stub");
 #   define __ _masm->
 
     address start = __ pc();
@@ -1875,7 +1874,7 @@ void VM_Version::check_virtualizations() {
       // CPUID leaf 0x40000007 is available to the root partition only.
       // See Hypervisor Top Level Functional Specification section 2.4.8 for more details.
       //   https://github.com/MicrosoftDocs/Virtualization-Documentation/raw/master/tlfs/Hypervisor%20Top%20Level%20Functional%20Specification%20v6.0b.pdf
-      detect_virt_stub(0x40000007, registers);
+      VM_Version__detect_virt_stub(0x40000007, registers);
       if ((registers[0] != 0x0) ||
           (registers[1] != 0x0) ||
           (registers[2] != 0x0) ||
@@ -1906,6 +1905,14 @@ void VM_Version::initialize() {
                                      g.generate_get_cpu_info());
   detect_virt_stub = CAST_TO_FN_PTR(detect_virt_stub_t,
                                      g.generate_detect_virt());
+
+  extern LeydenStaticData leydenStaticData;
+  leydenStaticData.VM_Version__get_cpu_info_stub = (void*)get_cpu_info_stub;
+  leydenStaticData.VM_Version__detect_virt_stub = (void*)detect_virt_stub;
+#else
+  extern LeydenStaticData leydenStaticData;
+  get_cpu_info_stub = (get_cpu_info_stub_t)leydenStaticData.VM_Version__get_cpu_info_stub;
+  detect_virt_stub = (detect_virt_stub_t)leydenStaticData.VM_Version__detect_virt_stub;
 #endif
 
   get_processor_features();

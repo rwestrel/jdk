@@ -174,7 +174,6 @@ void TypeArrayKlass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos
 }
 
 // create a klass of array holding typeArrays
-#ifndef LEYDEN
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
   int dim = dimension();
   assert(dim <= n, "check order of chain");
@@ -183,6 +182,7 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 
   // lock-free read needs acquire semantics
   if (higher_dimension_acquire() == NULL) {
+#ifndef LEYDEN
     if (or_null)  return NULL;
 
     ResourceMark rm;
@@ -201,6 +201,9 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
         assert(h_ak->is_objArray_klass(), "incorrect initialization of ObjArrayKlass");
       }
     }
+#else
+    ShouldNotReachHere();
+#endif
   }
 
   ObjArrayKlass* h_ak = ObjArrayKlass::cast(higher_dimension());
@@ -214,7 +217,6 @@ Klass* TypeArrayKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 Klass* TypeArrayKlass::array_klass_impl(bool or_null, TRAPS) {
   return array_klass_impl(or_null, dimension() +  1, THREAD);
 }
-#endif
 
 int TypeArrayKlass::oop_size(oop obj) const {
   assert(obj->is_typeArray(),"must be a type array");
@@ -222,10 +224,14 @@ int TypeArrayKlass::oop_size(oop obj) const {
   return t->object_size();
 }
 
+#ifndef LEYDEN
+
 void TypeArrayKlass::initialize(TRAPS) {
   // Nothing to do. Having this function is handy since objArrayKlasses can be
   // initialized by calling initialize on their bottom_klass, see ObjArrayKlass::initialize
 }
+
+#endif
 
 const char* TypeArrayKlass::external_name(BasicType type) {
   switch (type) {

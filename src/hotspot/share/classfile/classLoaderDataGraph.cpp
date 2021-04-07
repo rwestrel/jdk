@@ -297,7 +297,7 @@ void ClassLoaderDataGraph::always_strong_cld_do(CLDClosure* cl) {
     cld_do(cl);
   }
 }
-
+#endif
 // Closure for locking and iterating through classes. Only lock outside of safepoint.
 LockedClassesDo::LockedClassesDo(classes_do_func_t f) : _function(f),
   _do_lock(!SafepointSynchronize::is_at_safepoint()) {
@@ -320,7 +320,6 @@ LockedClassesDo::~LockedClassesDo() {
   }
 }
 
-#endif
 // Iterating over the CLDG needs to be locked because
 // unloading can remove entries concurrently soon.
 class ClassLoaderDataGraphIterator : public StackObj {
@@ -360,7 +359,7 @@ void ClassLoaderDataGraph::loaded_cld_do(CLDClosure* cl) {
     cl->do_cld(cld);
   }
 }
-#ifndef LEYDEN
+
 // These functions assume that the caller has locked the ClassLoaderDataGraph_lock
 // if they are not calling the function from a safepoint.
 void ClassLoaderDataGraph::classes_do(KlassClosure* klass_closure) {
@@ -370,6 +369,7 @@ void ClassLoaderDataGraph::classes_do(KlassClosure* klass_closure) {
   }
 }
 
+#ifndef LEYDEN
 void ClassLoaderDataGraph::classes_do(void f(Klass* const)) {
   ClassLoaderDataGraphIterator iter;
   while (ClassLoaderData* cld = iter.get_next()) {

@@ -123,6 +123,9 @@ const char* Abstract_VM_Version::vm_vendor() {
 
 
 const char* Abstract_VM_Version::vm_info_string() {
+#ifdef LEYDEN
+  return "leyden";
+#else
   switch (Arguments::mode()) {
     case Arguments::_int:
       return UseSharedSpaces ? "interpreted mode, sharing" : "interpreted mode";
@@ -145,15 +148,20 @@ const char* Abstract_VM_Version::vm_info_string() {
           return "mixed mode";
         }
       }
+#endif
     case Arguments::_comp:
+#ifndef LEYDEN
       if (CompilationModeFlag::quick_only()) {
          return UseSharedSpaces ? "compiled mode, emulated-client, sharing" : "compiled mode, emulated-client";
       }
       return UseSharedSpaces ? "compiled mode, sharing" : "compiled mode";
+#else
+      break;
 #endif
   }
   ShouldNotReachHere();
   return "";
+#endif
 }
 
 // NOTE: do *not* use stringStream. this function is called by

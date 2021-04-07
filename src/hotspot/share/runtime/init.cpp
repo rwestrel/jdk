@@ -109,8 +109,8 @@ void vm_init_globals() {
 
 
 jint init_globals() {
-#ifndef LEYDEN
   management_init();
+#ifndef LEYDEN
   JvmtiExport::initialize_oop_storage();
   bytecodes_init();
   classLoader_init1();

@@ -247,8 +247,12 @@ inline instanceOop InstanceKlass::allocate_instance(oop java_class, TRAPS) {
     THROW_(vmSymbols::java_lang_InstantiationException(), NULL);
   }
   InstanceKlass* ik = cast(k);
+#ifndef LEYDEN
   ik->check_valid_for_instantiation(false, CHECK_NULL);
   ik->initialize(CHECK_NULL);
+#else
+  assert(ik->is_initialized(), "");
+#endif
   return ik->allocate_instance(THREAD);
 }
 

@@ -71,7 +71,11 @@ class TypeArrayKlass : public ArrayKlass {
   typeArrayOop allocate(int length, TRAPS) { return allocate_common(length, true, THREAD); }
   oop multi_allocate(int rank, jint* sizes, TRAPS);
 
+#if 1 //ndef LEYDEN
+
   oop protection_domain() const { return NULL; }
+
+#endif
 
   // Copying
   void  copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int length, TRAPS);
@@ -98,12 +102,10 @@ class TypeArrayKlass : public ArrayKlass {
 
  protected:
   // Find n'th dimensional array
-#ifndef LEYDEN
   virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   virtual Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
  public:
   static TypeArrayKlass* cast(Klass* k) {
@@ -122,8 +124,12 @@ class TypeArrayKlass : public ArrayKlass {
   static int header_size()  { return sizeof(TypeArrayKlass)/wordSize; }
   int size() const          { return ArrayKlass::static_size(header_size()); }
 
+#ifndef LEYDEN
+
   // Initialization (virtual from Klass)
   void initialize(TRAPS);
+
+#endif
 
  public:
   // Printing

@@ -1494,6 +1494,8 @@ void Arguments::set_mode_flags(Mode mode) {
     }
     break;
   }
+#else
+  _mode = _leyden;
 #endif
 }
 

@@ -145,7 +145,11 @@ class InstanceKlass: public Klass {
   InstanceKlass(const ClassFileParser& parser, unsigned kind, KlassID id = ID);
 
  public:
-  InstanceKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
+  InstanceKlass() {
+#if 0
+    assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS");
+#endif
+  }
 
   // See "The Java Virtual Machine Specification" section 2.16.2-5 for a detailed description
   // of the class loading & initialization procedure, and the use of the states.
@@ -706,7 +710,7 @@ public:
   ConstantPool* constants() const        { return _constants; }
   void set_constants(ConstantPool* c)    { _constants = c; }
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
   // protection domain
   oop protection_domain() const;
@@ -1317,12 +1321,10 @@ private:
   JNIid* jni_id_for_impl                         (int offset);
 
   // Returns the array class for the n'th dimension
-#ifndef LEYDEN
   Klass* array_klass_impl(bool or_null, int n, TRAPS);
 
   // Returns the array class with this class as element type
   Klass* array_klass_impl(bool or_null, TRAPS);
-#endif
 
   // find a local method (returns NULL if not found)
   Method* find_method_impl(const Symbol* name,

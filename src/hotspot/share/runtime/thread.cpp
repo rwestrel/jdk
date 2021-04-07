@@ -3470,7 +3470,92 @@ void Threads::initialize_jsr292_core_classes(TRAPS) {
 
 #endif
 
+JNIEXPORT LeydenStaticData leydenStaticData;
+
+#include "oops/objArrayKlass.hpp"
+#include "oops/instanceKlass.hpp"
+#include "classfile/classLoaderDataGraph.hpp"
+#include "oops/instanceClassLoaderKlass.hpp"
+#include "oops/instanceMirrorKlass.hpp"
+
+static void leyden_fix_vtbl(Metadata* m) {
+  uintptr_t vtbl = *(uintptr_t*)m;
+  printf("XXX vtbl fix for %p?", m);
+  if (vtbl == leydenStaticData.InstanceKlass_vtbl) {
+    InstanceKlass dummy;
+    *(uintptr_t*)m = *(uintptr_t*)&dummy;
+    printf(" yes!\n");
+  } else if (vtbl == leydenStaticData.TypeArrayKlass_vtbl) {
+    TypeArrayKlass dummy;
+    *(uintptr_t*)m = *(uintptr_t*)&dummy;
+    printf(" yes!\n");
+  } else if (vtbl == leydenStaticData.ObjArrayKlass_vtbl) {
+    ObjArrayKlass dummy;
+    *(uintptr_t*) m = *(uintptr_t*) &dummy;
+    printf(" yes!\n");
+  } else if (vtbl == leydenStaticData.InstanceClassLoaderKlass_vtbl) {
+    InstanceClassLoaderKlass dummy;
+    *(uintptr_t*) m = *(uintptr_t*) &dummy;
+    printf(" yes!\n");
+  } else if (vtbl == leydenStaticData.InstanceMirrorKlass_vtbl) {
+    InstanceMirrorKlass dummy;
+    *(uintptr_t*) m = *(uintptr_t*) &dummy;
+    printf(" yes!\n");
+  } else if (vtbl == leydenStaticData.InstanceRefKlass_vtbl) {
+    InstanceRefKlass dummy;
+    *(uintptr_t*) m = *(uintptr_t*) &dummy;
+    printf(" yes!\n");
+  } else {
+    ShouldNotReachHere();
+    printf(" no!\n");
+  }
+}
+
+class FixVtblKlassClosure : public KlassClosure {
+public:
+  virtual void do_klass(Klass* k) {
+    leyden_fix_vtbl(k);
+  }
+};
+
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
+#ifdef LEYDEN
+#define copy_in(c, f) do {  c::f = leydenStaticData.c##__##f; } while (0)
+#define copy_in_array(c, f) memcpy(c::f, leydenStaticData.c##__##f, sizeof(leydenStaticData.c##__##f))
+
+  copy_in(VM_Version, _cpuinfo_segv_addr);
+  copy_in(VM_Version, _cpuinfo_cont_addr);
+  copy_in(java_lang_String, _value_offset);
+  copy_in(java_lang_String, _hash_offset);
+  copy_in(java_lang_String, _hashIsZero_offset);
+  copy_in(java_lang_String, _coder_offset);
+  copy_in(java_lang_String, _initialized);
+  copy_in_array(vmClasses, _klasses);
+  copy_in_array(vmClasses, _box_klasses);
+  copy_in(CompressedKlassPointers, _narrow_klass);
+  copy_in(CompressedKlassPointers, _range);
+  copy_in_array(Universe, _typeArrayKlassObjs);
+  copy_in(Universe, _objectArrayKlassObj);
+  copy_in(Universe, _the_array_interfaces_array);
+  copy_in(ClassLoaderDataGraph, _head);
+  copy_in(java_lang_Throwable, _detailMessage_offset);
+  copy_in(java_lang_Throwable, _backtrace_offset);
+  copy_in(java_lang_Throwable, _stackTrace_offset);
+  copy_in(java_lang_Throwable, _depth_offset);
+  copy_in(java_lang_Throwable, _static_unassigned_stacktrace_offset);
+  copy_in_array(Symbol, _vm_symbols);
+  copy_in(ClassLoaderData, _the_null_class_loader_data);
+
+  ClassLoaderData* cld = ClassLoaderDataGraph::_head;
+  FixVtblKlassClosure closure;
+  while (cld != NULL) {
+    cld->classes_do(&closure);
+    cld = cld->next();
+  }
+
+#undef copy_in
+#endif
+
   extern void JDK_Version_init();
 
   // Preinitialize version info.
@@ -4119,6 +4204,9 @@ void JavaThread::invoke_shutdown_hooks() {
   CLEAR_PENDING_EXCEPTION;
 }
 
+//  return &leydenStaticData;
+//};
+
 // Threads::destroy_vm() is normally called from jni_DestroyJavaVM() when
 // the program falls off the end of main(). Another VM exit path is through
 // vm_exit() when the program calls System.exit() to return a value or when
@@ -4152,6 +4240,8 @@ void JavaThread::invoke_shutdown_hooks() {
 //      > deletes PerfMemory resources
 //   + Delete this thread
 //   + Return to caller
+
+#include <signal.h>
 
 bool Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
@@ -4248,6 +4338,89 @@ bool Threads::destroy_vm() {
 #endif
 
   LogConfiguration::finalize();
+
+#ifndef LEYDEN
+  if (UseNewCode) {
+#define copy_out(c, f) do { leydenStaticData.c##__##f = c::f; } while (0)
+#define copy_out_array(c, f) memcpy(leydenStaticData.c##__##f, c::f, sizeof(leydenStaticData.c##__##f))
+
+    copy_out(VM_Version, _cpuinfo_segv_addr);
+    copy_out(VM_Version, _cpuinfo_cont_addr);
+    copy_out(java_lang_String, _value_offset);
+    copy_out(java_lang_String, _hash_offset);
+    copy_out(java_lang_String, _hashIsZero_offset);
+    copy_out(java_lang_String, _coder_offset);
+    copy_out(java_lang_String, _initialized);
+    copy_out_array(vmClasses, _klasses);
+    copy_out_array(vmClasses, _box_klasses);
+    copy_out(CompressedKlassPointers, _narrow_klass);
+    copy_out(CompressedKlassPointers, _range);
+    copy_out_array(Universe, _typeArrayKlassObjs);
+    copy_out(Universe, _objectArrayKlassObj);
+    copy_out(Universe, _the_array_interfaces_array);
+    copy_out(ClassLoaderDataGraph, _head);
+    copy_out(java_lang_Throwable, _detailMessage_offset);
+    copy_out(java_lang_Throwable, _backtrace_offset);
+    copy_out(java_lang_Throwable, _stackTrace_offset);
+    copy_out(java_lang_Throwable, _depth_offset);
+    copy_out(java_lang_Throwable, _static_unassigned_stacktrace_offset);
+    copy_out_array(Symbol, _vm_symbols);
+    copy_out(ClassLoaderData, _the_null_class_loader_data);
+
+    {
+      ObjArrayKlass dummy;
+      leydenStaticData.ObjArrayKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      TypeArrayKlass dummy;
+      leydenStaticData.TypeArrayKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceKlass dummy;
+      leydenStaticData.InstanceKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceKlass dummy;
+      leydenStaticData.InstanceKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceClassLoaderKlass dummy;
+      leydenStaticData.InstanceClassLoaderKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceMirrorKlass dummy;
+      leydenStaticData.InstanceMirrorKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceRefKlass dummy;
+      leydenStaticData.InstanceRefKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+
+#undef copy_out
+
+    void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so",
+                            RTLD_NOW | RTLD_LOCAL);
+    printf("XXX %p\n", minimal);
+    void* sym = dlsym(minimal, "JNI_CreateJavaVM");
+    printf("XXX %p\n", sym);
+    jint (*CreateJavaVM)(JavaVM **, void **, void *) = (jint (*)(JavaVM **, void **, void *))sym;
+    printf("XXX %p\n", sym);
+    sym = dlsym(minimal, "leydenStaticData");
+    memcpy(sym, &leydenStaticData, sizeof(leydenStaticData));
+    printf("XXX %p\n", sym);
+
+    struct sigaction sa;
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGSEGV, &sa, NULL);
+
+    JavaVMInitArgs args;
+    memset(&args, 0, sizeof(args));
+    args.version  = JNI_VERSION_1_2;
+    JavaVM *vm;
+    JNIEnv *env = 0;
+    CreateJavaVM(&vm, (void**)&env, &args);
+  }
+#endif
 
   return true;
 }

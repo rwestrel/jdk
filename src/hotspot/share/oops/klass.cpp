@@ -177,9 +177,13 @@ void Klass::copy_array(arrayOop s, int src_pos, arrayOop d, int dst_pos, int len
 }
 
 
+#ifndef LEYDEN
+
 void Klass::initialize(TRAPS) {
   ShouldNotReachHere();
 }
+
+#endif
 
 Klass* Klass::find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const {
 #ifdef ASSERT
