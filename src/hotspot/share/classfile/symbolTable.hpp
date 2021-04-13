@@ -97,6 +97,10 @@ class SymbolTableCreateEntry;
 class constantPoolHandle;
 class SymbolClosure;
 
+#include "utilities/concurrentHashTable.hpp"
+
+typedef ConcurrentHashTable<SymbolTableConfig, mtSymbol> SymbolTableHash;
+
 class SymbolTable : public AllStatic {
   friend class VMStructs;
   friend class Symbol;
@@ -225,6 +229,8 @@ public:
 
   // Histogram
   static void print_histogram() PRODUCT_RETURN;
+
+  static SymbolTableHash* _local_table;
 };
 
 #endif

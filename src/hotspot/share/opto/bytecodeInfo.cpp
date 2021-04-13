@@ -362,7 +362,6 @@ bool InlineTree::is_not_reached(ciMethod* callee_method, ciMethod* caller_method
 bool InlineTree::try_to_inline(ciMethod* callee_method, ciMethod* caller_method,
                                int caller_bci, JVMState* jvms, ciCallProfile& profile,
                                WarmCallInfo* wci_result, bool& should_delay) {
-
   if (ClipInlining && (int)count_inline_bcs() >= DesiredMethodLimit) {
     if (!callee_method->force_inline() || !IncrementalInline) {
       set_msg("size > DesiredMethodLimit");

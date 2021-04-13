@@ -136,7 +136,6 @@ class StubRoutines: AllStatic {
 #ifndef LEYDEN
   static jint    _verify_oop_count;
   static address _verify_oop_subroutine_entry;
-
 #endif
   static address _call_stub_return_address;                // the return PC, when returning to a call stub
   static address _call_stub_entry;

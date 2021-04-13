@@ -1467,12 +1467,12 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
       // if the version of the methods from the native libraries is called.
       // As the interpreter and the C2-intrinsified version of the methods preserves
       // sNaNs, that would result in an inconsistent way of handling of sNaNs.
-      if ((UseSSE >= 1 &&
+      if (0 && ((UseSSE >= 1 &&
           (method->intrinsic_id() == vmIntrinsics::_intBitsToFloat ||
            method->intrinsic_id() == vmIntrinsics::_floatToRawIntBits)) ||
           (UseSSE >= 2 &&
            (method->intrinsic_id() == vmIntrinsics::_longBitsToDouble ||
-            method->intrinsic_id() == vmIntrinsics::_doubleToRawLongBits))) {
+            method->intrinsic_id() == vmIntrinsics::_doubleToRawLongBits)))) {
         return NULL;
       }
 #endif // X86 && !ZERO

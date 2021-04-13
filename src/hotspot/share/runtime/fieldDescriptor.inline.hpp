@@ -29,7 +29,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/signature.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // All fieldDescriptor inline functions that (directly or indirectly) use "_cp()" or "_cp->"
 // must be put in this file, as they require runtime/handles.inline.hpp.
 

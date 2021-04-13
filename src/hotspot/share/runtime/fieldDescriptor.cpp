@@ -36,9 +36,12 @@
 #include "runtime/signature.hpp"
 
 
+#if 1 //ndef LEYDEN
+
 oop fieldDescriptor::loader() const {
   return _cp->pool_holder()->class_loader();
 }
+
 
 Symbol* fieldDescriptor::generic_signature() const {
   if (!has_generic_signature()) {
@@ -228,5 +231,5 @@ void fieldDescriptor::print_on_for(outputStream* st, oop obj) {
     st->print(" (%x)", as_int);
   }
 }
-
+#endif
 #endif /* PRODUCT */

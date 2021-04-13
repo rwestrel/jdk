@@ -29,7 +29,7 @@
 #include "oops/fieldInfo.hpp"
 #include "runtime/fieldDescriptor.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 // The is the base class for iteration over the fields array
 // describing the declared fields in the class.  Several subclasses
@@ -88,6 +88,7 @@ class FieldStreamBase : public StackObj {
 
   // accessors
   int index() const                 { return _index; }
+
   InstanceKlass* field_holder() const { return _constants->pool_holder(); }
 
   void next() {
@@ -163,6 +164,7 @@ class FieldStreamBase : public StackObj {
 // Iterate over only the internal fields
 class JavaFieldStream : public FieldStreamBase {
  public:
+
   JavaFieldStream(const InstanceKlass* k): FieldStreamBase(k->fields(), k->constants(), 0, k->java_fields_count()) {}
 
   int name_index() const {
@@ -219,6 +221,7 @@ class AllFieldStream : public FieldStreamBase {
  public:
   AllFieldStream(Array<u2>* fields, ConstantPool* constants): FieldStreamBase(fields, constants) {}
   AllFieldStream(InstanceKlass* k):      FieldStreamBase(k->fields(), k->constants()) {}
+
 };
 
 #endif

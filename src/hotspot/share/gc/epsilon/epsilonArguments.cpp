@@ -54,6 +54,7 @@ void EpsilonArguments::initialize() {
     FLAG_SET_DEFAULT(EpsilonElasticTLABDecay, false);
   }
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   // Enable loop strip mining: there are still non-GC safepoints, no need to make it worse
   if (FLAG_IS_DEFAULT(UseCountedLoopSafepoints)) {
@@ -62,6 +63,7 @@ void EpsilonArguments::initialize() {
       FLAG_SET_DEFAULT(LoopStripMiningIter, 1000);
     }
   }
+#endif
 #endif
 }
 

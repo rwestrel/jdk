@@ -25,6 +25,7 @@
 #ifndef SHARE_MEMORY_UNIVERSE_HPP
 #define SHARE_MEMORY_UNIVERSE_HPP
 
+#include <classfile/symbolTable.hpp>
 #include "gc/shared/verifyOption.hpp"
 #include "oops/array.hpp"
 #include "oops/oopHandle.hpp"
@@ -383,6 +384,14 @@ class Universe: AllStatic {
 #include "oops/compressedOops.hpp"
 #include "oops/symbol.hpp"
 #include "classfile/vmSymbols.hpp"
+struct CompiledCode {
+  Klass* klass;
+  Symbol* name;
+  Symbol* signature;
+  Method* method;
+};
+
+class CodeHeap;
 
 struct LeydenStaticData {
   void* VM_Version__get_cpu_info_stub;
@@ -409,6 +418,47 @@ struct LeydenStaticData {
   int java_lang_Throwable___static_unassigned_stacktrace_offset;
   Symbol* Symbol___vm_symbols[vmSymbols::number_of_symbols()];
   ClassLoaderData* ClassLoaderData___the_null_class_loader_data;
+  address StubRoutines___call_stub_entry;
+  address StubRoutines___call_stub_return_address;
+  GrowableArray<CodeHeap*>* CodeCache___heaps;
+  int java_lang_Class___klass_offset;
+  int java_lang_Class___array_klass_offset;
+  int java_lang_Class___oop_size_offset;
+  int java_lang_Class___static_oop_field_count_offset;
+  int java_lang_Class___protection_domain_offset;
+  int java_lang_Class___init_lock_offset;
+  int java_lang_Class___signers_offset;
+  int java_lang_Class___class_loader_offset;
+  int java_lang_Class___module_offset;
+  int java_lang_Class___component_mirror_offset;
+  int java_lang_Class___name_offset;
+  int java_lang_Class___source_file_offset;
+  int java_lang_Class___classData_offset;
+  int java_lang_Class___classRedefinedCount_offset;
+  bool java_lang_Class___offsets_computed;
+  GrowableArray<Klass*>* java_lang_Class___fixup_mirror_list;
+  GrowableArray<Klass*>* java_lang_Class___fixup_module_field_list;
+  int java_security_AccessControlContext___context_offset;
+  int java_security_AccessControlContext___privilegedContext_offset;
+  int java_security_AccessControlContext___isPrivileged_offset;
+  int java_security_AccessControlContext___isAuthorized_offset;
+  int java_lang_Thread___name_offset;
+  int java_lang_Thread___group_offset;
+  int java_lang_Thread___contextClassLoader_offset;
+  int java_lang_Thread___inheritedAccessControlContext_offset;
+  int java_lang_Thread___priority_offset;
+  int java_lang_Thread___eetop_offset;
+  int java_lang_Thread___interrupted_offset;
+  int java_lang_Thread___daemon_offset;
+  int java_lang_Thread___stillborn_offset;
+  int java_lang_Thread___stackSize_offset;
+  int java_lang_Thread___tid_offset;
+  int java_lang_Thread___thread_status_offset;
+  int java_lang_Thread___park_blocker_offset;
+  SymbolTableHash* SymbolTable___local_table;
+
+  CompiledCode* nmethods;
+  uint nmethods_size;
 
   uintptr_t InstanceKlass_vtbl;
   uintptr_t TypeArrayKlass_vtbl;
@@ -416,6 +466,7 @@ struct LeydenStaticData {
   uintptr_t InstanceClassLoaderKlass_vtbl;
   uintptr_t InstanceMirrorKlass_vtbl;
   uintptr_t InstanceRefKlass_vtbl;
+  uintptr_t Method_vtbl;
 };
 
 #endif // SHARE_MEMORY_UNIVERSE_HPP

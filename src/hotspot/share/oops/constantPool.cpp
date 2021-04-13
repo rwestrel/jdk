@@ -62,11 +62,16 @@
 #include "runtime/vframe.inline.hpp"
 #include "utilities/copy.hpp"
 
+#ifndef LEYDEN
+#ifndef LEYDEN
+
 ConstantPool* ConstantPool::allocate(ClassLoaderData* loader_data, int length, TRAPS) {
   Array<u1>* tags = MetadataFactory::new_array<u1>(loader_data, length, 0, CHECK_NULL);
   int size = ConstantPool::size(length);
   return new (loader_data, size, MetaspaceObj::ConstantPoolType, THREAD) ConstantPool(tags);
 }
+
+#endif
 
 void ConstantPool::copy_fields(const ConstantPool* orig) {
   // Preserve dynamic constant information from the original pool
@@ -82,6 +87,7 @@ void ConstantPool::copy_fields(const ConstantPool* orig) {
   set_generic_signature_index(orig->generic_signature_index());
 }
 
+#ifndef LEYDEN
 #ifdef ASSERT
 
 // MetaspaceObj allocation invariant is calloc equivalent memory
@@ -98,6 +104,9 @@ static bool tag_array_is_zero_initialized(Array<u1>* tags) {
 }
 
 #endif
+#endif
+
+#ifndef LEYDEN
 
 ConstantPool::ConstantPool(Array<u1>* tags) :
   _tags(tags),
@@ -135,11 +144,15 @@ void ConstantPool::release_C_heap_structures() {
   unreference_symbols();
 }
 
+#endif
+
 void ConstantPool::metaspace_pointers_do(MetaspaceClosure* it) {
   log_trace(cds)("Iter(ConstantPool): %p", this);
 
   it->push(&_tags, MetaspaceClosure::_writable);
+#ifndef LEYDEN
   it->push(&_cache);
+#endif
   it->push(&_pool_holder);
   it->push(&_operands);
   it->push(&_resolved_klasses, MetaspaceClosure::_writable);
@@ -155,6 +168,8 @@ void ConstantPool::metaspace_pointers_do(MetaspaceClosure* it) {
   }
 }
 
+#ifndef LEYDEN
+
 objArrayOop ConstantPool::resolved_references() const {
   return (objArrayOop)_cache->resolved_references();
 }
@@ -168,6 +183,10 @@ objArrayOop ConstantPool::resolved_references_or_null() const {
     return (objArrayOop)_cache->resolved_references();
   }
 }
+
+#endif
+
+#ifndef LEYDEN
 
 // Create resolved_references array and mapping array for original cp indexes
 // The ldc bytecode was rewritten to have the resolved reference array index so need a way
@@ -238,6 +257,8 @@ void ConstantPool::initialize_unresolved_klasses(ClassLoaderData* loader_data, T
   }
   allocate_resolved_klasses(loader_data, num_klasses, THREAD);
 }
+
+#endif
 
 // Unsafe anonymous class support:
 void ConstantPool::klass_at_put(int class_index, int name_index, int resolved_klass_index, Klass* k, Symbol* name) {
@@ -352,6 +373,8 @@ void ConstantPool::add_dumped_interned_strings() {
 }
 #endif
 
+#ifndef LEYDEN
+
 // CDS support. Create a new resolved_references array.
 void ConstantPool::restore_unshareable_info(TRAPS) {
   assert(is_constantPool(), "ensure C++ vtable is restored");
@@ -389,6 +412,10 @@ void ConstantPool::restore_unshareable_info(TRAPS) {
     }
   }
 }
+
+#endif
+
+#ifndef LEYDEN
 
 void ConstantPool::remove_unshareable_info() {
   // Resolved references are not in the shared archive.
@@ -443,6 +470,10 @@ void ConstantPool::remove_unshareable_info() {
   }
 }
 
+#endif
+
+#ifndef LEYDEN
+
 int ConstantPool::cp_to_object_index(int cp_index) {
   // this is harder don't do this so much.
   int i = reference_map()->find(cp_index);
@@ -450,9 +481,15 @@ int ConstantPool::cp_to_object_index(int cp_index) {
   return (i < 0) ? _no_index_sentinel : i;
 }
 
+#endif
+
+#ifndef LEYDEN
+
 void ConstantPool::string_at_put(int which, int obj_index, oop str) {
   resolved_references()->obj_at_put(obj_index, str);
 }
+
+#endif
 
 void ConstantPool::trace_class_resolution(const constantPoolHandle& this_cp, Klass* k) {
   ResourceMark rm;
@@ -482,6 +519,8 @@ void ConstantPool::trace_class_resolution(const constantPoolHandle& this_cp, Kla
     }
   }
 }
+
+#ifndef LEYDEN
 
 Klass* ConstantPool::klass_at_impl(const constantPoolHandle& this_cp, int which,
                                    bool save_resolution_error, TRAPS) {
@@ -562,6 +601,10 @@ Klass* ConstantPool::klass_at_impl(const constantPoolHandle& this_cp, int which,
   return k;
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 // Does not update ConstantPool* - to avoid any exception throwing. Used
 // by compiler and exception handling.  Also used to avoid classloads for
@@ -602,6 +645,10 @@ Klass* ConstantPool::klass_at_if_loaded(const constantPoolHandle& this_cp, int w
   }
 }
 
+#endif
+
+#ifndef LEYDEN
+
 Method* ConstantPool::method_at_if_loaded(const constantPoolHandle& cpool,
                                                    int which) {
   if (cpool->cache() == NULL)  return NULL;  // nothing to load yet
@@ -638,6 +685,8 @@ bool ConstantPool::has_local_signature_at_if_loaded(const constantPoolHandle& cp
   return e->has_local_signature();
 }
 
+#endif
+
 Symbol* ConstantPool::impl_name_ref_at(int which, bool uncached) {
   int name_index = name_ref_index_at(impl_name_and_type_ref_index_at(which, uncached));
   return symbol_at(name_index);
@@ -648,6 +697,8 @@ Symbol* ConstantPool::impl_signature_ref_at(int which, bool uncached) {
   int signature_index = signature_ref_index_at(impl_name_and_type_ref_index_at(which, uncached));
   return symbol_at(signature_index);
 }
+
+#ifndef LEYDEN
 
 int ConstantPool::impl_name_and_type_ref_index_at(int which, bool uncached) {
   int i = which;
@@ -674,6 +725,10 @@ int ConstantPool::impl_name_and_type_ref_index_at(int which, bool uncached) {
   return extract_high_short_from_int(ref_index);
 }
 
+#endif
+
+#ifndef LEYDEN
+
 constantTag ConstantPool::impl_tag_ref_at(int which, bool uncached) {
   int pool_index = which;
   if (!uncached && cache() != NULL) {
@@ -687,6 +742,8 @@ constantTag ConstantPool::impl_tag_ref_at(int which, bool uncached) {
   }
   return tag_at(pool_index);
 }
+
+#endif
 
 int ConstantPool::impl_klass_ref_index_at(int which, bool uncached) {
   guarantee(!ConstantPool::is_invokedynamic_index(which),
@@ -702,6 +759,7 @@ int ConstantPool::impl_klass_ref_index_at(int which, bool uncached) {
 }
 
 
+#ifndef LEYDEN
 
 int ConstantPool::remap_instruction_operand_from_cache(int operand) {
   int cpc_index = operand;
@@ -711,6 +769,10 @@ int ConstantPool::remap_instruction_operand_from_cache(int operand) {
   return member_index;
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void ConstantPool::verify_constant_pool_resolve(const constantPoolHandle& this_cp, Klass* k, TRAPS) {
   if (!(k->is_instance_klass() || k->is_objArray_klass())) {
@@ -719,6 +781,8 @@ void ConstantPool::verify_constant_pool_resolve(const constantPoolHandle& this_c
   Klass* holder = this_cp->pool_holder();
   LinkResolver::check_klass_accessibility(holder, k, CHECK);
 }
+
+#endif
 
 
 int ConstantPool::name_ref_index_at(int which_nt) {
@@ -872,6 +936,8 @@ BasicType ConstantPool::basic_type_for_constant_at(int which) {
   }
   return tag.basic_type();
 }
+
+#ifndef LEYDEN
 
 // Called to resolve constants in the constant pool and return an oop.
 // Some constant pool entries cache their resolved oop. This is also
@@ -1138,13 +1204,15 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
   }
 }
 
+#endif
+#endif
 oop ConstantPool::uncached_string_at(int which, TRAPS) {
   Symbol* sym = unresolved_string_at(which);
   oop str = StringTable::intern(sym, CHECK_(NULL));
   assert(java_lang_String::is_instance(str), "must be string");
   return str;
 }
-
+#ifndef LEYDEN
 void ConstantPool::copy_bootstrap_arguments_at_impl(const constantPoolHandle& this_cp, int index,
                                                     int start_arg, int end_arg,
                                                     objArrayHandle info, int pos,
@@ -1423,6 +1491,8 @@ bool ConstantPool::compare_entry_to(int index1, const constantPoolHandle& cp2,
 } // end compare_entry_to()
 
 
+#ifndef LEYDEN
+
 // Resize the operands array with delta_len and delta_size.
 // Used in RedefineClasses for CP merge.
 void ConstantPool::resize_operands(int delta_len, int delta_size, TRAPS) {
@@ -1453,7 +1523,10 @@ void ConstantPool::resize_operands(int delta_len, int delta_size, TRAPS) {
   }
   set_operands(new_ops);
 } // end resize_operands()
+#endif
 
+
+#ifndef LEYDEN
 
 // Extend the operands array with the length and size of the ext_cp operands.
 // Used in RedefineClasses for CP merge.
@@ -1477,6 +1550,7 @@ void ConstantPool::extend_operands(const constantPoolHandle& ext_cp, TRAPS) {
   }
 
 } // end extend_operands()
+#endif
 
 
 // Shrink the operands array to a smaller array with new_len length.
@@ -1496,6 +1570,8 @@ void ConstantPool::shrink_operands(int new_len, TRAPS) {
 
 } // end shrink_operands()
 
+
+#ifndef LEYDEN
 
 void ConstantPool::copy_operands(const constantPoolHandle& from_cp,
                                  const constantPoolHandle& to_cp,
@@ -1556,6 +1632,7 @@ void ConstantPool::copy_operands(const constantPoolHandle& from_cp,
     }
   }
 } // end copy_operands()
+#endif
 
 
 // Copy this constant pool's entries at start_i to end_i (inclusive)
@@ -2248,6 +2325,8 @@ void ConstantPool::patch_resolved_references(GrowableArray<Handle>* cp_patches) 
 
 // Printing
 
+#ifndef LEYDEN
+
 void ConstantPool::print_on(outputStream* st) const {
   assert(is_constantPool(), "must be constantPool");
   st->print_cr("%s", internal_name());
@@ -2276,6 +2355,8 @@ void ConstantPool::print_on(outputStream* st) const {
   }
   st->cr();
 }
+
+#endif
 
 // Print one constant pool entry
 void ConstantPool::print_entry_on(const int index, outputStream* st) {
@@ -2486,3 +2567,5 @@ void SymbolHashMap::initialize_table(int table_size) {
     _buckets[index].clear();
   }
 }
+
+#endif

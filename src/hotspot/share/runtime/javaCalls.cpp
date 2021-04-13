@@ -194,6 +194,8 @@ void JavaCalls::call_virtual(JavaValue* result, Klass* spec_klass, Symbol* name,
 
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
+#else
+  ShouldNotReachHere();
 #endif
 }
 
@@ -233,7 +235,19 @@ void JavaCalls::call_special(JavaValue* result, Klass* klass, Symbol* name, Symb
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
 #else
-  ShouldNotReachHere();
+  extern LeydenStaticData leydenStaticData;
+
+  uint i;
+  for (i = 0; i < leydenStaticData.nmethods_size; i++) {
+    CompiledCode cc = leydenStaticData.nmethods[i];
+    if (cc.klass == klass && cc.name == name && cc.signature == signature) {
+//      os::message_box("xxx", "yyy");
+      JavaCalls::call(result, methodHandle(THREAD, cc.method), args, CHECK);
+//      os::message_box("xxx", "yyy");
+      break;
+    }
+  }
+  assert(i < leydenStaticData.nmethods_size, "");
 #endif
 }
 
@@ -271,6 +285,20 @@ void JavaCalls::call_static(JavaValue* result, Klass* klass, Symbol* name, Symbo
 
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
+#else
+  extern LeydenStaticData leydenStaticData;
+
+  uint i;
+  for (i = 0; i < leydenStaticData.nmethods_size; i++) {
+    CompiledCode cc = leydenStaticData.nmethods[i];
+    if (cc.klass == klass && cc.name == name && cc.signature == signature) {
+//      os::message_box("xxx", "yyy");
+      JavaCalls::call(result, methodHandle(THREAD, cc.method), args, CHECK);
+//      os::message_box("xxx", "yyy");
+      break;
+    }
+  }
+  assert(i < leydenStaticData.nmethods_size, "");
 #endif
 }
 

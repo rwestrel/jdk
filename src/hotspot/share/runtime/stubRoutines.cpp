@@ -54,7 +54,6 @@ address UnsafeCopyMemory::_common_exit_stub_pc                  = NULL;
 
 BufferBlob* StubRoutines::_code1                                = NULL;
 BufferBlob* StubRoutines::_code2                                = NULL;
-
 #endif
 address StubRoutines::_call_stub_return_address                 = NULL;
 address StubRoutines::_call_stub_entry                          = NULL;

@@ -323,7 +323,16 @@ static void set_property(Handle props, const char* key, const char* value, TRAPS
  * names and values from the jvm SystemProperty.
  * Which includes some internal and all commandline -D defined properties.
  */
-JVM_ENTRY(jobjectArray, JVM_GetProperties(JNIEnv *env))
+extern "C" {
+jobjectArray JNICALL JVM_GetProperties(JNIEnv *env) {
+  extern jobjectArray (*JVM_GetProperties_reduced)(JNIEnv *env);
+  if (JVM_GetProperties_reduced != NULL) {
+    return JVM_GetProperties_reduced(env);
+  }
+  JavaThread* thread=JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  debug_only(VMNativeEntryWrapper __vew;)
+  VM_ENTRY_BASE(result_type, header, thread)
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
   int ndx = 0;
@@ -1259,12 +1268,32 @@ JVM_END
 
 
 // Returns the inherited_access_control_context field of the running thread.
-JVM_ENTRY(jobject, JVM_GetInheritedAccessControlContext(JNIEnv *env, jclass cls))
+//JVM_ENTRY(jobject, JVM_GetInheritedAccessControlContext(JNIEnv *env, jclass cls))
+extern "C" {
+jobject JNICALL JVM_GetInheritedAccessControlContext(JNIEnv *env, jclass cls) {
+  extern jobject (*JVM_GetInheritedAccessControlContext_reduced) (JNIEnv *, jclass );
+  if (JVM_GetInheritedAccessControlContext_reduced != NULL) {
+    return JVM_GetInheritedAccessControlContext_reduced(env, cls);
+  }
+  JavaThread* thread=JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  debug_only(VMNativeEntryWrapper __vew;)
+  VM_ENTRY_BASE(result_type, header, thread)
   oop result = java_lang_Thread::inherited_access_control_context(thread->threadObj());
   return JNIHandles::make_local(THREAD, result);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
+//JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
+extern "C" {
+  jobject JNICALL JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls) {
+    extern jobject (*JVM_GetStackAccessControlContext_reduced) (JNIEnv *, jclass );
+    if (JVM_GetStackAccessControlContext_reduced != NULL) {
+      return JVM_GetStackAccessControlContext_reduced(env, cls);
+    }
+    JavaThread* thread=JavaThread::thread_from_jni_environment(env);
+    ThreadInVMfromNative __tiv(thread);
+    debug_only(VMNativeEntryWrapper __vew;)
+    VM_ENTRY_BASE(result_type, header, thread)
   if (!UsePrivilegedStack) return NULL;
 
   ResourceMark rm(THREAD);
@@ -3071,7 +3100,18 @@ JVM_ENTRY(void, JVM_ResumeThread(JNIEnv* env, jobject jthread))
 JVM_END
 
 
-JVM_ENTRY(void, JVM_SetThreadPriority(JNIEnv* env, jobject jthread, jint prio))
+//JVM_ENTRY(void, JVM_SetThreadPriority(JNIEnv* env, jobject jthread, jint prio))
+extern "C" {
+void JNICALL JVM_SetThreadPriority(JNIEnv* env, jobject jthread, jint prio) {
+  extern void (*JVM_SetThreadPriority_reduced) (JNIEnv* env, jobject jthread, jint prio);
+  if (JVM_SetThreadPriority_reduced != NULL) {
+    JVM_SetThreadPriority_reduced(env, jthread, prio);
+    return;
+  }
+  JavaThread* thread=JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  debug_only(VMNativeEntryWrapper __vew;)
+  VM_ENTRY_BASE(result_type, header, thread)
   ThreadsListHandle tlh(thread);
   oop java_thread = NULL;
   JavaThread* receiver = NULL;

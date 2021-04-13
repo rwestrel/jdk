@@ -152,7 +152,7 @@ JVMState* DirectCallGenerator::generate(JVMState* jvms) {
   }
 
   CallStaticJavaNode* call = new CallStaticJavaNode(kit.C, tf(), target, method());
-  if (is_inlined_method_handle_intrinsic(jvms, method())) {
+  if (is_inlined_method_handle_intrinsic(jvms, method()) || true) {
     // To be able to issue a direct call and skip a call to MH.linkTo*/invokeBasic adapter,
     // additional information about the method being invoked should be attached
     // to the call site to make resolution logic work

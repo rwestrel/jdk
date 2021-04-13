@@ -447,11 +447,7 @@ class InstanceKlass: public Klass {
  private:
   friend class fieldDescriptor;
 
-#ifndef LEYDEN
-
   FieldInfo* field(int index) const { return FieldInfo::from_field_array(_fields, index); }
-
-#endif
 
  public:
 #ifndef LEYDEN
@@ -619,8 +615,6 @@ public:
 
   static ByteSize reference_type_offset() { return in_ByteSize(offset_of(InstanceKlass, _reference_type)); }
 
-#ifndef LEYDEN
-
   // find local field, returns true if found
   bool find_local_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
   // find field in direct superinterfaces, returns the interface in which the field is defined
@@ -629,8 +623,6 @@ public:
   Klass* find_field(Symbol* name, Symbol* sig, fieldDescriptor* fd) const;
   // find instance or static fields according to JVM spec 5.4.3.2, returns the klass in which the field is defined
   Klass* find_field(Symbol* name, Symbol* sig, bool is_static, fieldDescriptor* fd) const;
-
-#endif
 
   // find a non-static or static field given its offset within the class.
   bool contains_field_offset(int offset);

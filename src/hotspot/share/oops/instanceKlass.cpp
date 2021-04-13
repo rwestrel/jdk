@@ -1540,7 +1540,7 @@ void InstanceKlass::mask_for(const methodHandle& method, int bci,
   // _oop_map_cache is constant after init; lookup below does its own locking.
   oop_map_cache->lookup(method, bci, entry_for);
 }
-
+#endif
 bool InstanceKlass::contains_field_offset(int offset) {
   fieldDescriptor fd;
   return find_field_from_offset(offset, false, &fd);
@@ -1638,7 +1638,6 @@ bool InstanceKlass::find_field_from_offset(int offset, bool is_static, fieldDesc
   }
   return false;
 }
-#endif
 
 void InstanceKlass::methods_do(void f(Method* method)) {
   // Methods aren't stable until they are loaded.  This can be read outside
@@ -2110,8 +2109,6 @@ void InstanceKlass::set_enclosing_method_indices(u2 class_index,
   }
 }
 
-#ifndef LEYDEN
-
 // Lookup or create a jmethodID.
 // This code is called by the VMThread and JavaThreads so the
 // locking has to be done very carefully to avoid deadlocks
@@ -2160,11 +2157,10 @@ jmethodID InstanceKlass::get_jmethod_id(const methodHandle& method_h) {
   }
   // implied else:
   // we need to allocate a cache so default length and id values are good
-
   if (jmeths == NULL ||   // no cache yet
       length <= idnum ||  // cache is too short
       id == NULL) {       // cache doesn't contain entry
-
+#ifndef LEYDEN
     // This function can be called by the VMThread so we have to do all
     // things that might block on a safepoint before grabbing the lock.
     // Otherwise, we can deadlock with the VMThread or have a cache
@@ -2217,10 +2213,14 @@ jmethodID InstanceKlass::get_jmethod_id(const methodHandle& method_h) {
     if (to_dealloc_id != NULL) {
       Method::destroy_jmethod_id(class_loader_data(), to_dealloc_id);
     }
+#else
+    ShouldNotReachHere();
+#endif
   }
   return id;
 }
 
+#ifndef LEYDEN
 // Figure out how many jmethodIDs haven't been allocated, and make
 // sure space for them is pre-allocated.  This makes getting all
 // method ids much, much faster with classes with more than 8
@@ -2293,7 +2293,7 @@ jmethodID InstanceKlass::get_jmethod_id_fetch_or_update(
   }
   return id;
 }
-
+#endif
 
 // Common code to get the jmethodID cache length and the jmethodID
 // value at index idnum if there is one.
@@ -2313,7 +2313,7 @@ void InstanceKlass::get_jmethod_id_length_value(jmethodID* cache,
   }
 }
 
-
+#ifndef LEYDEN
 // Lookup a jmethodID, NULL if not found.  Do no blocking, no allocations, no handles
 jmethodID InstanceKlass::jmethod_id_or_null(Method* method) {
   size_t idnum = (size_t)method->method_idnum();

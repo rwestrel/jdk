@@ -23,6 +23,7 @@
  *
  */
 
+#include <utilities/utf8.hpp>
 #include "precompiled.hpp"
 #include "jni.h"
 #include "jvm.h"
@@ -177,8 +178,6 @@ extern LONG WINAPI topLevelExceptionFilter(_EXCEPTION_POINTERS* );
 
 // out-of-line helpers for class jfieldIDWorkaround:
 
-#ifndef LEYDEN
-
 bool jfieldIDWorkaround::is_valid_jfieldID(Klass* k, jfieldID id) {
   if (jfieldIDWorkaround::is_instance_jfieldID(k, id)) {
     uintptr_t as_uint = (uintptr_t) id;
@@ -226,8 +225,6 @@ intptr_t jfieldIDWorkaround::encode_klass_hash(Klass* k, intptr_t offset) {
     return 0;
   }
 }
-
-#endif
 
 bool jfieldIDWorkaround::klass_hash_ok(Klass* k, jfieldID id) {
   uintptr_t as_uint = (uintptr_t) id;
@@ -1067,8 +1064,6 @@ JNI_ENTRY_NO_PRESERVE(jboolean, jni_IsInstanceOf(JNIEnv *env, jobject obj, jclas
 JNI_END
 
 
-#ifndef LEYDEN
-
 static jmethodID get_method_id(JNIEnv *env, jclass clazz, const char *name_str,
                                const char *sig, bool is_static, TRAPS) {
   // %%%% This code should probably just call into a method in the LinkResolver
@@ -1098,7 +1093,11 @@ static jmethodID get_method_id(JNIEnv *env, jclass clazz, const char *name_str,
 
   // Make sure class is linked and initialized before handing id's out to
   // Method*s.
+#ifndef LEYDEN
   klass->initialize(CHECK_NULL);
+#else
+  assert(!klass->is_instance_klass() || InstanceKlass::cast(klass)->is_initialized(), "");
+#endif
 
   Method* m;
   if (name == vmSymbols::object_initializer_name() ||
@@ -1139,7 +1138,6 @@ JNI_ENTRY(jmethodID, jni_GetStaticMethodID(JNIEnv *env, jclass clazz,
   HOTSPOT_JNI_GETSTATICMETHODID_RETURN((uintptr_t) ret);
   return ret;
 JNI_END
-#endif
 
 
 
@@ -1785,10 +1783,6 @@ JNI_END
 //
 
 
-DT_RETURN_MARK_DECL(GetFieldID, jfieldID
-                    , HOTSPOT_JNI_GETFIELDID_RETURN((uintptr_t)_ret_ref));
-
-#ifndef LEYDEN
 JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
           const char *name, const char *sig))
   HOTSPOT_JNI_GETFIELDID_ENTRY(env, clazz, (char *) name, (char *) sig);
@@ -1807,8 +1801,12 @@ JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
     THROW_MSG_0(vmSymbols::java_lang_NoSuchFieldError(), err_msg("%s.%s %s", k->external_name(), name, sig));
   }
 
+#ifndef LEYDEN
   // Make sure class is initialized before handing id's out to fields
   k->initialize(CHECK_NULL);
+#else
+  assert(!k->is_instance_klass() || InstanceKlass::cast(k)->is_initialized(), "");
+#endif
 
   fieldDescriptor fd;
   if (!k->is_instance_klass() ||
@@ -1822,7 +1820,6 @@ JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
   ret = jfieldIDWorkaround::to_instance_jfieldID(k, fd.offset());
   return ret;
 JNI_END
-#endif
 
 
 JNI_ENTRY(jobject, jni_GetObjectField(JNIEnv *env, jobject obj, jfieldID fieldID))
@@ -3239,11 +3236,7 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_GetObjectClass,
     jni_IsInstanceOf,
 
-#ifndef LEYDEN
     jni_GetMethodID,
-#else
-        NULL,
-#endif
 
     jni_CallObjectMethod,
     jni_CallObjectMethodV,
@@ -3307,11 +3300,7 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_CallNonvirtualVoidMethodV,
     jni_CallNonvirtualVoidMethodA,
 
-#ifndef LEYDEN
     jni_GetFieldID,
-#else
-        NULL,
-#endif
 
     jni_GetObjectField,
     jni_GetBooleanField,
@@ -3333,11 +3322,7 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_SetFloatField,
     jni_SetDoubleField,
 
-#ifndef LEYDEN
     jni_GetStaticMethodID,
-#else
-        NULL,
-#endif
 
     jni_CallStaticObjectMethod,
     jni_CallStaticObjectMethodV,
@@ -3640,6 +3625,182 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void *args_) {
   return ret;
 }
 
+#ifndef LEYDEN
+class PreLoadAndPreCompile : public StackObj {
+private:
+  FILE* _stream;
+  Thread* _thread;
+  Handle _protection_domain;
+  Handle _loader;
+
+  const char* _error_message;
+
+  char* _bufptr;
+  char* _buffer;
+  int _buffer_length;
+  int _buffer_pos;
+
+  GrowableArray<Method*> _methods;
+
+public:
+  PreLoadAndPreCompile(const char* filename, TRAPS) {
+    _thread = THREAD;
+    _loader = Handle(_thread, SystemDictionary::java_system_loader());
+    _protection_domain = Handle();
+
+    _stream = fopen(filename, "rt");
+    if (_stream == NULL) {
+      fprintf(stderr, "ERROR: Can't open replay file %s\n", filename);
+    }
+
+    _error_message = NULL;
+
+    _buffer_length = 32;
+    _buffer = NEW_RESOURCE_ARRAY(char, _buffer_length);
+    _bufptr = _buffer;
+    _buffer_pos = 0;
+  }
+
+  bool had_error() {
+    return _error_message != NULL || _thread->has_pending_exception();
+  }
+
+  bool can_pre_compile() {
+    return !(_stream == NULL || had_error());
+  }
+
+  void report_error(const char* msg) {
+    _error_message = msg;
+    // Restore the _buffer contents for error reporting
+    for (int i = 0; i < _buffer_pos; i++) {
+      if (_buffer[i] == '\0') _buffer[i] = ' ';
+    }
+  }
+
+  int get_line(int c) {
+    while(c != EOF) {
+      if (_buffer_pos + 1 >= _buffer_length) {
+        int new_length = _buffer_length * 2;
+        // Next call will throw error in case of OOM.
+        _buffer = REALLOC_RESOURCE_ARRAY(char, _buffer, _buffer_length, new_length);
+        _buffer_length = new_length;
+      }
+      if (c == '\n') {
+        c = getc(_stream); // get next char
+        break;
+      } else if (c == '\r') {
+        // skip LF
+      } else {
+        _buffer[_buffer_pos++] = c;
+      }
+      c = getc(_stream);
+    }
+    // null terminate it, reset the pointer
+    _buffer[_buffer_pos] = '\0'; // NL or EOF
+    _buffer_pos = 0;
+    _bufptr = _buffer;
+    return c;
+  }
+
+  char* scan_and_terminate(char delim) {
+    char* str = _bufptr;
+    while (*_bufptr != delim && *_bufptr != '\0') {
+      _bufptr++;
+    }
+    if (*_bufptr != '\0') {
+      *_bufptr++ = '\0';
+    }
+    if (_bufptr == str) {
+      // nothing here
+      return NULL;
+    }
+    return str;
+  }
+
+  // Take an ascii string contain \u#### escapes and convert it to utf8
+  // in place.
+  static void unescape_string(char* value) {
+    char* from = value;
+    char* to = value;
+    while (*from != '\0') {
+      if (*from != '\\') {
+        *from++ = *to++;
+      } else {
+        switch (from[1]) {
+          case 'u': {
+            from += 2;
+            jchar value=0;
+            for (int i=0; i<4; i++) {
+              char c = *from++;
+              switch (c) {
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9':
+                  value = (value << 4) + c - '0';
+                  break;
+                case 'a': case 'b': case 'c':
+                case 'd': case 'e': case 'f':
+                  value = (value << 4) + 10 + c - 'a';
+                  break;
+                case 'A': case 'B': case 'C':
+                case 'D': case 'E': case 'F':
+                  value = (value << 4) + 10 + c - 'A';
+                  break;
+                default:
+                  ShouldNotReachHere();
+              }
+            }
+            UNICODE::convert_to_utf8(&value, 1, to);
+            to++;
+            break;
+          }
+          case 't': *to++ = '\t'; from += 2; break;
+          case 'n': *to++ = '\n'; from += 2; break;
+          case 'r': *to++ = '\r'; from += 2; break;
+          case 'f': *to++ = '\f'; from += 2; break;
+          default:
+            ShouldNotReachHere();
+        }
+      }
+    }
+    *from = *to;
+  }
+
+  GrowableArray<Method*> process(TRAPS) {
+    int line_no = 1;
+    int c = getc(_stream);
+    while(c != EOF) {
+      c = get_line(c);
+      if (_bufptr[0] == '#') {
+        continue;
+      }
+      char* k_str = scan_and_terminate('.');
+      unescape_string(k_str);
+      Symbol* k_name = SymbolTable::new_symbol(k_str);
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, _loader, _protection_domain, true, THREAD);
+      assert(!HAS_PENDING_EXCEPTION && k != NULL, "");
+      InstanceKlass* ik = (InstanceKlass*)k;
+      ik->initialize(THREAD);
+      assert(!HAS_PENDING_EXCEPTION, "");
+
+      char* m_str = scan_and_terminate(':');
+      unescape_string(m_str);
+      Symbol* m_name = SymbolTable::new_symbol(m_str);
+      assert(m_name != NULL, "");
+      char* s_str = scan_and_terminate(' ');
+      unescape_string(s_str);
+      Symbol* s_name = SymbolTable::new_symbol(s_str);
+      assert(s_name != NULL, "");
+      Method* m = ik->find_method(m_name, s_name);
+      assert(m != NULL, "");
+      _methods.push(m);
+    }
+    return _methods;
+  }
+};
+#endif
+#include "compiler/compileBroker.hpp"
+
 DT_RETURN_MARK_DECL(CreateJavaVM, jint
                     , HOTSPOT_JNI_CREATEJAVAVM_RETURN(_ret_ref));
 
@@ -3737,6 +3898,23 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 #ifndef PRODUCT
     if (ReplayCompiles) ciReplay::replay(thread);
 #endif
+    if (PreLoadAndPreCompileFile != NULL) {
+      HandleMark hm(thread);
+      ResourceMark rm(thread);
+
+      PreLoadAndPreCompile pre_compile(PreLoadAndPreCompileFile, thread);
+      int exit_code = 0;
+      if (pre_compile.can_pre_compile()) {
+        GrowableArray<Method*> methods = pre_compile.process(thread);
+
+        for (int i = 0; i < methods.length(); i++) {
+          Method* m = methods.at(i);
+          methodHandle mh(thread, m);
+          nmethod* nm = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0, CompileTask::Reason_Whitebox, thread);
+          assert(!thread->has_pending_exception() && nm != NULL, "");
+        }
+      }
+    }
 #endif
 
 #ifdef ASSERT

@@ -361,7 +361,7 @@ class StubGenerator: public StubCodeGenerator {
     // pop parameters
     __ lea(rsp, rsp_after_call);
 
-#ifdef ASSERT
+#if 0 //def ASSERT
     // verify that threads correspond
     {
      Label L1, L2, L3;

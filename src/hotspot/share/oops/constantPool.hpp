@@ -37,7 +37,7 @@
 #include "utilities/bytes.hpp"
 #include "utilities/constantTag.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // A ConstantPool is an array containing class constants as described in the
 // class file.
 //
@@ -262,7 +262,11 @@ class ConstantPool : public Metadata {
   objArrayOop resolved_references()  const;
   objArrayOop resolved_references_or_null()  const;
   // mapping resolved object array indexes to cp indexes and back.
+#ifndef LEYDEN
+
   int object_to_cp_index(int index)         { return reference_map()->at(index); }
+
+#endif
   int cp_to_object_index(int index);
 
   void set_resolved_klasses(Array<Klass*>* rk)  { _resolved_klasses = rk; }
@@ -287,17 +291,22 @@ class ConstantPool : public Metadata {
     int cache_index = decode_invokedynamic_index(indy_index);
     return cache_index;
   }
+
+#ifndef LEYDEN
+
   ConstantPoolCacheEntry* invokedynamic_cp_cache_entry_at(int indy_index) const {
     // decode index that invokedynamic points to.
     int cp_cache_index = invokedynamic_cp_cache_index(indy_index);
     return cache()->entry_at(cp_cache_index);
   }
+
   // Given the per-instruction index of an indy instruction, report the
   // main constant pool entry for its bootstrap specifier.
   // From there, uncached_name/signature_ref_at will get the name/type.
   int invokedynamic_bootstrap_ref_index_at(int indy_index) const {
     return invokedynamic_cp_cache_entry_at(indy_index)->constant_pool_index();
   }
+#endif
 
   // Assembly code support
   static int tags_offset_in_bytes()         { return offset_of(ConstantPool, _tags); }
@@ -859,9 +868,13 @@ class ConstantPool : public Metadata {
 
  private:
 
+#ifndef LEYDEN
+
   void set_resolved_references(OopHandle s) { _cache->set_resolved_references(s); }
   Array<u2>* reference_map() const        {  return (_cache == NULL) ? NULL :  _cache->reference_map(); }
   void set_reference_map(Array<u2>* o)    { _cache->set_reference_map(o); }
+
+#endif
 
   // patch JSR 292 resolved references after the class is linked.
   void patch_resolved_references(GrowableArray<Handle>* cp_patches);

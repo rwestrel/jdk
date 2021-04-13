@@ -4033,6 +4033,7 @@ void Compile::verify_graph_edges(bool no_dead_code) {
 // behavior, the Compile's failure reason is quietly copied up to the ciEnv
 // by the logic in C2Compiler.
 void Compile::record_failure(const char* reason) {
+  ShouldNotReachHere();
   if (log() != NULL) {
     log()->elem("failure reason='%s' phase='compile'", reason);
   }

@@ -154,23 +154,27 @@ class Method : public Metadata {
   AccessFlags access_flags() const               { return _access_flags;  }
   void set_access_flags(AccessFlags flags)       { _access_flags = flags; }
 
+  Symbol* _name;
+
   // name
   Symbol* name() const                           {
 #ifndef LEYDEN
     return constants()->symbol_at(name_index());
 #else
-    return NULL;
+    return _name;
 #endif
   }
   int name_index() const                         { return constMethod()->name_index();         }
   void set_name_index(int index)                 { constMethod()->set_name_index(index);       }
+
+  Symbol* _signature;
 
   // signature
   Symbol* signature() const                      {
 #ifndef LEYDEN
     return constants()->symbol_at(signature_index());
 #else
-    return NULL;
+    return _signature;
 #endif
   }
   int signature_index() const                    { return constMethod()->signature_index();         }
@@ -628,11 +632,12 @@ public:
 
   // method holder (the Klass* holding this method)
 
+  InstanceKlass* _holder;
   InstanceKlass* method_holder() const         {
 #ifndef LEYDEN
     return constants()->pool_holder();
 #else
-    return NULL;
+    return _holder;
 #endif
   }
 

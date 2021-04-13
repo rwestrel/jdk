@@ -40,18 +40,12 @@
 #include CPU_HEADER_INLINE(frame)
 
 inline bool frame::is_entry_frame() const {
-#ifndef LEYDEN
   return StubRoutines::returns_to_call_stub(pc());
-#else
-  return false;
-#endif
 }
 
-#ifndef LEYDEN
 inline bool frame::is_stub_frame() const {
   return StubRoutines::is_stub_code(pc()) || (_cb != NULL && _cb->is_adapter_blob());
 }
-#endif
 
 inline bool frame::is_first_frame() const {
   return is_entry_frame() && entry_frame_is_first();

@@ -2311,12 +2311,14 @@ jmethodID Method::make_jmethod_id(ClassLoaderData* loader_data, Method* m) {
     return (jmethodID)cld->jmethod_ids()->add_method(m);
   }
 }
+#endif
 
 jmethodID Method::jmethod_id() {
   methodHandle mh(Thread::current(), this);
   return method_holder()->get_jmethod_id(mh);
 }
 
+#ifndef LEYDEN
 // Mark a jmethodID as free.  This is called when there is a data race in
 // InstanceKlass while creating the jmethodID cache.
 void Method::destroy_jmethod_id(ClassLoaderData* loader_data, jmethodID m) {

@@ -230,6 +230,7 @@ class java_lang_String : AllStatic {
 class java_lang_Class : AllStatic {
   friend class VMStructs;
   friend class JVMCIVMStructs;
+  friend class Threads;
 
  private:
 
@@ -363,6 +364,7 @@ class java_lang_Class : AllStatic {
 // Interface to java.lang.Thread objects
 
 class java_lang_Thread : AllStatic {
+  friend class Threads;
  private:
   // Note that for this class the layout changed between JDK1.2 and JDK1.3,
   // so we compute the offsets at startup rather than hard-wiring them.
@@ -1296,6 +1298,7 @@ public:
 // Interface to java.security.AccessControlContext objects
 
 class java_security_AccessControlContext: AllStatic {
+  friend class Threads;
  private:
   // Note that for this class the layout changed between JDK1.2 and JDK1.3,
   // so we compute the offsets at startup rather than hard-wiring them.

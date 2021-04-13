@@ -76,8 +76,7 @@ static OffsetCompactHashtable<
 
 // --------------------------------------------------------------------------
 #endif
-typedef ConcurrentHashTable<SymbolTableConfig, mtSymbol> SymbolTableHash;
-static SymbolTableHash* _local_table = NULL;
+SymbolTableHash* SymbolTable::_local_table = NULL;
 
 volatile bool SymbolTable::_has_work = 0;
 volatile bool SymbolTable::_needs_rehashing = false;

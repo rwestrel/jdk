@@ -85,6 +85,7 @@ class CodeCache : AllStatic {
   friend class WhiteBox;
   friend class CodeCacheLoader;
   friend class ShenandoahParallelCodeHeapIterator;
+  friend class Threads;
  private:
   // CodeHeaps of the cache
   static GrowableArray<CodeHeap*>* _heaps;

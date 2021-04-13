@@ -28,7 +28,7 @@
 #include "oops/fieldStreams.hpp"
 #include "runtime/thread.inline.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 FieldStreamBase::FieldStreamBase(Array<u2>* fields, ConstantPool* constants, int start, int limit) : _fields(fields),
          _constants(constantPoolHandle(Thread::current(), constants)), _index(start) {

@@ -32,7 +32,7 @@
 #include "utilities/accessFlags.hpp"
 #include "utilities/constantTag.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 // A fieldDescriptor describes the attributes of a single field (instance or class variable).
 // It needs the class constant pool to work (because it only holds indices into the pool
 // rather than the actual info).

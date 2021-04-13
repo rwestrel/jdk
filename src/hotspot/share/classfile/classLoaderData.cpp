@@ -341,7 +341,6 @@ void ClassLoaderData::classes_do(KlassClosure* klass_closure) {
   }
 }
 
-#ifndef LEYDEN
 void ClassLoaderData::classes_do(void f(Klass * const)) {
   // Lock-free access requires load_acquire
   for (Klass* k = Atomic::load_acquire(&_klasses); k != NULL; k = k->next_link()) {
@@ -412,10 +411,8 @@ void ClassLoaderData::packages_do(void f(PackageEntry*)) {
     }
   }
 }
-
 #ifndef LEYDEN
-
- void ClassLoaderData::record_dependency(const Klass* k) {
+void ClassLoaderData::record_dependency(const Klass* k) {
   assert(k != NULL, "invariant");
 
   ClassLoaderData * const from_cld = this;
