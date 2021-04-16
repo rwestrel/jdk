@@ -78,6 +78,8 @@ public class BootLoader {
     // ClassLoaderValue map for the boot class loader
     private static final ConcurrentHashMap<?, ?> CLASS_LOADER_VALUE_MAP
         = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<?, ?> CLASS_LOADER_VALUE_MAP_copy
+        = new ConcurrentHashMap<>();
 
     // native libraries loaded by the boot class loader
     private static final NativeLibraries NATIVE_LIBS

@@ -972,4 +972,5 @@ public final class ModuleLayer {
 
     // the list of layers with modules defined to a class loader
     private static final ClassLoaderValue<List<ModuleLayer>> CLV = new ClassLoaderValue<>();
+    private static final ClassLoaderValue<List<ModuleLayer>> CLV_copy = new ClassLoaderValue<>();
 }

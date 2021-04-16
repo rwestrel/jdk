@@ -481,7 +481,19 @@ JVM_ENTRY_NO_ENV(jlong, JVM_FreeMemory(void))
 JVM_END
 
 
-JVM_ENTRY_NO_ENV(jlong, JVM_MaxMemory(void))
+extern "C" {
+jlong JVM_MaxMemory(void) {
+  extern jlong (*JVM_MaxMemory_reduced) ();
+  if (JVM_MaxMemory_reduced != NULL) {
+    return JVM_MaxMemory_reduced();
+  }
+  JavaThread* thread = JavaThread::current();
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
+
   size_t n = Universe::heap()->max_capacity();
   return convert_size_t_to_jlong(n);
 JVM_END
@@ -611,7 +623,19 @@ JVM_ENTRY(jint, JVM_IHashCode(JNIEnv* env, jobject handle))
 JVM_END
 
 
-JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
+extern "C" {
+void JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms) {
+  extern void (* JVM_MonitorWait_reduced)(JNIEnv*, jobject, jlong);
+  if (JVM_MonitorWait_reduced != NULL) {
+    JVM_MonitorWait_reduced(env, handle, ms);
+    return;
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   JavaThreadInObjectWaitState jtiows(thread, ms != 0);
   if (JvmtiExport::should_post_monitor_wait()) {
@@ -633,7 +657,19 @@ JVM_ENTRY(void, JVM_MonitorNotify(JNIEnv* env, jobject handle))
 JVM_END
 
 
-JVM_ENTRY(void, JVM_MonitorNotifyAll(JNIEnv* env, jobject handle))
+extern "C" {
+void JVM_MonitorNotifyAll(JNIEnv* env, jobject handle) {
+  extern void (*JVM_MonitorNotifyAll_reduced)(JNIEnv* , jobject );
+  if (JVM_MonitorNotifyAll_reduced) {
+    JVM_MonitorNotifyAll_reduced(env, handle);
+    return;
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   ObjectSynchronizer::notifyall(obj, CHECK);
 JVM_END
@@ -1129,11 +1165,23 @@ JVM_END
 JVM_ENTRY (void, JVM_AddReadsModule(JNIEnv *env, jobject from_module, jobject source_module))
   Modules::add_reads_module(from_module, source_module, CHECK);
 JVM_END
+#endif
 
-JVM_ENTRY(void, JVM_DefineArchivedModules(JNIEnv *env, jobject platform_loader, jobject system_loader))
+extern "C" {
+void JVM_DefineArchivedModules(JNIEnv* env, jobject platform_loader, jobject system_loader) {
+  extern void (*JVM_DefineArchivedModules_reduced)(JNIEnv*, jobject, jobject);
+  if (JVM_DefineArchivedModules_reduced != NULL) {
+    JVM_DefineArchivedModules_reduced(env, platform_loader, system_loader);
+    return;
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   Modules::define_archived_modules(platform_loader, system_loader, CHECK);
 JVM_END
-#endif
 
 // Reflection support //////////////////////////////////////////////////////////////////////////////
 

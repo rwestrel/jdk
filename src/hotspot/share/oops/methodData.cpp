@@ -127,7 +127,7 @@ void ProfileData::print_data_on(outputStream* st, const MethodData* md) const {
 void ProfileData::print_shared(outputStream* st, const char* name, const char* extra) const {
   st->print("bci: %d", bci());
   st->fill_to(tab_width_one);
-  st->print("%s", name);
+  st->print("%s (%p)", name, data());
   tab(st);
   int trap = trap_state();
   if (trap != 0) {
@@ -420,7 +420,7 @@ void ReceiverTypeData::print_receiver_data_on(outputStream* st) const {
 #if INCLUDE_JVMCI
   st->print_cr("count(%u) nonprofiled_count(%u) entries(%u)", count(), nonprofiled_count(), entries);
 #else
-  st->print_cr("count(%u) entries(%u)", count(), entries);
+  st->print_cr("count(%u/%d) entries(%u)", count(), in_bytes(count_offset()), entries);
 #endif
   int total = count();
   for (row = 0; row < row_limit(); row++) {

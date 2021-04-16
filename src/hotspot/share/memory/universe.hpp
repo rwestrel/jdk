@@ -26,6 +26,7 @@
 #define SHARE_MEMORY_UNIVERSE_HPP
 
 #include <classfile/symbolTable.hpp>
+#include <memory/metaspace/metaspaceContext.hpp>
 #include "gc/shared/verifyOption.hpp"
 #include "oops/array.hpp"
 #include "oops/oopHandle.hpp"
@@ -456,6 +457,10 @@ struct LeydenStaticData {
   int java_lang_Thread___thread_status_offset;
   int java_lang_Thread___park_blocker_offset;
   SymbolTableHash* SymbolTable___local_table;
+  int InstanceMirrorKlass___offset_of_static_fields;
+  metaspace::MetaspaceContext* MetaspaceContext___nonclass_space_context;
+  metaspace::MetaspaceContext* MetaspaceContext___class_space_context;
+
 
   CompiledCode* nmethods;
   uint nmethods_size;
@@ -467,6 +472,9 @@ struct LeydenStaticData {
   uintptr_t InstanceMirrorKlass_vtbl;
   uintptr_t InstanceRefKlass_vtbl;
   uintptr_t Method_vtbl;
+
+  void (* OptoRuntime__new_instance_C)(Klass*, JavaThread*);
+  void (*OptoRuntime__new_array_C)(Klass*, int, JavaThread*);
 };
 
 #endif // SHARE_MEMORY_UNIVERSE_HPP

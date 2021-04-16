@@ -2016,7 +2016,6 @@ JNI_END
 DT_RETURN_MARK_DECL(GetStaticFieldID, jfieldID
                     , HOTSPOT_JNI_GETSTATICFIELDID_RETURN((uintptr_t)_ret_ref));
 
-#ifndef LEYDEN
 JNI_ENTRY(jfieldID, jni_GetStaticFieldID(JNIEnv *env, jclass clazz,
           const char *name, const char *sig))
   HOTSPOT_JNI_GETSTATICFIELDID_ENTRY(env, clazz, (char *) name, (char *) sig);
@@ -2033,7 +2032,11 @@ JNI_ENTRY(jfieldID, jni_GetStaticFieldID(JNIEnv *env, jclass clazz,
   }
   Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz));
   // Make sure class is initialized before handing id's out to static fields
+#ifndef LEYDEN
   k->initialize(CHECK_NULL);
+#else
+  assert(!k->is_instance_klass() || InstanceKlass::cast(k)->is_initialized(), "");
+#endif
 
   fieldDescriptor fd;
   if (!k->is_instance_klass() ||
@@ -2050,7 +2053,6 @@ JNI_ENTRY(jfieldID, jni_GetStaticFieldID(JNIEnv *env, jclass clazz,
   ret = jfieldIDWorkaround::to_static_jfieldID(id);
   return ret;
 JNI_END
-#endif
 
 
 JNI_ENTRY(jobject, jni_GetStaticObjectField(JNIEnv *env, jclass clazz, jfieldID fieldID))
@@ -3355,11 +3357,7 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_CallStaticVoidMethodV,
     jni_CallStaticVoidMethodA,
 
-#ifndef LEYDEN
     jni_GetStaticFieldID,
-#else
-        NULL,
-#endif
 
     jni_GetStaticObjectField,
     jni_GetStaticBooleanField,

@@ -3845,6 +3845,7 @@ bool Compile::final_graph_reshaping() {
 bool Compile::too_many_traps(ciMethod* method,
                              int bci,
                              Deoptimization::DeoptReason reason) {
+  return true;
   ciMethodData* md = method->method_data();
   if (md->is_empty()) {
     // Assume the trap has not occurred, or that it occurred only
@@ -3870,6 +3871,7 @@ bool Compile::too_many_traps(ciMethod* method,
 // Less-accurate variant which does not require a method and bci.
 bool Compile::too_many_traps(Deoptimization::DeoptReason reason,
                              ciMethodData* logmd) {
+  return true;
   if (trap_count(reason) >= Deoptimization::per_method_trap_limit(reason)) {
     // Too many traps globally.
     // Note that we use cumulative trap_count, not just md->trap_count.
@@ -4033,7 +4035,9 @@ void Compile::verify_graph_edges(bool no_dead_code) {
 // behavior, the Compile's failure reason is quietly copied up to the ciEnv
 // by the logic in C2Compiler.
 void Compile::record_failure(const char* reason) {
-  ShouldNotReachHere();
+  if (UseNewCode) {
+    ShouldNotReachHere();
+  }
   if (log() != NULL) {
     log()->elem("failure reason='%s' phase='compile'", reason);
   }

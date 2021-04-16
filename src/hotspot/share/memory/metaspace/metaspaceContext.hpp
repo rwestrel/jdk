@@ -68,6 +68,8 @@ class MetaspaceContext : public CHeapObj<mtMetaspace> {
     _cm(cm)
   {}
 
+public:
+
   static MetaspaceContext* _nonclass_space_context;
   static MetaspaceContext* _class_space_context;
 

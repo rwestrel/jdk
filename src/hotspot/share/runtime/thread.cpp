@@ -22,6 +22,7 @@
  *
  */
 
+#include <opto/runtime.hpp>
 #include "precompiled.hpp"
 #include "jvm.h"
 #include "aot/aotLoader.hpp"
@@ -3475,6 +3476,9 @@ JNIEXPORT LeydenStaticData leydenStaticData;
 #include "classfile/classLoaderDataGraph.hpp"
 #include "oops/instanceClassLoaderKlass.hpp"
 #include "oops/instanceMirrorKlass.hpp"
+#include "memory/metaspace/metaspaceContext.hpp"
+
+using metaspace::MetaspaceContext;
 
 static void leyden_fix_vtbl(Metadata* m) {
   uintptr_t vtbl = *(uintptr_t*)m;
@@ -3596,6 +3600,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   copy_in(java_lang_Thread, _thread_status_offset);
   copy_in(java_lang_Thread, _park_blocker_offset);
   copy_in(SymbolTable, _local_table);
+  copy_in(InstanceMirrorKlass, _offset_of_static_fields);
+  copy_in(MetaspaceContext, _nonclass_space_context);
+  copy_in(MetaspaceContext, _class_space_context);
+
 
 #undef copy_in
 
@@ -3606,6 +3614,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     cld->methods_do(leyden_fix_method_vtbl);
     cld = cld->next();
   }
+
+  printf("WWW %p\n", &leydenStaticData);
+
+  leydenStaticData.OptoRuntime__new_instance_C = OptoRuntime::new_instance_C;
+  leydenStaticData.OptoRuntime__new_array_C = OptoRuntime::new_array_C;
+
+  UseEpsilonGC = true;
+
 #endif
 
   extern void JDK_Version_init();
@@ -4306,16 +4322,21 @@ static void compile_callees(JavaThread* thread, nmethod* nm) {
       Method* method = r->method_value();
       tty->print("YYY %p -> %p %p", r->addr(), r->destination(), method);
       if (method != NULL) {
-        method->print_short_name(tty); tty->cr();
-//        assert(method->is_native(), "");
-        if (!method->has_compiled_code()) {
-          methodHandle mh(thread, method);
-          nmethod* callee = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0, CompileTask::Reason_Whitebox, thread);
-          assert(!thread->has_pending_exception() && nm != NULL, "");
-          r->set_destination(method->code()->verified_entry_point());
-          compile_callees(thread, method->code()->as_nmethod());
+        stringStream ss;
+        method->print_short_name(&ss); tty->print_cr("%s", ss.as_string());
+        if (strcmp(ss.as_string(), " jdk.internal.module.SystemModules$default::moduleDescriptors")) {
+          if (!method->has_compiled_code()) {
+            methodHandle mh(thread, method);
+            nmethod* callee = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
+                                                            CompileTask::Reason_Whitebox, thread);
+            assert(!thread->has_pending_exception() && nm != NULL, "");
+            r->set_destination(method->code()->verified_entry_point());
+            compile_callees(thread, method->code()->as_nmethod());
+          } else {
+            r->set_destination(method->code()->verified_entry_point());
+          }
         } else {
-          r->set_destination(method->code()->verified_entry_point());
+          tty->cr();
         }
       } else {
         tty->cr();
@@ -4325,17 +4346,22 @@ static void compile_callees(JavaThread* thread, nmethod* nm) {
       Method* method = r->method_value();
       tty->print("YYY %p -> %p %p", r->addr(), r->destination(), method);
       if (method != NULL) {
-        method->print_short_name(tty); tty->cr();
+        stringStream ss;
+        method->print_short_name(&ss); tty->print_cr("%s", ss.as_string());
 //        assert(method->is_native(), "");
-        if (!method->has_compiled_code()) {
-          methodHandle mh(thread, method);
-          nmethod* callee = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
-                                                          CompileTask::Reason_Whitebox, thread);
-          assert(!thread->has_pending_exception() && nm != NULL, "");
-          r->set_destination(method->code()->verified_entry_point());
-          compile_callees(thread, method->code()->as_nmethod());
+        if (strcmp(ss.as_string(), " jdk.internal.module.SystemModules$default::moduleDescriptors")) {
+          if (!method->has_compiled_code()) {
+            methodHandle mh(thread, method);
+            nmethod* callee = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
+                                                            CompileTask::Reason_Whitebox, thread);
+            assert(!thread->has_pending_exception() && nm != NULL, "");
+            r->set_destination(method->code()->verified_entry_point());
+            compile_callees(thread, method->code()->as_nmethod());
+          } else {
+            r->set_destination(method->code()->verified_entry_point());
+          }
         } else {
-          r->set_destination(method->code()->verified_entry_point());
+          tty->cr();
         }
       } else {
         tty->cr();
@@ -4375,31 +4401,185 @@ jobject (*JVM_GetStackAccessControlContext_reduced) (JNIEnv *, jclass );
 jobject (*JVM_GetInheritedAccessControlContext_reduced) (JNIEnv *env, jclass cls);
 void (*JVM_SetThreadPriority_reduced) (JNIEnv* env, jobject jthread, jint prio);
 jobjectArray (*JVM_GetProperties_reduced)(JNIEnv *env);
+jlong (*JVM_MaxMemory_reduced) ();
+void (* JVM_MonitorWait_reduced)(JNIEnv*, jobject, jlong);
+void (*JVM_MonitorNotifyAll_reduced)(JNIEnv* , jobject );
+void (*JVM_DefineArchivedModules_reduced)(JNIEnv*, jobject, jobject);
+//LeydenStaticData* leydenStaticData_reduced;
 
 bool Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
 #ifndef LEYDEN
+  Klass* VM_klass;
+  oop FileDescriptor_in;
+  oop FileDescriptor_out;
+  oop FileDescriptor_err;
+  int VM_klass_intLevel;
+  int FileDescriptor_klass_parent;
+  Klass* ModuleLayer_klass;
+  int ModuleLayer_klass_CLV;
+  int ModuleLayer_klass_CLV_copy;
+  Klass* BootLoader_klass;
+  int BootLoader_klass_CLASS_LOADER_VALUE_MAP;
+  int BootLoader_klass_CLASS_LOADER_VALUE_MAP_copy;
+
+//  Handle VM_mirror;
   if (UseNewCode) {
     ResourceMark rm;
     HandleMark hm(thread);
 
-    Symbol* k_name = SymbolTable::new_symbol("java/lang/Void");
-    assert(k_name != NULL, "");
-    Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()), Handle(), true, thread);
-    assert(!thread->has_pending_exception() && k != NULL, "");
+    {
+      Symbol* k_name = SymbolTable::new_symbol("java/lang/Void");
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()), Handle(),
+                                            true, thread);
+      assert(!thread->has_pending_exception() && k != NULL, "");
+    }
 
+//    Handle VM_old_mirror;
+    {
+      Symbol* k_name = SymbolTable::new_symbol("jdk/internal/misc/VM");
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()), Handle(),
+                                            true, thread);
+      assert(!thread->has_pending_exception() && k != NULL, "");
+      VM_klass = k;
+      Symbol* field_name = SymbolTable::new_symbol("initLevel");
+      Symbol* field_signature = SymbolTable::new_symbol("I");
+      fieldDescriptor fd;
+      Klass* res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      VM_klass_intLevel = fd.offset();
+      //      Handle old_mirror(thread, k->java_mirror());
+//      Handle classData(thread, java_lang_Class::class_data(k->java_mirror()));
+//      oop mirror_oop = InstanceMirrorKlass::cast(vmClasses::Class_klass())->allocate_instance(k, thread);
+//      assert(!thread->has_pending_exception() && mirror_oop != NULL, "");
+//      Handle mirror(thread, mirror_oop);
+//      VM_mirror = mirror;
+//      java_lang_Class::set_klass(mirror(), k);
+//
+//      InstanceMirrorKlass* mk = InstanceMirrorKlass::cast(mirror->klass());
+//      assert(java_lang_Class::oop_size(mirror()) == mk->instance_size(k), "should have been set");
+//
+//      java_lang_Class::set_static_oop_field_count(mirror(), mk->compute_static_oop_field_count(mirror()));
+//      java_lang_Class::initialize_mirror_fields(k, mirror, Handle(thread, k->protection_domain()), classData, thread);
+//      assert(!thread->has_pending_exception(), "");
+//      java_lang_Class::set_class_loader(mirror(), k->class_loader());
+//
+//      k->replace_java_mirror(mirror());
+//
+//      java_lang_Class::set_mirror_module_field(k, mirror, Handle(thread, k->module()->module()), thread);
+//      assert(!thread->has_pending_exception(), "");
+//
+//      methodHandle h_method(thread, InstanceKlass::cast(k)->class_initializer());
+//      if (h_method() != NULL) {
+//        JavaCallArguments args; // No arguments
+//        JavaValue result(T_VOID);
+//        JavaCalls::call(&result, h_method, &args, thread); // Static call (no args)
+//        assert(!thread->has_pending_exception(), "");
+//      }
+//
+//      VM_old_mirror = old_mirror;
+////      k->replace_java_mirror(old_mirror());
+    }
+
+    {
+      Symbol* k_name = SymbolTable::new_symbol("java/io/FileDescriptor");
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()),
+                                                   Handle(),
+                                                   true, thread);
+      assert(!thread->has_pending_exception() && k != NULL, "");
+
+      Symbol* field_name = SymbolTable::new_symbol("in");
+      Symbol* field_signature = SymbolTable::new_symbol("Ljava/io/FileDescriptor;");
+      fieldDescriptor fd;
+      Klass* res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      Handle FileDescriptor_in_h = Handle(thread, k->java_mirror()->obj_field(fd.offset()));
+
+      field_name = SymbolTable::new_symbol("out");
+      field_signature = SymbolTable::new_symbol("Ljava/io/FileDescriptor;");
+      res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      Handle FileDescriptor_out_h = Handle(thread, k->java_mirror()->obj_field(fd.offset()));
+
+      field_name = SymbolTable::new_symbol("err");
+      field_signature = SymbolTable::new_symbol("Ljava/io/FileDescriptor;");
+      res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      Handle FileDescriptor_err_h = Handle(thread, k->java_mirror()->obj_field(fd.offset()));
+
+      field_name = SymbolTable::new_symbol("parent");
+      field_signature = SymbolTable::new_symbol("Ljava/io/Closeable;");
+      res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      FileDescriptor_klass_parent = fd.offset();
+
+      FileDescriptor_err = FileDescriptor_err_h();
+      FileDescriptor_in = FileDescriptor_in_h();
+      FileDescriptor_out = FileDescriptor_out_h();
+    }
+    {
+      Symbol* k_name = SymbolTable::new_symbol("java/lang/ModuleLayer");
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()),
+                                                   Handle(),
+                                                   true, thread);
+      assert(!thread->has_pending_exception() && k != NULL, "");
+      ModuleLayer_klass = k;
+
+      Symbol* field_name = SymbolTable::new_symbol("CLV");
+      Symbol* field_signature = SymbolTable::new_symbol("Ljdk/internal/loader/ClassLoaderValue;");
+      fieldDescriptor fd;
+      Klass* res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      ModuleLayer_klass_CLV = fd.offset();
+
+      field_name = SymbolTable::new_symbol("CLV_copy");
+      field_signature = SymbolTable::new_symbol("Ljdk/internal/loader/ClassLoaderValue;");
+      res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      ModuleLayer_klass_CLV_copy = fd.offset();
+    }
+    {
+      Symbol* k_name = SymbolTable::new_symbol("jdk/internal/loader/BootLoader");
+      assert(k_name != NULL, "");
+      Klass* k = SystemDictionary::resolve_or_fail(k_name, Handle(thread, SystemDictionary::java_system_loader()),
+                                                   Handle(),
+                                                   true, thread);
+      assert(!thread->has_pending_exception() && k != NULL, "");
+      BootLoader_klass = k;
+
+      Symbol* field_name = SymbolTable::new_symbol("CLASS_LOADER_VALUE_MAP");
+      Symbol* field_signature = SymbolTable::new_symbol("Ljava/util/concurrent/ConcurrentHashMap;");
+      fieldDescriptor fd;
+      Klass* res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      BootLoader_klass_CLASS_LOADER_VALUE_MAP = fd.offset();
+
+      field_name = SymbolTable::new_symbol("CLASS_LOADER_VALUE_MAP_copy");
+      field_signature = SymbolTable::new_symbol("Ljava/util/concurrent/ConcurrentHashMap;");
+      res = k->find_field(field_name, field_signature, &fd);
+      assert(res != NULL, "");
+      BootLoader_klass_CLASS_LOADER_VALUE_MAP_copy = fd.offset();
+
+    }
     GrowableArray<CompiledCode> nmethods;
     compile_method(thread, vmClasses::ThreadGroup_klass(), vmSymbols::object_initializer_name(), vmSymbols::void_method_signature(), nmethods, false);
     compile_method(thread, vmClasses::ThreadGroup_klass(), vmSymbols::object_initializer_name(), vmSymbols::threadgroup_string_void_signature(), nmethods, false);
     compile_method(thread, vmClasses::Thread_klass(), vmSymbols::object_initializer_name(), vmSymbols::threadgroup_string_void_signature(), nmethods, false);
     compile_method(thread, vmClasses::System_klass(), vmSymbols::initPhase1_name(), vmSymbols::void_method_signature(), nmethods, true);
+    compile_method(thread, vmClasses::ThreadGroup_klass(),vmSymbols::add_method_name(), vmSymbols::thread_void_signature(), nmethods, false);
+    compile_method(thread, vmClasses::System_klass(), vmSymbols::initPhase2_name(), vmSymbols::boolean_boolean_int_signature(), nmethods, true);
 
     leydenStaticData.nmethods = NEW_C_HEAP_ARRAY(CompiledCode, nmethods.length(), mtOther);
     for (int i = 0; i < nmethods.length(); ++i) {
       leydenStaticData.nmethods[i] = nmethods.at(i);
     }
     leydenStaticData.nmethods_size = nmethods.length();
+//    VM_klass->replace_java_mirror(VM_old_mirror());
   }
 #endif
 
@@ -4498,8 +4678,20 @@ bool Threads::destroy_vm() {
 
 #ifndef LEYDEN
   if (UseNewCode) {
+    VM_klass->java_mirror()->int_field_put(VM_klass_intLevel, 0);
+    FileDescriptor_in->obj_field_put(FileDescriptor_klass_parent, NULL);
+    FileDescriptor_out->obj_field_put(FileDescriptor_klass_parent, NULL);
+    FileDescriptor_err->obj_field_put(FileDescriptor_klass_parent, NULL);
+    ModuleLayer_klass->java_mirror()->obj_field_put(ModuleLayer_klass_CLV, ModuleLayer_klass->java_mirror()->obj_field(ModuleLayer_klass_CLV_copy));
+    printf("XXX old = %p new = %p\n",
+           BootLoader_klass->java_mirror()->obj_field(BootLoader_klass_CLASS_LOADER_VALUE_MAP_copy),
+           BootLoader_klass->java_mirror()->obj_field(BootLoader_klass_CLASS_LOADER_VALUE_MAP));
+    BootLoader_klass->java_mirror()->obj_field_put(BootLoader_klass_CLASS_LOADER_VALUE_MAP, BootLoader_klass->java_mirror()->obj_field(BootLoader_klass_CLASS_LOADER_VALUE_MAP_copy));
+
+//    VM_klass->replace_java_mirror(VM_mirror());
+
 #define copy_out(c, f) do { leydenStaticData.c##__##f = c::f; } while (0)
-#define copy_out_array(c, f) memcpy(leydenStaticData.c##__##f, c::f, sizeof(leydenStaticData.c##__##f))
+#define copy_out_array(c, f) memcpy(leydenStaticData.c##__##f, c::f, sizeof(leydenStaticData.c##__##f));
 
     copy_out(VM_Version, _cpuinfo_segv_addr);
     copy_out(VM_Version, _cpuinfo_cont_addr);
@@ -4561,6 +4753,10 @@ bool Threads::destroy_vm() {
     copy_out(java_lang_Thread, _thread_status_offset);
     copy_out(java_lang_Thread, _park_blocker_offset);
     copy_out(SymbolTable, _local_table);
+    copy_out(InstanceMirrorKlass, _offset_of_static_fields);
+    copy_out(MetaspaceContext, _nonclass_space_context);
+    copy_out(MetaspaceContext, _class_space_context);
+
 
     {
       ObjArrayKlass dummy;
@@ -4610,13 +4806,20 @@ bool Threads::destroy_vm() {
     printf("XXX %p\n", sym);
     jint (*CreateJavaVM)(JavaVM **, void **, void *) = (jint (*)(JavaVM **, void **, void *))sym;
     printf("XXX %p\n", sym);
-    sym = dlsym(minimal, "leydenStaticData");
-    memcpy(sym, &leydenStaticData, sizeof(leydenStaticData));
-    printf("XXX %p\n", sym);
+//    leydenStaticData_reduced = (LeydenStaticData*)dlsym(minimal, "leydenStaticData");
+//    memcpy(leydenStaticData_reduced, &leydenStaticData, sizeof(leydenStaticData));
+//    printf("WWW %p %p\n", &leydenStaticData, leydenStaticData_reduced);
+
+//    printf("XXX %p\n", sym);
     JVM_GetStackAccessControlContext_reduced = (jobject (*) (JNIEnv *, jclass ))dlsym(minimal, "JVM_GetStackAccessControlContext");
     JVM_GetInheritedAccessControlContext_reduced = (jobject (*) (JNIEnv *, jclass ))dlsym(minimal, "JVM_GetInheritedAccessControlContext");
     JVM_SetThreadPriority_reduced = (void (*) (JNIEnv* , jobject , jint ))dlsym(minimal, "JVM_SetThreadPriority");
     JVM_GetProperties_reduced = (jobjectArray (*)(JNIEnv*))dlsym(minimal, "JVM_GetProperties");
+    JVM_MaxMemory_reduced = (jlong (*)())dlsym(minimal, "JVM_MaxMemory");
+    JVM_MonitorWait_reduced = (void (*)(JNIEnv*, jobject, jlong))dlsym(minimal, "JVM_MonitorWait");
+    JVM_MonitorNotifyAll_reduced = (void (*)(JNIEnv* , jobject))dlsym(minimal, "JVM_MonitorNotifyAll");
+    JVM_DefineArchivedModules_reduced = (void (*)(JNIEnv*, jobject, jobject))dlsym(minimal, "JVM_DefineArchivedModules");
+
     struct sigaction sa;
     sa.sa_handler = SIG_DFL;
     sigaction(SIGSEGV, &sa, NULL);

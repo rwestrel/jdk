@@ -136,6 +136,7 @@ typedef const TypeFunc*(*TypeFunc_generator)();
 
 class OptoRuntime : public AllStatic {
   friend class Matcher;  // allow access to stub names
+  friend class Threads;
 
  private:
 #ifndef LEYDEN

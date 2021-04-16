@@ -202,8 +202,16 @@ const char* OptoRuntime::stub_name(address entry) {
 // We failed the fast-path allocation.  Now we need to do a scavenge or GC
 // and try allocation again.
 
+extern "C" LeydenStaticData leydenStaticData;
 // object allocation
-JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thread))
+void OptoRuntime::new_instance_C(Klass* klass, JavaThread* thread) {
+#ifndef LEYDEN
+  if (leydenStaticData.OptoRuntime__new_instance_C != NULL) {
+    leydenStaticData.OptoRuntime__new_instance_C(klass, thread);
+    return;
+  }
+#endif
+  HandleMarkCleaner __hm(thread);
   JRT_BLOCK;
 #ifndef PRODUCT
   SharedRuntime::_new_instance_ctr++;         // new instance requires GC
@@ -247,7 +255,14 @@ JRT_END
 
 
 // array allocation
-JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_C(Klass* array_type, int len, JavaThread *thread))
+void OptoRuntime::new_array_C(Klass* array_type, int len, JavaThread* thread) {
+#ifndef LEYDEN
+  if (leydenStaticData.OptoRuntime__new_array_C != NULL) {
+    leydenStaticData.OptoRuntime__new_array_C(array_type, len, thread);
+    return;
+  }
+#endif
+  HandleMarkCleaner __hm(thread);
   JRT_BLOCK;
 #ifndef PRODUCT
   SharedRuntime::_new_array_ctr++;            // new array requires GC

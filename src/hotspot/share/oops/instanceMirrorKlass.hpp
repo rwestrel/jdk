@@ -44,6 +44,7 @@ class ClassFileParser;
 class InstanceMirrorKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
+  friend class Threads;
 
  public:
   static const KlassID ID = InstanceMirrorKlassID;

@@ -3656,7 +3656,6 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ movl(rax, flags);
   __ andl(rax, (1 << ConstantPoolCacheEntry::is_vfinal_shift));
   __ jcc(Assembler::zero, notFinal);
-
   const Register method = index;  // method must be rbx
   assert(method == rbx,
          "Method* must be rbx for interpreter calling convention");
@@ -3672,7 +3671,6 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ profile_arguments_type(rax, method, rbcp, true);
 
   __ jump_from_interpreted(method, rax);
-
   __ bind(notFinal);
 
   // get receiver klass

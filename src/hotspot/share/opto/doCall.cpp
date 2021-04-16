@@ -233,7 +233,7 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
       }
       if (receiver_method == NULL &&
           (have_major_receiver || morphism == 1 ||
-           (morphism == 2 && UseBimorphicInlining))) {
+           (morphism >= 2 && UseBimorphicInlining))) {
         // receiver_method = profile.method();
         // Profiles do not suggest methods now.  Look it up in the major receiver.
         receiver_method = callee->resolve_invoke(jvms->method()->holder(),
@@ -247,17 +247,23 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
           // Look up second receiver.
           CallGenerator* next_hit_cg = NULL;
           ciMethod* next_receiver_method = NULL;
-          if (morphism == 2 && UseBimorphicInlining) {
-            next_receiver_method = callee->resolve_invoke(jvms->method()->holder(),
-                                                               profile.receiver(1));
-            if (next_receiver_method != NULL) {
-              next_hit_cg = this->call_generator(next_receiver_method,
-                                  vtable_index, !call_does_dispatch, jvms,
-                                  allow_inline, prof_factor);
-              if (next_hit_cg != NULL && !next_hit_cg->is_inline() &&
-                  have_major_receiver && UseOnlyInlinedBimorphic) {
+          if (morphism >= 2 && UseBimorphicInlining) {
+            for (int i = 1; i < morphism; ++i) {
+              next_receiver_method = callee->resolve_invoke(jvms->method()->holder(),
+                                                            profile.receiver(i));
+              if (next_receiver_method != NULL) {
+                CallGenerator* cg = this->call_generator(next_receiver_method,
+                                                         vtable_index, !call_does_dispatch, jvms,
+                                                         allow_inline, prof_factor);
+                if (cg != NULL && !cg->is_inline() &&
+                    have_major_receiver && UseOnlyInlinedBimorphic) {
                   // Skip if we can't inline second receiver's method
                   next_hit_cg = NULL;
+                }
+                if (next_hit_cg != NULL && cg != NULL) {
+                  assert(i > 1, "");
+                  next_hit_cg = CallGenerator::for_predicted_call(profile.receiver(i-1), cg, next_hit_cg, PROB_MAX);
+                }
               }
             }
           }
@@ -265,7 +271,7 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
           Deoptimization::DeoptReason reason = (morphism == 2
                                                ? Deoptimization::Reason_bimorphic
                                                : Deoptimization::reason_class_check(speculative_receiver_type != NULL));
-          if ((morphism == 1 || (morphism == 2 && next_hit_cg != NULL)) &&
+          if ((morphism == 1 || (morphism >= 2 && next_hit_cg != NULL)) &&
               !too_many_traps_or_recompiles(caller, bci, reason)
              ) {
             // Generate uncommon trap for class check failure path
@@ -284,7 +290,8 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
               trace_type_profile(C, jvms->method(), jvms->depth() - 1, jvms->bci(), next_receiver_method, profile.receiver(1), site_count, profile.receiver_count(1));
               // We don't need to record dependency on a receiver here and below.
               // Whenever we inline, the dependency is added by Parse::Parse().
-              miss_cg = CallGenerator::for_predicted_call(profile.receiver(1), miss_cg, next_hit_cg, PROB_MAX);
+              assert(morphism >= 2, "");
+              miss_cg = CallGenerator::for_predicted_call(profile.receiver(morphism-1), miss_cg, next_hit_cg, PROB_MAX);
             }
             if (miss_cg != NULL) {
               ciKlass* k = speculative_receiver_type != NULL ? speculative_receiver_type : profile.receiver(0);

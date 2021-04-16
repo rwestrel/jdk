@@ -381,7 +381,11 @@ void JavaCalls::call(JavaValue* result, const methodHandle& method, JavaCallArgu
 }
 
 void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaCallArguments* args, TRAPS) {
-
+#ifdef LEYDEN
+  tty->print("XXX ");
+  method->print_short_name(tty);
+  tty->cr();
+#endif
   JavaThread* thread = THREAD->as_Java_thread();
   assert(method.not_null(), "must have a method to call");
   assert(!SafepointSynchronize::is_at_safepoint(), "call to Java code during VM operation");

@@ -299,6 +299,7 @@ void ciField::initialize_from(fieldDescriptor* fd) {
       _is_constant = false;
     }
   }
+  _is_constant = false;
 }
 
 // ------------------------------------------------------------------

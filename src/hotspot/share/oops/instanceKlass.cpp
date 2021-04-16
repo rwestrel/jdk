@@ -3960,8 +3960,6 @@ void JNIid::deallocate(JNIid* current) {
 }
 
 
-#ifndef LEYDEN
-
 void JNIid::verify(Klass* holder) {
   int first_field_offset  = InstanceMirrorKlass::offset_of_static_fields();
   int end_field_offset;
@@ -3979,8 +3977,6 @@ void JNIid::verify(Klass* holder) {
     current = current->next();
   }
 }
-
-#endif
 
 void InstanceKlass::set_init_state(ClassState state) {
 #ifdef ASSERT
