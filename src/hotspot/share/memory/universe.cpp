@@ -440,6 +440,8 @@ void Universe::genesis(TRAPS) {
   #endif
 }
 
+#ifndef LEYDEN
+
 void Universe::initialize_basic_type_mirrors(TRAPS) {
 #if INCLUDE_CDS_JAVA_HEAP
     if (UseSharedSpaces &&
@@ -467,6 +469,8 @@ void Universe::initialize_basic_type_mirrors(TRAPS) {
       }
     }
 }
+
+#endif
 
 #ifndef LEYDEN
 
@@ -805,8 +809,8 @@ jint universe_init() {
   {
 #ifndef LEYDEN
     SymbolTable::create_table();
-#endif
     StringTable::create_table();
+#endif
   }
 
 #if INCLUDE_CDS

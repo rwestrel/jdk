@@ -197,11 +197,13 @@ void ClassLoaderDataGraph::walk_metadata_and_clean_metaspaces() {
 
 // GC root of class loader data created.
 ClassLoaderData* volatile ClassLoaderDataGraph::_head = NULL;
+#ifndef LEYDEN
 ClassLoaderData* ClassLoaderDataGraph::_unloading = NULL;
 
 bool ClassLoaderDataGraph::_should_clean_deallocate_lists = false;
 bool ClassLoaderDataGraph::_safepoint_cleanup_needed = false;
 bool ClassLoaderDataGraph::_metaspace_oom = false;
+#endif
 
 #ifndef LEYDEN
 

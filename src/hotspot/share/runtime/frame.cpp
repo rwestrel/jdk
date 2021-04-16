@@ -136,6 +136,7 @@ void RegisterMap::print() const {
 // is deoptimization. It likely no one else should ever use it.
 
 address frame::raw_pc() const {
+#ifndef LEYDEN
   if (is_deoptimized_frame()) {
     CompiledMethod* cm = cb()->as_compiled_method_or_null();
     if (cm->is_method_handle_return(pc()))
@@ -143,8 +144,11 @@ address frame::raw_pc() const {
     else
       return cm->deopt_handler_begin() - pc_return_offset;
   } else {
+#endif
     return (pc() - pc_return_offset);
+#ifndef LEYDEN
   }
+#endif
 }
 
 // Change the pc in a frame object. This does not change the actual pc in

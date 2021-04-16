@@ -27,6 +27,8 @@
 #include "code/nmethod.hpp"
 #include "memory/allocation.inline.hpp"
 
+#ifndef LEYDEN
+
 void ExceptionHandlerTable::add_entry(HandlerTableEntry entry) {
   _nesting.check();
   if (_length >= _size) {
@@ -39,6 +41,8 @@ void ExceptionHandlerTable::add_entry(HandlerTableEntry entry) {
   assert(_length < _size, "sanity check");
   _table[_length++] = entry;
 }
+
+#endif
 
 
 HandlerTableEntry* ExceptionHandlerTable::subtable_for(int catch_pco) const {
@@ -72,6 +76,8 @@ ExceptionHandlerTable::ExceptionHandlerTable(const CompiledMethod* cm) {
 }
 
 
+#ifndef LEYDEN
+
 void ExceptionHandlerTable::add_subtable(
   int                 catch_pco,
   GrowableArray<intptr_t>* handler_bcis,
@@ -97,6 +103,10 @@ void ExceptionHandlerTable::add_subtable(
   }
 }
 
+#endif
+
+
+#ifndef LEYDEN
 
 void ExceptionHandlerTable::copy_to(CompiledMethod* cm) {
   assert(size_in_bytes() == cm->handler_table_size(), "size of space allocated in compiled method incorrect");
@@ -106,6 +116,8 @@ void ExceptionHandlerTable::copy_to(CompiledMethod* cm) {
 void ExceptionHandlerTable::copy_bytes_to(address addr) {
   memmove(addr, _table, size_in_bytes());
 }
+
+#endif
 
 HandlerTableEntry* ExceptionHandlerTable::entry_for(int catch_pco, int handler_bci, int scope_depth) const {
   HandlerTableEntry* t = subtable_for(catch_pco);
@@ -170,6 +182,8 @@ void ImplicitExceptionTable::set_size( uint size ) {
   _len = 0;
 }
 
+#ifndef LEYDEN
+
 void ImplicitExceptionTable::append( uint exec_off, uint cont_off ) {
   assert( (sizeof(implicit_null_entry) >= 4) || (exec_off < 65535), "" );
   assert( (sizeof(implicit_null_entry) >= 4) || (cont_off < 65535), "" );
@@ -185,6 +199,7 @@ void ImplicitExceptionTable::append( uint exec_off, uint cont_off ) {
   *(adr(l)+1) = cont_off;
   _len = l+1;
 };
+#endif
 
 uint ImplicitExceptionTable::continuation_offset( uint exec_off ) const {
   uint l = len();
@@ -215,6 +230,7 @@ void ImplicitExceptionTable::print(address base) const {
   }
 }
 
+
 ImplicitExceptionTable::ImplicitExceptionTable(const CompiledMethod* nm) {
   if (nm->nul_chk_table_size() == 0) {
     _len = 0;
@@ -238,6 +254,8 @@ void ImplicitExceptionTable::copy_to( nmethod* nm ) {
 
 #endif
 
+#ifndef LEYDEN
+
 void ImplicitExceptionTable::copy_bytes_to(address addr, int size) {
   assert(size_in_bytes() <= size, "size of space allocated in nmethod incorrect");
   if (len() != 0) {
@@ -253,6 +271,8 @@ void ImplicitExceptionTable::copy_bytes_to(address addr, int size) {
     assert(size == 0, "bad size");
   }
 }
+
+#endif
 
 #ifndef LEYDEN
 

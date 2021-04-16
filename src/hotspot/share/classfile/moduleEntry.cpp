@@ -49,6 +49,7 @@
 
 ModuleEntry* ModuleEntryTable::_javabase_module = NULL;
 
+#ifndef LEYDEN
 oop ModuleEntry::module() const { return _module.resolve(); }
 
 void ModuleEntry::set_location(Symbol* location) {
@@ -67,7 +68,7 @@ void ModuleEntry::set_location(Symbol* location) {
       });
   }
 }
-
+#endif
 // Return true if the module's version should be displayed in error messages,
 // logging, etc.
 // Return false if the module's version is null, if it is unnamed, or if the
@@ -98,6 +99,7 @@ bool ModuleEntry::should_show_version() {
   return true;
 }
 
+#ifndef LEYDEN
 void ModuleEntry::set_version(Symbol* version) {
   if (_version != NULL) {
     // _version symbol's refcounts are managed by ModuleEntry,
@@ -117,7 +119,6 @@ oop ModuleEntry::shared_protection_domain() {
   return _shared_pd.resolve();
 }
 
-#ifndef LEYDEN
 
 // Set the shared ProtectionDomain atomically
 void ModuleEntry::set_shared_protection_domain(ClassLoaderData *loader_data,
@@ -127,7 +128,6 @@ void ModuleEntry::set_shared_protection_domain(ClassLoaderData *loader_data,
   loader_data->init_handle_locked(_shared_pd, pd_h);
 }
 
-#endif
 
 // Returns true if this module can read module m
 bool ModuleEntry::can_read(ModuleEntry* m) const {
@@ -267,7 +267,6 @@ void ModuleEntry::delete_reads() {
   _reads = NULL;
 }
 
-#ifndef LEYDEN
 
 ModuleEntry* ModuleEntry::create_unnamed_module(ClassLoaderData* cld) {
   // The java.lang.Module for this loader's
@@ -332,7 +331,6 @@ void ModuleEntry::delete_unnamed_module() {
   FREE_C_HEAP_OBJ(this);
 }
 
-#endif
 
 ModuleEntryTable::ModuleEntryTable(int table_size)
   : Hashtable<Symbol*, mtModule>(table_size, sizeof(ModuleEntry))
@@ -578,7 +576,6 @@ void ModuleEntryTable::restore_archived_oops(ClassLoaderData* loader_data, Array
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
 
-#ifndef LEYDEN
 
 ModuleEntry* ModuleEntryTable::new_entry(unsigned int hash, Handle module_handle,
                                          bool is_open, Symbol* name,
@@ -642,7 +639,6 @@ ModuleEntry* ModuleEntryTable::locked_create_entry(Handle module_handle,
   return entry;
 }
 
-#endif
 
 // lookup_only by Symbol* to find a ModuleEntry.
 ModuleEntry* ModuleEntryTable::lookup_only(Symbol* name) {
@@ -669,7 +665,6 @@ void ModuleEntryTable::purge_all_module_reads() {
   }
 }
 
-#ifndef LEYDEN
 
 void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, Symbol* location) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
@@ -730,7 +725,6 @@ void ModuleEntryTable::patch_javabase_entries(Handle module_handle) {
   java_lang_Class::set_fixup_module_field_list(NULL);
 }
 
-#endif
 
 void ModuleEntryTable::print(outputStream* st) {
   st->print_cr("Module Entry Table (table_size=%d, entries=%d)",
@@ -755,6 +749,8 @@ void ModuleEntry::print(outputStream* st) {
                location() != NULL ? location()->as_C_string() : "NULL",
                BOOL_TO_STR(!can_read_all_unnamed()), p2i(next()));
 }
+
+#endif
 
 void ModuleEntryTable::verify() {
   verify_table<ModuleEntry>("Module Entry Table");

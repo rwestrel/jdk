@@ -30,6 +30,8 @@
 #include "runtime/atomic.hpp"
 #include "runtime/frame.hpp"
 
+#ifndef LEYDEN
+
 inline bool CompiledMethod::is_deopt_pc(address pc) { return is_deopt_entry(pc) || is_deopt_mh_entry(pc); }
 
 // When using JVMCI the address might be off by the size of a call instruction.
@@ -49,6 +51,7 @@ inline bool CompiledMethod::is_deopt_mh_entry(address pc) {
     ;
 }
 
+
 // -----------------------------------------------------------------------------
 // CompiledMethod::get_deopt_original_pc
 //
@@ -65,6 +68,7 @@ inline address CompiledMethod::get_deopt_original_pc(const frame* fr) {
 
   return NULL;
 }
+#endif
 
 
 // class ExceptionCache methods

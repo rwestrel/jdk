@@ -72,7 +72,10 @@ class DebugToken; // Opaque datatype for stored:
 // is on the implicit monitorenter of a synchronized method.
 const int SynchronizationEntryBCI = InvocationEntryBci;
 
+#ifndef LEYDEN
+
 class DIR_Chunk; // private class, a nugget of collected information
+#endif
 
 class DebugInformationRecorder: public ResourceObj {
 #ifndef LEYDEN

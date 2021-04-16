@@ -1372,10 +1372,14 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 
 #endif
 
+#ifndef LEYDEN
+
 void java_lang_Class::fixup_module_field(Klass* k, Handle module) {
   assert(_module_offset != 0, "must have been computed already");
   java_lang_Class::set_module(k->java_mirror(), module());
 }
+
+#endif
 
 int  java_lang_Class::oop_size(oop java_class) {
   assert(_oop_size_offset != 0, "must be set");
@@ -1491,6 +1495,8 @@ void java_lang_Class::set_source_file(oop java_class, oop source_file) {
   java_class->obj_field_put(_source_file_offset, source_file);
 }
 
+#ifndef LEYDEN
+
 oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, BasicType type, TRAPS) {
   // This should be improved by adding a field at the Java level or by
   // introducing a new VM klass (see comment in ClassFileParser)
@@ -1506,6 +1512,8 @@ oop java_lang_Class::create_basic_type_mirror(const char* basic_type_name, Basic
 #endif
   return java_class;
 }
+
+#endif
 
 
 Klass* java_lang_Class::as_Klass_raw(oop java_class) {
@@ -1598,10 +1606,14 @@ Klass* java_lang_Class::array_klass_acquire(oop java_class) {
 }
 
 
+#ifndef LEYDEN
+
 void java_lang_Class::release_set_array_klass(oop java_class, Klass* klass) {
   assert(klass->is_klass() && klass->is_array_klass(), "should be array klass");
   java_class->release_metadata_field_put(_array_klass_offset, klass);
 }
+
+#endif
 
 
 BasicType java_lang_Class::primitive_type(oop java_class) {
@@ -3026,17 +3038,25 @@ oop java_lang_reflect_Method::clazz(oop reflect) {
   return reflect->obj_field(_clazz_offset);
 }
 
+#ifndef LEYDEN
+
 void java_lang_reflect_Method::set_clazz(oop reflect, oop value) {
    reflect->obj_field_put(_clazz_offset, value);
 }
+
+#endif
 
 int java_lang_reflect_Method::slot(oop reflect) {
   return reflect->int_field(_slot_offset);
 }
 
+#ifndef LEYDEN
+
 void java_lang_reflect_Method::set_slot(oop reflect, int value) {
   reflect->int_field_put(_slot_offset, value);
 }
+
+#endif
 #ifndef LEYDEN
 void java_lang_reflect_Method::set_name(oop method, oop value) {
   method->obj_field_put(_name_offset, value);
@@ -3575,10 +3595,11 @@ bool java_lang_ref_Reference::is_referent_field(oop obj, ptrdiff_t offset) {
   assert(!is_reference || ik->is_subclass_of(vmClasses::Reference_klass()), "sanity");
   return is_reference;
 }
-
+#endif
 int java_lang_boxing_object::_value_offset;
 int java_lang_boxing_object::_long_value_offset;
 
+#ifndef LEYDEN
 #define BOXING_FIELDS_DO(macro) \
   macro(_value_offset,      integerKlass, "value", int_signature, false); \
   macro(_long_value_offset, longKlass, "value", long_signature, false);
@@ -3637,7 +3658,7 @@ oop java_lang_boxing_object::create(BasicType type, jvalue* value, TRAPS) {
   }
   return box;
 }
-
+#endif
 
 BasicType java_lang_boxing_object::basic_type(oop box) {
   if (box == NULL)  return T_ILLEGAL;
@@ -3681,6 +3702,7 @@ BasicType java_lang_boxing_object::get_value(oop box, jvalue* value) {
   return type;
 }
 
+#ifndef LEYDEN
 
 BasicType java_lang_boxing_object::set_value(oop box, jvalue* value) {
   BasicType type = vmClasses::box_klass_type(box->klass());
@@ -3715,6 +3737,8 @@ BasicType java_lang_boxing_object::set_value(oop box, jvalue* value) {
   return type;
 }
 
+#endif
+
 
 void java_lang_boxing_object::print(BasicType type, jvalue* value, outputStream* st) {
   switch (type) {
@@ -3729,8 +3753,6 @@ void java_lang_boxing_object::print(BasicType type, jvalue* value, outputStream*
   default:          st->print("type %d?", type);                    break;
   }
 }
-
-#endif
 
 
 // Support for java_lang_ref_SoftReference

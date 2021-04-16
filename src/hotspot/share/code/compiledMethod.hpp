@@ -333,9 +333,13 @@ public:
   virtual address get_original_pc(const frame* fr) = 0;
   // Deopt
   // Return true is the PC is one would expect if the frame is being deopted.
+#ifndef LEYDEN
+
   inline bool is_deopt_pc(address pc);
   inline bool is_deopt_mh_entry(address pc);
   inline bool is_deopt_entry(address pc);
+
+#endif
 
   virtual bool can_convert_to_zombie() = 0;
   virtual const char* compile_kind() const = 0;
@@ -386,10 +390,14 @@ public:
 
   bool has_evol_metadata();
 
+#ifndef LEYDEN
+
   // Fast breakpoint support. Tells if this compiled method is
   // dependent on the given method. Returns true if this nmethod
   // corresponds to the given method as well.
   virtual bool is_dependent_on_method(Method* dependee) = 0;
+
+#endif
 
   virtual NativeCallWrapper* call_wrapper_at(address call) const = 0;
   virtual NativeCallWrapper* call_wrapper_before(address return_pc) const = 0;
@@ -419,7 +427,11 @@ public:
   // GC unloading support
   // Cleans unloaded klasses and unloaded nmethods in inline caches
 
+#ifndef LEYDEN
+
   virtual bool is_unloading() = 0;
+
+#endif
 
 #ifndef LEYDEN
   bool unload_nmethod_caches(bool class_unloading_occurred);

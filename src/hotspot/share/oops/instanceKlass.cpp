@@ -3648,9 +3648,11 @@ void InstanceKlass::oop_print_value_on(oop obj, outputStream* st) {
   } else if (this == vmClasses::MethodType_klass()) {
     st->print(" = ");
     java_lang_invoke_MethodType::print_signature(obj, st);
+#endif
   } else if (java_lang_boxing_object::is_instance(obj)) {
     st->print(" = ");
     java_lang_boxing_object::print(obj, st);
+#ifndef LEYDEN
   } else if (this == vmClasses::LambdaForm_klass()) {
     oop vmentry = java_lang_invoke_LambdaForm::vmentry(obj);
     if (vmentry != NULL) {

@@ -72,6 +72,8 @@ CompiledMethod::CompiledMethod(Method* method, const char* name, CompilerType ty
 
 #endif
 
+#ifndef LEYDEN
+
 void CompiledMethod::init_defaults() {
   { // avoid uninitialized fields, even for short time periods
     _is_far_code                = false;
@@ -85,6 +87,8 @@ void CompiledMethod::init_defaults() {
   _has_wide_vectors           = 0;
 }
 
+#endif
+
 bool CompiledMethod::is_method_handle_return(address return_pc) {
   if (!has_method_handle_invokes())  return false;
   PcDesc* pd = pc_desc_at(return_pc);
@@ -92,6 +96,8 @@ bool CompiledMethod::is_method_handle_return(address return_pc) {
     return false;
   return pd->is_method_handle_invoke();
 }
+
+#ifndef LEYDEN
 
 // Returns a string version of the method state.
 const char* CompiledMethod::state() const {
@@ -115,6 +121,7 @@ const char* CompiledMethod::state() const {
   }
 }
 
+
 //-----------------------------------------------------------------------------
 void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock,
@@ -123,7 +130,6 @@ void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
 }
 
 //-----------------------------------------------------------------------------
-#ifndef LEYDEN
 ExceptionCache* CompiledMethod::exception_cache_acquire() const {
   return Atomic::load_acquire(&_exception_cache);
 }
@@ -307,6 +313,8 @@ ScopeDesc* CompiledMethod::scope_desc_near(address pc) {
   return new ScopeDesc(this, pd);
 }
 
+#ifndef LEYDEN
+
 address CompiledMethod::oops_reloc_begin() const {
   // If the method is not entrant or zombie then a JMP is plastered over the
   // first few bytes.  If an oop in the old code was there, that oop
@@ -336,6 +344,8 @@ address CompiledMethod::oops_reloc_begin() const {
   }
   return low_boundary;
 }
+
+#endif
 
 #ifndef LEYDEN
 int CompiledMethod::verify_icholder_relocations() {
@@ -582,6 +592,8 @@ bool CompiledMethod::unload_nmethod_caches(bool unloading_occurred) {
 }
 #endif
 
+#ifndef LEYDEN
+
 void CompiledMethod::run_nmethod_entry_barrier() {
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
   if (bs_nm != NULL) {
@@ -596,6 +608,8 @@ void CompiledMethod::run_nmethod_entry_barrier() {
     }
   }
 }
+
+#endif
 #ifndef LEYDEN
 void CompiledMethod::cleanup_inline_caches(bool clean_all) {
   for (;;) {

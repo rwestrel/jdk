@@ -137,8 +137,8 @@ class StubRoutines: AllStatic {
   static jint    _verify_oop_count;
   static address _verify_oop_subroutine_entry;
 
-  static address _call_stub_return_address;                // the return PC, when returning to a call stub
 #endif
+  static address _call_stub_return_address;                // the return PC, when returning to a call stub
   static address _call_stub_entry;
 #ifndef LEYDEN
   static address _forward_exception_entry;

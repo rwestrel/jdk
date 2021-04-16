@@ -48,6 +48,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
+#ifndef LEYDEN
   adjust_unextended_sp();
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
@@ -55,8 +56,11 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
     _pc = original_pc;
     _deopt_state = is_deoptimized;
   } else {
+#endif
     _deopt_state = not_deoptimized;
+#ifndef LEYDEN
   }
+#endif
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -70,8 +74,11 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
+#ifndef LEYDEN
   adjust_unextended_sp();
+#endif
 
+#ifndef LEYDEN
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
     _pc = original_pc;
@@ -82,9 +89,12 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
     if (_cb->is_deoptimization_stub()) {
       _deopt_state = is_deoptimized;
     } else {
+#endif
       _deopt_state = not_deoptimized;
+#ifndef LEYDEN
     }
   }
+#endif
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp) {
@@ -106,15 +116,21 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   // assert(_pc != NULL, "no pc?");
 
   _cb = CodeCache::find_blob(_pc);
+#ifndef LEYDEN
   adjust_unextended_sp();
+#endif
 
+#ifndef LEYDEN
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
     _pc = original_pc;
     _deopt_state = is_deoptimized;
   } else {
+#endif
     _deopt_state = not_deoptimized;
+#ifndef LEYDEN
   }
+#endif
 }
 
 // Accessors

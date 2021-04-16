@@ -29,9 +29,9 @@
 // definition. See stubRoutines.hpp for a description on how to
 // extend it.
 
-#ifndef LEYDEN
 static bool returns_to_call_stub(address return_pc) { return return_pc == _call_stub_return_address; }
 
+#ifndef LEYDEN
 enum platform_dependent_constants {
   code_size1 = 20000 LP64_ONLY(+10000),         // simply increase if too small (assembler will crash if too small)
   code_size2 = 35300 LP64_ONLY(+25000)          // simply increase if too small (assembler will crash if too small)
@@ -333,7 +333,5 @@ class x86 {
   static address _ones_addr()      { return _ones_adr; }
 
 };
-#else
-static bool returns_to_call_stub(address return_pc) { return false; }
 #endif
 #endif // CPU_X86_STUBROUTINES_X86_HPP

@@ -56,6 +56,8 @@ void ProtectionDomainCacheTable::trigger_cleanup() {
   Service_lock->notify_all();
 }
 
+#ifndef LEYDEN
+
 class CleanProtectionDomainEntries : public CLDClosure {
   void do_cld(ClassLoaderData* data) {
     Dictionary* dictionary = data->dictionary();
@@ -64,6 +66,10 @@ class CleanProtectionDomainEntries : public CLDClosure {
     }
   }
 };
+
+#endif
+
+#ifndef LEYDEN
 
 void ProtectionDomainCacheTable::unlink() {
   {
@@ -103,6 +109,8 @@ void ProtectionDomainCacheTable::unlink() {
   _total_oops_removed += oops_removed;
   _dead_entries = false;
 }
+
+#endif
 
 void ProtectionDomainCacheTable::print_on(outputStream* st) const {
   assert_locked_or_safepoint(SystemDictionary_lock);

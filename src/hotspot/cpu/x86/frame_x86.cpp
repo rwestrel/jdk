@@ -385,6 +385,7 @@ void frame::verify_deopt_original_pc(CompiledMethod* nm, intptr_t* unextended_sp
 }
 #endif
 
+#ifndef LEYDEN
 //------------------------------------------------------------------------------
 // frame::adjust_unextended_sp
 #ifdef ASSERT
@@ -404,6 +405,7 @@ void frame::adjust_unextended_sp() {
     }
   }
 }
+#endif
 #endif
 
 //------------------------------------------------------------------------------

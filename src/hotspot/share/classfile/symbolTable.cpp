@@ -134,15 +134,10 @@ public:
   }
   // We use default allocation/deallocation but counted
   static void* allocate_node(size_t size, Value const& value) {
-#ifndef LEYDEN
     SymbolTable::item_added();
     return AllocateHeap(size, mtSymbol);
-#else
-    return NULL;
-#endif
   }
   static void free_node(void* memory, Value const& value) {
-#ifndef LEYDEN
     // We get here because #1 some threads lost a race to insert a newly created Symbol
     // or #2 we're cleaning up unused symbol.
     // If #1, then the symbol can be either permanent,
@@ -157,7 +152,6 @@ public:
     SymbolTable::delete_symbol(value);
     FreeHeap(memory);
     SymbolTable::item_removed();
-#endif
   }
 };
 

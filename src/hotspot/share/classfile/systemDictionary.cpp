@@ -103,9 +103,11 @@ const int _loader_constraint_size = 107;                     // number of entrie
 const int _resolution_error_size  = 107;                     // number of entries in resolution error table
 const int _invoke_method_size     = 139;                     // number of entries in invoke method table
 
+#ifndef LEYDEN
 // Hashtable holding placeholders for classes being loaded.
 const int _placeholder_table_size = 1009;
 PlaceholderTable* _placeholders   = NULL;
+#endif
 
 #ifndef LEYDEN
 static PlaceholderTable*   placeholders() { return _placeholders; }
@@ -242,6 +244,8 @@ void verify_dictionary_entry(Symbol* class_name, InstanceKlass* k) {
 #endif
 #endif
 
+#ifndef LEYDEN
+
 static void handle_resolution_exception(Symbol* class_name, bool throw_error, TRAPS) {
   if (HAS_PENDING_EXCEPTION) {
     // If we have a pending exception we forward it to the caller, unless throw_error is true,
@@ -265,15 +269,19 @@ static void handle_resolution_exception(Symbol* class_name, bool throw_error, TR
     THROW_MSG(vmSymbols::java_lang_ClassNotFoundException(), class_name->as_C_string());
   }
 }
+
+#endif
 // Forwards to resolve_or_null
 
 Klass* SystemDictionary::resolve_or_fail(Symbol* class_name, Handle class_loader, Handle protection_domain,
                                          bool throw_error, TRAPS) {
   Klass* klass = resolve_or_null(class_name, class_loader, protection_domain, THREAD);
   // Check for pending exception or null klass, and throw exception
+#ifndef LEYDEN
   if (HAS_PENDING_EXCEPTION || klass == NULL) {
     handle_resolution_exception(class_name, throw_error, CHECK_NULL);
   }
+#endif
   return klass;
 }
 

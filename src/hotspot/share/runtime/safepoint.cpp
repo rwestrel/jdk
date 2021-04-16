@@ -572,14 +572,14 @@ public:
         SymbolTable::rehash_table();
       }
     }
-
+#endif
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_STRING_TABLE_REHASH)) {
       if (StringTable::needs_rehashing()) {
         Tracer t("rehashing string table");
         StringTable::rehash_table();
       }
     }
-
+#ifndef LEYDEN
     if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_SYSTEM_DICTIONARY_RESIZE)) {
       if (Dictionary::does_any_dictionary_needs_resizing()) {
         Tracer t("resizing system dictionaries");

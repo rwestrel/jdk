@@ -42,6 +42,8 @@
 #include "utilities/quickSort.hpp"
 #include "utilities/resourceHash.hpp"
 
+#ifndef LEYDEN
+
 // Returns true if this package specifies m as a qualified export, including through an unnamed export
 bool PackageEntry::is_qexported_to(ModuleEntry* m) const {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
@@ -55,7 +57,6 @@ bool PackageEntry::is_qexported_to(ModuleEntry* m) const {
   }
 }
 
-#ifndef LEYDEN
 
 // Add a module to the package's qualified export list.
 void PackageEntry::add_qexport(ModuleEntry* m) {
@@ -116,7 +117,6 @@ void PackageEntry::set_exported(ModuleEntry* m) {
   }
 }
 
-#endif
 
 // Set the package as exported to all unnamed modules unless the package is
 // already unqualifiedly exported.
@@ -128,7 +128,6 @@ void PackageEntry::set_is_exported_allUnnamed() {
   }
 }
 
-#ifndef LEYDEN
 
 // Remove dead module entries within the package's exported list.  Note that
 // if all of the modules on the _qualified_exports get purged the list does not
@@ -168,7 +167,6 @@ void PackageEntry::purge_qualified_exports() {
   }
 }
 
-#endif
 
 void PackageEntry::delete_qualified_exports() {
   if (_qualified_exports != NULL) {
@@ -434,7 +432,6 @@ bool PackageEntry::exported_pending_delete() const {
   return (is_unqual_exported() && _qualified_exports != NULL);
 }
 
-#ifndef LEYDEN
 
 // Remove dead entries from all packages' exported list
 void PackageEntryTable::purge_all_package_exports() {
@@ -454,7 +451,6 @@ void PackageEntryTable::purge_all_package_exports() {
   }
 }
 
-#endif
 
 void PackageEntryTable::print(outputStream* st) {
   st->print_cr("Package Entry Table (table_size=%d, entries=%d)",
@@ -480,7 +476,7 @@ void PackageEntry::print(outputStream* st) {
                _classpath_index, _export_flags == PKG_EXP_UNQUALIFIED,
                _export_flags == PKG_EXP_ALLUNNAMED, p2i(next()));
 }
-
+#endif
 void PackageEntryTable::verify() {
   verify_table<PackageEntry>("Package Entry Table");
 }
@@ -488,3 +484,4 @@ void PackageEntryTable::verify() {
 void PackageEntry::verify() {
   guarantee(name() != NULL, "A package entry must have a corresponding symbol name.");
 }
+

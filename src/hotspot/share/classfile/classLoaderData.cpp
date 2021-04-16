@@ -413,7 +413,9 @@ void ClassLoaderData::packages_do(void f(PackageEntry*)) {
   }
 }
 
-void ClassLoaderData::record_dependency(const Klass* k) {
+#ifndef LEYDEN
+
+ void ClassLoaderData::record_dependency(const Klass* k) {
   assert(k != NULL, "invariant");
 
   ClassLoaderData * const from_cld = this;
@@ -467,6 +469,8 @@ void ClassLoaderData::record_dependency(const Klass* k) {
     record_modified_oops();
   }
 }
+
+#endif
 
 void ClassLoaderData::add_class(Klass* k, bool publicize /* true */) {
   {
@@ -727,6 +731,7 @@ ClassLoaderData::~ClassLoaderData() {
   }
 }
 #endif
+
 // Returns true if this class loader data is for the app class loader
 // or a user defined system class loader.  (Note that the class loader
 // data may have a Class holder.)

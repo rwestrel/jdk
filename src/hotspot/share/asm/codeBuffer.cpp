@@ -255,12 +255,16 @@ address CodeBuffer::decode_begin() {
 }
 #endif // !PRODUCT
 
+#ifndef LEYDEN
+
 GrowableArray<int>* CodeBuffer::create_patch_overflow() {
   if (_overflow_arena == NULL) {
     _overflow_arena = new (mtCode) Arena(mtCode);
   }
   return new (_overflow_arena) GrowableArray<int>(_overflow_arena, 8, 0, 0);
 }
+
+#endif
 
 
 // Helper function for managing labels and their target addresses.
@@ -405,6 +409,8 @@ void CodeSection::initialize_shared_locs(relocInfo* buf, int length) {
   }
 }
 
+#ifndef LEYDEN
+
 void CodeSection::initialize_locs_from(const CodeSection* source_cs) {
   int lcount = source_cs->locs_count();
   if (lcount != 0) {
@@ -438,6 +444,8 @@ void CodeSection::expand_locs(int new_capacity) {
     _locs_limit    = locs_start + new_capacity;
   }
 }
+
+#endif
 
 
 /// Support for emitting the code to its final location.

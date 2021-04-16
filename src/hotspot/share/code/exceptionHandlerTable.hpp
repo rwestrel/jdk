@@ -148,9 +148,11 @@ class ImplicitExceptionTable {
   ReallocMark          _nesting;  // assertion check for reallocations
 
 public:
+
   ImplicitExceptionTable( ) :  _size(0), _len(0), _data(0) { }
   // (run-time) construction from nmethod
   ImplicitExceptionTable( const CompiledMethod *nm );
+
 
   void set_size( uint size );
   void append( uint exec_off, uint cont_off );

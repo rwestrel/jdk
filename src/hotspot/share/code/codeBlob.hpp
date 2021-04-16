@@ -128,8 +128,12 @@ public:
   static unsigned int allocation_size(CodeBuffer* cb, int header_size);
   static unsigned int align_code_offset(int offset);
 
+#ifndef LEYDEN
+
   // Deletion
   virtual void flush();
+
+#endif
 
   // Typing
   virtual bool is_buffer_blob() const                 { return false; }

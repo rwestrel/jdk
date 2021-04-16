@@ -161,6 +161,8 @@ RuntimeBlob::RuntimeBlob(
 }
 #endif
 
+#ifndef LEYDEN
+
 void CodeBlob::flush() {
   FREE_C_HEAP_ARRAY(unsigned char, _oop_maps);
   _oop_maps = NULL;
@@ -176,6 +178,8 @@ void CodeBlob::set_oop_maps(OopMapSet* p) {
     _oop_maps = NULL;
   }
 }
+
+#endif
 
 
 #ifndef LEYDEN

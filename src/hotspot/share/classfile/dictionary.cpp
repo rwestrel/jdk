@@ -46,6 +46,8 @@
 // needs resizing, which is costly to do at Safepoint.
 bool Dictionary::_some_dictionary_needs_resizing = false;
 
+#ifndef LEYDEN
+
 Dictionary::Dictionary(ClassLoaderData* loader_data, int table_size, bool resizable)
   : Hashtable<InstanceKlass*, mtClass>(table_size, (int)sizeof(DictionaryEntry)),
     _resizable(resizable), _needs_resizing(false), _loader_data(loader_data) {
@@ -95,6 +97,7 @@ void Dictionary::free_entry(DictionaryEntry* entry) {
   FREE_C_HEAP_ARRAY(char, entry);
 }
 
+
 const int _resize_load_trigger = 5;       // load factor that will trigger the resize
 
 bool Dictionary::does_any_dictionary_needs_resizing() {
@@ -131,6 +134,7 @@ bool Dictionary::resize_if_needed() {
 
   return (desired_size != 0);
 }
+#endif
 
 bool DictionaryEntry::contains_protection_domain(oop protection_domain) const {
   // Lock the pd_set list.  This lock cannot safepoint since the caller holds
@@ -248,6 +252,8 @@ void Dictionary::classes_do(MetaspaceClosure* it) {
 // also cast to volatile;  we do this to ensure store order is maintained
 // by the compilers.
 
+#ifndef LEYDEN
+
 void Dictionary::add_klass(unsigned int hash, Symbol* class_name,
                            InstanceKlass* obj) {
   assert_locked_or_safepoint(SystemDictionary_lock);
@@ -259,6 +265,8 @@ void Dictionary::add_klass(unsigned int hash, Symbol* class_name,
   add_entry(index, entry);
   check_if_needs_resize();
 }
+
+#endif
 
 
 // This routine does not lock the dictionary.
@@ -338,6 +346,8 @@ bool Dictionary::is_valid_protection_domain(unsigned int hash,
   return entry->is_valid_protection_domain(protection_domain);
 }
 
+#ifndef LEYDEN
+
 // During class loading we may have cached a protection domain that has
 // since been unreferenced, so this entry should be cleared.
 void Dictionary::clean_cached_protection_domains() {
@@ -388,9 +398,13 @@ void Dictionary::clean_cached_protection_domains() {
   }
 }
 
+#endif
+
 oop SymbolPropertyEntry::method_type() const {
   return _method_type.resolve();
 }
+
+#ifndef LEYDEN
 
 void SymbolPropertyEntry::set_method_type(oop p) {
   _method_type = OopHandle(Universe::vm_global(), p);
@@ -402,6 +416,8 @@ void SymbolPropertyEntry::free_entry() {
   // Free OopHandle
   _method_type.release(Universe::vm_global());
 }
+
+#endif
 
 void SymbolPropertyEntry::print_entry(outputStream* st) const {
   symbol()->print_value_on(st);
@@ -424,11 +440,16 @@ SymbolPropertyTable::SymbolPropertyTable(int table_size)
   : Hashtable<Symbol*, mtSymbol>(table_size, sizeof(SymbolPropertyEntry))
 {
 }
+
+#ifndef LEYDEN
+
 SymbolPropertyTable::SymbolPropertyTable(int table_size, HashtableBucket<mtSymbol>* t,
                                          int number_of_entries)
   : Hashtable<Symbol*, mtSymbol>(table_size, sizeof(SymbolPropertyEntry), t, number_of_entries)
 {
 }
+
+#endif
 
 
 SymbolPropertyEntry* SymbolPropertyTable::find_entry(int index, unsigned int hash,
@@ -444,6 +465,8 @@ SymbolPropertyEntry* SymbolPropertyTable::find_entry(int index, unsigned int has
 }
 
 
+#ifndef LEYDEN
+
 SymbolPropertyEntry* SymbolPropertyTable::add_entry(int index, unsigned int hash,
                                                     Symbol* sym, intptr_t sym_mode) {
   assert_locked_or_safepoint(SystemDictionary_lock);
@@ -454,6 +477,8 @@ SymbolPropertyEntry* SymbolPropertyTable::add_entry(int index, unsigned int hash
   Hashtable<Symbol*, mtSymbol>::add_entry(index, p);
   return p;
 }
+
+#endif
 
 void SymbolPropertyTable::methods_do(void f(Method*)) {
   for (int index = 0; index < table_size(); index++) {
@@ -466,10 +491,14 @@ void SymbolPropertyTable::methods_do(void f(Method*)) {
   }
 }
 
+#ifndef LEYDEN
+
 void SymbolPropertyTable::free_entry(SymbolPropertyEntry* entry) {
   entry->free_entry();
   Hashtable<Symbol*, mtSymbol>::free_entry(entry);
 }
+
+#endif
 
 #ifndef LEYDEN
 void DictionaryEntry::verify_protection_domain_set() {

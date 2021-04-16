@@ -64,6 +64,7 @@ const size_t REHASH_LEN = 100;
 // If we have as many dead items as 50% of the number of bucket
 const double CLEAN_DEAD_HIGH_WATER_MARK = 0.5;
 
+#ifndef LEYDEN
 #if INCLUDE_CDS_JAVA_HEAP
 inline oop read_string_from_compact_hashtable(address base_address, u4 offset) {
   assert(sizeof(narrowOop) == sizeof(offset), "must be");
@@ -79,17 +80,14 @@ static CompactHashtable<
 #endif
 
 // --------------------------------------------------------------------------
-
+#endif
 typedef ConcurrentHashTable<StringTableConfig, mtSymbol> StringTableHash;
 static StringTableHash* _local_table = NULL;
-
 volatile bool StringTable::_has_work = false;
 volatile bool StringTable::_needs_rehashing = false;
 OopStorage*   StringTable::_oop_storage;
-
 static size_t _current_size = 0;
 static volatile size_t _items_count = 0;
-
 volatile bool _alt_hash = false;
 static uint64_t _alt_hash_seed = 0;
 
@@ -98,7 +96,6 @@ uintx hash_string(const jchar* s, int len, bool useAlt) {
     AltHashing::halfsiphash_32(_alt_hash_seed, s, len) :
     java_lang_String::hash_code(s, len);
 }
-
 class StringTableConfig : public StackObj {
  private:
  public:
@@ -198,6 +195,7 @@ class StringTableLookupOop : public StackObj {
   }
 };
 
+#ifndef LEYDEN
 static size_t ceil_log2(size_t val) {
   size_t ret;
   for (ret = 1; ((size_t)1 << ret) < val; ++ret);
@@ -213,7 +211,7 @@ void StringTable::create_table() {
   _oop_storage = OopStorageSet::create_weak("StringTable Weak");
   _oop_storage->register_num_dead_callback(&gc_notification);
 }
-
+#endif
 size_t StringTable::item_added() {
   return Atomic::add(&_items_count, (size_t)1);
 }
@@ -239,7 +237,7 @@ void StringTable::trigger_concurrent_work() {
   Atomic::store(&_has_work, true);
   Service_lock->notify_all();
 }
-
+#ifndef LEYDEN
 // Probing
 oop StringTable::lookup(Symbol* symbol) {
   ResourceMark rm;
@@ -259,7 +257,7 @@ oop StringTable::lookup(const jchar* name, int len) {
   }
   return do_lookup(name, len, hash);
 }
-
+#endif
 class StringTableGet : public StackObj {
   Thread* _thread;
   Handle  _return;
@@ -559,14 +557,14 @@ struct SizeFunc : StackObj {
     return literal_size(s);
   };
 };
-
+#ifndef LEYDEN
 TableStatistics StringTable::get_table_statistics() {
   static TableStatistics ts;
   SizeFunc sz;
   ts = _local_table->statistics_get(Thread::current(), sz, ts);
   return ts;
 }
-
+#endif
 void StringTable::print_table_statistics(outputStream* st,
                                          const char* table_name) {
   SizeFunc sz;
@@ -617,7 +615,6 @@ class VerifyCompStrings : StackObj {
     return true;
   };
 };
-
 size_t StringTable::verify_and_compare_entries() {
   Thread* thr = Thread::current();
   GrowableArray<oop>* oops =
@@ -684,6 +681,7 @@ void StringTable::dump(outputStream* st, bool verbose) {
   }
 }
 
+#ifndef LEYDEN
 // Utility for dumping strings
 StringtableDCmd::StringtableDCmd(outputStream* output, bool heap) :
                                  DCmdWithParser(output, heap),
@@ -793,3 +791,4 @@ void StringTable::shared_oops_do(OopClosure* f) {
   _shared_table.iterate(&iter);
 }
 #endif //INCLUDE_CDS_JAVA_HEAP
+#endif

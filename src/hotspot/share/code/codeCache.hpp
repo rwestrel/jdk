@@ -353,6 +353,7 @@ template <class T, class Filter> class CodeBlobIterator : public StackObj {
         continue;
       }
 
+#ifndef LEYDEN
       // Filter is_alive as required
       if (_only_alive && !_code_blob->is_alive()) {
         continue;
@@ -365,6 +366,7 @@ template <class T, class Filter> class CodeBlobIterator : public StackObj {
           continue;
         }
       }
+#endif
 
       return true;
     }
