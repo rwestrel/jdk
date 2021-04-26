@@ -100,6 +100,7 @@
 
 #endif
 
+#ifndef LEYDEN
 //---------------------------------------------------------------------------------
 // NMethod statistics
 // They are printed under various flags, including:
@@ -325,17 +326,20 @@ void ExceptionCache::set_next(ExceptionCache *ec) {
 }
 
 //-----------------------------------------------------------------------------
-
+#endif
 
 // Helper used by both find_pc_desc methods.
 static inline bool match_desc(PcDesc* pc, int pc_offset, bool approximate) {
+#ifndef LEYDEN
   NOT_PRODUCT(++pc_nmethod_stats.pc_desc_tests);
+#endif
   if (!approximate)
     return pc->pc_offset() == pc_offset;
   else
     return (pc-1)->pc_offset() < pc_offset && pc_offset <= pc->pc_offset();
 }
 
+#ifndef LEYDEN
 void PcDescCache::reset_to(PcDesc* initial_pc_desc) {
   if (initial_pc_desc == NULL) {
     _pc_descs[0] = NULL; // native method; no PcDescs at all
@@ -347,10 +351,12 @@ void PcDescCache::reset_to(PcDesc* initial_pc_desc) {
   for (int i = 0; i < cache_size; i++)
     _pc_descs[i] = initial_pc_desc;
 }
-
+#endif
 PcDesc* PcDescCache::find_pc_desc(int pc_offset, bool approximate) {
+#ifndef LEYDEN
   NOT_PRODUCT(++pc_nmethod_stats.pc_desc_queries);
   NOT_PRODUCT(if (approximate) ++pc_nmethod_stats.pc_desc_approx);
+#endif
 
   // Note: one might think that caching the most recently
   // read value separately would be a win, but one would be
@@ -366,7 +372,9 @@ PcDesc* PcDescCache::find_pc_desc(int pc_offset, bool approximate) {
   res = _pc_descs[0];
   if (res == NULL) return NULL;  // native method; no PcDescs at all
   if (match_desc(res, pc_offset, approximate)) {
+#ifndef LEYDEN
     NOT_PRODUCT(++pc_nmethod_stats.pc_desc_repeats);
+#endif
     return res;
   }
 
@@ -375,7 +383,9 @@ PcDesc* PcDescCache::find_pc_desc(int pc_offset, bool approximate) {
     res = _pc_descs[i];
     if (res->pc_offset() < 0) break;  // optimization: skip empty cache
     if (match_desc(res, pc_offset, approximate)) {
+#ifndef LEYDEN
       NOT_PRODUCT(++pc_nmethod_stats.pc_desc_hits);
+#endif
       return res;
     }
   }
@@ -385,7 +395,9 @@ PcDesc* PcDescCache::find_pc_desc(int pc_offset, bool approximate) {
 }
 
 void PcDescCache::add_pc_desc(PcDesc* pc_desc) {
+#ifndef LEYDEN
   NOT_PRODUCT(++pc_nmethod_stats.pc_desc_adds);
+#endif
   // Update the LRU cache by shifting pc_desc forward.
   for (int i = 0; i < cache_size; i++)  {
     PcDesc* next = _pc_descs[i];
@@ -394,6 +406,7 @@ void PcDescCache::add_pc_desc(PcDesc* pc_desc) {
   }
 }
 
+#ifndef LEYDEN
 // adjust pcs_size so that it is a multiple of both oopSize and
 // sizeof(PcDesc) (assumes that if sizeof(PcDesc) is not a multiple
 // of oopSize, then 2*sizeof(PcDesc) is)
@@ -2100,6 +2113,7 @@ void nmethod::copy_scopes_data(u_char* buffer, int size) {
   assert(scopes_data_size() >= size, "oob");
   memcpy(scopes_data_begin(), buffer, size);
 }
+#endif
 
 #ifdef ASSERT
 static PcDesc* linear_search(const PcDescSearch& search, int pc_offset, bool approximate) {
@@ -2108,7 +2122,9 @@ static PcDesc* linear_search(const PcDescSearch& search, int pc_offset, bool app
   lower += 1; // exclude initial sentinel
   PcDesc* res = NULL;
   for (PcDesc* p = lower; p < upper; p++) {
+#ifndef LEYDEN
     NOT_PRODUCT(--pc_nmethod_stats.pc_desc_tests);  // don't count this call to match_desc
+#endif
     if (match_desc(p, pc_offset, approximate)) {
       if (res == NULL)
         res = p;
@@ -2155,7 +2171,9 @@ PcDesc* PcDescContainer::find_pc_desc_internal(address pc, bool approximate, con
 
   // Use the last successful return as a split point.
   PcDesc* mid = _pc_desc_cache.last_pc_desc();
+#ifndef LEYDEN
   NOT_PRODUCT(++pc_nmethod_stats.pc_desc_searches);
+#endif
   if (mid->pc_offset() < pc_offset) {
     lower = mid;
   } else {
@@ -2168,7 +2186,9 @@ PcDesc* PcDescContainer::find_pc_desc_internal(address pc, bool approximate, con
   for (int step = (1 << (LOG2_RADIX*3)); step > 1; step >>= LOG2_RADIX) {
     while ((mid = lower + step) < upper) {
       assert_LU_OK;
+#ifndef LEYDEN
       NOT_PRODUCT(++pc_nmethod_stats.pc_desc_searches);
+#endif
       if (mid->pc_offset() < pc_offset) {
         lower = mid;
       } else {
@@ -2183,7 +2203,9 @@ PcDesc* PcDescContainer::find_pc_desc_internal(address pc, bool approximate, con
   while (true) {
     assert_LU_OK;
     mid = lower + 1;
+#ifndef LEYDEN
     NOT_PRODUCT(++pc_nmethod_stats.pc_desc_searches);
+#endif
     if (mid->pc_offset() < pc_offset) {
       lower = mid;
     } else {
@@ -2203,6 +2225,8 @@ PcDesc* PcDescContainer::find_pc_desc_internal(address pc, bool approximate, con
   }
 }
 
+
+#ifndef LEYDEN
 
 void nmethod::check_all_dependencies(DepChange& changes) {
   // Checked dependencies are allocated into this ResourceMark
@@ -3538,4 +3562,5 @@ const char* nmethod::jvmci_name() {
   }
   return NULL;
 }
+#endif
 #endif

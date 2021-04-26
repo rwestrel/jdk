@@ -124,13 +124,7 @@ private:
 public:
   PcDescContainer() {}
 
-#ifndef LEYDEN
-
   PcDesc* find_pc_desc_internal(address pc, bool approximate, const PcDescSearch& search);
-#else
-  PcDesc* find_pc_desc_internal(address pc, bool approximate, const PcDescSearch& search) { return NULL; }
-
-#endif
   void    reset_to(PcDesc* initial_pc_desc) { _pc_desc_cache.reset_to(initial_pc_desc); }
 
   PcDesc* find_pc_desc(address pc, bool approximate, const PcDescSearch& search) {

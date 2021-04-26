@@ -22,6 +22,7 @@
  *
  */
 
+#ifndef LEYDEN
 #ifndef SHARE_COMPILER_DIRECTIVESPARSER_HPP
 #define SHARE_COMPILER_DIRECTIVESPARSER_HPP
 
@@ -140,3 +141,4 @@ class DirectivesParser : public JSON {
 };
 
 #endif // SHARE_COMPILER_DIRECTIVESPARSER_HPP
+#endif
