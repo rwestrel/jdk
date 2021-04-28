@@ -252,7 +252,7 @@ class os: AllStatic {
   static bool have_special_privileges();
 
   static jlong  javaTimeMillis();
-  static jlong  javaTimeNanos();
+  static JNIEXPORT jlong  javaTimeNanos();
   static void   javaTimeNanos_info(jvmtiTimerInfo *info_ptr);
   static void   javaTimeSystemUTC(jlong &seconds, jlong &nanos);
   static void   run_periodic_checks(outputStream* st);

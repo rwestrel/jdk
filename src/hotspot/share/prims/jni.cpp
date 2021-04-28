@@ -3619,6 +3619,35 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
     if (ReplayCompiles) ciReplay::replay(thread);
 
+    if (RestoreCodeFromDisk && !UseNewCode) {
+//      ResourceMark rm;
+//      HandleMark hm(thread);
+//      FILE* file = fopen("/home/roland/tmp/dump", "r");
+//      assert(file != NULL, "fopen failed");
+//      int nb;
+//      int r = fread(&nb, sizeof(nb), 1, file);
+//      assert(r == 1, "fread failed");
+//      for (int i = 0; i < nb; i++) {
+//        int l;
+//        r = fread(&l, sizeof(l), 1, file);
+//        assert(r == 1, "fread failed");
+//        char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
+//        r = fread(klass_name, 1, l, file);
+//        assert(r == l, "fread failed");
+//        klass_name[l] = '\0';
+////        tty->print_cr("XXX %s", klass_name);
+//        Symbol* sym = SymbolTable::new_symbol(klass_name, l);
+//        Klass* k = SystemDictionary::resolve_or_null(sym, Handle(thread, SystemDictionary::java_system_loader()),
+//                                                     Handle(), thread);
+////      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+//        if (k == NULL || thread->has_pending_exception()) {
+//          thread->clear_pending_exception();
+//          tty->print_cr("Warning: failed to resolve: %s", klass_name);
+//        }
+//      }
+      CodeCache::restore_from_disk(thread);
+    }
+
 #ifdef ASSERT
     // Some platforms (like Win*) need a wrapper around these test
     // functions in order to properly handle error conditions.

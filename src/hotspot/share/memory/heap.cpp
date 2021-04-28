@@ -488,6 +488,21 @@ CodeBlob* CodeHeap::find_blob(void* start) const {
   return (result != nullptr && result->blob_contains((address)start)) ? result : nullptr;
 }
 
+CodeBlob* LeydenCodeHeap::find_blob_unsafe(void* start) const {
+  CodeBlob** cb = (CodeBlob**)find_block_for(start);
+  if (cb == NULL) {
+    return NULL;
+  }
+  size_t seg_idx = segment_for(cb);
+  address seg_map = (address)_segmap.low();
+  assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
+  if (seg_map[seg_idx] == free_sentinel) {
+    return NULL;
+  }
+  CodeBlob* result = *cb;
+  return (result != NULL && result->blob_contains((address)start)) ? result : NULL;
+}
+
 size_t CodeHeap::alignment_unit() const {
   // this will be a power of two
   return _segment_size;

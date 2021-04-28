@@ -383,7 +383,7 @@ extern "C" {                                                         \
 
 #define JVM_ENTRY(result_type, header)                               \
 extern "C" {                                                         \
-  result_type JNICALL header {                                       \
+  JNIEXPORT result_type JNICALL header {                                       \
     JavaThread* thread=JavaThread::thread_from_jni_environment(env); \
     MACOS_AARCH64_ONLY(ThreadWXEnable __wx(WXWrite, thread));        \
     ThreadInVMfromNative __tiv(thread);                              \

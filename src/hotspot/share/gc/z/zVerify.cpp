@@ -250,7 +250,7 @@ public:
       _bs_nm(BarrierSet::barrier_set()->barrier_set_nmethod()),
       _verify_fixed(verify_fixed) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     assert(!trust_nmethod_state() || !_bs_nm->is_armed(nm), "Should not encounter any armed nmethods");
 
     ZNMethod::nmethod_oops_do(nm, _cl);

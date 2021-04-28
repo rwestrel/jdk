@@ -899,7 +899,7 @@ void Disassembler::decode(CodeBlob* cb, outputStream* st) {
 // Decode a nmethod.
 // This includes printing the constant pool and all code segments.
 // The nmethod data structures (oop maps, relocations and the like) are not printed.
-void Disassembler::decode(nmethod* nm, outputStream* st) {
+void Disassembler::decode(CompiledMethod* nm, outputStream* st) {
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
   ttyLocker ttyl;
 

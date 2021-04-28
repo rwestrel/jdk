@@ -72,7 +72,7 @@
 
 
 #define UNSAFE_ENTRY(result_type, header) \
-  JVM_ENTRY(static result_type, header)
+  JVM_ENTRY(JNIEXPORT result_type, header)
 
 #define UNSAFE_LEAF(result_type, header) \
   JVM_LEAF(static result_type, header)

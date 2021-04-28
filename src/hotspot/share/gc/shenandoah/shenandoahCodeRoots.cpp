@@ -108,7 +108,7 @@ void ShenandoahCodeRoots::initialize() {
   _nmethod_table = new ShenandoahNMethodTable();
 }
 
-void ShenandoahCodeRoots::register_nmethod(nmethod* nm) {
+void ShenandoahCodeRoots::register_nmethod(CompiledMethod* nm) {
   assert(CodeCache_lock->owned_by_self(), "Must have CodeCache_lock held");
   _nmethod_table->register_nmethod(nm);
 }
@@ -132,7 +132,7 @@ public:
     _bs(BarrierSet::barrier_set()->barrier_set_nmethod()) {
   }
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     _bs->disarm(nm);
   }
 };
@@ -187,7 +187,7 @@ public:
       _heap(ShenandoahHeap::heap()),
       _bs(ShenandoahBarrierSet::barrier_set()->barrier_set_nmethod()) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     assert(_heap->is_concurrent_weak_root_in_progress(), "Only this phase");
     if (failed()) {
       return;
@@ -198,7 +198,7 @@ public:
 
     if (nm->is_unloading()) {
       ShenandoahReentrantLocker locker(nm_data->lock());
-      nm->unlink();
+      ((nmethod*)nm)->unlink();
       return;
     }
 

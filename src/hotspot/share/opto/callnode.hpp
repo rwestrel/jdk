@@ -54,6 +54,7 @@ class       AllocateArrayNode;
 class     AbstractLockNode;
 class       LockNode;
 class       UnlockNode;
+class     InitializeKlassNode;
 class FastLockNode;
 
 //------------------------------StartNode--------------------------------------
@@ -1157,4 +1158,36 @@ public:
   JVMState* dbg_jvms() const { return nullptr; }
 #endif
 };
+
+class InitializeKlassNode : public CallNode {
+public:
+  enum {
+    // Inputs:
+    KlassNode = TypeFunc::Parms,
+    ParmLimit
+  };
+
+  static const TypeFunc* initialize_klass_type() {
+    const Type** fields = TypeTuple::fields(ParmLimit - TypeFunc::Parms);
+    fields[KlassNode]   = TypeKlassPtr::NOTNULL;
+
+    const TypeTuple *domain = TypeTuple::make(ParmLimit, fields);
+
+    // create result type (range)
+    fields = TypeTuple::fields(0);
+
+    const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
+
+    return TypeFunc::make(domain, range);
+  }
+
+  InitializeKlassNode(Compile* C, Node* ctrl, Node* mem, Node* abio, Node* klass_node);
+  // Expansion modifies the JVMState, so we need to clone it
+  virtual bool needs_clone_jvms(Compile* C) { return true; }
+  virtual int Opcode() const;
+  virtual bool        guaranteed_safepoint()  { return false; }
+  virtual uint size_of() const; // Size is bigger
+};
+
+
 #endif // SHARE_OPTO_CALLNODE_HPP

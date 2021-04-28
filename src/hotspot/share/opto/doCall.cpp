@@ -531,6 +531,12 @@ void Parse::do_call() {
     }
     return;
   }
+
+  if (DumpCodeToDisk && (bc() == Bytecodes::_invokestatic)) {
+    ensure_klass_initialization(holder_klass);
+  }
+
+
   assert(holder_klass->is_loaded(), "");
   //assert((bc_callee->is_static() || is_invokedynamic) == !has_receiver , "must match bc");  // XXX invokehandle (cur_bc_raw)
   // Note: this takes into account invokeinterface of methods declared in java/lang/Object,

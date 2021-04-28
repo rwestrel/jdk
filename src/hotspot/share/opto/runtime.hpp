@@ -113,6 +113,7 @@ typedef const TypeFunc*(*TypeFunc_generator)();
 
 class OptoRuntime : public AllStatic {
   friend class Matcher;  // allow access to stub names
+  friend class CodeCache;
 
  private:
   // define stubs
@@ -140,38 +141,40 @@ class OptoRuntime : public AllStatic {
   static address _notify_jvmti_unmount;
 #endif
 
+  static address _initialize_klass_Java;
+
   //
   // Implementation of runtime methods
   // =================================
 
   // Allocate storage for a Java instance.
-  static void new_instance_C(Klass* instance_klass, JavaThread* current);
+  static JNIEXPORT void new_instance_C(Klass* instance_klass, JavaThread* current);
 
   // Allocate storage for a objArray or typeArray
-  static void new_array_C(Klass* array_klass, int len, JavaThread* current);
-  static void new_array_nozero_C(Klass* array_klass, int len, JavaThread* current);
+  static JNIEXPORT void new_array_C(Klass* array_klass, int len, JavaThread* current);
+  static JNIEXPORT void new_array_nozero_C(Klass* array_klass, int len, JavaThread* current);
 
   // Allocate storage for a multi-dimensional arrays
   // Note: needs to be fixed for arbitrary number of dimensions
-  static void multianewarray2_C(Klass* klass, int len1, int len2, JavaThread* current);
-  static void multianewarray3_C(Klass* klass, int len1, int len2, int len3, JavaThread* current);
-  static void multianewarray4_C(Klass* klass, int len1, int len2, int len3, int len4, JavaThread* current);
-  static void multianewarray5_C(Klass* klass, int len1, int len2, int len3, int len4, int len5, JavaThread* current);
-  static void multianewarrayN_C(Klass* klass, arrayOopDesc* dims, JavaThread* current);
+  static JNIEXPORT void multianewarray2_C(Klass* klass, int len1, int len2, JavaThread* current);
+  static JNIEXPORT void multianewarray3_C(Klass* klass, int len1, int len2, int len3, JavaThread* current);
+  static JNIEXPORT void multianewarray4_C(Klass* klass, int len1, int len2, int len3, int len4, JavaThread* current);
+  static JNIEXPORT void multianewarray5_C(Klass* klass, int len1, int len2, int len3, int len4, int len5, JavaThread* current);
+  static JNIEXPORT void multianewarrayN_C(Klass* klass, arrayOopDesc* dims, JavaThread* current);
 
 public:
-  static void monitor_notify_C(oopDesc* obj, JavaThread* current);
-  static void monitor_notifyAll_C(oopDesc* obj, JavaThread* current);
+  static JNIEXPORT void monitor_notify_C(oopDesc* obj, JavaThread* current);
+  static JNIEXPORT void monitor_notifyAll_C(oopDesc* obj, JavaThread* current);
 
 private:
 
   // Implicit exception support
-  static void throw_null_exception_C(JavaThread* thread);
+  static JNIEXPORT void throw_null_exception_C(JavaThread* thread);
 
   // Exception handling
-  static address handle_exception_C       (JavaThread* current);
+  static JNIEXPORT address handle_exception_C       (JavaThread* current);
   static address handle_exception_C_helper(JavaThread* current, nmethod*& nm);
-  static address rethrow_C                (oopDesc* exception, JavaThread *thread, address return_pc );
+  static JNIEXPORT address rethrow_C                (oopDesc* exception, JavaThread *thread, address return_pc );
   static void deoptimize_caller_frame     (JavaThread *thread);
   static void deoptimize_caller_frame     (JavaThread *thread, bool doit);
   static bool is_deoptimized_caller_frame (JavaThread *thread);
@@ -182,7 +185,7 @@ private:
   static ExceptionBlob*       _exception_blob;
   static void generate_exception_blob();
 
-  static void register_finalizer(oopDesc* obj, JavaThread* current);
+  static JNIEXPORT void register_finalizer(oopDesc* obj, JavaThread* current);
 
  public:
 
@@ -217,11 +220,13 @@ private:
   static address notify_jvmti_unmount()                  { return _notify_jvmti_unmount; }
 #endif
 
+  static address initialize_klass_Java()                 { return _initialize_klass_Java; }
+
   static ExceptionBlob*    exception_blob()                      { return _exception_blob; }
 
   // Implicit exception support
-  static void throw_div0_exception_C      (JavaThread* thread);
-  static void throw_stack_overflow_error_C(JavaThread* thread);
+  static JNIEXPORT void throw_div0_exception_C      (JavaThread* thread);
+  static JNIEXPORT void throw_stack_overflow_error_C(JavaThread* thread);
 
   // Exception handling
   static address rethrow_stub()             { return _rethrow_Java; }
@@ -321,6 +326,8 @@ private:
  // dumps all the named counters
  static void          print_named_counters();
 
+  static const TypeFunc* initialize_klass_Type();
+  static JNIEXPORT void initialize_klass_C(Klass* instance_klass, JavaThread* current);
 };
 
 #endif // SHARE_OPTO_RUNTIME_HPP

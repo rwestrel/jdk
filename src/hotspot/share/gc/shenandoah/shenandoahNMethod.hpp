@@ -38,7 +38,7 @@
 // because it would then require handling these tuples as the new class of roots.
 class ShenandoahNMethod : public CHeapObj<mtGC> {
 private:
-  nmethod* const          _nm;
+  CompiledMethod* const          _nm;
   oop**                   _oops;
   int                     _oops_count;
   bool                    _has_non_immed_oops;
@@ -46,10 +46,10 @@ private:
   ShenandoahReentrantLock _lock;
 
 public:
-  ShenandoahNMethod(nmethod *nm, GrowableArray<oop*>& oops, bool has_non_immed_oops);
+  ShenandoahNMethod(CompiledMethod *nm, GrowableArray<oop*>& oops, bool has_non_immed_oops);
   ~ShenandoahNMethod();
 
-  inline nmethod* nm() const;
+  inline CompiledMethod* nm() const;
   inline ShenandoahReentrantLock* lock();
   inline void oops_do(OopClosure* oops, bool fix_relocations = false);
   // Update oops when the nmethod is re-registered
@@ -63,22 +63,22 @@ public:
   inline void mark_unregistered();
   inline bool is_unregistered() const;
 
-  static ShenandoahNMethod* for_nmethod(nmethod* nm);
-  static inline ShenandoahReentrantLock* lock_for_nmethod(nmethod* nm);
+  static ShenandoahNMethod* for_nmethod(CompiledMethod* nm);
+  static inline ShenandoahReentrantLock* lock_for_nmethod(CompiledMethod* nm);
 
-  static void heal_nmethod(nmethod* nm);
+  static void heal_nmethod(CompiledMethod* nm);
   static inline void heal_nmethod_metadata(ShenandoahNMethod* nmethod_data);
-  static inline void disarm_nmethod(nmethod* nm);
+  static inline void disarm_nmethod(CompiledMethod* nm);
 
-  static inline ShenandoahNMethod* gc_data(nmethod* nm);
-  static inline void attach_gc_data(nmethod* nm, ShenandoahNMethod* gc_data);
+  static inline ShenandoahNMethod* gc_data(CompiledMethod* nm);
+  static inline void attach_gc_data(CompiledMethod* nm, ShenandoahNMethod* gc_data);
 
   void assert_correct() NOT_DEBUG_RETURN;
   void assert_same_oops(bool allow_dead = false) NOT_DEBUG_RETURN;
 
 private:
   bool has_non_immed_oops() const { return _has_non_immed_oops; }
-  static void detect_reloc_oops(nmethod* nm, GrowableArray<oop*>& oops, bool& _has_non_immed_oops);
+  static void detect_reloc_oops(CompiledMethod* nm, GrowableArray<oop*>& oops, bool& _has_non_immed_oops);
 };
 
 class ShenandoahNMethodTable;
@@ -148,10 +148,10 @@ public:
   ShenandoahNMethodTable();
   ~ShenandoahNMethodTable();
 
-  void register_nmethod(nmethod* nm);
+  void register_nmethod(CompiledMethod* nm);
   void unregister_nmethod(nmethod* nm);
 
-  bool contain(nmethod* nm) const;
+  bool contain(CompiledMethod* nm) const;
   int length() const { return _index; }
 
   // Table iteration support
@@ -169,7 +169,7 @@ private:
   }
 
   ShenandoahNMethod* at(int index) const;
-  int  index_of(nmethod* nm) const;
+  int  index_of(CompiledMethod* nm) const;
   void remove(int index);
   void append(ShenandoahNMethod* snm);
 
@@ -177,7 +177,7 @@ private:
   void wait_until_concurrent_iteration_done();
 
   // Logging support
-  void log_register_nmethod(nmethod* nm);
+  void log_register_nmethod(CompiledMethod* nm);
   void log_unregister_nmethod(nmethod* nm);
 };
 

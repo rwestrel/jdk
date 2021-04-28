@@ -35,7 +35,7 @@
 #include "memory/resourceArea.hpp"
 #include "runtime/threadWXSetters.inline.hpp"
 
-bool ShenandoahBarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
+bool ShenandoahBarrierSetNMethod::nmethod_entry_barrier(CompiledMethod* nm) {
   ShenandoahReentrantLock* lock = ShenandoahNMethod::lock_for_nmethod(nm);
   assert(lock != nullptr, "Must be");
   ShenandoahReentrantLocker locker(lock);
@@ -52,7 +52,7 @@ bool ShenandoahBarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
     // We don't need to take the lock when unlinking nmethods from
     // the Method, because it is only concurrently unlinked by
     // the entry barrier, which acquires the per nmethod lock.
-    nm->unlink_from_method();
+    ((nmethod*)nm)->unlink_from_method();
 
     // We can end up calling nmethods that are unloading
     // since we clear compiled ICs lazily. Returning false

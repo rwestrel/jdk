@@ -29,6 +29,7 @@
 #include "memory/allocation.hpp"
 
 class nmethod;
+class CompiledMethod;
 class ShenandoahHeap;
 
 class ShenandoahBarrierSetNMethod : public BarrierSetNMethod {
@@ -39,7 +40,7 @@ public:
   ShenandoahBarrierSetNMethod(ShenandoahHeap* heap) : _heap(heap) {
   }
 
-  virtual bool nmethod_entry_barrier(nmethod* nm);
+  virtual bool nmethod_entry_barrier(CompiledMethod* nm);
 };
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHBARRIERSETNMETHOD_HPP

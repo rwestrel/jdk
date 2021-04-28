@@ -94,8 +94,15 @@ void Parse::do_field_access(bool is_get, bool is_field) {
       (void) pop();  // pop receiver after putting
     }
   } else {
-    const TypeInstPtr* tip = TypeInstPtr::make(field_holder->java_mirror());
-    obj = _gvn.makecon(tip);
+    if (DumpCodeToDisk) {
+      ensure_klass_initialization(field_holder);
+    }
+    if (DumpCodeToDisk && 0) {
+      obj = load_mirror_from_klass(makecon(TypeKlassPtr::make(field_holder)));
+    } else {
+      const TypeInstPtr* tip = TypeInstPtr::make(field_holder->java_mirror());
+      obj = _gvn.makecon(tip);
+    }
     if (is_get) {
       do_get_xxx(obj, field, is_field);
     } else {

@@ -621,7 +621,7 @@ bool GenCollectedHeap::should_do_full_collection(size_t size, bool full, bool is
   return max_gen == OldGen && _old_gen->should_collect(full, size, is_tlab);
 }
 
-void GenCollectedHeap::register_nmethod(nmethod* nm) {
+void GenCollectedHeap::register_nmethod(CompiledMethod* nm) {
   ScavengableNMethods::register_nmethod(nm);
 }
 
@@ -629,7 +629,7 @@ void GenCollectedHeap::unregister_nmethod(nmethod* nm) {
   ScavengableNMethods::unregister_nmethod(nm);
 }
 
-void GenCollectedHeap::verify_nmethod(nmethod* nm) {
+void GenCollectedHeap::verify_nmethod(CompiledMethod* nm) {
   ScavengableNMethods::verify_nmethod(nm);
 }
 

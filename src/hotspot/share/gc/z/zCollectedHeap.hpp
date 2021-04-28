@@ -100,9 +100,9 @@ public:
 
   void keep_alive(oop obj) override;
 
-  void register_nmethod(nmethod* nm) override;
+  void register_nmethod(CompiledMethod* nm) override;
   void unregister_nmethod(nmethod* nm) override;
-  void verify_nmethod(nmethod* nmethod) override;
+  void verify_nmethod(CompiledMethod* nmethod) override;
 
   WorkerThreads* safepoint_workers() override;
 

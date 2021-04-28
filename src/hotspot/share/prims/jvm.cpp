@@ -1321,6 +1321,9 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
 
       StackValueCollection* locals = priv->locals();
       StackValue* ctx_sv = locals->at(1); // AccessControlContext context
+      if (RestoreCodeFromDisk && ctx_sv->type() == T_CONFLICT) {
+        ctx_sv = priv->expressions()->at(0);
+      }
       StackValue* clr_sv = locals->at(2); // Class<?> caller
       assert(!ctx_sv->obj_is_scalar_replaced(), "found scalar-replaced object");
       assert(!clr_sv->obj_is_scalar_replaced(), "found scalar-replaced object");

@@ -81,6 +81,8 @@ unsigned int CodeBlob::allocation_size(CodeBuffer* cb, int header_size) {
 CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments, bool compiled) :
   _code_begin(layout.code_begin()),
   _code_end(layout.code_end()),
+  _old_code_begin(layout.code_begin()),
+  _old_code_end(layout.code_end()),
   _content_begin(layout.content_begin()),
   _data_end(layout.data_end()),
   _relocation_begin(layout.relocation_begin()),
@@ -110,6 +112,8 @@ CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& la
 CodeBlob::CodeBlob(const char* name, CompilerType type, const CodeBlobLayout& layout, CodeBuffer* cb /*UNUSED*/, int frame_complete_offset, int frame_size, OopMapSet* oop_maps, bool caller_must_gc_arguments, bool compiled) :
   _code_begin(layout.code_begin()),
   _code_end(layout.code_end()),
+  _old_code_begin(layout.code_begin()),
+  _old_code_end(layout.code_end()),
   _content_begin(layout.content_begin()),
   _data_end(layout.data_end()),
   _relocation_begin(layout.relocation_begin()),

@@ -31,7 +31,7 @@
 #include "memory/resourceArea.hpp"
 #include "runtime/continuation.hpp"
 
-ShenandoahNMethod::ShenandoahNMethod(nmethod* nm, GrowableArray<oop*>& oops, bool non_immediate_oops) :
+ShenandoahNMethod::ShenandoahNMethod(CompiledMethod* nm, GrowableArray<oop*>& oops, bool non_immediate_oops) :
   _nm(nm), _oops(nullptr), _oops_count(0), _unregistered(false) {
 
   if (!oops.is_empty()) {
@@ -111,7 +111,7 @@ void ShenandoahNMethod::update() {
   assert_same_oops();
 }
 
-void ShenandoahNMethod::detect_reloc_oops(nmethod* nm, GrowableArray<oop*>& oops, bool& has_non_immed_oops) {
+void ShenandoahNMethod::detect_reloc_oops(CompiledMethod* nm, GrowableArray<oop*>& oops, bool& has_non_immed_oops) {
   has_non_immed_oops = false;
   // Find all oops relocations
   RelocIterator iter(nm);
@@ -142,7 +142,7 @@ void ShenandoahNMethod::detect_reloc_oops(nmethod* nm, GrowableArray<oop*>& oops
   }
 }
 
-ShenandoahNMethod* ShenandoahNMethod::for_nmethod(nmethod* nm) {
+ShenandoahNMethod* ShenandoahNMethod::for_nmethod(CompiledMethod* nm) {
   ResourceMark rm;
   bool non_immediate_oops = false;
   GrowableArray<oop*> oops;
@@ -151,7 +151,7 @@ ShenandoahNMethod* ShenandoahNMethod::for_nmethod(nmethod* nm) {
   return new ShenandoahNMethod(nm, oops, non_immediate_oops);
 }
 
-void ShenandoahNMethod::heal_nmethod(nmethod* nm) {
+void ShenandoahNMethod::heal_nmethod(CompiledMethod* nm) {
   ShenandoahNMethod* data = gc_data(nm);
   assert(data != nullptr, "Sanity");
   assert(data->lock()->owned_by_self(), "Must hold the lock");
@@ -267,7 +267,7 @@ ShenandoahNMethodTable::~ShenandoahNMethodTable() {
   _list->release();
 }
 
-void ShenandoahNMethodTable::register_nmethod(nmethod* nm) {
+void ShenandoahNMethodTable::register_nmethod(CompiledMethod* nm) {
   assert(CodeCache_lock->owned_by_self(), "Must have CodeCache_lock held");
   assert(_index >= 0 && _index <= _list->size(), "Sanity");
 
@@ -309,7 +309,7 @@ void ShenandoahNMethodTable::unregister_nmethod(nmethod* nm) {
   remove(idx);
 }
 
-bool ShenandoahNMethodTable::contain(nmethod* nm) const {
+bool ShenandoahNMethodTable::contain(CompiledMethod* nm) const {
   return index_of(nm) != -1;
 }
 
@@ -318,7 +318,7 @@ ShenandoahNMethod* ShenandoahNMethodTable::at(int index) const {
   return _list->at(index);
 }
 
-int ShenandoahNMethodTable::index_of(nmethod* nm) const {
+int ShenandoahNMethodTable::index_of(CompiledMethod* nm) const {
   for (int index = 0; index < length(); index ++) {
     if (at(index)->nm() == nm) {
       return index;
@@ -382,7 +382,7 @@ void ShenandoahNMethodTable::finish_iteration(ShenandoahNMethodTableSnapshot* sn
   delete snapshot;
 }
 
-void ShenandoahNMethodTable::log_register_nmethod(nmethod* nm) {
+void ShenandoahNMethodTable::log_register_nmethod(CompiledMethod* nm) {
   LogTarget(Debug, gc, nmethod) log;
   if (!log.is_enabled()) {
     return;

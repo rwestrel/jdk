@@ -1,0 +1,32 @@
+Code in this repo builds the usual way. Only debug builds were tested
+on x86_64.
+
+To produce a shared library:
+
+$ java -XX:-TieredCompilation -XX:+PrintCompilation -XX:-BackgroundCompilation -XX:+DumpCodeToDisk -XX:-UseCompressedClassPointers -XX:-UseCompressedOops -XX:-UseOnStackReplacement -XX:CompileCommandFile=commands -XX:SuppressErrorAt=/graphKit.cpp:278 -XX:MaxNodeLimit=800000 -XX:NodeLimitFudgeFactor=16000 -XX:+UseG1GC  -version
+
+commands contains all methods that needs to be compiled to produce a
+shared library that contains all the code needed to run
+-version. Gathering them is a manual process. The file is included in
+the repo.
+
+One method in the build requires a lot of resources and can cause the
+JVM to run out of memory. The options:
+-XX:MaxNodeLimit=800000 -XX:NodeLimitFudgeFactor=16000
+are needed otherwise c2 bails out of its compilation.
+
+-XX:SuppressErrorAt=/graphKit.cpp:278 works around a bug that's
+ armless in the context of this experiment.
+
+The result of the command above is a leyden.o file in the current directory. Then:
+
+# ld -shared -z noexecstack -o ./libleyden.so leyden.o -L ~/jdk-jdk/build/linux-x86_64-server-fastdebug/images/jdk/lib -ljava
+
+creates the shared library libleyden.so
+
+Finally:
+
+LD_LIBRARY_PATH=. java -XX:-UseCompressedClassPointers -XX:-UseCompressedOops -XX:-UseOnStackReplacement -XX:+TraceBytecodes -XX:+UseG1GC -XX:+UseNewCode -XX:+RestoreCodeFromDisk -version
+
+executes -version. -XX:+TraceBytecodes -XX:+UseNewCode cause an assert
+to fire if any code runs interpreted.

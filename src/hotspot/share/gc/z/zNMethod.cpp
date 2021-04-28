@@ -46,15 +46,15 @@
 #include "runtime/continuation.hpp"
 #include "utilities/debug.hpp"
 
-static ZNMethodData* gc_data(const nmethod* nm) {
+static ZNMethodData* gc_data(const CompiledMethod* nm) {
   return nm->gc_data<ZNMethodData>();
 }
 
-static void set_gc_data(nmethod* nm, ZNMethodData* data) {
+static void set_gc_data(CompiledMethod* nm, ZNMethodData* data) {
   return nm->set_gc_data<ZNMethodData>(data);
 }
 
-void ZNMethod::attach_gc_data(nmethod* nm) {
+void ZNMethod::attach_gc_data(CompiledMethod* nm) {
   GrowableArray<oop*> immediate_oops;
   bool non_immediate_oops = false;
 
@@ -95,11 +95,11 @@ void ZNMethod::attach_gc_data(nmethod* nm) {
   ZNMethodDataOops::destroy(old_oops);
 }
 
-ZReentrantLock* ZNMethod::lock_for_nmethod(nmethod* nm) {
+ZReentrantLock* ZNMethod::lock_for_nmethod(CompiledMethod* nm) {
   return gc_data(nm)->lock();
 }
 
-void ZNMethod::log_register(const nmethod* nm) {
+void ZNMethod::log_register(CompiledMethod* nm) {
   LogTarget(Trace, gc, nmethod) log;
   if (!log.is_enabled()) {
     return;
@@ -157,7 +157,7 @@ void ZNMethod::log_unregister(const nmethod* nm) {
             p2i(nm));
 }
 
-void ZNMethod::register_nmethod(nmethod* nm) {
+void ZNMethod::register_nmethod(CompiledMethod* nm) {
   ResourceMark rm;
 
   // Create and attach gc data
@@ -187,12 +187,12 @@ bool ZNMethod::supports_entry_barrier(nmethod* nm) {
   return bs->supports_entry_barrier(nm);
 }
 
-bool ZNMethod::is_armed(nmethod* nm) {
+bool ZNMethod::is_armed(CompiledMethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
   return bs->is_armed(nm);
 }
 
-void ZNMethod::disarm(nmethod* nm) {
+void ZNMethod::disarm(CompiledMethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
   bs->disarm(nm);
 }
@@ -202,12 +202,12 @@ void ZNMethod::set_guard_value(nmethod* nm, int value) {
   bs->set_guard_value(nm, value);
 }
 
-void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl) {
+void ZNMethod::nmethod_oops_do(CompiledMethod* nm, OopClosure* cl) {
   ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
   ZNMethod::nmethod_oops_do_inner(nm, cl);
 }
 
-void ZNMethod::nmethod_oops_do_inner(nmethod* nm, OopClosure* cl) {
+void ZNMethod::nmethod_oops_do_inner(CompiledMethod* nm, OopClosure* cl) {
   // Process oops table
   {
     oop* const begin = nm->oops_begin();
@@ -253,7 +253,7 @@ public:
   }
 };
 
-void ZNMethod::nmethod_oops_barrier(nmethod* nm) {
+void ZNMethod::nmethod_oops_barrier(CompiledMethod* nm) {
   ZNMethodOopClosure cl;
   nmethod_oops_do_inner(nm, &cl);
 }
@@ -284,14 +284,14 @@ public:
       _unloading_occurred(unloading_occurred),
       _failed(false) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     if (failed()) {
       return;
     }
 
     if (nm->is_unloading()) {
       ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
-      nm->unlink();
+      ((nmethod*)nm)->unlink();
       return;
     }
 

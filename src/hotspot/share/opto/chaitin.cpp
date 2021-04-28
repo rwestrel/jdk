@@ -486,7 +486,7 @@ void PhaseChaitin::Register_Allocate() {
     _ifg->SquareUp();
     _ifg->Compute_Effective_Degree();
     // Only do conservative coalescing if requested
-    if (OptoCoalesce) {
+    if (OptoCoalesce && (!DumpCodeToDisk || C->live_nodes() < 100000)) {
       Compile::TracePhase tp("chaitinCoalesce2", &timers[_t_chaitinCoalesce2]);
       // Conservative (and pessimistic) copy coalescing of those spills
       PhaseConservativeCoalesce coalesce(*this);
@@ -560,7 +560,7 @@ void PhaseChaitin::Register_Allocate() {
     _ifg->Compute_Effective_Degree();
 
     // Only do conservative coalescing if requested
-    if (OptoCoalesce) {
+    if (OptoCoalesce && (!DumpCodeToDisk || C->live_nodes() < 100000)) {
       Compile::TracePhase tp("chaitinCoalesce3", &timers[_t_chaitinCoalesce3]);
       // Conservative (and pessimistic) copy coalescing
       PhaseConservativeCoalesce coalesce(*this);

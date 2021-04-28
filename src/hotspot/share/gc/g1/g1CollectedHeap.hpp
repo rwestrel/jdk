@@ -1250,13 +1250,13 @@ public:
   // Optimized nmethod scanning support routines
 
   // Register the given nmethod with the G1 heap.
-  void register_nmethod(nmethod* nm) override;
+  void register_nmethod(CompiledMethod* nm) override;
 
   // Unregister the given nmethod from the G1 heap.
   void unregister_nmethod(nmethod* nm) override;
 
   // No nmethod verification implemented.
-  void verify_nmethod(nmethod* nm) override {}
+  void verify_nmethod(CompiledMethod* nm) override {}
 
   // Recalculate amount of used memory after GC. Must be called after all allocation
   // has finished.

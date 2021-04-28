@@ -81,6 +81,7 @@ class FreeBlock: public HeapBlock {
 
 class CodeHeap : public CHeapObj<mtCode> {
   friend class VMStructs;
+  friend class CodeCache;
  protected:
   VirtualSpace _memory;                          // the memory holding the blocks
   VirtualSpace _segmap;                          // the memory holding the segment map
@@ -228,6 +229,41 @@ public:
   // Debugging
   void verify() PRODUCT_RETURN;
   void print()  PRODUCT_RETURN;
+};
+
+class JNIEXPORT LeydenCodeHeap : public CodeHeap {
+  friend class CodeCache;
+private:
+  LeydenCodeHeap() : CodeHeap(NULL, 0) {}
+public:
+  virtual void* first() const {
+    address seg_map = (address)_segmap.low();
+    size_t  seg_idx = 0;
+    assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
+    assert((seg_map[seg_idx] == 0) == (_next_segment > 0), "");
+    if (seg_map[seg_idx] == free_sentinel) {
+      return NULL;
+    }
+    CodeBlob** cb = (CodeBlob**)address_for(0);
+    return *cb;
+  }
+
+  virtual void* next(void* p) const {
+    CodeBlob** cb = (CodeBlob**)find_block_for(p);
+    size_t segments = size_to_segments((*cb)->code_size() + CodeEntryAlignment);
+    size_t  seg_idx = segment_for(p) + segments;
+    address seg_map = (address)_segmap.low();
+    assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
+
+    if (seg_map[seg_idx] == free_sentinel) {
+      return NULL;
+    }
+    CodeBlob** next = (CodeBlob**)address_for(seg_idx);
+    return *next;
+  }
+
+  virtual CodeBlob* find_blob_unsafe(void* start) const;
+
 };
 
 #endif // SHARE_MEMORY_HEAP_HPP

@@ -693,7 +693,7 @@ public:
   ZMarkNMethodClosure(OopClosure* cl) :
       _cl(cl) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
     if (ZNMethod::is_armed(nm)) {
       ZNMethod::nmethod_oops_do_inner(nm, _cl);

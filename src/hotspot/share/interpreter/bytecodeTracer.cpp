@@ -132,6 +132,16 @@ class BytecodePrinter {
     // the next bytecode.
     _is_wide = (code == Bytecodes::_wide);
     _code = Bytecodes::_illegal;
+    if (UpdateCompileList) {
+      FILE* f = fopen("/home/roland/tmp/commands2", "a");
+      assert(f != NULL, "");
+      ResourceMark rm;
+      stringStream ss;
+      _current_method->print_short_name(&ss);
+      fprintf(f, "compileonexit %s\n", ss.as_string());
+      fclose(f);
+    }
+    assert(!RestoreCodeFromDisk, "");
   }
 
   // Used for Method*::print_codes().  The input bcp comes from

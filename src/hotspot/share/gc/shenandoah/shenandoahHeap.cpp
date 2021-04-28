@@ -1909,7 +1909,7 @@ void ShenandoahHeap::set_update_refs_in_progress(bool in_progress) {
   set_gc_state_mask(UPDATEREFS, in_progress);
 }
 
-void ShenandoahHeap::register_nmethod(nmethod* nm) {
+void ShenandoahHeap::register_nmethod(CompiledMethod* nm) {
   ShenandoahCodeRoots::register_nmethod(nm);
 }
 

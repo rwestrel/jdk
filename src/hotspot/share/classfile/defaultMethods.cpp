@@ -1044,7 +1044,7 @@ static void sort_methods(GrowableArray<Method*>* methods) {
     for (int j = 0; j < i; ++j) {
       Method* m1 = methods->at(j);
       Method* m2 = methods->at(j + 1);
-      if ((uintptr_t)m1->name() > (uintptr_t)m2->name()) {
+      if (m1->name()->fast_compare(m2->name()) > 0) {
         methods->at_put(j, m2);
         methods->at_put(j + 1, m1);
         sorted = false;
@@ -1054,11 +1054,11 @@ static void sort_methods(GrowableArray<Method*>* methods) {
     sorted = true;
   }
 #ifdef ASSERT
-  uintptr_t prev = 0;
+  Symbol* prev = 0;
   for (int i = 0; i < methods->length(); ++i) {
     Method* mh = methods->at(i);
-    uintptr_t nv = (uintptr_t)mh->name();
-    assert(nv >= prev, "Incorrect overpass method ordering");
+    Symbol* nv = mh->name();
+    assert(prev == NULL || nv->fast_compare(prev) >= 0, "Incorrect overpass method ordering");
     prev = nv;
   }
 #endif
@@ -1102,7 +1102,7 @@ static void merge_in_new_methods(InstanceKlass* klass,
     }
 
     if (orig_method != nullptr &&
-        (new_method == nullptr || orig_method->name() < new_method->name())) {
+        (new_method == nullptr || orig_method->name()->fast_compare(new_method->name()) < 0)) {
       merged_methods->at_put(i, orig_method);
       original_methods->at_put(orig_idx, nullptr);
       if (merged_ordering->length() > 0) {
@@ -1125,11 +1125,11 @@ static void merge_in_new_methods(InstanceKlass* klass,
 
   // Verify correct order
 #ifdef ASSERT
-  uintptr_t prev = 0;
+  Symbol* prev = 0;
   for (int i = 0; i < merged_methods->length(); ++i) {
     Method* mo = merged_methods->at(i);
-    uintptr_t nv = (uintptr_t)mo->name();
-    assert(nv >= prev, "Incorrect method ordering");
+    Symbol* nv = mo->name();
+    assert(prev == NULL || nv->fast_compare(prev) >= 0, "Incorrect method ordering");
     prev = nv;
   }
 #endif

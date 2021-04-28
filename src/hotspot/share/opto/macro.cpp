@@ -2369,6 +2369,8 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
         break;
       case Node::Class_Opaque1:
         break;
+      case Node::Class_InitializeKlass:
+        break;
       default:
         assert(n->Opcode() == Op_LoopLimit ||
                n->Opcode() == Op_Opaque3   ||
@@ -2515,6 +2517,9 @@ bool PhaseMacroExpand::expand_macro_nodes() {
     case Node::Class_SubTypeCheck:
       expand_subtypecheck_node(n->as_SubTypeCheck());
       break;
+    case Node::Class_InitializeKlass:
+      expand_initialize_klass_node(n->as_InitializeKlass());
+      break;
     default:
       assert(false, "unknown node type in macro list");
     }
@@ -2609,3 +2614,46 @@ int PhaseMacroExpand::count_MemBar(Compile *C) {
   return total;
 }
 #endif
+
+void PhaseMacroExpand::expand_initialize_klass_node(InitializeKlassNode* init) {
+  CallProjections projs;
+  Node* c = init->in(TypeFunc::Control);
+  Node* m = init->in(TypeFunc::Memory);
+  Node* io = init->in(TypeFunc::I_O);
+  Node* klass = init->in(InitializeKlassNode::KlassNode);
+  init->extract_projections(&projs, false, false);
+
+  Node* init_state_adr = transform_later(new AddPNode(C->top(), klass, MakeConX(in_bytes(InstanceKlass::init_state_offset()))));
+  Node* init_state = transform_later(new LoadUBNode(c, m, init_state_adr, TypeRawPtr::NOTNULL, TypeInt::UBYTE, MemNode::unordered));
+  Node* cmp = transform_later(new CmpINode(init_state, intcon(InstanceKlass::fully_initialized)));
+  Node* bol = transform_later(new BoolNode(cmp, BoolTest::eq));
+  IfNode* iff = new IfNode(c, bol, PROB_STATIC_FREQUENT, COUNT_UNKNOWN);
+  transform_later(iff);
+  Node* iftrue = transform_later(new IfTrueNode(iff));
+  Node* iffalse = transform_later(new IfFalseNode(iff));
+
+
+  make_slow_call(init, OptoRuntime::initialize_klass_Type(), OptoRuntime::initialize_klass_Java(), NULL, iffalse, init->in(TypeFunc::Parms), NULL, NULL);
+
+  Node* region = new RegionNode(3);
+  region->init_req(1, iftrue);
+  Node* proj = transform_later(projs.fallthrough_catchproj->clone());
+  region->init_req(2, proj);
+  transform_later(region);
+  _igvn.replace_node(projs.fallthrough_catchproj, region);
+
+  Node* mem_phi = new PhiNode(region, Type::MEMORY, TypePtr::BOTTOM);
+  mem_phi->init_req(1, m);
+  proj = transform_later(projs.fallthrough_memproj->clone());
+  mem_phi->init_req(2, proj);
+  transform_later(mem_phi);
+  _igvn.replace_node(projs.fallthrough_memproj, mem_phi);
+
+  Node* io_phi = new PhiNode(region, Type::ABIO);
+  io_phi->init_req(1, io);
+  proj = transform_later(projs.fallthrough_ioproj->clone());
+  io_phi->init_req(2, proj);
+  transform_later(io_phi);
+  _igvn.replace_node(projs.fallthrough_ioproj, io_phi);
+}
+

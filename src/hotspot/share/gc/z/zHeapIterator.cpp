@@ -290,7 +290,7 @@ public:
       _cl(cl),
       _bs_nm(BarrierSet::barrier_set()->barrier_set_nmethod()) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     // If ClassUnloading is turned off, all nmethods are considered strong,
     // not only those on the call stacks. The heap iteration might happen
     // before the concurrent processign of the code cache, make sure that

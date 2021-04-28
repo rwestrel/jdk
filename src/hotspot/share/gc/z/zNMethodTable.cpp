@@ -52,7 +52,7 @@ size_t ZNMethodTable::_nunregistered = 0;
 ZNMethodTableIteration ZNMethodTable::_iteration;
 ZSafeDeleteNoLock<ZNMethodTableEntry[]> ZNMethodTable::_safe_delete;
 
-size_t ZNMethodTable::first_index(const nmethod* nm, size_t size) {
+size_t ZNMethodTable::first_index(CompiledMethod* nm, size_t size) {
   assert(is_power_of_2(size), "Invalid size");
   const size_t mask = size - 1;
   const size_t hash = ZHash::address_to_uint32((uintptr_t)nm);
@@ -65,7 +65,7 @@ size_t ZNMethodTable::next_index(size_t prev_index, size_t size) {
   return (prev_index + 1) & mask;
 }
 
-bool ZNMethodTable::register_entry(ZNMethodTableEntry* table, size_t size, nmethod* nm) {
+bool ZNMethodTable::register_entry(ZNMethodTableEntry* table, size_t size, CompiledMethod* nm) {
   const ZNMethodTableEntry entry(nm);
   size_t index = first_index(nm, size);
 
@@ -175,7 +175,7 @@ size_t ZNMethodTable::unregistered_nmethods() {
   return _nunregistered;
 }
 
-void ZNMethodTable::register_nmethod(nmethod* nm) {
+void ZNMethodTable::register_nmethod(CompiledMethod* nm) {
   assert(CodeCache_lock->owned_by_self(), "Lock must be held");
 
   // Grow/Shrink/Prune table if needed

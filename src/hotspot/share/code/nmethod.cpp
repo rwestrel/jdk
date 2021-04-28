@@ -438,6 +438,12 @@ const char* nmethod::compile_kind() const {
   return nullptr;
 }
 
+const char* LeydenNMethod::compile_kind() const {
+  if (is_osr_method())     return "osr";
+  if (method() != NULL && is_native_method())  return "c2n";
+  return NULL;
+}
+
 // Fill in default values for various flag fields
 void nmethod::init_defaults() {
   _state                      = not_installed;
@@ -669,6 +675,7 @@ nmethod::nmethod(
     _gc_epoch                = CodeCache::gc_epoch();
 
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
+    _consts_end_offset       = code_begin() - consts_begin() + content_offset();
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     _oops_offset             = data_offset();
     _metadata_offset         = _oops_offset          + align_up(code_buffer->total_oop_size(), oopSize);
@@ -812,6 +819,8 @@ nmethod::nmethod(
 
     // Section offsets
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
+    _consts_end_offset       = code_begin() - consts_begin() + content_offset();
+    assert(consts_end() == code_begin(), "");
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     set_ctable_begin(header_begin() + _consts_offset);
     _skipped_instructions_size      = code_buffer->total_skipped_instructions_size();
@@ -982,6 +991,18 @@ void nmethod::print_on(outputStream* st, const char* msg) const {
   }
 }
 
+void LeydenNMethod::print_on(outputStream* st, const char* msg) const {
+  if (st != NULL) {
+    ttyLocker ttyl;
+    if (WizardMode) {
+      CompileTask::print(st, this, msg, /*short_form:*/ true);
+      st->print_cr(" (" INTPTR_FORMAT ")", p2i(this));
+    } else {
+      CompileTask::print(st, this, msg, /*short_form:*/ false);
+    }
+  }
+}
+
 void nmethod::maybe_print_nmethod(const DirectiveSet* directive) {
   bool printnmethods = directive->PrintAssemblyOption || directive->PrintNMethodsOption;
   if (printnmethods || PrintDebugInfo || PrintRelocations || PrintDependencies || PrintExceptionHandlers) {
@@ -1068,10 +1089,105 @@ void nmethod::print_nmethod(bool printmethod) {
   }
 }
 
+void LeydenNMethod::print_nmethod(bool printmethod) {
+  run_nmethod_entry_barrier(); // ensure all embedded OOPs are valid before printing
+
+  ttyLocker ttyl;  // keep the following output all in one block
+  if (xtty != NULL) {
+    xtty->begin_head("print_nmethod");
+    log_identity(xtty);
+    xtty->stamp();
+    xtty->end_head();
+  }
+  // Print the header part, then print the requested information.
+  // This is both handled in decode2().
+  if (printmethod) {
+    ResourceMark m;
+    if (is_compiled_by_c1()) {
+      tty->cr();
+      tty->print_cr("============================= C1-compiled nmethod ==============================");
+    }
+    if (is_compiled_by_jvmci()) {
+      tty->cr();
+      tty->print_cr("=========================== JVMCI-compiled nmethod =============================");
+    }
+    tty->print_cr("----------------------------------- Assembly -----------------------------------");
+    decode2(tty);
+#if defined(SUPPORT_DATA_STRUCTS)
+    if (AbstractDisassembler::show_structs()) {
+      // Print the oops from the underlying CodeBlob as well.
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      print_oops(tty);
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      print_metadata(tty);
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      print_pcs();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      if (oop_maps() != NULL) {
+        tty->print("oop maps:"); // oop_maps()->print_on(tty) outputs a cr() at the beginning
+        oop_maps()->print_on(tty);
+        tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      }
+    }
+#endif
+  } else {
+    print(); // print the header part only.
+  }
+
+#if defined(SUPPORT_DATA_STRUCTS)
+  if (AbstractDisassembler::show_structs()) {
+    methodHandle mh(Thread::current(), _method);
+    if (printmethod || PrintDebugInfo || CompilerOracle::has_option(mh, CompileCommand::PrintDebugInfo)) {
+      print_scopes();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+    }
+    if (printmethod || PrintRelocations || CompilerOracle::has_option(mh, CompileCommand::PrintRelocations)) {
+      print_relocations();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+    }
+//    if (printmethod || PrintDependencies || CompilerOracle::has_option(mh, CompileCommand::PrintDependencies)) {
+//      print_dependencies();
+//      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+//    }
+//    if (printmethod && native_invokers_begin() < native_invokers_end()) {
+//      print_native_invokers();
+//      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+//    }
+    if (printmethod || PrintExceptionHandlers) {
+      print_handler_table();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      print_nul_chk_table();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+    }
+
+    if (printmethod) {
+      print_recorded_oops();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+      print_recorded_metadata();
+      tty->print_cr("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ");
+    }
+  }
+#endif
+
+  if (xtty != NULL) {
+    xtty->tail("print_nmethod");
+  }
+}
+
 
 // Promote one word from an assembly-time handle to a live embedded oop.
 inline void nmethod::initialize_immediate_oop(oop* dest, jobject handle) {
   if (handle == nullptr ||
+      // As a special case, IC oops are initialized to 1 or -1.
+      handle == (jobject) Universe::non_oop_word()) {
+    *(void**)dest = handle;
+  } else {
+    *dest = JNIHandles::resolve_non_null(handle);
+  }
+}
+
+inline void LeydenNMethod::initialize_immediate_oop(oop* dest, jobject handle) {
+  if (handle == NULL ||
       // As a special case, IC oops are initialized to 1 or -1.
       handle == (jobject) Universe::non_oop_word()) {
     *(void**)dest = handle;
@@ -1157,6 +1273,26 @@ void nmethod::finalize_relocations() {
     }
   }
 }
+
+void LeydenNMethod::fix_oop_relocations(address begin, address end, bool initialize_immediates) {
+  // re-patch all oop-bearing instructions, just in case some oops moved
+  RelocIterator iter(this, begin, end);
+  while (iter.next()) {
+    if (iter.type() == relocInfo::oop_type) {
+      oop_Relocation* reloc = iter.oop_reloc();
+      if (initialize_immediates && reloc->oop_is_immediate()) {
+        oop* dest = reloc->oop_addr();
+        initialize_immediate_oop(dest, cast_from_oop<jobject>(*dest));
+      }
+      // Refresh the oop-related bits of this instruction.
+      reloc->fix_oop_relocation();
+    } else if (iter.type() == relocInfo::metadata_type) {
+      metadata_Relocation* reloc = iter.metadata_reloc();
+      reloc->fix_metadata_relocation();
+    }
+  }
+}
+
 
 void nmethod::make_deoptimized() {
   if (!Continuations::enabled()) {
@@ -1320,6 +1456,7 @@ void nmethod::unlink_from_method() {
 
 // Invalidate code
 bool nmethod::make_not_entrant() {
+  assert(!RestoreCodeFromDisk, "");
   // This can be called while the system is already at a safepoint which is ok
   NoSafepointVerifier nsv;
 
@@ -1474,6 +1611,13 @@ oop nmethod::oop_at(int index) const {
     return nullptr;
   }
   return NMethodAccess<AS_NO_KEEPALIVE>::oop_load(oop_addr_at(index));
+}
+
+oop LeydenNMethod::oop_at(int index) const {
+  if (index == 0) {
+    return NULL;
+  }
+  return NativeAccess<AS_NO_KEEPALIVE>::oop_load(oop_addr_at(index));
 }
 
 oop nmethod::oop_at_phantom(int index) const {
@@ -1658,6 +1802,52 @@ bool nmethod::is_cold() {
   return CodeCache::previous_completed_gc_marking_cycle() > _gc_epoch + 2 * CodeCache::cold_gc_count();
 }
 
+void LeydenNMethod::metadata_do(MetadataClosure* f) {
+  {
+    // Visit all immediate references that are embedded in the instruction stream.
+    RelocIterator iter(this, oops_reloc_begin());
+    while (iter.next()) {
+      if (iter.type() == relocInfo::metadata_type) {
+        metadata_Relocation* r = iter.metadata_reloc();
+        // In this metadata, we must only follow those metadatas directly embedded in
+        // the code.  Other metadatas (oop_index>0) are seen as part of
+        // the metadata section below.
+        assert(1 == (r->metadata_is_immediate()) +
+               (r->metadata_addr() >= metadata_begin() && r->metadata_addr() < metadata_end()),
+               "metadata must be found in exactly one place");
+        if (r->metadata_is_immediate() && r->metadata_value() != NULL) {
+          Metadata* md = r->metadata_value();
+          if (md != _method) f->do_metadata(md);
+        }
+      } else if (iter.type() == relocInfo::virtual_call_type) {
+        // Check compiledIC holders associated with this nmethod
+        ResourceMark rm;
+        CompiledIC *ic = CompiledIC_at(&iter);
+        if (ic->is_icholder_call()) {
+          CompiledICHolder* cichk = ic->cached_icholder();
+          f->do_metadata(cichk->holder_metadata());
+          f->do_metadata(cichk->holder_klass());
+        } else {
+          Metadata* ic_oop = ic->cached_metadata();
+          if (ic_oop != NULL) {
+            f->do_metadata(ic_oop);
+          }
+        }
+      }
+    }
+  }
+
+  // Visit the metadata section
+  for (Metadata** p = metadata_begin(); p < metadata_end(); p++) {
+    if (*p == Universe::non_oop_word() || *p == NULL)  continue;  // skip non-oops
+    Metadata* md = *p;
+    f->do_metadata(md);
+  }
+
+  // Visit metadata not embedded in the other places.
+  if (_method != NULL) f->do_metadata(_method);
+}
+
 // The _is_unloading_state encodes a tuple comprising the unloading cycle
 // and the result of IsUnloadingBehaviour::is_unloading() for that cycle.
 // This is the bit layout of the _is_unloading_state byte: 00000CCU
@@ -1796,6 +1986,37 @@ void nmethod::follow_nmethod(OopIterateClosure* cl) {
 
   // There's an assumption made that this function is not used by GCs that
   // relocate objects, and therefore we don't call fix_oop_relocations.
+}
+
+void LeydenNMethod::oops_do(OopClosure* f, bool allow_dead) {
+  // make sure the oops ready to receive visitors
+  assert(allow_dead || is_alive(), "should not call follow on dead nmethod");
+
+  // Prevent extra code cache walk for platforms that don't have immediate oops.
+  if (relocInfo::mustIterateImmediateOopsInCode()) {
+    RelocIterator iter(this, oops_reloc_begin());
+
+    while (iter.next()) {
+      if (iter.type() == relocInfo::oop_type ) {
+        oop_Relocation* r = iter.oop_reloc();
+        // In this loop, we must only follow those oops directly embedded in
+        // the code.  Other oops (oop_index>0) are seen as part of scopes_oops.
+        assert(1 == (r->oop_is_immediate()) +
+               (r->oop_addr() >= oops_begin() && r->oop_addr() < oops_end()),
+               "oop must be found in exactly one place");
+        if (r->oop_is_immediate() && r->oop_value() != NULL) {
+          f->do_oop(r->oop_addr());
+        }
+      }
+    }
+  }
+
+  // Scopes
+  // This includes oop constants not inlined in the code stream.
+  for (oop* p = oops_begin(); p < oops_end(); p++) {
+    if (*p == Universe::non_oop_word())  continue;  // skip non-oops
+    f->do_oop(p);
+  }
 }
 
 nmethod* volatile nmethod::_oops_do_mark_nmethods;
@@ -2224,10 +2445,10 @@ void nmethod_init() {
 // Verification
 
 class VerifyOopsClosure: public OopClosure {
-  nmethod* _nm;
+  CompiledMethod* _nm;
   bool     _ok;
 public:
-  VerifyOopsClosure(nmethod* nm) : _nm(nm), _ok(true) { }
+  VerifyOopsClosure(CompiledMethod* nm) : _nm(nm), _ok(true) { }
   bool ok() { return _ok; }
   virtual void do_oop(oop* p) {
     if (oopDesc::is_oop_or_null(*p)) return;
@@ -2321,6 +2542,77 @@ void nmethod::verify() {
   metadata_do(&vmc);
 }
 
+void LeydenNMethod::verify() {
+
+  // Hmm. OSR methods can be deopted but not marked as zombie or not_entrant
+  // seems odd.
+
+  if (is_zombie() || is_not_entrant() || is_unloaded())
+    return;
+
+  // Make sure all the entry points are correctly aligned for patching.
+  NativeJump::check_verified_entry_alignment(entry_point(), verified_entry_point());
+
+  // assert(oopDesc::is_oop(method()), "must be valid");
+
+  ResourceMark rm;
+
+  if (!CodeCache::contains(this)) {
+    fatal("nmethod at " INTPTR_FORMAT " not in zone", p2i(this));
+  }
+
+  if(is_native_method() )
+    return;
+
+  LeydenNMethod* nm = CodeCache::find_leyden_nmethod(verified_entry_point());
+  if (nm != this) {
+    fatal("findNMethod did not find this nmethod (" INTPTR_FORMAT ")", p2i(this));
+  }
+
+  for (PcDesc* p = scopes_pcs_begin(); p < scopes_pcs_end(); p++) {
+    if (! p->verify(this)) {
+      tty->print_cr("\t\tin nmethod at " INTPTR_FORMAT " (pcs)", p2i(this));
+    }
+  }
+
+#ifdef ASSERT
+#if INCLUDE_JVMCI
+  {
+    // Verify that implicit exceptions that deoptimize have a PcDesc and OopMap
+    ImmutableOopMapSet* oms = oop_maps();
+    ImplicitExceptionTable implicit_table(this);
+    for (uint i = 0; i < implicit_table.len(); i++) {
+      int exec_offset = (int) implicit_table.get_exec_offset(i);
+      if (implicit_table.get_exec_offset(i) == implicit_table.get_cont_offset(i)) {
+        assert(pc_desc_at(code_begin() + exec_offset) != NULL, "missing PcDesc");
+        bool found = false;
+        for (int i = 0, imax = oms->count(); i < imax; i++) {
+          if (oms->pair_at(i)->pc_offset() == exec_offset) {
+            found = true;
+            break;
+          }
+        }
+        assert(found, "missing oopmap");
+      }
+    }
+  }
+#endif
+#endif
+
+  VerifyOopsClosure voc(this);
+  oops_do(&voc);
+  assert(voc.ok(), "embedded oops must be OK");
+  Universe::heap()->verify_nmethod(this);
+
+  assert(_oops_do_mark_link == NULL, "_oops_do_mark_link for %s should be NULL but is " PTR_FORMAT,
+         nm->method()->external_name(), p2i(_oops_do_mark_link));
+  verify_scopes();
+
+  CompiledICLocker nm_verify(this);
+  VerifyMetadataClosure vmc;
+  metadata_do(&vmc);
+}
+
 
 void nmethod::verify_interrupt_point(address call_site) {
 
@@ -2338,6 +2630,25 @@ void nmethod::verify_interrupt_point(address call_site) {
 
   PcDesc* pd = pc_desc_at(nativeCall_at(call_site)->return_address());
   assert(pd != nullptr, "PcDesc must exist");
+  for (ScopeDesc* sd = new ScopeDesc(this, pd);
+       !sd->is_top(); sd = sd->sender()) {
+    sd->verify();
+  }
+}
+
+void LeydenNMethod::verify_interrupt_point(address call_site) {
+
+  if (CompiledICLocker::is_safe(this)) {
+    CompiledIC_at(this, call_site);
+  } else {
+    CompiledICLocker ml_verify(this);
+    CompiledIC_at(this, call_site);
+  }
+
+  HandleMark hm(Thread::current());
+
+  PcDesc* pd = pc_desc_at(nativeCall_at(call_site)->return_address());
+  assert(pd != NULL, "PcDesc must exist");
   for (ScopeDesc* sd = new ScopeDesc(this, pd);
        !sd->is_top(); sd = sd->sender()) {
     sd->verify();
@@ -2379,11 +2690,51 @@ void nmethod::verify_scopes() {
   }
 }
 
+void LeydenNMethod::verify_scopes() {
+  if( !method() ) return;       // Runtime stubs have no scope
+  if (method()->is_native()) return; // Ignore stub methods.
+  // iterate through all interrupt point
+  // and verify the debug information is valid.
+  RelocIterator iter((nmethod*)this);
+  while (iter.next()) {
+    address stub = NULL;
+    switch (iter.type()) {
+      case relocInfo::virtual_call_type:
+        verify_interrupt_point(iter.addr());
+        break;
+      case relocInfo::opt_virtual_call_type:
+        stub = iter.opt_virtual_call_reloc()->static_stub();
+        verify_interrupt_point(iter.addr());
+        break;
+      case relocInfo::static_call_type:
+        stub = iter.static_call_reloc()->static_stub();
+        //verify_interrupt_point(iter.addr());
+        break;
+      case relocInfo::runtime_call_type:
+      case relocInfo::runtime_call_w_cp_type: {
+        address destination = iter.reloc()->value();
+        // Right now there is no way to find out which entries support
+        // an interrupt point.  It would be nice if we had this
+        // information in a table.
+        break;
+      }
+      default:
+        break;
+    }
+    assert(stub == NULL || stub_contains(stub), "static call stub outside stub section");
+  }
+}
+
 
 // -----------------------------------------------------------------------------
 // Printing operations
 
 void nmethod::print() const {
+  ttyLocker ttyl;   // keep the following output all in one block
+  print(tty);
+}
+
+void LeydenNMethod::print() const {
   ttyLocker ttyl;   // keep the following output all in one block
   print(tty);
 }
@@ -2472,6 +2823,90 @@ void nmethod::print(outputStream* st) const {
 #endif
 }
 
+void LeydenNMethod::print(outputStream* st) const {
+  ResourceMark rm;
+
+  st->print("Compiled method ");
+
+  if (is_compiled_by_c1()) {
+    st->print("(c1) ");
+  } else if (is_compiled_by_c2()) {
+    st->print("(c2) ");
+  } else if (is_compiled_by_jvmci()) {
+    st->print("(JVMCI) ");
+  } else {
+    st->print("(n/a) ");
+  }
+
+  print_on(tty, NULL);
+
+  if (WizardMode) {
+    st->print("((nmethod*) " INTPTR_FORMAT ") ", p2i(this));
+    st->print(" for method " INTPTR_FORMAT , p2i(method()));
+    st->print(" { ");
+    st->print_cr("%s ", state());
+    st->print_cr("}:");
+  }
+  if (size              () > 0) st->print_cr(" total in heap  [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(this),
+                                             p2i(this) + size(),
+                                             size());
+  if (relocation_size   () > 0) st->print_cr(" relocation     [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(relocation_begin()),
+                                             p2i(relocation_end()),
+                                             relocation_size());
+  if (consts_size       () > 0) st->print_cr(" constants      [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(consts_begin()),
+                                             p2i(consts_end()),
+                                             consts_size());
+  if (insts_size        () > 0) st->print_cr(" main code      [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(insts_begin()),
+                                             p2i(insts_end()),
+                                             insts_size());
+  if (stub_size         () > 0) st->print_cr(" stub code      [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(stub_begin()),
+                                             p2i(stub_end()),
+                                             stub_size());
+  if (oops_size         () > 0) st->print_cr(" oops           [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(oops_begin()),
+                                             p2i(oops_end()),
+                                             oops_size());
+  if (metadata_size     () > 0) st->print_cr(" metadata       [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(metadata_begin()),
+                                             p2i(metadata_end()),
+                                             metadata_size());
+  if (scopes_data_size  () > 0) st->print_cr(" scopes data    [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(scopes_data_begin()),
+                                             p2i(scopes_data_end()),
+                                             scopes_data_size());
+  if (scopes_pcs_size   () > 0) st->print_cr(" scopes pcs     [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(scopes_pcs_begin()),
+                                             p2i(scopes_pcs_end()),
+                                             scopes_pcs_size());
+//  if (dependencies_size () > 0) st->print_cr(" dependencies   [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+//                                             p2i(dependencies_begin()),
+//                                             p2i(dependencies_end()),
+//                                             dependencies_size());
+  if (handler_table_size() > 0) st->print_cr(" handler table  [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(handler_table_begin()),
+                                             p2i(handler_table_end()),
+                                             handler_table_size());
+  if (nul_chk_table_size() > 0) st->print_cr(" nul chk table  [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+                                             p2i(nul_chk_table_begin()),
+                                             p2i(nul_chk_table_end()),
+                                             nul_chk_table_size());
+//#if INCLUDE_JVMCI
+//  if (speculations_size () > 0) st->print_cr(" speculations   [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+//                                             p2i(speculations_begin()),
+//                                             p2i(speculations_end()),
+//                                             speculations_size());
+//  if (jvmci_data_size   () > 0) st->print_cr(" JVMCI data     [" INTPTR_FORMAT "," INTPTR_FORMAT "] = %d",
+//                                             p2i(jvmci_data_begin()),
+//                                             p2i(jvmci_data_end()),
+//                                             jvmci_data_size());
+//#endif
+}
+
 void nmethod::print_code() {
   ResourceMark m;
   ttyLocker ttyl;
@@ -2525,8 +2960,50 @@ void nmethod::print_oops(outputStream* st) {
   }
 }
 
+void LeydenNMethod::print_oops(outputStream* st) {
+  ResourceMark m;
+  st->print("Oops:");
+  if (oops_begin() < oops_end()) {
+    st->cr();
+    for (oop* p = oops_begin(); p < oops_end(); p++) {
+      Disassembler::print_location((unsigned char*)p, (unsigned char*)oops_begin(), (unsigned char*)oops_end(), st, true, false);
+      st->print(PTR_FORMAT " ", *((uintptr_t*)p));
+      if (Universe::contains_non_oop_word(p)) {
+        st->print_cr("NON_OOP");
+        continue;  // skip non-oops
+      }
+      if (*p == NULL) {
+        st->print_cr("NULL-oop");
+        continue;  // skip non-oops
+      }
+      (*p)->print_value_on(st);
+      st->cr();
+    }
+  } else {
+    st->print_cr(" <list empty>");
+  }
+}
+
 // Print metadata pool.
 void nmethod::print_metadata(outputStream* st) {
+  ResourceMark m;
+  st->print("Metadata:");
+  if (metadata_begin() < metadata_end()) {
+    st->cr();
+    for (Metadata** p = metadata_begin(); p < metadata_end(); p++) {
+      Disassembler::print_location((unsigned char*)p, (unsigned char*)metadata_begin(), (unsigned char*)metadata_end(), st, true, false);
+      st->print(PTR_FORMAT " ", *((uintptr_t*)p));
+      if (*p && *p != Universe::non_oop_word()) {
+        (*p)->print_value_on(st);
+      }
+      st->cr();
+    }
+  } else {
+    st->print_cr(" <list empty>");
+  }
+}
+
+void LeydenNMethod::print_metadata(outputStream* st) {
   ResourceMark m;
   st->print("Metadata:");
   if (metadata_begin() < metadata_end()) {
@@ -2565,10 +3042,38 @@ void nmethod::print_scopes_on(outputStream* st) {
     st->print_cr(" <list empty>");
   }
 }
+
+void LeydenNMethod::print_scopes_on(outputStream* st) {
+  // Find the first pc desc for all scopes in the code and print it.
+  ResourceMark rm;
+  st->print("scopes:");
+  if (scopes_pcs_begin() < scopes_pcs_end()) {
+    st->cr();
+    for (PcDesc* p = scopes_pcs_begin(); p < scopes_pcs_end(); p++) {
+      if (p->scope_decode_offset() == DebugInformationRecorder::serialized_null)
+        continue;
+
+      ScopeDesc* sd = scope_desc_at(p->real_pc(this));
+      while (sd != NULL) {
+        sd->print_on(st, p);  // print output ends with a newline
+        sd = sd->sender();
+      }
+    }
+  } else {
+    st->print_cr(" <list empty>");
+  }
+}
 #endif
 
 #ifndef PRODUCT  // RelocIterator does support printing only then.
 void nmethod::print_relocations() {
+  ResourceMark m;       // in case methods get printed via the debugger
+  tty->print_cr("relocations:");
+  RelocIterator iter(this);
+  iter.print();
+}
+
+void LeydenNMethod::print_relocations() {
   ResourceMark m;       // in case methods get printed via the debugger
   tty->print_cr("relocations:");
   RelocIterator iter(this);
@@ -2594,6 +3099,14 @@ void nmethod::print_handler_table() {
 }
 
 void nmethod::print_nul_chk_table() {
+  ImplicitExceptionTable(this).print(code_begin());
+}
+
+void LeydenNMethod::print_handler_table() {
+  ExceptionHandlerTable(this).print(code_begin());
+}
+
+void LeydenNMethod::print_nul_chk_table() {
   ImplicitExceptionTable(this).print(code_begin());
 }
 
@@ -2663,11 +3176,131 @@ void nmethod::print_recorded_metadata() {
     tty->print_cr(" <list empty>");
   }
 }
+
+void LeydenNMethod::print_recorded_oop(int log_n, int i) {
+  void* value;
+
+  if (i == 0) {
+    value = NULL;
+  } else {
+    // Be careful around non-oop words. Don't create an oop
+    // with that value, or it will assert in verification code.
+    if (Universe::contains_non_oop_word(oop_addr_at(i))) {
+      value = Universe::non_oop_word();
+    } else {
+      value = oop_at(i);
+    }
+  }
+
+  tty->print("#%*d: " INTPTR_FORMAT " ", log_n, i, p2i(value));
+
+  if (value == Universe::non_oop_word()) {
+    tty->print("non-oop word");
+  } else {
+    if (value == 0) {
+      tty->print("NULL-oop");
+    } else {
+      oop_at(i)->print_value_on(tty);
+    }
+  }
+
+  tty->cr();
+}
+
+void LeydenNMethod::print_recorded_oops() {
+  const int n = oops_count();
+  const int log_n = (n<10) ? 1 : (n<100) ? 2 : (n<1000) ? 3 : (n<10000) ? 4 : 6;
+  tty->print("Recorded oops:");
+  if (n > 0) {
+    tty->cr();
+    for (int i = 0; i < n; i++) {
+      print_recorded_oop(log_n, i);
+    }
+  } else {
+    tty->print_cr(" <list empty>");
+  }
+}
+
+void LeydenNMethod::print_recorded_metadata() {
+  const int n = metadata_count();
+  const int log_n = (n<10) ? 1 : (n<100) ? 2 : (n<1000) ? 3 : (n<10000) ? 4 : 6;
+  tty->print("Recorded metadata:");
+  if (n > 0) {
+    tty->cr();
+    for (int i = 0; i < n; i++) {
+      Metadata* m = metadata_at(i);
+      tty->print("#%*d: " INTPTR_FORMAT " ", log_n, i, p2i(m));
+      if (m == (Metadata*)Universe::non_oop_word()) {
+        tty->print("non-metadata word");
+      } else if (m == NULL) {
+        tty->print("NULL-oop");
+      } else {
+        Metadata::print_value_on_maybe_null(tty, m);
+      }
+      tty->cr();
+    }
+  } else {
+    tty->print_cr(" <list empty>");
+  }
+}
 #endif
 
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
 
 void nmethod::print_constant_pool(outputStream* st) {
+  //-----------------------------------
+  //---<  Print the constant pool  >---
+  //-----------------------------------
+  int consts_size = this->consts_size();
+  if ( consts_size > 0 ) {
+    unsigned char* cstart = this->consts_begin();
+    unsigned char* cp     = cstart;
+    unsigned char* cend   = cp + consts_size;
+    unsigned int   bytes_per_line = 4;
+    unsigned int   CP_alignment   = 8;
+    unsigned int   n;
+
+    st->cr();
+
+    //---<  print CP header to make clear what's printed  >---
+    if( ((uintptr_t)cp&(CP_alignment-1)) == 0 ) {
+      n = bytes_per_line;
+      st->print_cr("[Constant Pool]");
+      Disassembler::print_location(cp, cstart, cend, st, true, true);
+      Disassembler::print_hexdata(cp, n, st, true);
+      st->cr();
+    } else {
+      n = (uintptr_t)cp&(bytes_per_line-1);
+      st->print_cr("[Constant Pool (unaligned)]");
+    }
+
+    //---<  print CP contents, bytes_per_line at a time  >---
+    while (cp < cend) {
+      Disassembler::print_location(cp, cstart, cend, st, true, false);
+      Disassembler::print_hexdata(cp, n, st, false);
+      cp += n;
+      n   = bytes_per_line;
+      st->cr();
+    }
+
+    //---<  Show potential alignment gap between constant pool and code  >---
+    cend = code_begin();
+    if( cp < cend ) {
+      n = 4;
+      st->print_cr("[Code entry alignment]");
+      while (cp < cend) {
+        Disassembler::print_location(cp, cstart, cend, st, false, false);
+        cp += n;
+        st->cr();
+      }
+    }
+  } else {
+    st->print_cr("[Constant Pool (empty)]");
+  }
+  st->cr();
+}
+
+void LeydenNMethod::print_constant_pool(outputStream* st) {
   //-----------------------------------
   //---<  Print the constant pool  >---
   //-----------------------------------
@@ -2893,6 +3526,165 @@ void nmethod::decode2(outputStream* ost) const {
 #endif
 }
 
+void LeydenNMethod::decode2(outputStream* ost) const {
+
+  // Called from frame::back_trace_with_decode without ResourceMark.
+  ResourceMark rm;
+
+  // Make sure we have a valid stream to print on.
+  outputStream* st = ost ? ost : tty;
+
+#if defined(SUPPORT_ABSTRACT_ASSEMBLY) && ! defined(SUPPORT_ASSEMBLY)
+  const bool use_compressed_format    = true;
+  const bool compressed_with_comments = use_compressed_format && (AbstractDisassembler::show_comment() ||
+                                                                  AbstractDisassembler::show_block_comment());
+#else
+  const bool use_compressed_format    = Disassembler::is_abstract();
+  const bool compressed_with_comments = use_compressed_format && (AbstractDisassembler::show_comment() ||
+                                                                  AbstractDisassembler::show_block_comment());
+#endif
+
+  st->cr();
+  this->print(st);
+  st->cr();
+
+#if defined(SUPPORT_ASSEMBLY)
+  //----------------------------------
+  //---<  Print real disassembly  >---
+  //----------------------------------
+  if (! use_compressed_format) {
+    Disassembler::decode(const_cast<LeydenNMethod*>(this), st);
+    return;
+  }
+#endif
+
+#if defined(SUPPORT_ABSTRACT_ASSEMBLY)
+
+  // Compressed undisassembled disassembly format.
+  // The following stati are defined/supported:
+  //   = 0 - currently at bol() position, nothing printed yet on current line.
+  //   = 1 - currently at position after print_location().
+  //   > 1 - in the midst of printing instruction stream bytes.
+  int        compressed_format_idx    = 0;
+  int        code_comment_column      = 0;
+  const int  instr_maxlen             = Assembler::instr_maxlen();
+  const uint tabspacing               = 8;
+  unsigned char* start = this->code_begin();
+  unsigned char* p     = this->code_begin();
+  unsigned char* end   = this->code_end();
+  unsigned char* pss   = p; // start of a code section (used for offsets)
+
+  if ((start == NULL) || (end == NULL)) {
+    st->print_cr("PrintAssembly not possible due to uninitialized section pointers");
+    return;
+  }
+#endif
+
+#if defined(SUPPORT_ABSTRACT_ASSEMBLY)
+  //---<  plain abstract disassembly, no comments or anything, just section headers  >---
+  if (use_compressed_format && ! compressed_with_comments) {
+    const_cast<LeydenNMethod*>(this)->print_constant_pool(st);
+
+    //---<  Open the output (Marker for post-mortem disassembler)  >---
+    st->print_cr("[MachCode]");
+    const char* header = NULL;
+    address p0 = p;
+    while (p < end) {
+      address pp = p;
+      while ((p < end) && (header == NULL)) {
+        header = nmethod_section_label(p);
+        pp  = p;
+        p  += Assembler::instr_len(p);
+      }
+      if (pp > p0) {
+        AbstractDisassembler::decode_range_abstract(p0, pp, start, end, st, Assembler::instr_maxlen());
+        p0 = pp;
+        p  = pp;
+        header = NULL;
+      } else if (header != NULL) {
+        st->bol();
+        st->print_cr("%s", header);
+        header = NULL;
+      }
+    }
+    //---<  Close the output (Marker for post-mortem disassembler)  >---
+    st->bol();
+    st->print_cr("[/MachCode]");
+    return;
+  }
+#endif
+
+#if defined(SUPPORT_ABSTRACT_ASSEMBLY)
+  //---<  abstract disassembly with comments and section headers merged in  >---
+  if (compressed_with_comments) {
+    const_cast<LeydenNMethod*>(this)->print_constant_pool(st);
+
+    //---<  Open the output (Marker for post-mortem disassembler)  >---
+    st->print_cr("[MachCode]");
+    while ((p < end) && (p != NULL)) {
+      const int instruction_size_in_bytes = Assembler::instr_len(p);
+
+      //---<  Block comments for nmethod. Interrupts instruction stream, if any.  >---
+      // Outputs a bol() before and a cr() after, but only if a comment is printed.
+      // Prints nmethod_section_label as well.
+      if (AbstractDisassembler::show_block_comment()) {
+        print_block_comment(st, p);
+        if (st->position() == 0) {
+          compressed_format_idx = 0;
+        }
+      }
+
+      //---<  New location information after line break  >---
+      if (compressed_format_idx == 0) {
+        code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
+        compressed_format_idx = 1;
+      }
+
+      //---<  Code comment for current instruction. Address range [p..(p+len))  >---
+      unsigned char* p_end = p + (ssize_t)instruction_size_in_bytes;
+      S390_ONLY(if (p_end > end) p_end = end;) // avoid getting past the end
+
+      if (AbstractDisassembler::show_comment() && const_cast<LeydenNMethod*>(this)->has_code_comment(p, p_end)) {
+        //---<  interrupt instruction byte stream for code comment  >---
+        if (compressed_format_idx > 1) {
+          st->cr();  // interrupt byte stream
+          st->cr();  // add an empty line
+          code_comment_column = Disassembler::print_location(p, pss, end, st, false, false);
+        }
+        const_cast<LeydenNMethod*>(this)->print_code_comment_on(st, code_comment_column, p, p_end );
+        st->bol();
+        compressed_format_idx = 0;
+      }
+
+      //---<  New location information after line break  >---
+      if (compressed_format_idx == 0) {
+        code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
+        compressed_format_idx = 1;
+      }
+
+      //---<  Nicely align instructions for readability  >---
+      if (compressed_format_idx > 1) {
+        Disassembler::print_delimiter(st);
+      }
+
+      //---<  Now, finally, print the actual instruction bytes  >---
+      unsigned char* p0 = p;
+      p = Disassembler::decode_instruction_abstract(p, st, instruction_size_in_bytes, instr_maxlen);
+      compressed_format_idx += p - p0;
+
+      if (Disassembler::start_newline(compressed_format_idx-1)) {
+        st->cr();
+        compressed_format_idx = 0;
+      }
+    }
+    //---<  Close the output (Marker for post-mortem disassembler)  >---
+    st->bol();
+    st->print_cr("[/MachCode]");
+    return;
+  }
+#endif
+}
+
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
 
 const char* nmethod::reloc_string_for(u_char* begin, u_char* end) {
@@ -2987,6 +3779,109 @@ const char* nmethod::reloc_string_for(u_char* begin, u_char* end) {
         case relocInfo::poll_type:             return "poll";
         case relocInfo::poll_return_type:      return "poll_return";
         case relocInfo::trampoline_stub_type:  return "trampoline_stub";
+        case relocInfo::card_mark_word_type:   return "card_mark";
+        case relocInfo::type_mask:             return "type_bit_mask";
+
+        default:
+          break;
+    }
+  }
+  return have_one ? "other" : NULL;
+}
+
+const char* LeydenNMethod::reloc_string_for(u_char* begin, u_char* end) {
+  RelocIterator iter(this, begin, end);
+  bool have_one = false;
+  while (iter.next()) {
+    have_one = true;
+    switch (iter.type()) {
+        case relocInfo::none:                  return "no_reloc";
+        case relocInfo::oop_type: {
+          // Get a non-resizable resource-allocated stringStream.
+          // Our callees make use of (nested) ResourceMarks.
+          stringStream st(NEW_RESOURCE_ARRAY(char, 1024), 1024);
+          oop_Relocation* r = iter.oop_reloc();
+          oop obj = r->oop_value();
+          st.print("oop(");
+          if (obj == NULL) st.print("NULL");
+          else obj->print_value_on(&st);
+          st.print(")");
+          return st.as_string();
+        }
+        case relocInfo::metadata_type: {
+          stringStream st;
+          metadata_Relocation* r = iter.metadata_reloc();
+          Metadata* obj = r->metadata_value();
+          st.print("metadata(");
+          if (obj == NULL) st.print("NULL");
+          else obj->print_value_on(&st);
+          st.print(")");
+          return st.as_string();
+        }
+        case relocInfo::runtime_call_type:
+        case relocInfo::runtime_call_w_cp_type: {
+          stringStream st;
+          st.print("runtime_call");
+          CallRelocation* r = (CallRelocation*)iter.reloc();
+          address dest = r->destination();
+          CodeBlob* cb = CodeCache::find_blob(dest);
+          if (cb != NULL) {
+            st.print(" %s", cb->name());
+          } else {
+            ResourceMark rm;
+            const int buflen = 1024;
+            char* buf = NEW_RESOURCE_ARRAY(char, buflen);
+            int offset;
+            if (os::dll_address_to_function_name(dest, buf, buflen, &offset)) {
+              st.print(" %s", buf);
+              if (offset != 0) {
+                st.print("+%d", offset);
+              }
+            }
+          }
+          return st.as_string();
+        }
+        case relocInfo::virtual_call_type: {
+          stringStream st;
+          st.print_raw("virtual_call");
+          virtual_call_Relocation* r = iter.virtual_call_reloc();
+          Method* m = r->method_value();
+          if (m != NULL) {
+            assert(m->is_method(), "");
+            m->print_short_name(&st);
+          }
+          return st.as_string();
+        }
+        case relocInfo::opt_virtual_call_type: {
+          stringStream st;
+          st.print_raw("optimized virtual_call");
+          opt_virtual_call_Relocation* r = iter.opt_virtual_call_reloc();
+          Method* m = r->method_value();
+          if (m != NULL) {
+            assert(m->is_method(), "");
+            m->print_short_name(&st);
+          }
+          return st.as_string();
+        }
+        case relocInfo::static_call_type: {
+          stringStream st;
+          st.print_raw("static_call");
+          static_call_Relocation* r = iter.static_call_reloc();
+          Method* m = r->method_value();
+          if (m != NULL) {
+            assert(m->is_method(), "");
+            m->print_short_name(&st);
+          }
+          return st.as_string();
+        }
+        case relocInfo::static_stub_type:      return "static_stub";
+        case relocInfo::external_word_type:    return "external_word";
+        case relocInfo::internal_word_type:    return "internal_word";
+        case relocInfo::section_word_type:     return "section_word";
+        case relocInfo::poll_type:             return "poll";
+        case relocInfo::poll_return_type:      return "poll_return";
+        case relocInfo::trampoline_stub_type:  return "trampoline_stub";
+        case relocInfo::card_mark_word_type:   return "card_mark";
         case relocInfo::type_mask:             return "type_bit_mask";
 
         default:
@@ -3005,6 +3900,14 @@ ScopeDesc* nmethod::scope_desc_in(address begin, address end) {
   return nullptr;
 }
 
+ScopeDesc* LeydenNMethod::scope_desc_in(address begin, address end) {
+  PcDesc* p = pc_desc_near(begin+1);
+  if (p != NULL && p->real_pc(this) <= end) {
+    return new ScopeDesc(this, p);
+  }
+  return NULL;
+}
+
 const char* nmethod::nmethod_section_label(address pos) const {
   const char* label = nullptr;
   if (pos == code_begin())                                              label = "[Instructions begin]";
@@ -3016,6 +3919,20 @@ const char* nmethod::nmethod_section_label(address pos) const {
   if (pos == this->stub_begin())                                        label = "[Stub Code]";
   if (JVMCI_ONLY(_exception_offset >= 0 &&) pos == exception_begin())           label = "[Exception Handler]";
   if (JVMCI_ONLY(_deopt_handler_begin != nullptr &&) pos == deopt_handler_begin()) label = "[Deopt Handler Code]";
+  return label;
+}
+
+const char* LeydenNMethod::nmethod_section_label(address pos) const {
+  const char* label = NULL;
+  if (pos == code_begin())                                              label = "[Instructions begin]";
+  if (pos == entry_point())                                             label = "[Entry Point]";
+  if (pos == verified_entry_point())                                    label = "[Verified Entry Point]";
+  if (has_method_handle_invokes() && (pos == deopt_mh_handler_begin())) label = "[Deopt MH Handler Code]";
+  if (pos == consts_begin() && pos != insts_begin())                    label = "[Constants]";
+  // Check stub_code before checking exception_handler or deopt_handler.
+  if (pos == this->stub_begin())                                        label = "[Stub Code]";
+  if (JVMCI_ONLY(_exception_offset >= 0 &&) pos == exception_begin())           label = "[Exception Handler]";
+  if (JVMCI_ONLY(_deopt_handler_begin != NULL &&) pos == deopt_handler_begin()) label = "[Deopt Handler Code]";
   return label;
 }
 
@@ -3121,6 +4038,108 @@ void nmethod::print_nmethod_labels(outputStream* stream, address block_begin, bo
   }
 }
 
+void LeydenNMethod  ::print_nmethod_labels(outputStream* stream, address block_begin, bool print_section_labels) const {
+  if (print_section_labels) {
+    const char* label = nmethod_section_label(block_begin);
+    if (label != NULL) {
+      stream->bol();
+      stream->print_cr("%s", label);
+    }
+  }
+
+  if (block_begin == entry_point()) {
+    Method* m = method();
+    if (m != NULL) {
+      stream->print("  # ");
+      m->print_value_on(stream);
+      stream->cr();
+    }
+    if (m != NULL && !is_osr_method()) {
+      ResourceMark rm;
+      int sizeargs = m->size_of_parameters();
+      BasicType* sig_bt = NEW_RESOURCE_ARRAY(BasicType, sizeargs);
+      VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
+      {
+        int sig_index = 0;
+        if (!m->is_static())
+          sig_bt[sig_index++] = T_OBJECT; // 'this'
+        for (SignatureStream ss(m->signature()); !ss.at_return_type(); ss.next()) {
+          BasicType t = ss.type();
+          sig_bt[sig_index++] = t;
+          if (type2size[t] == 2) {
+            sig_bt[sig_index++] = T_VOID;
+          } else {
+            assert(type2size[t] == 1, "size is 1 or 2");
+          }
+        }
+        assert(sig_index == sizeargs, "");
+      }
+      const char* spname = "sp"; // make arch-specific?
+      intptr_t out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
+      int stack_slot_offset = this->frame_size() * wordSize;
+      int tab1 = 14, tab2 = 24;
+      int sig_index = 0;
+      int arg_index = (m->is_static() ? 0 : -1);
+      bool did_old_sp = false;
+      for (SignatureStream ss(m->signature()); !ss.at_return_type(); ) {
+        bool at_this = (arg_index == -1);
+        bool at_old_sp = false;
+        BasicType t = (at_this ? T_OBJECT : ss.type());
+        assert(t == sig_bt[sig_index], "sigs in sync");
+        if (at_this)
+          stream->print("  # this: ");
+        else
+          stream->print("  # parm%d: ", arg_index);
+        stream->move_to(tab1);
+        VMReg fst = regs[sig_index].first();
+        VMReg snd = regs[sig_index].second();
+        if (fst->is_reg()) {
+          stream->print("%s", fst->name());
+          if (snd->is_valid())  {
+            stream->print(":%s", snd->name());
+          }
+        } else if (fst->is_stack()) {
+          int offset = fst->reg2stack() * VMRegImpl::stack_slot_size + stack_slot_offset;
+          if (offset == stack_slot_offset)  at_old_sp = true;
+          stream->print("[%s+0x%x]", spname, offset);
+        } else {
+          stream->print("reg%d:%d??", (int)(intptr_t)fst, (int)(intptr_t)snd);
+        }
+        stream->print(" ");
+        stream->move_to(tab2);
+        stream->print("= ");
+        if (at_this) {
+          m->method_holder()->print_value_on(stream);
+        } else {
+          bool did_name = false;
+          if (!at_this && ss.is_reference()) {
+            Symbol* name = ss.as_symbol();
+            name->print_value_on(stream);
+            did_name = true;
+          }
+          if (!did_name)
+            stream->print("%s", type2name(t));
+        }
+        if (at_old_sp) {
+          stream->print("  (%s of caller)", spname);
+          did_old_sp = true;
+        }
+        stream->cr();
+        sig_index += type2size[t];
+        arg_index += 1;
+        if (!at_this)  ss.next();
+      }
+      if (!did_old_sp) {
+        stream->print("  # ");
+        stream->move_to(tab1);
+        stream->print("[%s+0x%x]", spname, stack_slot_offset);
+        stream->print("  (%s of caller)", spname);
+        stream->cr();
+      }
+    }
+  }
+}
+
 // Returns whether this nmethod has code comments.
 bool nmethod::has_code_comment(address begin, address end) {
   // scopes?
@@ -3130,6 +4149,22 @@ bool nmethod::has_code_comment(address begin, address end) {
   // relocations?
   const char* str = reloc_string_for(begin, end);
   if (str != nullptr) return true;
+
+  // implicit exceptions?
+  int cont_offset = ImplicitExceptionTable(this).continuation_offset(begin - code_begin());
+  if (cont_offset != 0) return true;
+
+  return false;
+}
+
+bool LeydenNMethod::has_code_comment(address begin, address end) {
+  // scopes?
+  ScopeDesc* sd  = scope_desc_in(begin, end);
+  if (sd != NULL) return true;
+
+  // relocations?
+  const char* str = reloc_string_for(begin, end);
+  if (str != NULL) return true;
 
   // implicit exceptions?
   int cont_offset = ImplicitExceptionTable(this).continuation_offset(begin - code_begin());
@@ -3277,6 +4312,145 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
   }
 }
 
+void LeydenNMethod::print_code_comment_on(outputStream* st, int column, address begin, address end) {
+  ImplicitExceptionTable implicit_table(this);
+  int pc_offset = begin - code_begin();
+  int cont_offset = implicit_table.continuation_offset(pc_offset);
+  bool oop_map_required = false;
+  if (cont_offset != 0) {
+    st->move_to(column, 6, 0);
+    if (pc_offset == cont_offset) {
+      st->print("; implicit exception: deoptimizes");
+      oop_map_required = true;
+    } else {
+      st->print("; implicit exception: dispatches to " INTPTR_FORMAT, p2i(code_begin() + cont_offset));
+    }
+  }
+
+  // Find an oopmap in (begin, end].  We use the odd half-closed
+  // interval so that oop maps and scope descs which are tied to the
+  // byte after a call are printed with the call itself.  OopMaps
+  // associated with implicit exceptions are printed with the implicit
+  // instruction.
+  address base = code_begin();
+  ImmutableOopMapSet* oms = oop_maps();
+  if (oms != NULL) {
+    for (int i = 0, imax = oms->count(); i < imax; i++) {
+      const ImmutableOopMapPair* pair = oms->pair_at(i);
+      const ImmutableOopMap* om = pair->get_from(oms);
+      address pc = base + pair->pc_offset();
+      if (pc >= begin) {
+#if INCLUDE_JVMCI
+        bool is_implicit_deopt = implicit_table.continuation_offset(pair->pc_offset()) == (uint) pair->pc_offset();
+#else
+        bool is_implicit_deopt = false;
+#endif
+        if (is_implicit_deopt ? pc == begin : pc > begin && pc <= end) {
+          st->move_to(column, 6, 0);
+          st->print("; ");
+          om->print_on(st);
+          oop_map_required = false;
+        }
+      }
+      if (pc > end) {
+        break;
+      }
+    }
+  }
+  assert(!oop_map_required, "missed oopmap");
+
+  Thread* thread = Thread::current();
+
+  // Print any debug info present at this pc.
+  ScopeDesc* sd  = scope_desc_in(begin, end);
+  if (sd != NULL) {
+    st->move_to(column, 6, 0);
+    if (sd->bci() == SynchronizationEntryBCI) {
+      st->print(";*synchronization entry");
+    } else if (sd->bci() == AfterBci) {
+      st->print(";* method exit (unlocked if synchronized)");
+    } else if (sd->bci() == UnwindBci) {
+      st->print(";* unwind (locked if synchronized)");
+    } else if (sd->bci() == AfterExceptionBci) {
+      st->print(";* unwind (unlocked if synchronized)");
+    } else if (sd->bci() == UnknownBci) {
+      st->print(";* unknown");
+    } else if (sd->bci() == InvalidFrameStateBci) {
+      st->print(";* invalid frame state");
+    } else {
+      if (sd->method() == NULL) {
+        st->print("method is NULL");
+      } else if (sd->method()->is_native()) {
+        st->print("method is native");
+      } else {
+        Bytecodes::Code bc = sd->method()->java_code_at(sd->bci());
+        st->print(";*%s", Bytecodes::name(bc));
+        switch (bc) {
+        case Bytecodes::_invokevirtual:
+        case Bytecodes::_invokespecial:
+        case Bytecodes::_invokestatic:
+        case Bytecodes::_invokeinterface:
+          {
+            Bytecode_invoke invoke(methodHandle(thread, sd->method()), sd->bci());
+            st->print(" ");
+            if (invoke.name() != NULL)
+              invoke.name()->print_symbol_on(st);
+            else
+              st->print("<UNKNOWN>");
+            break;
+          }
+        case Bytecodes::_getfield:
+        case Bytecodes::_putfield:
+        case Bytecodes::_getstatic:
+        case Bytecodes::_putstatic:
+          {
+            Bytecode_field field(methodHandle(thread, sd->method()), sd->bci());
+            st->print(" ");
+            if (field.name() != NULL)
+              field.name()->print_symbol_on(st);
+            else
+              st->print("<UNKNOWN>");
+          }
+        default:
+          break;
+        }
+      }
+      st->print(" {reexecute=%d rethrow=%d return_oop=%d}", sd->should_reexecute(), sd->rethrow_exception(), sd->return_oop());
+    }
+
+    // Print all scopes
+    for (;sd != NULL; sd = sd->sender()) {
+      st->move_to(column, 6, 0);
+      st->print("; -");
+      if (sd->should_reexecute()) {
+        st->print(" (reexecute)");
+      }
+      if (sd->method() == NULL) {
+        st->print("method is NULL");
+      } else {
+        sd->method()->print_short_name(st);
+      }
+      int lineno = sd->method()->line_number_from_bci(sd->bci());
+      if (lineno != -1) {
+        st->print("@%d (line %d)", sd->bci(), lineno);
+      } else {
+        st->print("@%d", sd->bci());
+      }
+      st->cr();
+    }
+  }
+
+  // Print relocation information
+  // Prevent memory leak: allocating without ResourceMark.
+  ResourceMark rm;
+  const char* str = reloc_string_for(begin, end);
+  if (str != NULL) {
+    if (sd != NULL) st->cr();
+    st->move_to(column, 6, 0);
+    st->print(";   {%s}", str);
+  }
+}
+
 #endif
 
 class DirectNativeCallWrapper: public NativeCallWrapper {
@@ -3365,6 +4539,34 @@ CompiledStaticCall* nmethod::compiledStaticCall_at(address call_site) const {
 }
 
 CompiledStaticCall* nmethod::compiledStaticCall_before(address return_addr) const {
+  return CompiledDirectStaticCall::before(return_addr);
+}
+
+NativeCallWrapper* LeydenNMethod::call_wrapper_at(address call) const {
+  return new DirectNativeCallWrapper((NativeCall*) call);
+}
+
+NativeCallWrapper* LeydenNMethod::call_wrapper_before(address return_pc) const {
+  return new DirectNativeCallWrapper(nativeCall_before(return_pc));
+}
+
+address LeydenNMethod::call_instruction_address(address pc) const {
+  if (NativeCall::is_call_before(pc)) {
+    NativeCall *ncall = nativeCall_before(pc);
+    return ncall->instruction_address();
+  }
+  return NULL;
+}
+
+CompiledStaticCall* LeydenNMethod::compiledStaticCall_at(Relocation* call_site) const {
+  return CompiledDirectStaticCall::at(call_site);
+}
+
+CompiledStaticCall* LeydenNMethod::compiledStaticCall_at(address call_site) const {
+  return CompiledDirectStaticCall::at(call_site);
+}
+
+CompiledStaticCall* LeydenNMethod::compiledStaticCall_before(address return_addr) const {
   return CompiledDirectStaticCall::before(return_addr);
 }
 

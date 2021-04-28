@@ -12441,7 +12441,7 @@ static bool is_reachable(address target, relocInfo::relocType reloc_type) {
     case relocInfo::poll_return_type: // these are really external_word but need special
     case relocInfo::poll_type: {      // relocs to identify them
       assert(!CodeCache::contains(target), "always reachable");
-      if (ForceUnreachable) {
+      if (ForceUnreachable || DumpCodeToDisk) {
         return false; // stress the correction code
       }
       // For external_word_type/runtime_call_type if it is reachable from where we

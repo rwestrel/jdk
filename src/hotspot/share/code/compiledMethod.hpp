@@ -141,6 +141,9 @@ public:
 class CompiledMethod : public CodeBlob {
   friend class VMStructs;
   friend class DeoptimizationScope;
+  friend class NMethodSweeper;
+  friend class CodeCache;
+
   void init_defaults();
 protected:
   enum DeoptimizationStatus : u1 {
@@ -228,6 +231,17 @@ public:
   virtual int osr_entry_bci() const = 0;
   Method* method() const                          { return _method; }
   virtual void print_pcs() = 0;
+  virtual void print_nmethod(bool print_code) = 0;
+  virtual void print_constant_pool(outputStream* st) = 0;
+  virtual void oops_do(OopClosure* f) = 0;
+  virtual bool oops_contains(oop*    addr) const = 0;
+  virtual oop* oops_begin() const = 0;
+  virtual oop* oops_end() const = 0;
+  virtual void oops_do(OopClosure* f, bool allow_dead) = 0;
+  virtual void fix_oop_relocations() = 0;
+  virtual int oops_count() const = 0;
+
+
   bool is_native_method() const { return _method != nullptr && _method->is_native(); }
   bool is_java_method() const { return _method != nullptr && !_method->is_native(); }
 

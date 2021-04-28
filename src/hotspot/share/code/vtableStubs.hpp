@@ -73,6 +73,7 @@
 class VtableStub;
 
 class VtableStubs : AllStatic {
+  friend class CodeCache;
  public:                                         // N must be public (some compilers need this for _table)
   enum {
     N    = 256,                                  // size of stub table; must be power of two
@@ -114,6 +115,7 @@ class VtableStubs : AllStatic {
 
 
 class VtableStub {
+  friend class CodeCache;
  private:
   friend class VtableStubs;
 

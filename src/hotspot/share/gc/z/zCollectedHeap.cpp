@@ -254,7 +254,7 @@ void ZCollectedHeap::keep_alive(oop obj) {
   _heap.keep_alive(obj);
 }
 
-void ZCollectedHeap::register_nmethod(nmethod* nm) {
+void ZCollectedHeap::register_nmethod(CompiledMethod* nm) {
   ZNMethod::register_nmethod(nm);
 }
 
@@ -262,7 +262,7 @@ void ZCollectedHeap::unregister_nmethod(nmethod* nm) {
   ZNMethod::unregister_nmethod(nm);
 }
 
-void ZCollectedHeap::verify_nmethod(nmethod* nm) {
+void ZCollectedHeap::verify_nmethod(CompiledMethod* nm) {
   // Does nothing
 }
 

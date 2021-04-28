@@ -31,7 +31,7 @@
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shenandoah/shenandoahClosures.inline.hpp"
 
-nmethod* ShenandoahNMethod::nm() const {
+CompiledMethod* ShenandoahNMethod::nm() const {
   return _nm;
 }
 
@@ -78,7 +78,7 @@ void ShenandoahNMethod::heal_nmethod_metadata(ShenandoahNMethod* nmethod_data) {
   nmethod_data->oops_do(&cl, true /*fix relocation*/);
 }
 
-void ShenandoahNMethod::disarm_nmethod(nmethod* nm) {
+void ShenandoahNMethod::disarm_nmethod(CompiledMethod* nm) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
   assert(bs != nullptr || !ShenandoahNMethodBarrier,
         "Must have nmethod barrier for concurrent GC");
@@ -87,15 +87,15 @@ void ShenandoahNMethod::disarm_nmethod(nmethod* nm) {
   }
 }
 
-ShenandoahNMethod* ShenandoahNMethod::gc_data(nmethod* nm) {
+ShenandoahNMethod* ShenandoahNMethod::gc_data(CompiledMethod* nm) {
   return nm->gc_data<ShenandoahNMethod>();
 }
 
-void ShenandoahNMethod::attach_gc_data(nmethod* nm, ShenandoahNMethod* gc_data) {
+void ShenandoahNMethod::attach_gc_data(CompiledMethod* nm, ShenandoahNMethod* gc_data) {
   nm->set_gc_data<ShenandoahNMethod>(gc_data);
 }
 
-ShenandoahReentrantLock* ShenandoahNMethod::lock_for_nmethod(nmethod* nm) {
+ShenandoahReentrantLock* ShenandoahNMethod::lock_for_nmethod(CompiledMethod* nm) {
   return gc_data(nm)->lock();
 }
 

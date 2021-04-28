@@ -28,6 +28,8 @@
 #include "classfile/javaClasses.hpp"
 #include "classfile/symbolTable.hpp"
 #include "compiler/compileLog.hpp"
+#include "gc/shared/barrierSet.hpp"
+#include "gc/shared/c2/barrierSetC2.hpp"
 #include "libadt/dict.hpp"
 #include "memory/oopFactory.hpp"
 #include "memory/resourceArea.hpp"
@@ -1282,6 +1284,14 @@ void Type::typerr( const Type *t ) const {
   ShouldNotReachHere();
 }
 
+relocInfo::relocType Type::reloc() const {
+  BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
+  relocInfo::relocType reloc = bs->reloc(this);
+  if (reloc != relocInfo::none) {
+    return reloc;
+  }
+  return _type_info[_base].reloc;
+}
 
 //=============================================================================
 // Convenience common pre-built types.

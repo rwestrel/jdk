@@ -199,7 +199,7 @@ char* NativeLookup::long_jni_name(const methodHandle& method) {
 }
 
 extern "C" {
-  void JNICALL JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass unsafecls);
+  JNIEXPORT void JNICALL JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass unsafecls);
   void JNICALL JVM_RegisterReferencesMethods(JNIEnv *env, jclass unsafecls);
   void JNICALL JVM_RegisterUpcallHandlerMethods(JNIEnv *env, jclass unsafecls);
   void JNICALL JVM_RegisterUpcallLinkerMethods(JNIEnv *env, jclass unsafecls);

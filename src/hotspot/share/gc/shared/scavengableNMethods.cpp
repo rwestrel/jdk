@@ -30,11 +30,11 @@
 #include "runtime/mutexLocker.hpp"
 #include "utilities/debug.hpp"
 
-static ScavengableNMethodsData gc_data(nmethod* nm) {
+static ScavengableNMethodsData gc_data(CompiledMethod* nm) {
   return ScavengableNMethodsData(nm);
 }
 
-nmethod* ScavengableNMethods::_head = nullptr;
+CompiledMethod* ScavengableNMethods::_head = nullptr;
 BoolObjectClosure* ScavengableNMethods::_is_scavengable = nullptr;
 
 void ScavengableNMethods::initialize(BoolObjectClosure* is_scavengable) {
@@ -43,7 +43,7 @@ void ScavengableNMethods::initialize(BoolObjectClosure* is_scavengable) {
 
 // Conditionally adds the nmethod to the list if it is
 // not already on the list and has a scavengeable root.
-void ScavengableNMethods::register_nmethod(nmethod* nm) {
+void ScavengableNMethods::register_nmethod(CompiledMethod* nm) {
   assert_locked_or_safepoint(CodeCache_lock);
 
   ScavengableNMethodsData data = gc_data(nm);
@@ -62,8 +62,8 @@ void ScavengableNMethods::unregister_nmethod(nmethod* nm) {
   assert_locked_or_safepoint(CodeCache_lock);
 
   if (gc_data(nm).on_list()) {
-    nmethod* prev = nullptr;
-    for (nmethod* cur = _head; cur != nullptr; cur = gc_data(cur).next()) {
+    CompiledMethod* prev = nullptr;
+    for (CompiledMethod* cur = _head; cur != nullptr; cur = gc_data(cur).next()) {
       if (cur == nm) {
         unlist_nmethod(cur, prev);
         return;
@@ -77,10 +77,10 @@ void ScavengableNMethods::unregister_nmethod(nmethod* nm) {
 
 class DebugScavengableOops: public OopClosure {
   BoolObjectClosure* _is_scavengable;
-  nmethod*           _nm;
+  CompiledMethod*           _nm;
   bool               _ok;
 public:
-  DebugScavengableOops(BoolObjectClosure* is_scavengable, nmethod* nm) :
+  DebugScavengableOops(BoolObjectClosure* is_scavengable, CompiledMethod* nm) :
       _is_scavengable(is_scavengable),
       _nm(nm),
       _ok(true) { }
@@ -104,7 +104,7 @@ public:
 
 #endif // PRODUCT
 
-void ScavengableNMethods::verify_nmethod(nmethod* nm) {
+void ScavengableNMethods::verify_nmethod(CompiledMethod* nm) {
 #ifndef PRODUCT
   if (!gc_data(nm).on_list()) {
     // Actually look inside, to verify the claim that it's clean.
@@ -121,7 +121,7 @@ class HasScavengableOops: public OopClosure {
   BoolObjectClosure* _is_scavengable;
   bool               _found;
 public:
-  HasScavengableOops(BoolObjectClosure* is_scavengable, nmethod* nm) :
+  HasScavengableOops(BoolObjectClosure* is_scavengable, CompiledMethod* nm) :
       _is_scavengable(is_scavengable),
       _found(false) {}
 
@@ -134,7 +134,7 @@ public:
   virtual void do_oop(narrowOop* p) { ShouldNotReachHere(); }
 };
 
-bool ScavengableNMethods::has_scavengable_oops(nmethod* nm) {
+bool ScavengableNMethods::has_scavengable_oops(CompiledMethod* nm) {
   HasScavengableOops cl(_is_scavengable, nm);
   nm->oops_do(&cl);
   return cl.found();
@@ -146,8 +146,8 @@ void ScavengableNMethods::nmethods_do_and_prune(CodeBlobToOopClosure* cl) {
 
   debug_only(mark_on_list_nmethods());
 
-  nmethod* prev = nullptr;
-  nmethod* cur = _head;
+  CompiledMethod* prev = nullptr;
+  CompiledMethod* cur = _head;
   while (cur != nullptr) {
     ScavengableNMethodsData data = gc_data(cur);
     debug_only(data.clear_marked());
@@ -185,7 +185,7 @@ void ScavengableNMethods::nmethods_do(CodeBlobToOopClosure* cl) {
 void ScavengableNMethods::asserted_non_scavengable_nmethods_do(CodeBlobClosure* cl) {
   // While we are here, verify the integrity of the list.
   mark_on_list_nmethods();
-  for (nmethod* cur = _head; cur != nullptr; cur = gc_data(cur).next()) {
+  for (CompiledMethod* cur = _head; cur != nullptr; cur = gc_data(cur).next()) {
     assert(gc_data(cur).on_list(), "else shouldn't be on this list");
     gc_data(cur).clear_marked();
   }
@@ -193,7 +193,7 @@ void ScavengableNMethods::asserted_non_scavengable_nmethods_do(CodeBlobClosure* 
 }
 #endif // PRODUCT
 
-void ScavengableNMethods::unlist_nmethod(nmethod* nm, nmethod* prev) {
+void ScavengableNMethods::unlist_nmethod(CompiledMethod * nm, CompiledMethod* prev) {
   assert_locked_or_safepoint(CodeCache_lock);
 
   assert((prev == nullptr && _head == nm) ||

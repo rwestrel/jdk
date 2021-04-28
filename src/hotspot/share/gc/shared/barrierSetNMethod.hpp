@@ -38,9 +38,9 @@ private:
 
 public:
   BarrierSetNMethod() : _current_phase(1) {}
-  bool supports_entry_barrier(nmethod* nm);
+  bool supports_entry_barrier(CompiledMethod* nm);
 
-  virtual bool nmethod_entry_barrier(nmethod* nm);
+  virtual bool nmethod_entry_barrier(CompiledMethod* nm);
   virtual ByteSize thread_disarmed_guard_value_offset() const;
   virtual int* disarmed_guard_value_address() const;
 
@@ -48,8 +48,8 @@ public:
 
   static int nmethod_stub_entry_barrier(address* return_address_ptr);
   bool nmethod_osr_entry_barrier(nmethod* nm);
-  bool is_armed(nmethod* nm);
-  void disarm(nmethod* nm);
+  bool is_armed(CompiledMethod* nm);
+  void disarm(CompiledMethod* nm);
 
   int guard_value(nmethod* nm);
   void set_guard_value(nmethod* nm, int value);

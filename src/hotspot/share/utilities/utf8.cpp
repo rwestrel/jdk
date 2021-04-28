@@ -241,6 +241,7 @@ const char* UTF8::from_quoted_ascii(const char* quoted_ascii_str) {
   while (*ptr != '\0') {
     char c = *ptr;
     if (c < 32 || c >= 127) break;
+    ptr++;
   }
   if (*ptr == '\0') {
     // nothing to do so return original string

@@ -165,6 +165,7 @@ public:
 class CompiledIC: public ResourceObj {
   friend class InlineCacheBuffer;
   friend class ICStub;
+  friend class CodeCache;
 
  private:
   NativeCallWrapper* _call;

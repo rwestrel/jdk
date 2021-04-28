@@ -813,7 +813,7 @@ void emit_fp_min_max(MacroAssembler& _masm, XMMRegister dst,
 }
 
 //=============================================================================
-const RegMask& MachConstantBaseNode::_out_RegMask = RegMask::Empty;
+const RegMask& MachConstantBaseNode::_out_RegMask = ANY_REG_mask();
 
 int ConstantTable::calculate_table_base_offset() const {
   return 0;  // absolute addressing, no offset
@@ -825,11 +825,22 @@ void MachConstantBaseNode::postalloc_expand(GrowableArray <Node *> *nodes, Phase
 }
 
 void MachConstantBaseNode::emit(CodeBuffer& cbuf, PhaseRegAlloc* ra_) const {
-  // Empty encoding
+  Compile* C = ra_->C;
+  ConstantTable& constant_table = C->output()->constant_table();
+  C2_MacroAssembler _masm(&cbuf);
+
+  Register r = as_Register(ra_->get_encode(this));
+  CodeSection* consts_section = __ code()->consts();
+  int consts_size = consts_section->align_at_start(consts_section->size());
+  assert(C->output()->in_scratch_emit_size() || constant_table.size() == consts_size, "must be: %d == %d", constant_table.size(), consts_size);
+
+  // Materialize the constant table base.
+  address baseaddr = consts_section->start() + -(constant_table.table_base_offset());
+  __ lea(r, InternalAddress(baseaddr));
 }
 
 uint MachConstantBaseNode::size(PhaseRegAlloc* ra_) const {
-  return 0;
+  return MachNode::size(ra_);
 }
 
 #ifndef PRODUCT
@@ -2154,7 +2165,7 @@ encode %{
   enc_class Java_To_Runtime(method meth) %{
     // No relocation needed
     MacroAssembler _masm(&cbuf);
-    __ mov64(r10, (int64_t) $meth$$method);
+    __ lea(r10, RuntimeAddress((address)$meth$$method));
     __ call(r10);
     __ post_call_nop();
   %}
@@ -3047,12 +3058,24 @@ operand immI_64()
 // Pointer Immediate
 operand immP()
 %{
+  predicate(!(n->bottom_type()->isa_oopptr() || n->bottom_type()->isa_klassptr()));
   match(ConP);
 
   op_cost(10);
   format %{ %}
   interface(CONST_INTER);
 %}
+
+operand immPTable()
+%{
+  predicate(n->bottom_type()->isa_oopptr() || n->bottom_type()->isa_klassptr()  || n->bottom_type()->isa_metadataptr());
+  match(ConP);
+
+  op_cost(10);
+  format %{ %}
+  interface(CONST_INTER);
+%}
+
 
 // NULL Pointer Immediate
 operand immP0()
@@ -5801,6 +5824,16 @@ instruct loadConP(rRegP dst, immP con) %{
   ins_pipe(ialu_reg_fat); // XXX
 %}
 
+instruct loadConPTable(rRegP dst, immPTable con) %{
+  match(Set dst con);
+
+  format %{ "movq    $dst, $con\t# ptr" %}
+  ins_encode %{
+    __ movptr($dst$$Register, Address($constanttablebase, $constantoffset($con)));
+  %}
+  ins_pipe(ialu_reg_fat); // XXX
+%}
+
 instruct loadConP0(rRegP dst, immP0 src, rFlagsReg cr)
 %{
   match(Set dst src);
@@ -5832,7 +5865,8 @@ instruct loadConF(regF dst, immF con) %{
   ins_cost(125);
   format %{ "movss   $dst, [$constantaddress]\t# load from constant table: float=$con" %}
   ins_encode %{
-    __ movflt($dst$$XMMRegister, $constantaddress($con));
+    //    __ movflt($dst$$XMMRegister, $constantaddress($con));
+    __ movflt($dst$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
   %}
   ins_pipe(pipe_slow);
 %}
@@ -5897,7 +5931,8 @@ instruct loadConD(regD dst, immD con) %{
   ins_cost(125);
   format %{ "movsd   $dst, [$constantaddress]\t# load from constant table: double=$con" %}
   ins_encode %{
-    __ movdbl($dst$$XMMRegister, $constantaddress($con));
+    //    __ movdbl($dst$$XMMRegister, $constantaddress($con));
+    __ movdbl($dst$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
   %}
   ins_pipe(pipe_slow);
 %}
@@ -7068,7 +7103,8 @@ instruct jumpXtnd_offset(rRegL switch_val, immI2 shift, rRegI dest) %{
     // Address index(noreg, switch_reg, (Address::ScaleFactor)$shift$$constant);
     // ArrayAddress dispatch(table, index);
     Address dispatch($dest$$Register, $switch_val$$Register, (Address::ScaleFactor) $shift$$constant);
-    __ lea($dest$$Register, $constantaddress);
+    //    __ lea($dest$$Register, $constantaddress);
+    __ lea($dest$$Register, Address($constanttablebase, $constantoffset));
     __ jmp(dispatch);
   %}
   ins_pipe(pipe_jmp);
@@ -7088,7 +7124,8 @@ instruct jumpXtnd_addr(rRegL switch_val, immI2 shift, immL32 offset, rRegI dest)
     // Address index(noreg, switch_reg, (Address::ScaleFactor) $shift$$constant, (int) $offset$$constant);
     // ArrayAddress dispatch(table, index);
     Address dispatch($dest$$Register, $switch_val$$Register, (Address::ScaleFactor) $shift$$constant, (int) $offset$$constant);
-    __ lea($dest$$Register, $constantaddress);
+    //    __ lea($dest$$Register, $constantaddress);
+    __ lea($dest$$Register, Address($constanttablebase, $constantoffset));
     __ jmp(dispatch);
   %}
   ins_pipe(pipe_jmp);
@@ -7108,7 +7145,8 @@ instruct jumpXtnd(rRegL switch_val, rRegI dest) %{
     // Address index(noreg, switch_reg, Address::times_1);
     // ArrayAddress dispatch(table, index);
     Address dispatch($dest$$Register, $switch_val$$Register, Address::times_1);
-    __ lea($dest$$Register, $constantaddress);
+    //    __ lea($dest$$Register, $constantaddress);
+    __ lea($dest$$Register, Address($constanttablebase, $constantoffset));
     __ jmp(dispatch);
   %}
   ins_pipe(pipe_jmp);
@@ -10799,7 +10837,8 @@ instruct cmpF_cc_immCF(rFlagsRegUCF cr, regF src, immF con) %{
   ins_cost(100);
   format %{ "ucomiss $src, [$constantaddress]\t# load from constant table: float=$con" %}
   ins_encode %{
-    __ ucomiss($src$$XMMRegister, $constantaddress($con));
+    //    __ ucomiss($src$$XMMRegister, $constantaddress($con));
+    __ ucomiss($src$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
   %}
   ins_pipe(pipe_slow);
 %}
@@ -10850,7 +10889,8 @@ instruct cmpD_cc_immCF(rFlagsRegUCF cr, regD src, immD con) %{
   ins_cost(100);
   format %{ "ucomisd $src, [$constantaddress]\t# load from constant table: double=$con" %}
   ins_encode %{
-    __ ucomisd($src$$XMMRegister, $constantaddress($con));
+    //    __ ucomisd($src$$XMMRegister, $constantaddress($con));
+    __ ucomisd($src$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
   %}
   ins_pipe(pipe_slow);
 %}
@@ -10911,7 +10951,8 @@ instruct cmpF_imm(rRegI dst, regF src, immF con, rFlagsReg cr) %{
             "movzbl  $dst, $dst\n"
     "done:" %}
   ins_encode %{
-    __ ucomiss($src$$XMMRegister, $constantaddress($con));
+    //    __ ucomiss($src$$XMMRegister, $constantaddress($con));
+    __ ucomiss($src$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
     emit_cmpfp3(_masm, $dst$$Register);
   %}
   ins_pipe(pipe_slow);
@@ -10973,7 +11014,8 @@ instruct cmpD_imm(rRegI dst, regD src, immD con, rFlagsReg cr) %{
             "movzbl  $dst, $dst\n"
     "done:" %}
   ins_encode %{
-    __ ucomisd($src$$XMMRegister, $constantaddress($con));
+    //    __ ucomisd($src$$XMMRegister, $constantaddress($con));
+    __ ucomisd($src$$XMMRegister, Address($constanttablebase, $constantoffset($con)));
     emit_cmpfp3(_masm, $dst$$Register);
   %}
   ins_pipe(pipe_slow);

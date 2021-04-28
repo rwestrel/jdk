@@ -34,6 +34,7 @@
 #include <new>
 
 class nmethod;
+class LeydenNMethod;
 class CodeBlob;
 class CompiledMethod;
 class Metadata;
@@ -275,6 +276,7 @@ class relocInfo {
     data_prefix_tag         = 15, // tag for a prefix (carries data arguments)
     post_call_nop_type      = 16, // A tag for post call nop relocations
     entry_guard_type        = 17, // A tag for an nmethod entry barrier guard value
+    card_mark_word_type     = 18,
     type_mask               = 31  // A mask which selects only the above values
   };
 
@@ -316,6 +318,7 @@ class relocInfo {
     visitor(trampoline_stub) \
     visitor(post_call_nop) \
     visitor(entry_guard) \
+    visitor(card_mark_word) \
 
 
  public:
@@ -568,7 +571,7 @@ class RelocIterator : public StackObj {
   address         _limit;   // stop producing relocations after this _addr
   relocInfo*      _current; // the current relocation information
   relocInfo*      _end;     // end marker; we're done iterating when _current == _end
-  CompiledMethod* _code;    // compiled method containing _addr
+  CodeBlob*       _code;    // compiled method containing _addr
   address         _addr;    // instruction to which the relocation applies
   short           _databuf; // spare buffer for compressed data
   short*          _data;    // pointer to the relocation's data
@@ -598,46 +601,25 @@ class RelocIterator : public StackObj {
 
   void initialize_misc();
 
-  void initialize(CompiledMethod* nm, address begin, address limit);
+  void initialize(CodeBlob* cb, address begin, address limit);
 
   RelocIterator() { initialize_misc(); }
 
  public:
   // constructor
   RelocIterator(CompiledMethod* nm, address begin = nullptr, address limit = nullptr);
+  RelocIterator(CodeBlob* cb, address begin = nullptr, address limit = nullptr);
   RelocIterator(CodeSection* cb, address begin = nullptr, address limit = nullptr);
 
   // get next reloc info, return !eos
-  bool next() {
-    _current++;
-    assert(_current <= _end, "must not overrun relocInfo");
-    if (_current == _end) {
-      set_has_current(false);
-      return false;
-    }
-    set_has_current(true);
-
-    if (_current->is_prefix()) {
-      advance_over_prefix();
-      assert(!current()->is_prefix(), "only one prefix at a time");
-    }
-
-    _addr += _current->addr_offset();
-
-    if (_limit != nullptr && _addr >= _limit) {
-      set_has_current(false);
-      return false;
-    }
-
-    return true;
-  }
+  bool next();
 
   // accessors
   address      limit()        const { return _limit; }
   relocType    type()         const { return current()->type(); }
   int          format()       const { return (relocInfo::have_format) ? current()->format() : 0; }
   address      addr()         const { return _addr; }
-  CompiledMethod*     code()  const { return _code; }
+  CompiledMethod*     code()  const;
   short*       data()         const { return _data; }
   int          datalen()      const { return _datalen; }
   bool     has_current()      const { return _datalen >= 0; }
@@ -1213,6 +1195,7 @@ class static_stub_Relocation : public Relocation {
 };
 
 class runtime_call_Relocation : public CallRelocation {
+  friend class CodeCache;
 
  public:
   static RelocationHolder spec() {
@@ -1338,7 +1321,27 @@ class external_word_Relocation : public DataRelocation {
   address  value() override { return target(); }
 };
 
+class card_mark_word_Relocation : public DataRelocation {
+  friend class CodeCache;
+public:
+  static RelocationHolder spec() {
+    RelocationHolder rh = newHolder();
+    new(rh) card_mark_word_Relocation();
+    return rh;
+  }
+
+private:
+
+  friend class RelocIterator;
+  card_mark_word_Relocation() : DataRelocation(relocInfo::card_mark_word_type) { }
+
+public:
+  address  value()          { return pd_get_address_from_code(); }
+};
+
+
 class internal_word_Relocation : public DataRelocation {
+  friend class CodeCache;
 
  public:
   static RelocationHolder spec(address target) {
@@ -1438,9 +1441,5 @@ inline Reloc* RelocIterator::Accessor() {                               \
 APPLY_TO_RELOCATIONS(EACH_CASE);
 #undef EACH_CASE_AUX
 #undef EACH_CASE
-
-inline RelocIterator::RelocIterator(CompiledMethod* nm, address begin, address limit) {
-  initialize(nm, begin, limit);
-}
 
 #endif // SHARE_CODE_RELOCINFO_HPP

@@ -31,6 +31,7 @@
 
 class CodeBlob;
 class nmethod;
+class CompiledMethod;
 class ReferenceDiscoverer;
 class DataLayout;
 class KlassClosure;
@@ -278,7 +279,7 @@ class MarkingCodeBlobClosure : public CodeBlobToOopClosure {
 
 class NMethodClosure : public Closure {
  public:
-  virtual void do_nmethod(nmethod* n) = 0;
+  virtual void do_nmethod(CompiledMethod* n) = 0;
 };
 
 class CodeBlobToNMethodClosure : public CodeBlobClosure {

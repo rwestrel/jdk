@@ -112,7 +112,7 @@ void HeapRegionRemSet::add_code_root(nmethod* nm) {
   add_code_root_locked(nm);
 }
 
-void HeapRegionRemSet::add_code_root_locked(nmethod* nm) {
+void HeapRegionRemSet::add_code_root_locked(CompiledMethod* nm) {
   assert(nm != NULL, "sanity");
   assert((CodeCache_lock->owned_by_self() ||
          (SafepointSynchronize::is_at_safepoint() &&

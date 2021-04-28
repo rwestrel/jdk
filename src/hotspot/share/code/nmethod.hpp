@@ -64,7 +64,7 @@ class FailedSpeculation;
 class JVMCINMethodData;
 #endif
 
-class nmethod : public CompiledMethod {
+class JNIEXPORT nmethod : public CompiledMethod {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCache;  // scavengable oops
@@ -207,6 +207,7 @@ class nmethod : public CompiledMethod {
   int _unwind_handler_offset;
 
   int _consts_offset;
+  int _consts_end_offset;
   int _stub_offset;
   int _oops_offset;                       // offset to where embedded oop table begins (inside data)
   int _metadata_offset;                   // embedded meta data table
@@ -376,16 +377,16 @@ class nmethod : public CompiledMethod {
 
   // boundaries for different parts
   address consts_begin          () const          { return           header_begin() + _consts_offset        ; }
-  address consts_end            () const          { return           code_begin()                           ; }
+  address consts_end          () const          { return           header_begin() + _consts_end_offset      ; }
   address stub_begin            () const          { return           header_begin() + _stub_offset          ; }
   address stub_end              () const          { return           header_begin() + _oops_offset          ; }
   address exception_begin       () const          { return           header_begin() + _exception_offset     ; }
   address unwind_handler_begin  () const          { return _unwind_handler_offset != -1 ? (header_begin() + _unwind_handler_offset) : nullptr; }
-  oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset)         ; }
-  oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset)     ; }
+  virtual oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset)         ; }
+  virtual oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset)     ; }
 
-  Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset)     ; }
-  Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
+  virtual Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset)     ; }
+  virtual Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
 
   address scopes_data_end       () const          { return           header_begin() + _scopes_pcs_offset    ; }
   PcDesc* scopes_pcs_begin      () const          { return (PcDesc*)(header_begin() + _scopes_pcs_offset   ); }
@@ -717,6 +718,320 @@ public:
 
   virtual void  make_deoptimized();
   void finalize_relocations();
+};
+
+class JNIEXPORT LeydenNMethod : public CompiledMethod {
+  friend class CodeCache;
+private:
+  LeydenNMethod() : CompiledMethod() {}
+public:
+
+  address scopes_data_end       () const          { return  header_begin() + _scopes_pcs_offset - code_size()    ; }
+  PcDesc* scopes_pcs_begin      () const          { return (PcDesc*)(header_begin() + _scopes_pcs_offset - code_size()  ); }
+  PcDesc* scopes_pcs_end        () const          { return (PcDesc*)(header_begin() + _dependencies_offset - code_size()) ; }
+  address handler_table_begin   () const          { return           header_begin() + _handler_table_offset - code_size(); }
+  address handler_table_end     () const          { return           header_begin() + _nul_chk_table_offset - code_size(); }
+  address nul_chk_table_begin   () const          { return           header_begin() + _nul_chk_table_offset - code_size() ; }
+#if INCLUDE_JVMCI
+  address nul_chk_table_end     () const          { return           header_begin() + _speculations_offset - code_size() ; }
+#else
+  address nul_chk_table_end     () const          { return           header_begin() + _nmethod_end_offset - code_size()  ; }
+#endif
+  oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset - code_size())         ; }
+  oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset - code_size())     ; }
+  Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset - code_size())     ; }
+
+private:
+  int       _entry_bci;        // != InvocationEntryBci if this nmethod is an on-stack replacement method
+
+  nmethod*  _osr_link;         // from InstanceKlass::osr_nmethods_head
+
+  struct oops_do_mark_link; // Opaque data type.
+
+  oops_do_mark_link* volatile _oops_do_mark_link;
+
+  address _entry_point;                      // entry point with class check
+  address _verified_entry_point;             // entry point without class check
+  address _osr_entry_point;                  // entry point for on stack replacement
+
+  int  _exception_offset;
+  int _unwind_handler_offset;
+
+  int _consts_offset;
+  int _consts_end_offset;
+  int _stub_offset;
+  int _oops_offset;                       // offset to where embedded oop table begins (inside data)
+  int _metadata_offset;                   // embedded meta data table
+  int _scopes_data_offset;
+  int _scopes_pcs_offset;
+  int _dependencies_offset;
+  int _native_invokers_offset;
+  int _handler_table_offset;
+  int _nul_chk_table_offset;
+#if INCLUDE_JVMCI
+  int _speculations_offset;
+  int _jvmci_data_offset;
+#endif
+  int _nmethod_end_offset;
+
+  int _orig_pc_offset;
+
+  int _compile_id;                           // which compilation made this nmethod
+  int _comp_level;                           // compilation level
+
+  bool _has_flushed_dependencies;            // Used for maintenance of dependencies (CodeCache_lock)
+
+  bool _unload_reported;
+  bool _load_reported;
+
+  volatile signed char _state;               // {not_installed, in_use, not_entrant, zombie, unloaded}
+
+#ifdef ASSERT
+  bool _oops_are_stale;  // indicates that it's no longer safe to access oops section
+#endif
+
+#if INCLUDE_RTM_OPT
+  RTMState _rtm_state;
+#endif
+
+  volatile jint _lock_count;
+
+  volatile long _stack_traversal_mark;
+
+  int _hotness_counter;
+
+  volatile uint8_t _is_unloading_state;
+
+  ByteSize _native_receiver_sp_offset;
+  ByteSize _native_basic_lock_sp_offset;
+
+  friend class nmethodLocker;
+
+  const char* reloc_string_for(u_char* begin, u_char* end);
+
+  bool make_entrant() { Unimplemented(); return false; }
+
+  void init_defaults() { ShouldNotReachHere(); }
+
+public:
+  // type info
+  bool is_leyden_nmethod() const                  { return true; }
+  bool is_osr_method() const                      { return _entry_bci != InvocationEntryBci; }
+
+  // boundaries for different parts
+  address consts_begin          () const          { return           header_begin() + _consts_offset        ; }
+  address consts_end          () const          { return           header_begin() + _consts_end_offset      ; }
+  address stub_begin            () const          { return           header_begin() + _stub_offset          ; }
+  address stub_end              () const          { return           header_begin() + _oops_offset          ; }
+  address exception_begin       () const          { return           header_begin() + _exception_offset     ; }
+
+  Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
+
+  // Sizes
+  int oops_size         () const                  { return (address)  oops_end         () - (address)  oops_begin         (); }
+  int metadata_size     () const                  { return (address)  metadata_end     () - (address)  metadata_begin     (); }
+
+  int     oops_count() const { assert(oops_size() % oopSize == 0, "");  return (oops_size() / oopSize) + 1; }
+  int metadata_count() const { assert(metadata_size() % wordSize == 0, ""); return (metadata_size() / wordSize) + 1; }
+
+  // Containment
+  bool oops_contains         (oop*    addr) const { return oops_begin         () <= addr && addr < oops_end         (); }
+  bool metadata_contains     (Metadata** addr) const   { return metadata_begin     () <= addr && addr < metadata_end     (); }
+
+  // entry points
+  address entry_point() const                     { return _entry_point;             } // normal entry point
+  address verified_entry_point() const            { return _verified_entry_point;    } // if klass is correct
+
+  // flag accessing and manipulation
+  bool  is_in_use() const                         { return _state <= in_use; }
+  bool  is_alive() const                          { return _state < unloaded; }
+  bool  is_not_entrant() const                    { return _state == not_entrant; }
+  bool  is_zombie() const                         { return _state == zombie; }
+  bool  is_unloaded() const                       { return _state == unloaded; }
+
+//  void clear_unloading_state();
+  virtual bool is_unloading() { ShouldNotReachHere(); return false; }
+  virtual void do_unloading(bool unloading_occurred) { ShouldNotReachHere(); }
+
+  bool  make_not_entrant() {
+    ShouldNotReachHere();
+    return false;
+  }
+  bool  make_not_used()    {
+    ShouldNotReachHere();
+    return false;
+  }
+  bool  make_zombie()      {
+    ShouldNotReachHere();
+    return false;
+  }
+
+  int get_state() const {
+    return _state;
+  }
+
+  int   comp_level() const                        { return _comp_level; }
+
+  oop   oop_at(int index) const;
+  oop*  oop_addr_at(int index) const {  // for GC
+    // relocation indexes are biased by 1 (because 0 is reserved)
+    assert(index > 0 && index <= oops_count(), "must be a valid non-zero index");
+    assert(!_oops_are_stale, "oops are stale");
+    return &oops_begin()[index - 1];
+  }
+
+  Metadata*     metadata_at(int index) const      { return index == 0 ? NULL: *metadata_addr_at(index); }
+  Metadata**  metadata_addr_at(int index) const {  // for GC
+    // relocation indexes are biased by 1 (because 0 is reserved)
+    assert(index > 0 && index <= metadata_count(), "must be a valid non-zero index");
+    return &metadata_begin()[index - 1];
+  }
+
+private:
+  void fix_oop_relocations(address begin, address end, bool initialize_immediates);
+  inline void initialize_immediate_oop(oop* dest, jobject handle);
+
+public:
+  void fix_oop_relocations()                           { fix_oop_relocations(NULL, NULL, false); }
+  int   osr_entry_bci() const                     { assert(is_osr_method(), "wrong kind of nmethod"); return _entry_bci; }
+
+protected:
+  void flush() { ShouldNotReachHere(); }
+
+public:
+  bool is_locked_by_vm() const                    { return _lock_count >0; }
+
+  bool can_convert_to_zombie()  { ShouldNotReachHere(); return false; }
+
+  void set_method(Method* method) { _method = method; }
+
+public:
+  void oops_do(OopClosure* f) { oops_do(f, false); }
+  void oops_do(OopClosure* f, bool allow_dead);
+
+private:
+  ScopeDesc* scope_desc_in(address begin, address end);
+
+  address* orig_pc_addr(const frame* fr) { ShouldNotReachHere(); return NULL; }
+
+public:
+
+  address get_original_pc(const frame* fr) { return *orig_pc_addr(fr); }
+  void    set_original_pc(const frame* fr, address pc) { *orig_pc_addr(fr) = pc; }
+
+  void verify();
+  void verify_scopes();
+  void verify_interrupt_point(address interrupt_point);
+
+  void decode2(outputStream* st) const;
+  void print_constant_pool(outputStream* st);
+
+  void print()                          const;
+  void print(outputStream* st)          const;
+  void print_code();
+
+#if defined(SUPPORT_DATA_STRUCTS)
+  void print_relocations()                        PRODUCT_RETURN;
+  void print_pcs() { print_pcs_on(tty); }
+  void print_pcs_on(outputStream* st) {}
+  void print_scopes() { print_scopes_on(tty); }
+  void print_scopes_on(outputStream* st)          PRODUCT_RETURN;
+  void print_value_on(outputStream* st) const {}
+  void print_handler_table();
+  void print_nul_chk_table();
+  void print_recorded_oop(int log_n, int index);
+  void print_recorded_oops();
+  void print_recorded_metadata();
+
+  void print_oops(outputStream* st);     // oops from the underlying CodeBlob.
+  void print_metadata(outputStream* st); // metadata in metadata pool.
+#else
+  // void print_pcs()                             PRODUCT_RETURN;
+  void print_pcs()                                { return; }
+#endif
+ void print_nmethod(bool print_code);
+
+  virtual void print_on(outputStream* st) const { CodeBlob::print_on(st); }
+  void print_on(outputStream* st, const char* msg) const;
+
+  void log_identity(xmlStream* log) const {}
+  void log_state_change() const {}
+
+  virtual void print_block_comment(outputStream* stream, address block_begin) const {
+#if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
+    print_nmethod_labels(stream, block_begin);
+    CodeBlob::print_block_comment(stream, block_begin);
+#endif
+  }
+
+  const char* nmethod_section_label(address pos) const;
+
+  void print_nmethod_labels(outputStream* stream, address block_begin, bool print_section_labels=true) const;
+  bool has_code_comment(address begin, address end);
+  void print_code_comment_on(outputStream* st, int column, address begin, address end);
+
+  virtual int compile_id() const { return _compile_id; }
+  const char* compile_kind() const;
+  virtual bool is_dependent_on_method(Method* dependee) {
+    ShouldNotReachHere();
+    return false;
+  }
+
+  virtual void metadata_do(MetadataClosure* f);
+
+  NativeCallWrapper* call_wrapper_at(address call) const;
+  NativeCallWrapper* call_wrapper_before(address return_pc) const;
+  address call_instruction_address(address pc) const;
+
+  virtual CompiledStaticCall* compiledStaticCall_at(Relocation* call_site) const;
+  virtual CompiledStaticCall* compiledStaticCall_at(address addr) const;
+  virtual CompiledStaticCall* compiledStaticCall_before(address addr) const;
+};
+
+// Locks an nmethod so its code will not get removed and it will not
+// be made into a zombie, even if it is a not_entrant method. After the
+// nmethod becomes a zombie, if CompiledMethodUnload event processing
+// needs to be done, then lock_nmethod() is used directly to keep the
+// generated code from being reused too early.
+class nmethodLocker : public StackObj {
+  CompiledMethod* _nm;
+
+ public:
+
+  // note: nm can be NULL
+  // Only JvmtiDeferredEvent::compiled_method_unload_event()
+  // should pass zombie_ok == true.
+  static void lock_nmethod(CompiledMethod* nm, bool zombie_ok = false);
+  static void unlock_nmethod(CompiledMethod* nm); // (ditto)
+
+  nmethodLocker(address pc); // derive nm from pc
+  nmethodLocker(nmethod *nm) { _nm = nm; lock_nmethod(_nm); }
+  nmethodLocker(CompiledMethod *nm) {
+    _nm = nm;
+    lock(_nm);
+  }
+
+  static void lock(CompiledMethod* method, bool zombie_ok = false) {
+    if (method == NULL) return;
+    lock_nmethod(method, zombie_ok);
+  }
+
+  static void unlock(CompiledMethod* method) {
+    if (method == NULL) return;
+    unlock_nmethod(method);
+  }
+
+  nmethodLocker() { _nm = NULL; }
+  ~nmethodLocker() {
+    unlock(_nm);
+  }
+
+  CompiledMethod* code() { return _nm; }
+  void set_code(CompiledMethod* new_nm, bool zombie_ok = false) {
+    unlock(_nm);   // note:  This works even if _nm==new_nm.
+    _nm = new_nm;
+    lock(_nm, zombie_ok);
+  }
 };
 
 #endif // SHARE_CODE_NMETHOD_HPP

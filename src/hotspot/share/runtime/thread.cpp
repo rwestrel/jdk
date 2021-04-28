@@ -23,6 +23,7 @@
  *
  */
 
+#include <classfile/symbolTable.hpp>
 #include "precompiled.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/javaThreadStatus.hpp"

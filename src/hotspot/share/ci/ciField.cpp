@@ -299,6 +299,9 @@ void ciField::initialize_from(fieldDescriptor* fd) {
       _is_constant = false;
     }
   }
+  if (DumpCodeToDisk) {
+    _is_constant = false;
+  }
 }
 
 // ------------------------------------------------------------------

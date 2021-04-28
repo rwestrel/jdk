@@ -169,14 +169,14 @@ static const int entry_barrier_offset(nmethod* nm) {
 #endif
 }
 
-static NativeNMethodCmpBarrier* native_nmethod_barrier(nmethod* nm) {
+static NativeNMethodCmpBarrier* native_nmethod_barrier(CompiledMethod* nm) {
   address barrier_address = nm->code_begin() + nm->frame_complete_offset() + entry_barrier_offset(nm);
   NativeNMethodCmpBarrier* barrier = reinterpret_cast<NativeNMethodCmpBarrier*>(barrier_address);
   debug_only(barrier->verify());
   return barrier;
 }
 
-void BarrierSetNMethod::set_guard_value(nmethod* nm, int value) {
+void BarrierSetNMethod::set_guard_value(CompiledMethod* nm, int value) {
   if (!supports_entry_barrier(nm)) {
     return;
   }
@@ -185,7 +185,7 @@ void BarrierSetNMethod::set_guard_value(nmethod* nm, int value) {
   cmp->set_immediate(value);
 }
 
-int BarrierSetNMethod::guard_value(nmethod* nm) {
+int BarrierSetNMethod::guard_value(CompiledMethod* nm) {
   if (!supports_entry_barrier(nm)) {
     return disarmed_guard_value();
   }

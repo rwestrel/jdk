@@ -43,6 +43,7 @@
 
 class CompiledICHolder : public CHeapObj<mtCompiler> {
   friend class VMStructs;
+  friend class CodeCache;
  private:
 #ifdef ASSERT
   static volatile int _live_count; // allocated

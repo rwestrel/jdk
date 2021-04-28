@@ -632,6 +632,36 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 
+  if (RestoreCodeFromDisk && UseNewCode) {
+//    ResourceMark rm;
+//    HandleMark hm(THREAD);
+//    FILE* file = fopen("/home/roland/tmp/dump", "r");
+//    assert(file != NULL, "fopen failed");
+//    int nb;
+//    int r = fread(&nb, sizeof(nb), 1, file);
+//    assert(r == 1, "fread failed");
+//    for (int i = 0; i < nb; i++) {
+//      int l;
+//      r = fread(&l, sizeof(l), 1, file);
+//      assert(r == 1, "fread failed");
+//      char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
+//      r = fread(klass_name, 1, l, file);
+//      assert(r == l, "fread failed");
+//      klass_name[l] = '\0';
+////        tty->print_cr("XXX %s", klass_name);
+//      Symbol* sym = SymbolTable::new_symbol(klass_name, l);
+//      Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
+//                                                   Handle(), true, THREAD);
+//      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+////      if (k == NULL || THREAD->has_pending_exception()) {
+////        THREAD->clear_pending_exception();
+////        tty->print_cr("Warning: failed to resolve: %s", klass_name);
+////      }
+//    }
+    CodeCache::restore_from_disk(THREAD);
+  }
+
+
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
   quicken_jni_functions();
@@ -1049,6 +1079,27 @@ void Threads::create_vm_init_libraries() {
 //   + Delete this thread
 //   + Return to caller
 
+#include "classfile/classLoaderDataGraph.hpp"
+
+GrowableArray<Method*>* compile_on_exit;
+GrowableArray<Klass*>* loaded_klasses;
+
+void maybe_compile_method(Method* m) {
+  Thread* thread = Thread::current();
+  methodHandle mh(thread, m);
+  if (!mh->is_abstract() && CompilerOracle::has_option(mh, CompileCommand::CompileOnExit)) {
+    compile_on_exit->push(m);
+  }
+}
+
+void collect_loaded_klasses(Klass* const k) {
+  if ((k->is_instance_klass() && InstanceKlass::cast(k)->is_loaded()) || k->is_array_klass()) {
+    loaded_klasses->push(k);
+  }
+}
+
+#include "oops/method.inline.hpp"
+
 void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
@@ -1081,6 +1132,67 @@ void Threads::destroy_vm() {
 
   // run Java level shutdown hooks
   thread->invoke_shutdown_hooks();
+
+  if (DumpCodeToDisk) {
+    ResourceMark rm;
+    HandleMark hm(thread);
+    compile_on_exit = new GrowableArray<Method*>();
+
+    SystemDictionary::methods_do(maybe_compile_method);
+
+    for (GrowableArrayIterator<Method*> m = compile_on_exit->begin(); m != compile_on_exit->end(); ++m) {
+      methodHandle mh(thread, *m);
+      nmethod* nm = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
+                                                  CompileTask::Reason_Whitebox, thread);
+      assert(!thread->has_pending_exception() && nm != NULL, "");
+      RelocIterator iter(nm);
+      while (iter.next()) {
+        if (iter.type() == relocInfo::static_call_type) {
+          static_call_Relocation* call = iter.static_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        }
+      }
+
+    }
+  }
+
+  if (DumpCodeToDisk) {
+
+    ResourceMark rm;
+    HandleMark hm(thread);
+
+    loaded_klasses = new GrowableArray<Klass*>();
+    {
+      MutexLocker ml(ClassLoaderDataGraph_lock);
+      ClassLoaderDataGraph::classes_do(collect_loaded_klasses);
+    }
+
+//    int nb = loaded_klasses->length();
+//    assert(nb >= 1, "");
+//    int w = fwrite(&nb, sizeof(nb), 1, file);
+//    assert(w == 1, "fwrite failed");
+//    for (int i = 0; i < nb; i++) {
+//      Symbol* klass_name = loaded_klasses->at(i)->name();
+//      int l = klass_name->utf8_length();
+//      w = fwrite(&l, sizeof(l), 1, file);
+//      assert(w == 1, "fwrite failed");
+//      w = fwrite(klass_name->as_utf8(), 1, l, file);
+//      assert(w == l, "fwrite failed");
+//    }
+
+    CodeCache::dump_to_disk(loaded_klasses, thread);
+  }
 
   before_exit(thread);
 

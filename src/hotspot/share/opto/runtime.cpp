@@ -114,6 +114,8 @@ address OptoRuntime::_notify_jvmti_mount                          = nullptr;
 address OptoRuntime::_notify_jvmti_unmount                        = nullptr;
 #endif
 
+address OptoRuntime::_initialize_klass_Java                       = NULL;
+
 ExceptionBlob* OptoRuntime::_exception_blob;
 
 // This should be called in an assertion at the start of OptoRuntime routines
@@ -163,6 +165,8 @@ bool OptoRuntime::generate(ciEnv* env) {
 
   gen(env, _slow_arraycopy_Java            , slow_arraycopy_Type          , SharedRuntime::slow_arraycopy_C ,    0 , false, false);
   gen(env, _register_finalizer_Java        , register_finalizer_Type      , register_finalizer              ,    0 , false, false);
+
+  gen(env, _initialize_klass_Java          , initialize_klass_Type        , initialize_klass_C              ,    0 , true , false);
 
   return true;
 }
@@ -1329,6 +1333,21 @@ const TypeFunc* OptoRuntime::osr_end_Type() {
   return TypeFunc::make(domain, range);
 }
 
+const TypeFunc *OptoRuntime::initialize_klass_Type() {
+  // create input type (domain)
+  const Type **fields = TypeTuple::fields(1);
+  fields[TypeFunc::Parms+0] = TypeKlassPtr::NOTNULL;
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+1, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+
 //-------------------------------------------------------------------------------------
 // register policy
 
@@ -1824,3 +1843,7 @@ static void trace_exception(outputStream* st, oop exception_oop, address excepti
 
   st->print_raw_cr(tempst.freeze());
 }
+
+JRT_ENTRY(void, OptoRuntime::initialize_klass_C(Klass* klass, JavaThread* current))
+  klass->initialize(current);
+JRT_END

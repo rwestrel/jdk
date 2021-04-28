@@ -795,7 +795,7 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   // If this happens, control eventually transfers back to the compiled
   // caller, but with an uncorrected stack, causing delayed havoc.
 
-  if (VerifyAdapterCalls &&
+  if (VerifyAdapterCalls && !DumpCodeToDisk &&
       (Interpreter::code() != NULL || StubRoutines::code1() != NULL)) {
     // So, let's test for cascading c2i/i2c adapters right now.
     //  assert(Interpreter::contains($return_addr) ||
@@ -2064,9 +2064,16 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   c_arg = total_c_args - total_in_args;
 
   if (method->is_static()) {
-
     //  load oop into a register
-    __ movoop(oop_handle_reg, JNIHandles::make_local(method->method_holder()->java_mirror()));
+    if (DumpCodeToDisk) {
+      jobject obj = JNIHandles::make_local(method->method_holder()->java_mirror());
+      int oop_index = __ oop_recorder()->find_index(obj);
+      __ lea(oop_handle_reg, InternalAddress(__ code()->consts()->start()));
+      address addr = __ address_constant((address) obj, oop_Relocation::spec(oop_index));
+      __ movptr(oop_handle_reg, Address(oop_handle_reg, addr - __ code()->consts()->start()));
+    } else {
+      __ movoop(oop_handle_reg, JNIHandles::make_local(method->method_holder()->java_mirror()));
+    }
 
     // Now handlize the static class mirror it's known not-null.
     __ movptr(Address(rsp, klass_offset), oop_handle_reg);
@@ -2094,7 +2101,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // We have all of the arguments setup at this point. We must not touch any register
   // argument registers at this point (what if we save/restore them there are no oop?
 
-  {
+  if (!DumpCodeToDisk){
     SkipIfEqual skip(masm, &DTraceMethodProbes, false, rscratch1);
     // protect the args we've loaded
     save_args(masm, total_c_args, c_arg, out_regs);
@@ -2327,7 +2334,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     __ bind(fast_done);
   }
-  {
+  if (!DumpCodeToDisk) {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false, rscratch1);
     save_native_result(masm, ret_type, stack_slots);
     __ mov_metadata(c_rarg1, method());

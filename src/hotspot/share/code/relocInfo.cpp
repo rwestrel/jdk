@@ -116,33 +116,50 @@ void relocInfo::change_reloc_info_for_address(RelocIterator *itr, address pc, re
 // ----------------------------------------------------------------------------------------------------
 // Implementation of RelocIterator
 
-void RelocIterator::initialize(CompiledMethod* nm, address begin, address limit) {
+RelocIterator::RelocIterator(CompiledMethod* nm, address begin, address limit) {
+  initialize(nm, begin, limit);
+}
+
+RelocIterator::RelocIterator(CodeBlob* cb, address begin, address limit) {
+  initialize(cb, begin, limit);
+}
+
+CompiledMethod* RelocIterator::code() const { return _code->as_compiled_method(); };
+
+void RelocIterator::initialize(CodeBlob* cb, address begin, address limit) {
   initialize_misc();
 
-  if (nm == nullptr && begin != nullptr) {
+  if (cb == nullptr && begin != nullptr) {
     // allow nmethod to be deduced from beginning address
-    CodeBlob* cb = CodeCache::find_blob(begin);
-    nm = (cb != nullptr) ? cb->as_compiled_method_or_null() : nullptr;
+    cb = CodeCache::find_blob(begin);
   }
-  guarantee(nm != nullptr, "must be able to deduce nmethod from other arguments");
+  guarantee(cb != nullptr, "must be able to deduce nmethod from other arguments");
 
-  _code    = nm;
-  _current = nm->relocation_begin() - 1;
-  _end     = nm->relocation_end();
-  _addr    = nm->content_begin();
+  _code    = cb;
+  _current = cb->relocation_begin() - 1;
+  _end     = cb->relocation_end();
+  _addr    = cb->content_begin();
+  assert(_addr <= cb->old_code_begin(), "");
+  if (_addr == cb->old_code_begin()) {
+    _addr = cb->code_begin();
+  }
 
-  // Initialize code sections.
-  _section_start[CodeBuffer::SECT_CONSTS] = nm->consts_begin();
-  _section_start[CodeBuffer::SECT_INSTS ] = nm->insts_begin() ;
-  _section_start[CodeBuffer::SECT_STUBS ] = nm->stub_begin()  ;
 
-  _section_end  [CodeBuffer::SECT_CONSTS] = nm->consts_end()  ;
-  _section_end  [CodeBuffer::SECT_INSTS ] = nm->insts_end()   ;
-  _section_end  [CodeBuffer::SECT_STUBS ] = nm->stub_end()    ;
+  if (cb->is_compiled()) {
+    CompiledMethod* cm = cb->as_compiled_method();
+    // Initialize code sections.
+    _section_start[CodeBuffer::SECT_CONSTS] = cm->consts_begin();
+    _section_start[CodeBuffer::SECT_INSTS ] = cm->insts_begin() ;
+    _section_start[CodeBuffer::SECT_STUBS ] = cm->stub_begin()  ;
+
+    _section_end  [CodeBuffer::SECT_CONSTS] = cm->consts_end()  ;
+    _section_end  [CodeBuffer::SECT_INSTS ] = cm->insts_end()   ;
+    _section_end  [CodeBuffer::SECT_STUBS ] = cm->stub_end()    ;
+  }
 
   assert(!has_current(), "just checking");
-  assert(begin == nullptr || begin >= nm->code_begin(), "in bounds");
-  assert(limit == nullptr || limit <= nm->code_end(),   "in bounds");
+  assert(begin == nullptr || begin >= cb->code_begin(), "in bounds");
+  assert(limit == nullptr || limit <= cb->code_end(), "in bounds");
   set_limits(begin, limit);
 }
 
@@ -173,7 +190,7 @@ RelocIterator::RelocIterator(CodeSection* cs, address begin, address limit) {
 
 bool RelocIterator::addr_in_const() const {
   const int n = CodeBuffer::SECT_CONSTS;
-  return section_start(n) <= addr() && addr() < section_end(n);
+  return _section_start[n] != NULL && section_start(n) <= addr() && addr() < section_end(n);
 }
 
 
@@ -241,6 +258,42 @@ Relocation* RelocIterator::reloc() {
   assert(t == relocInfo::none, "must be padding");
   _rh = RelocationHolder::none;
   return _rh.reloc();
+}
+
+bool RelocIterator::next() {
+  _current++;
+  assert(_current <= _end, "must not overrun relocInfo");
+  if (_current == _end) {
+    set_has_current(false);
+    return false;
+  }
+  set_has_current(true);
+
+  if (_current->is_prefix()) {
+    advance_over_prefix();
+    assert(!current()->is_prefix(), "only one prefix at a time");
+  }
+
+  address next_addr = _addr + _current->addr_offset();
+  if (_code != nullptr) {
+    if (_addr < _code->old_code_begin() && next_addr >= _code->old_code_begin() && next_addr < _code->old_code_end()) {
+      address fixed_next_addr = _code->code_begin() + (next_addr -_code->old_code_begin());
+      assert(RestoreCodeFromDisk || fixed_next_addr == next_addr, "");
+      next_addr = fixed_next_addr;
+    } else if (_addr >= _code->code_begin() && _addr < _code->code_end() && next_addr > _code->code_end()) {
+      address fixed_next_addr = (_code->old_code_begin() == _code->code_begin() ? _code->old_code_end() : _code->old_code_begin())+ (next_addr - _code->code_end());
+      assert(RestoreCodeFromDisk || fixed_next_addr == next_addr, "");
+      next_addr = fixed_next_addr;
+    }
+  }
+  _addr = next_addr;
+
+  if (_limit != nullptr && _addr >= _limit) {
+    set_has_current(false);
+    return false;
+  }
+
+  return true;
 }
 
 // Verify all the destructors are trivial, so we don't need to worry about
@@ -899,6 +952,7 @@ void RelocIterator::print_current() {
   case relocInfo::external_word_type:
   case relocInfo::internal_word_type:
   case relocInfo::section_word_type:
+  case relocInfo::card_mark_word_type:
     {
       DataRelocation* r = (DataRelocation*) reloc();
       tty->print(" | [target=" INTPTR_FORMAT "]", p2i(r->value())); //value==target

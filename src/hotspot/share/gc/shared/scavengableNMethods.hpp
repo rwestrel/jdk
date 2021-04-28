@@ -36,15 +36,15 @@ class nmethod;
 class ScavengableNMethods : public AllStatic {
   friend class VMStructs;
 
-  static nmethod*           _head;
+  static CompiledMethod*           _head;
   static BoolObjectClosure* _is_scavengable;
 
 public:
   static void initialize(BoolObjectClosure* is_scavengable);
 
-  static void register_nmethod(nmethod* nm);
+  static void register_nmethod(CompiledMethod* nm);
   static void unregister_nmethod(nmethod* nm);
-  static void verify_nmethod(nmethod* nm);
+  static void verify_nmethod(CompiledMethod* nm);
 
   // Remove nmethods that no longer have scavengable oops.
   static void prune_nmethods();
@@ -57,9 +57,9 @@ public:
 
 private:
   static void nmethods_do_and_prune(CodeBlobToOopClosure* cl);
-  static void unlist_nmethod(nmethod* nm, nmethod* prev);
+  static void unlist_nmethod(CompiledMethod* nm, CompiledMethod* prev);
 
-  static bool has_scavengable_oops(nmethod* nm);
+  static bool has_scavengable_oops(CompiledMethod* nm);
 
   static void mark_on_list_nmethods() PRODUCT_RETURN;
   static void verify_unlisted_nmethods(CodeBlobClosure* cl) PRODUCT_RETURN;

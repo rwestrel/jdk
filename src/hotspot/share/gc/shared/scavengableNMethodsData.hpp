@@ -38,7 +38,7 @@ class ScavengableNMethodsData : public CHeapObj<mtGC> {
   static const uintptr_t state_marked  = 0x2;
 
   // nmethod containing the GC data.
-  nmethod* const _nm;
+  CompiledMethod* const _nm;
 
   // The data is stored as a bit pattern in a void* inside the nmethod.
   uintptr_t data() const                    { return reinterpret_cast<uintptr_t>(_nm->gc_data<void>()); }
@@ -47,11 +47,11 @@ class ScavengableNMethodsData : public CHeapObj<mtGC> {
   jbyte state() const                       { return data() & state_mask; }
   void set_state(jbyte state) const         { set_data((data() & ~state_mask) | state); }
 
-  uintptr_t from_nmethod(nmethod* nm) const { return reinterpret_cast<uintptr_t>(nm); }
+  uintptr_t from_nmethod(CompiledMethod* nm) const { return reinterpret_cast<uintptr_t>(nm); }
   nmethod* to_nmethod(uintptr_t data) const { return reinterpret_cast<nmethod*>(data); }
 
 public:
-  ScavengableNMethodsData(nmethod* nm) : _nm(nm) {
+  ScavengableNMethodsData(CompiledMethod* nm) : _nm(nm) {
     assert(is_aligned(nm, 4), "Must be aligned to fit state bits");
   }
 
@@ -68,7 +68,7 @@ public:
 #endif //PRODUCT
 
   nmethod* next() const     { return to_nmethod(data() & ~state_mask); }
-  void set_next(nmethod *n) { set_data(from_nmethod(n) | state()); }
+  void set_next(CompiledMethod *n) { set_data(from_nmethod(n) | state()); }
 };
 
 #endif // SHARE_GC_SHARED_SCAVENGABLENMETHODDATAS_HPP

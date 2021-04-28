@@ -830,7 +830,7 @@ void ParallelScavengeHeap::gen_mangle_unused_area() {
 }
 #endif
 
-void ParallelScavengeHeap::register_nmethod(nmethod* nm) {
+void ParallelScavengeHeap::register_nmethod(CompiledMethod* nm) {
   ScavengableNMethods::register_nmethod(nm);
 }
 
@@ -838,7 +838,7 @@ void ParallelScavengeHeap::unregister_nmethod(nmethod* nm) {
   ScavengableNMethods::unregister_nmethod(nm);
 }
 
-void ParallelScavengeHeap::verify_nmethod(nmethod* nm) {
+void ParallelScavengeHeap::verify_nmethod(CompiledMethod* nm) {
   ScavengableNMethods::verify_nmethod(nm);
 }
 

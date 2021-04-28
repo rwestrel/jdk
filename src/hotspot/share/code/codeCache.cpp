@@ -22,6 +22,9 @@
  *
  */
 
+#include <classfile/symbolTable.hpp>
+#include <classfile/systemDictionary.hpp>
+#include <opto/runtime.hpp>
 #include "precompiled.hpp"
 #include "code/codeBlob.hpp"
 #include "code/codeCache.hpp"
@@ -75,6 +78,8 @@
 #include "opto/c2compiler.hpp"
 #include "opto/compile.hpp"
 #include "opto/node.hpp"
+#include "vtableStubs.hpp"
+
 #endif
 
 // Helper class for printing in CodeCache
@@ -415,7 +420,7 @@ int CodeCache::code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs) {
 }
 
 void CodeCache::add_heap(CodeHeap* heap) {
-  assert(!Universe::is_fully_initialized(), "late heap addition?");
+//  assert(!Universe::is_fully_initialized(), "late heap addition?");
 
   _heaps->insert_sorted<code_heap_compare>(heap);
 
@@ -499,7 +504,7 @@ CodeBlob* CodeCache::first_blob(CodeBlobType code_blob_type) {
 CodeBlob* CodeCache::next_blob(CodeHeap* heap, CodeBlob* cb) {
   assert_locked_or_safepoint(CodeCache_lock);
   assert(heap != nullptr, "heap is null");
-  return (CodeBlob*)heap->next(cb);
+  return (CodeBlob*)heap->next(cb->code_begin());
 }
 
 /**
@@ -643,7 +648,7 @@ bool CodeCache::contains(void *p) {
   return false;
 }
 
-bool CodeCache::contains(nmethod *nm) {
+bool CodeCache::contains(CompiledMethod *nm) {
   return contains((void *)nm);
 }
 
@@ -664,6 +669,12 @@ nmethod* CodeCache::find_nmethod(void* start) {
   CodeBlob* cb = find_blob(start);
   assert(cb->is_nmethod(), "did not find an nmethod");
   return (nmethod*)cb;
+}
+
+LeydenNMethod* CodeCache::find_leyden_nmethod(void* start) {
+  CodeBlob* cb = find_blob(start);
+  assert(cb->is_leyden_nmethod(), "did not find an nmethod");
+  return (LeydenNMethod*)cb;
 }
 
 void CodeCache::blobs_do(void f(CodeBlob* nm)) {
@@ -1866,4 +1877,1428 @@ void CodeCache::print_names(outputStream *out) {
     CodeHeapState::print_names(out, (*heap));
   }
 }
+
+struct Vtables {
+  intptr_t nmethod;
+  intptr_t bufferblob;
+  intptr_t runtimestub;
+  intptr_t adapterblob;
+  intptr_t exceptionblob;
+  intptr_t methodhandlesadapterblob;
+  intptr_t safepointblob;
+  intptr_t uncommontrapblob;
+  intptr_t deoptimizationblob;
+  intptr_t vtableblob;
+};
+
+struct VtableSymbols {
+  int LeydenNMethod;
+  int bufferblob;
+  int runtimestub;
+  int adapterblob;
+  int exceptionblob;
+  int methodhandlesadapterblob;
+  int safepointblob;
+  int uncommontrapblob;
+  int deoptimizationblob;
+  int vtableblob;
+};
+
+struct PerMethod {
+  intptr_t _from_interpreted_entry;
+};
+
+enum MetadataRecord {
+  METHOD_RECORD = 0,
+  KLASS_RECORD = 1,
+};
+
+static char metadata_record_values[] = { METHOD_RECORD, KLASS_RECORD};
+
+enum RuntimeCallLib {
+  LIBJVM = 1,
+  LIBJAVA = 2,
+  CODECACHE = 3,
+};
+
+enum OopRecord {
+  STRING_RECORD = 0,
+  CLASS_RECORD = 1,
+  CLASSLOADER_RECORD = 2,
+  NPE_RECORD = 3,
+  ASE_RECORD = 4,
+  AE_RECORD = 5,
+  CCE_RECORD = 6,
+};
+
+static char oop_record_values[] { STRING_RECORD, CLASS_RECORD, CLASSLOADER_RECORD, NPE_RECORD, ASE_RECORD, AE_RECORD, CCE_RECORD };
+
+#include "code/scopeDesc.hpp"
+#include <libelf.h>
+
+static void push_array(GrowableArray<char> &array, const char* string) {
+  for (size_t i = 0; i <= strlen(string); i++) {
+    array.push(string[i]);
+  }
+}
+
+static int add_external_symbol(address addr, GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbols, int &offset) {
+  char func_name[256];
+
+  bool success = os::dll_address_to_function_name(addr, func_name, sizeof(func_name), &offset, false);
+  assert(success, "");
+
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, func_name);
+  sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_NOTYPE);
+  sym.st_other = 0;
+  sym.st_shndx = SHN_UNDEF;
+  sym.st_value = 0;
+  sym.st_size = 0;
+  int res = symbols.length();
+  symbols.push(sym);
+  return res;
+}
+
+int64_t record_metadata_type(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, MetadataRecord record) {
+  Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
+  codeblobsro_data->d_buf = &metadata_record_values[record];
+  assert(metadata_record_values[record] == record, "");
+  codeblobsro_data->d_type = ELF_T_BYTE;
+  codeblobsro_data->d_size = 1;
+  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+  codeblobsro_data->d_align = 1;
+  codeblobsro_data->d_version = EV_CURRENT;
+  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+  return codeblobsro_data->d_off;
+}
+
+int64_t record_oop_type(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, OopRecord record) {
+  Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
+  codeblobsro_data->d_buf = &oop_record_values[record];
+  assert(oop_record_values[record] == record, "");
+  codeblobsro_data->d_type = ELF_T_BYTE;
+  codeblobsro_data->d_size = 1;
+  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+  codeblobsro_data->d_align = 1;
+  codeblobsro_data->d_version = EV_CURRENT;
+  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+  return codeblobsro_data->d_off;
+}
+
+int64_t record_string(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const char* str) {
+  Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
+  codeblobsro_data->d_buf = (void*) str;
+  codeblobsro_data->d_type = ELF_T_BYTE;
+  codeblobsro_data->d_size = strlen(str) + 1;
+  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+  codeblobsro_data->d_align = 1;
+  codeblobsro_data->d_version = EV_CURRENT;
+  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+  return codeblobsro_data->d_off;
+}
+
+int64_t record_klass(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const Klass* k) {
+  const char* str = k->name()->as_C_string();
+  return record_string(codeblobsro_section, codeblobsro_hdr, str);
+}
+
+int64_t record_method(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const Method* m) {
+  int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, m->method_holder());
+
+  const char* str = m->name()->as_quoted_ascii();
+  record_string(codeblobsro_section, codeblobsro_hdr, str);
+  str = m->signature()->as_quoted_ascii();
+  record_string(codeblobsro_section, codeblobsro_hdr, str);
+
+  return off;
+}
+
+int64_t record_class_object(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, oop o) {
+  Klass* k = java_lang_Class::as_Klass(o);
+  return record_klass(codeblobsro_section, codeblobsro_hdr, k);
+}
+
+int64_t record_string_object(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, oop o) {
+  const char* str = java_lang_String::as_utf8_string(o);
+  return record_string(codeblobsro_section, codeblobsro_hdr, str);
+}
+
+
+Klass* restore_klass(const char* ptr, JavaThread* thread) {
+  const char* klass_name = ptr;
+  Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
+  Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
+                                               Handle(), true, thread);
+  assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+  return k;
+}
+
+Method* restore_method(const char* ptr, JavaThread* thread) {
+  Klass* k = restore_klass(ptr, thread);
+
+  const char* method_name = ptr + strlen(ptr) + 1;
+  Symbol* method_sym = SymbolTable::new_symbol(method_name);
+
+  const char* signature = method_name + strlen(method_name) + 1;
+  Symbol* signature_sym = SymbolTable::new_symbol(signature);
+
+  Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
+  return m;
+}
+
+static void
+add_elf_section(Elf* elf, GrowableArray<char> &shstrings, Elf_Scn*& section, Elf64_Shdr*& hdr, const char* name, int flags) {
+  section= elf_newscn(elf);
+  hdr= elf64_getshdr(section);
+  assert(section != NULL, "");
+  assert(hdr != NULL, "");
+
+  push_array(shstrings, "");
+  hdr->sh_name = shstrings.length();
+  push_array(shstrings, name);
+  hdr->sh_type = SHT_PROGBITS;
+  hdr->sh_flags = SHF_ALLOC | flags;
+  hdr->sh_addr = 0;
+  hdr->sh_offset = 0;
+  hdr->sh_entsize = 0;
+  hdr->sh_addralign = os::vm_page_size();
+}
+
+
+static int add_section_symbol(GrowableArray<Elf64_Sym>& symbols, Elf_Scn* section, GrowableArray<char>& strings,
+                              const char* name) {
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, name);
+  sym.st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
+  sym.st_other = 0;
+  sym.st_shndx = elf_ndxscn(section);
+  sym.st_value = 0;
+  sym.st_size = 0;
+  int sym_id = symbols.length();
+  symbols.push(sym);
+  return sym_id;
+}
+
+static void add_relocation(unsigned long offset, int64_t addend, int sym, GrowableArray<Elf64_Rela> &relocs) {
+  Elf64_Rela reloc;
+  reloc.r_offset = offset;
+  reloc.r_addend = addend;
+  reloc.r_info = ELF64_R_INFO(sym, R_X86_64_64);
+  relocs.push(reloc);
+}
+
+static Elf_Data* new_data(Elf_Scn* section, void* buf, unsigned long size) {
+  Elf64_Shdr* hdr = elf64_getshdr(section);
+  Elf_Data* data = elf_newdata(section);
+  data->d_buf = buf;
+  data->d_type = ELF_T_BYTE;
+  data->d_size = size;
+  data->d_off = hdr->sh_size;
+  data->d_align = 1;
+  data->d_version = EV_CURRENT;
+  hdr->sh_size += data->d_size;
+  return data;
+}
+
+static int add_global_symbol(GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbols, Elf_Scn* section,
+                             const char* name, int kind, int64_t value, size_t size) {
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, name);
+  sym.st_info = ELF64_ST_INFO(STB_GLOBAL, kind);
+  sym.st_other = 0;
+  sym.st_shndx = elf_ndxscn(section);
+  sym.st_value = value;
+  sym.st_size = size;
+  int sym_id = symbols.length();
+  symbols.push(sym);
+  return sym_id;
+}
+
+static void add_relocation_section(Elf* elf, GrowableArray<char> &shstrings, const GrowableArray<Elf64_Rela> &relocs,
+                                   Elf_Scn* section, Elf_Scn* symbol_section, const char* name) {
+  Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
+  assert(codeblobs_rela_section != NULL, "");
+  Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
+  assert(codeblobs_rela_hdr != NULL, "");
+
+  codeblobs_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, name);
+  codeblobs_rela_hdr->sh_type = SHT_RELA;
+  codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
+  codeblobs_rela_hdr->sh_addr = 0;
+  codeblobs_rela_hdr->sh_offset = 0;
+  codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  codeblobs_rela_hdr->sh_addralign = 8;
+  codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  codeblobs_rela_hdr->sh_info = elf_ndxscn(section);
+  codeblobs_rela_hdr->sh_size = relocs.length();
+
+  Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
+  codeblobs_rela_data->d_buf = relocs.adr_at(0);
+  codeblobs_rela_data->d_type = ELF_T_RELA;
+  codeblobs_rela_data->d_size = relocs.length() * sizeof(Elf64_Rela);
+  codeblobs_rela_data->d_off = 0;
+  codeblobs_rela_data->d_align = 8;
+  codeblobs_rela_data->d_version = EV_CURRENT;
+}
+
+
+static Elf_Scn* add_string_section(Elf* elf, const GrowableArray<char> &strings, GrowableArray<char> &shstrings) {
+  Elf_Scn* string_section = elf_newscn(elf);
+  assert(string_section != NULL, "");
+  Elf64_Shdr* string_hdr = elf64_getshdr(string_section);
+  assert(string_hdr != NULL, "");
+
+  string_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".strtab");
+  string_hdr->sh_type = SHT_STRTAB;
+  string_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  string_hdr->sh_addr = 0;
+  string_hdr->sh_offset = 0;
+  string_hdr->sh_entsize = 0;
+  string_hdr->sh_addralign = 1;
+  string_hdr->sh_size = strings.length();
+
+  Elf_Data* string_data = new_data(string_section, strings.adr_at(0), strings.length());
+
+  return string_section;
+}
+
+
+static Elf_Scn* add_symbol_section(Elf* elf, const GrowableArray<Elf64_Sym> &symbols, int local_sym, Elf_Scn* string_section,
+                                   GrowableArray<char> &shstrings) {
+  Elf_Scn* symbol_section = elf_newscn(elf);
+  assert(symbol_section != NULL, "");
+  Elf64_Shdr* symbol_hdr = elf64_getshdr(symbol_section);
+  assert(symbol_hdr != NULL, "");
+
+  symbol_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".symtab");
+  symbol_hdr->sh_type = SHT_SYMTAB;
+  symbol_hdr->sh_flags = 0;
+  symbol_hdr->sh_addr = 0;
+  symbol_hdr->sh_offset = 0;
+  symbol_hdr->sh_entsize = sizeof(Elf64_Sym);
+  symbol_hdr->sh_addralign = 8;
+  symbol_hdr->sh_size = symbols.length();
+
+  Elf_Data* symbol_data = new_data(symbol_section, symbols.adr_at(0), symbols.length() * sizeof(Elf64_Sym));
+
+  symbol_hdr->sh_link = elf_ndxscn(string_section);
+  symbol_hdr->sh_info = local_sym;
+  return symbol_section;
+}
+
+
+static void add_shstring_section(Elf* elf, Elf64_Ehdr* ehdr, GrowableArray<char> &shstrings) {
+  Elf_Scn* shstring_section = elf_newscn(elf);
+  assert(shstring_section != NULL, "");
+  Elf64_Shdr* shstring_hdr = elf64_getshdr(shstring_section);
+  assert(shstring_hdr != NULL, "");
+
+  shstring_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".shstrtab");
+  shstring_hdr->sh_type = SHT_STRTAB;
+  shstring_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  shstring_hdr->sh_addr = 0;
+  shstring_hdr->sh_offset = 0;
+  shstring_hdr->sh_entsize = 0;
+  shstring_hdr->sh_addralign = 1;
+  shstring_hdr->sh_size = shstrings.length();
+
+  Elf_Data* shstring_data = elf_newdata(shstring_section);
+  shstring_data->d_buf = shstrings.adr_at(0);
+  shstring_data->d_type = ELF_T_BYTE;
+  shstring_data->d_size = shstrings.length();
+  shstring_data->d_off = 0;
+  shstring_data->d_align = 1;
+  shstring_data->d_version = EV_CURRENT;
+
+  ehdr->e_shstrndx = elf_ndxscn(shstring_section);
+}
+
+class CodeBlobEntry : public HashtableEntry<CodeBlob*, mtLeyden> {
+  friend class CodeBlobHashtable;
+
+private:
+  uint _symbol_index;
+  long _offset;
+  long _from_interpreted_entry_off;
+
+public:
+
+  CodeBlobEntry* next() const {
+    return (CodeBlobEntry*)HashtableEntry<CodeBlob*, mtLeyden>::next();
+  }
+
+  uint symbol_index() const {
+    return _symbol_index;
+  }
+
+  long offset() const {
+    return _offset;
+  }
+
+  long from_interpreted_entry_off() const {
+    return  _from_interpreted_entry_off;
+  }
+};
+
+class CodeBlobHashtable : public Hashtable<CodeBlob*, mtLeyden> {
+private:
+  unsigned int compute_hash(CodeBlob* cb) {
+    uintptr_t hash = (uintptr_t)cb;
+    return hash ^ (hash >> 7); // code heap blocks are 128byte aligned
+  }
+
+  CodeBlobEntry* bucket(int i) const {
+    return (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::bucket(i);
+  }
+
+  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index, long offset, long from_interpreted_entry_off) {
+    assert(offset > 0, "");
+    unsigned int hash = compute_hash(cb);
+    CodeBlobEntry* entry = (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::new_entry(hash, cb);
+    entry->_symbol_index = symbol_index;
+    entry->_offset = offset;
+    entry->_from_interpreted_entry_off = from_interpreted_entry_off;
+    return entry;
+  }
+
+public:
+  CodeBlobHashtable(int table_size) : Hashtable<CodeBlob*, mtLeyden>(table_size, sizeof(CodeBlobEntry)) {
+  }
+
+  bool add(CodeBlob* cb, int symbol_index, long offset, long from_interpreted_entry_off) {
+    CodeBlobEntry* e = find(cb);
+    if (e == NULL) {
+      CodeBlobEntry* e = new_entry(cb, symbol_index, offset, from_interpreted_entry_off);
+      int index = hash_to_index(e->hash());
+      add_entry(index, e);
+      return false;
+    }
+    return true;
+  }
+
+  CodeBlobEntry* find(CodeBlob* cb) {
+    int index = hash_to_index(compute_hash(cb));
+    for (CodeBlobEntry* e = bucket(index); e != NULL; e = e->next()) {
+      if (e->literal() == cb) {
+        return e;
+      }
+    }
+    return NULL;
+  }
+};
+
+static const char* codeblob_code_symbol(CodeBlob* cb) {
+  const char* name;
+  if (cb->is_nmethod()) {
+    name = cb->as_nmethod()->method()->external_name();
+  } else {
+    stringStream ss;
+    ss.print("%s:%p", cb->name(), cb);
+    name = ss.as_string();
+  }
+  return name;
+}
+
+static const char* codeblob_obj_symbol(CodeBlob* cb) {
+  const char* name;
+  if (cb->is_nmethod()) {
+    stringStream ss;
+    ss.print("%s-nmethod", cb->as_nmethod()->method()->external_name());
+    name = ss.as_string();
+  } else {
+    stringStream ss;
+    ss.print("%s:%p-nmethod", cb->name(), cb);
+    name = ss.as_string();
+  }
+  return name;
+}
+
+static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<Elf64_Rela> &text_relocs, int text_sym,
+                                  CodeBlob* caller, CodeBlob* callee, address call_addr, address dest, long addend,
+                                  Assembler::WhichOperand format) {
+  CodeBlobEntry* callee_data = codeblobs.find(callee);
+  assert(callee_data != NULL, "");
+  CodeBlobEntry* caller_data = codeblobs.find(caller);
+  assert(caller_data != NULL, "");
+//  NativeInstruction* ni = nativeInstruction_at(call_addr);
+//  assert(ni->is_call() || ni->is_jump() || ni->is_cond_jump(), "");
+//  Assembler::WhichOperand operand = Assembler::call32_operand;
+
+  Elf64_Rela reloc;
+  long displacement_offset = Assembler::locate_operand(call_addr, format) - call_addr;
+  long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
+  assert(call_offset > 0, "outside the code cache?");
+  reloc.r_offset = call_offset + displacement_offset;
+  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
+  reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_PC32);
+  text_relocs.push(reloc);
+}
+
+
+//JNIEXPORT uint8_t* card_table_base;
+
+void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread) {
+  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+
+  CodeBlobHashtable codeblobs(heap->blob_count() / 3 * 4);
+
+  bool has_compiledicholders = false;
+  bool has_oopmaps = false;
+  FOR_ALL_BLOBS(cb, heap) {
+    if (cb->is_nmethod()) {
+      RelocIterator iter(cb);
+      nmethod* nm = cb->as_nmethod();
+      while (iter.next()) {
+        if (iter.type() == relocInfo::virtual_call_type) {
+          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          address entry;
+          if (virtual_call_entry_and_holder(thread, iter, nm, entry, NULL)) {
+            has_compiledicholders |= VtableStubs::entry_point(entry)->is_itable_stub();
+          }
+        }
+      }
+    }
+    if (cb->oop_maps() != NULL) {
+      has_oopmaps = true;
+    }
+  }
+
+  if (elf_version(EV_CURRENT) == EV_NONE) {
+    ShouldNotReachHere();
+  }
+  stringStream ss;
+  ss.print("%s.o", CodeFileName);
+
+  int fd = open(ss.as_string(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  assert(fd > 0, "");
+
+  Elf* elf = elf_begin(fd, ELF_C_WRITE, (Elf *)0);
+  assert(elf != NULL, "");
+
+  Elf64_Ehdr* ehdr = elf64_newehdr(elf);
+  assert(ehdr != NULL, "");
+
+  ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+  ehdr->e_type = ET_REL;
+  ehdr->e_machine = EM_X86_64;
+  ehdr->e_version = EV_CURRENT;
+
+  GrowableArray<char> shstrings;
+  GrowableArray<char> strings;
+  GrowableArray<Elf64_Sym> symbols;
+  GrowableArray<Elf64_Rela> codeblobs_relocs;
+  GrowableArray<Elf64_Rela> codeblobsro_relocs;
+  GrowableArray<Elf64_Rela> text_relocs;
+  GrowableArray<Elf64_Rela> codecache_relocs;
+  GrowableArray<Elf64_Rela> compiledicholders_relocs;
+
+  Elf_Scn* text_section;
+  Elf64_Shdr* text_hdr;
+  add_elf_section(elf, shstrings, text_section, text_hdr, ".text", SHF_EXECINSTR);
+
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, "");
+  sym.st_info = 0;		/* Symbol type and binding */
+  sym.st_other =0 ;		/* Symbol visibility */
+  sym.st_shndx = SHN_UNDEF;		/* Section index */
+  sym.st_value = 0;		/* Symbol value */
+  sym.st_size = 0;		/* Symbol size */
+  symbols.push(sym);
+
+  Elf_Scn* codeblobs_section;
+  Elf64_Shdr* codeblobs_hdr;
+  add_elf_section(elf, shstrings, codeblobs_section, codeblobs_hdr, ".codeblobs", SHF_WRITE);
+
+  Elf_Scn* codeblobsro_section;
+  Elf64_Shdr* codeblobsro_hdr;
+  add_elf_section(elf, shstrings, codeblobsro_section, codeblobsro_hdr, ".codeblobsro", 0);
+
+  Elf_Scn* codecache_section;
+  Elf64_Shdr* codecache_hdr;
+  add_elf_section(elf, shstrings, codecache_section, codecache_hdr, ".codecache", 0);
+
+  int codeblobsro_sym = add_section_symbol(symbols, codeblobsro_section, strings, ".codeblobsro");
+  int codeblobs_sym = add_section_symbol(symbols, codeblobs_section, strings, ".codeblobs");
+  int text_sym = add_section_symbol(symbols, text_section, strings, ".text");
+  int codecache_sym = add_section_symbol(symbols, codecache_section, strings, ".codecache");
+
+  Elf_Scn* compiledicholders_section = NULL;
+  Elf64_Shdr* compiledicholders_hdr = NULL;
+  int compiledicholders_sym;
+
+  if (has_compiledicholders) {
+    add_elf_section(elf, shstrings, compiledicholders_section, compiledicholders_hdr, ".compiledicholders", SHF_WRITE);
+    compiledicholders_sym = add_section_symbol(symbols, compiledicholders_section, strings, ".compiledicholders");
+  }
+
+  Elf_Scn* oopmaps_section = NULL;
+  Elf64_Shdr* oopmaps_hdr = NULL;
+  int oopmaps_sym;
+
+  if (has_oopmaps) {
+    add_elf_section(elf, shstrings, oopmaps_section, oopmaps_hdr, ".oopmaps", 0);
+    oopmaps_sym = add_section_symbol(symbols, oopmaps_section, strings, ".oopmaps");
+  }
+
+  int local_sym = symbols.length();
+
+  Vtables vts;
+  VtableSymbols vt_syms;
+  int vt_offset;
+  {
+    nmethod nm;
+    vts.nmethod = *(intptr_t*)&nm;
+    LeydenNMethod lnm;
+    vt_syms.LeydenNMethod = add_external_symbol((address)*(intptr_t*)&lnm, strings, symbols, vt_offset);
+
+    int offset = -1;
+    BufferBlob bb;
+    vts.bufferblob = *(intptr_t*)&bb;
+    vt_syms.bufferblob = add_external_symbol((address)vts.bufferblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    RuntimeStub rs;
+    vts.runtimestub = *(intptr_t*)&rs;
+    vt_syms.runtimestub = add_external_symbol((address)vts.runtimestub, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    AdapterBlob ab;
+    vts.adapterblob = *(intptr_t*)&ab;
+    vt_syms.adapterblob = add_external_symbol((address)vts.adapterblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    ExceptionBlob eb;
+    vts.exceptionblob = *(intptr_t*)&eb;
+    vt_syms.exceptionblob = add_external_symbol((address)vts.exceptionblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    MethodHandlesAdapterBlob mhab;
+    vts.methodhandlesadapterblob = *(intptr_t*)&mhab;
+    vt_syms.methodhandlesadapterblob = add_external_symbol((address)vts.methodhandlesadapterblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    SafepointBlob sb;
+    vts.safepointblob = *(intptr_t*)&sb;
+    vt_syms.safepointblob = add_external_symbol((address)vts.safepointblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    UncommonTrapBlob utb;
+    vts.uncommontrapblob = *(intptr_t*)&utb;
+    vt_syms.uncommontrapblob = add_external_symbol((address)vts.uncommontrapblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    DeoptimizationBlob db;
+    vts.deoptimizationblob = *(intptr_t*)&db;
+    vt_syms.deoptimizationblob = add_external_symbol((address)vts.deoptimizationblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+
+    VtableBlob vb;
+    vts.vtableblob = *(intptr_t*)&vb;
+    vt_syms.vtableblob = add_external_symbol((address)vts.vtableblob, strings, symbols, offset);
+    assert(offset == vt_offset, "");
+  }
+
+  int nb = loaded_klasses->length();
+  {
+    assert(nb >= 1, "");
+    Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &nb, sizeof(nb));
+
+    add_global_symbol(strings, symbols, codeblobsro_section, "leydenLoadedKlasses", STT_OBJECT,
+                      codeblobsro_data->d_off, codeblobsro_data->d_size);
+
+    for (int i = 0; i < nb; i++) {
+      record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*)loaded_klasses->at(i));
+    }
+  }
+
+  GrowableArray<char> segmap_clone(2, 0, CodeHeap::free_sentinel);
+
+  size_t current_segment = 0;
+  bool success = true;
+  FOR_ALL_BLOBS(cb, heap) {
+    intptr_t vtbl = *(intptr_t*) cb;
+    if (vtbl != vts.nmethod &&
+        vtbl != vts.bufferblob &&
+        vtbl != vts.runtimestub &&
+        vtbl != vts.adapterblob &&
+        vtbl != vts.exceptionblob &&
+        vtbl != vts.methodhandlesadapterblob &&
+        vtbl != vts.safepointblob &&
+        vtbl != vts.uncommontrapblob &&
+        vtbl != vts.deoptimizationblob &&
+        vtbl != vts.vtableblob &&
+        true
+            ) {
+      ShouldNotReachHere();
+    }
+
+    int vtbl_sym;
+    if (vtbl == vts.nmethod) {
+      vtbl_sym = vt_syms.LeydenNMethod;
+    } else if (vtbl == vts.bufferblob) {
+      vtbl_sym = vt_syms.bufferblob;
+    } else if (vtbl == vts.runtimestub) {
+      vtbl_sym = vt_syms.runtimestub;
+    } else if (vtbl == vts.adapterblob) {
+      vtbl_sym = vt_syms.adapterblob;
+    } else if (vtbl == vts.exceptionblob) {
+      vtbl_sym = vt_syms.exceptionblob;
+    } else if (vtbl == vts.methodhandlesadapterblob) {
+      vtbl_sym = vt_syms.methodhandlesadapterblob;
+    } else if (vtbl == vts.safepointblob) {
+      vtbl_sym = vt_syms.safepointblob;
+    } else if (vtbl == vts.uncommontrapblob) {
+      vtbl_sym = vt_syms.uncommontrapblob;
+    } else if (vtbl == vts.deoptimizationblob) {
+      vtbl_sym = vt_syms.deoptimizationblob;
+    } else if (vtbl == vts.vtableblob) {
+      vtbl_sym = vt_syms.vtableblob;
+    } else {
+      ShouldNotReachHere();
+    }
+
+    assert(cb->is_nmethod() || cb->data_end() == cb->code_end(), "");
+
+    int size = cb->code_size() + CodeEntryAlignment;
+    size_t segments = heap->size_to_segments(size);
+    size_t actual_size = heap->segments_to_size(segments);
+
+    segmap_clone.at_put_grow(current_segment, 0);
+    for (size_t i = 1; i < segments; i++) {
+      segmap_clone.at_put_grow(current_segment + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
+    }
+    current_segment += segments;
+
+
+    Elf_Data* text_data = new_data(text_section, cb->code_begin() - CodeEntryAlignment, actual_size);
+
+    long code_offset = text_data->d_off + CodeEntryAlignment;
+
+    int sym_id;
+    long from_interpreted_entry_off = -1;
+
+    {
+      const char* name = codeblob_code_symbol(cb);
+
+      sym_id = add_global_symbol(strings, symbols, text_section, name, STT_FUNC, code_offset, cb->code_size());
+    }
+
+    {
+//      CodeBlob* next_cb = next_blob(heap, cb);
+//      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
+
+      int size = cb->code_begin() - (address)cb;
+      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, size);
+      if (cb->is_nmethod()) {
+        int extra_size = cb->data_end() - cb->code_end();
+        Elf_Data* codeblobs_data_end = new_data(codeblobs_section, cb->code_end(), extra_size);
+        size += extra_size;
+      }
+
+      const char* name = codeblob_obj_symbol(cb);
+
+      add_global_symbol(strings, symbols, codeblobs_section, name, STT_OBJECT, codeblobs_data->d_off, size);
+
+      add_relocation(codeblobs_data->d_off, vt_offset, vtbl_sym, codeblobs_relocs);
+      // pointer in text section to CodeBlob object
+      add_relocation(text_data->d_off, codeblobs_data->d_off, codeblobs_sym, text_relocs);
+
+      Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*)cb->_name, strlen(cb->_name) + 1);
+
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _name), codeblobsro_data->d_off, codeblobsro_sym,
+                     codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_begin), code_offset, text_sym,
+                     codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_end), code_offset + cb->code_size(),
+                     text_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _old_code_begin),
+                     codeblobs_data->d_off + (cb->_old_code_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _old_code_end),
+                     codeblobs_data->d_off + (cb->_old_code_end - (address) cb), codeblobs_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _content_begin),
+                     codeblobs_data->d_off + (cb->_content_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _data_end),
+                     codeblobs_data->d_off + (cb->_data_end - (address) cb) - cb->code_size(), codeblobs_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _relocation_begin),
+                     codeblobs_data->d_off + (cb->_relocation_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _relocation_end),
+                     codeblobs_data->d_off + (cb->_relocation_end - (address) cb), codeblobs_sym, codeblobs_relocs);
+
+      {
+        RelocIterator iter(cb);
+        address base_addr = NULL;
+        while (iter.next()) {
+          if (iter.type() == relocInfo::runtime_call_type) {
+            runtime_call_Relocation* r = iter.runtime_call_reloc();
+            address dest = r->destination();
+            if (dest != (address) -1) {
+              if (heap->contains(dest)) {
+                CodeBlob* callee = CodeCache::find_blob(dest);
+                NativeInstruction* ni = nativeInstruction_at(r->addr());
+                if (ni->is_mov_literal64()) {
+//                  add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
+//                                 dest - (address) heap->low(), text_sym, text_relocs);
+                } else if (ni->is_call()) {
+//                  add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(), dest - callee->code_begin());
+                } else {
+
+                }
+              } else {
+                static address to_skip[] = {
+                        (address) SharedRuntime::handle_wrong_method,
+                        (address) SharedRuntime::fixup_callers_callsite,
+                        (address) SharedRuntime::handle_wrong_method_abstract,
+                        (address) SharedRuntime::handle_wrong_method_ic_miss,
+                        (address) SharedRuntime::resolve_opt_virtual_call_C,
+                        (address) SharedRuntime::resolve_virtual_call_C,
+                        (address)SharedRuntime::resolve_static_call_C,
+                        (address)Deoptimization::fetch_unroll_info,
+                        (address)Deoptimization::unpack_frames,
+                        (address)Deoptimization::uncommon_trap
+                };
+                bool skip = false;
+                for (uint i = 0; i < sizeof(to_skip) / sizeof(to_skip[0]); i++) {
+                  if (dest == to_skip[i]) {
+                    skip = true;
+                    break;
+                  }
+                }
+                if (!skip) {
+                  int offset;
+                  int sym = add_external_symbol(dest, strings, symbols, offset);
+                  assert(offset == 0, "");
+
+                  add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset, offset, sym, text_relocs);
+                }
+              }
+            }
+          } else if (iter.type() == relocInfo::internal_word_type) {
+            internal_word_Relocation* r = iter.internal_word_reloc();
+            assert(cb->code_contains(r->target()), "");
+            add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset,
+                           (r->target() - cb->code_begin()) + code_offset, text_sym, text_relocs);
+          } else if (iter.type() == relocInfo::section_word_type) {
+            section_word_Relocation* r = iter.section_word_reloc();
+            assert(!cb->code_contains(r->target()), "");
+            add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset,
+                           (r->target() - (address)cb) + codeblobs_data->d_off, codeblobs_sym, text_relocs);
+          } else if (iter.type() == relocInfo::card_mark_word_type) {
+//            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
+//            add_relocation((address)r->pd_address_in_code() - (address)heap->low(), 0, card_table_base_sym, text_relocs);
+          }
+        }
+      }
+
+      ImmutableOopMapSet* oopmaps = cb->oop_maps();
+      if (oopmaps != NULL) {
+        Elf_Data* oopmaps_data = new_data(oopmaps_section, oopmaps, oopmaps->nr_of_bytes());
+        add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _oop_maps), oopmaps_data->d_off, oopmaps_sym, codeblobs_relocs);
+      }
+      if (cb->is_nmethod()) {
+        nmethod* nm = cb->as_nmethod();
+        assert((nm->_scopes_data_begin - (address)cb) - cb->code_size() > 0, "");
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _scopes_data_begin), codeblobs_data->d_off + (nm->_scopes_data_begin - (address)cb) - cb->code_size(), codeblobs_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _entry_point), code_offset + (nm->_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _verified_entry_point), code_offset + (nm->_verified_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _osr_entry_point), code_offset + (nm->_osr_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+
+        {
+          Method* m = nm->method();
+
+          int64_t off = record_method(codeblobsro_section, codeblobsro_hdr, m);
+
+          add_relocation(codeblobs_data->d_off + offset_of(nmethod, _method), off, codeblobsro_sym, codeblobs_relocs);
+        }
+        {
+          static intptr_t from_interpreted_entry;
+          Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &from_interpreted_entry, sizeof(from_interpreted_entry));
+          from_interpreted_entry_off = codeblobsro_data->d_off;
+//          add_relocation(codeblobsro_data->d_off, nm->method()->_from_interpreted_entry - (address)heap->low(), text_sym, codeblobsro_relocs);
+        }
+        for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
+          oop o = *ptr;
+          int64_t off;
+          if (o->is_a(vmClasses::String_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, STRING_RECORD);
+            record_string_object(codeblobsro_section, codeblobsro_hdr, o);
+          } else if (o->is_a(vmClasses::Class_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASS_RECORD);
+            record_class_object(codeblobsro_section, codeblobsro_hdr, o);
+          } else if (o == SystemDictionary::java_system_loader()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASSLOADER_RECORD);
+          } else if (o == Universe::null_ptr_exception_instance()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, NPE_RECORD);
+          } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, ASE_RECORD);
+          } else if (o == Universe::arithmetic_exception_instance()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, AE_RECORD);
+          } else if (o->is_a(vmClasses::ClassCastException_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CCE_RECORD);
+          } else {
+            o->print();
+            ShouldNotReachHere();
+          }
+
+          assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+          add_relocation(codeblobs_data->d_off + ((address)ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
+        }
+
+        {
+          RelocIterator iter(nm);
+          while (iter.next()) {
+            switch (iter.type()) {
+              case relocInfo::metadata_type: {
+                metadata_Relocation* r = iter.metadata_reloc();
+                Metadata* md = r->metadata_value();
+                assert(!nm->consts_contains(iter.addr()) || *(Metadata**)iter.addr() == md, "");
+                if (md != NULL) {
+                  assert(!nm->code_contains(iter.addr()), "");
+                  int64_t off;
+                  if (md->is_klass()) {
+                    off = record_metadata_type(codeblobsro_section, codeblobsro_hdr, KLASS_RECORD);
+                    record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*)md);
+                  } else if (md->is_method()) {
+                    off = record_metadata_type(codeblobsro_section, codeblobsro_hdr, METHOD_RECORD);
+                    record_method(codeblobsro_section, codeblobsro_hdr, (Method*)md);
+                  } else {
+                    ShouldNotReachHere();
+                  }
+
+                  Metadata** ptr = r->metadata_addr();
+                  assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+                  add_relocation(codeblobs_data->d_off + ((address) ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
+                }
+                break;
+              }
+              case relocInfo::oop_type: {
+                oop_Relocation* r = iter.oop_reloc();
+                oop o = r->oop_value();
+                assert(!nm->code_contains(iter.addr()), "");
+                int64_t off;
+                if (o->is_a(vmClasses::String_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, STRING_RECORD);
+                  record_string_object(codeblobsro_section, codeblobsro_hdr, o);
+                } else if (o->is_a(vmClasses::Class_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASS_RECORD);
+                  record_class_object(codeblobsro_section, codeblobsro_hdr, o);
+                } else if (o == SystemDictionary::java_system_loader()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASSLOADER_RECORD);
+                } else if (o == Universe::null_ptr_exception_instance()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, NPE_RECORD);
+                } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, ASE_RECORD);
+                } else if (o == Universe::arithmetic_exception_instance()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, AE_RECORD);
+                } else if (o->is_a(vmClasses::ClassCastException_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CCE_RECORD);
+                } else {
+                  o->print();
+                  ShouldNotReachHere();
+                }
+                oop* ptr = r->oop_addr();
+                assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+                add_relocation(codeblobs_data->d_off + ((address) ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
+                break;
+              }
+              case relocInfo::runtime_call_w_cp_type:
+                ShouldNotReachHere();
+              case relocInfo::virtual_call_type: {
+                MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+                address entry;
+                CompiledICHolder* holder;
+                if (virtual_call_entry_and_holder(thread, iter, nm, entry, &holder) && holder != NULL) {
+                  Elf_Data* compiledicholders_data = new_data(compiledicholders_section, holder, sizeof(*holder));
+
+                  NativeCall* call = nativeCall_at(iter.addr());
+                  NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
+                  NativeMovConstReg* load = (NativeMovConstReg*)call_wrapper->get_load_instruction(iter.virtual_call_reloc());
+
+                  add_relocation((load->data_addr() - nm->code_begin()) + code_offset, compiledicholders_data->d_off, compiledicholders_sym, text_relocs);
+//                  address ptr = load->data_addr();
+//                  add_relocation(codeblobs_data->d_off + (ptr - (address)nm) , compiledicholders_data->d_off, compiledicholders_sym, codeblobs_relocs);
+                  {
+                    assert(!holder->_is_metadata_method, "");
+                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
+
+                    add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass), off, codeblobsro_sym, compiledicholders_relocs);
+                  }
+//                  {
+//                    assert(!holder->_is_metadata_method, "");
+//                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
+//
+//
+//                    add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass), off, codeblobsro_sym, compiledicholders_relocs);
+//                  }
+
+                  {
+                    assert(holder->holder_metadata()->is_klass(), "");
+                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*) holder->holder_metadata());
+
+
+                    add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_metadata), off, codeblobsro_sym, compiledicholders_relocs);
+                  }
+                }
+                break;
+              }
+              default:
+                break;
+            }
+          }
+        }
+        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+          assert(!nm->code_contains((address)p), "");
+
+          Metadata* md = *p;
+          int64_t off;
+          if (md->is_method()) {
+            off = record_metadata_type(codeblobsro_section, codeblobsro_hdr, METHOD_RECORD);
+            record_method(codeblobsro_section, codeblobsro_hdr, (Method*)md);
+          } else if (md->is_klass()) {
+            off = record_metadata_type(codeblobsro_section, codeblobsro_hdr, KLASS_RECORD);
+            record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*)md);
+          } else {
+            ShouldNotReachHere();
+          }
+
+//          assert(((address) p >= (address) nm && (address) p < nm->code_begin()) || ((address) p >= nm->code_end() && (address) p < nm->data_end()), "");
+          assert((address) p >= nm->code_end() && (address) p < nm->data_end(), "");
+          add_relocation(codeblobs_data->d_off + ((address)p - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
+        }
+      }
+    }
+    bool duplicate = codeblobs.add(cb, sym_id, code_offset, from_interpreted_entry_off);
+    assert(!duplicate, "");
+    assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
+  }
+
+  FOR_ALL_BLOBS(cb, heap) {
+    RelocIterator iter(cb);
+    while (iter.next()) {
+      if (iter.type() == relocInfo::static_call_type) {
+        static_call_Relocation* call = iter.static_call_reloc();
+        Method* method = call->method_value();
+        assert(method != NULL, "can't resolve the call");
+        if (!method->has_compiled_code()) {
+          method->print_short_name();
+          tty->cr();
+          success = false;
+        } else {
+          CompiledMethod* cm = method->code();
+          address call_addr = call->addr();
+
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
+                                call->destination(), method->from_compiled_entry() - cm->code_begin(), Assembler::call32_operand);
+        }
+      } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+        opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+        Method* method = call->method_value();
+        assert(method != NULL, "can't resolve the call");
+        if (!method->has_compiled_code()) {
+          method->print_short_name();
+          tty->cr();
+          success = false;
+        } else {
+          CompiledMethod* cm = method->code();
+          address call_addr = call->addr();
+
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
+                                call->destination(), method->from_compiled_entry() - cm->code_begin(), Assembler::call32_operand);
+        }
+      } else if (iter.type() == relocInfo::runtime_call_type) {
+        runtime_call_Relocation* r = iter.runtime_call_reloc();
+        address dest = r->destination();
+        if (dest != (address) -1) {
+          if (heap->contains(dest)) {
+            CodeBlob* callee = CodeCache::find_blob(dest);
+            NativeInstruction* ni = nativeInstruction_at(r->addr());
+            if (ni->is_mov_literal64()) {
+              CodeBlobEntry* callee_data = codeblobs.find(callee);
+              assert(callee_data != NULL, "");
+              CodeBlobEntry* caller_data = codeblobs.find(cb);
+              assert(caller_data != NULL, "");
+
+              long call_offset = caller_data->offset() + ((address) r->pd_address_in_code() - cb->code_begin());
+              long callee_offset = callee_data->offset() + (dest - callee->code_begin());
+              add_relocation(call_offset, callee_offset, text_sym, text_relocs);
+            } else if (ni->is_call() || ni->is_jump() || ni->is_cond_jump()) {
+              add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
+                                    dest, dest - callee->code_begin(), Assembler::call32_operand/*(Assembler::WhichOperand)iter.format()*/);
+            } else {
+              ShouldNotReachHere();
+            }
+          }
+        }
+      } else if (iter.type() == relocInfo::virtual_call_type) {
+        virtual_call_Relocation* r = iter.virtual_call_reloc();
+        MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+        address entry;
+        bool ignored;
+        if (virtual_call_entry_and_holder(thread, iter, cb->as_nmethod(), entry, NULL)) {
+          CodeBlob* callee = CodeCache::find_blob(entry);
+          address dest = r->destination();
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
+                                dest, entry - callee->code_begin(), Assembler::call32_operand);
+        }
+      } else if (iter.type() == relocInfo::external_word_type) {
+        external_word_Relocation* r = iter.external_word_reloc();
+        if (CodeCache::contains(r->target())) {
+          address target = r->target();
+          CodeBlob* target_cb = CodeCache::find_blob(target);
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, target_cb, r->addr(),
+                                target, target - target_cb->code_begin(), (Assembler::WhichOperand)iter.format());
+        }
+      }
+    }
+    if (cb->is_nmethod()) {
+      nmethod* nm = cb->as_nmethod();
+      CodeBlobEntry* nm_data = codeblobs.find(nm);
+      assert(nm_data != NULL, "");
+      CodeBlob* adapter = CodeCache::find_blob(nm->method()->_from_interpreted_entry);
+      CodeBlobEntry* adapter_data = codeblobs.find(adapter);
+      assert(adapter_data != NULL, "");
+      assert(nm_data->from_interpreted_entry_off() != -1, "");
+      add_relocation(nm_data->from_interpreted_entry_off(), (nm->method()->_from_interpreted_entry - adapter->code_begin()) + adapter_data->offset(), text_sym, codeblobsro_relocs);
+    }
+
+    assert(success, "");
+  }
+
+  {
+    Elf_Data* codecache_data = new_data(codecache_section, heap, sizeof(*heap));
+
+    add_global_symbol(strings, symbols, codecache_section, "leydenCodeHeap", STT_OBJECT, 0, codecache_data->d_size);
+  }
+  {
+//    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), segmap_size);
+    Elf_Data* codecache_data = new_data(codecache_section, segmap_clone.adr_at(0), segmap_clone.length());
+    add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
+  }
+  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
+//  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->high() - heap->low(), text_sym, codecache_relocs);
+  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->segments_to_size(current_segment), text_sym, codecache_relocs);
+
+  {
+    LeydenCodeHeap ch;
+
+    int sym = add_external_symbol(*(address*)&ch, strings, symbols, vt_offset);
+
+
+    add_relocation(0, vt_offset, sym, codecache_relocs);
+  }
+
+//  codecache_data = elf_newdata(codecache_section);
+//  codecache_data->d_size = offset_of(LeydenCodeHeap, _blobs[0]) - sizeof(*heap) + codecache_relocs.length() * sizeof(CodeBlob*);
+//  codecache_data->d_buf = NEW_RESOURCE_ARRAY(char, codecache_data->d_size);
+//  codecache_data->d_type = ELF_T_BYTE;
+//  codecache_data->d_off = codecache_hdr->sh_size;
+//  codecache_data->d_align = 8;
+//  codecache_data->d_version = EV_CURRENT;
+//
+//  codecache_hdr->sh_size += codecache_data->d_size;
+  Elf_Scn* string_section = add_string_section(elf, strings, shstrings);
+  Elf_Scn* symbol_section = add_symbol_section(elf, symbols, local_sym, string_section, shstrings);
+
+  add_relocation_section(elf, shstrings, codeblobs_relocs, codeblobs_section, symbol_section, ".rela.codeblobs");
+
+  add_relocation_section(elf, shstrings, codeblobsro_relocs, codeblobsro_section, symbol_section, ".rela.codeblobsro");
+
+  add_relocation_section(elf, shstrings, text_relocs, text_section, symbol_section, ".rela.text");
+
+  add_relocation_section(elf, shstrings, codecache_relocs, codecache_section, symbol_section, ".rela.codecache");
+
+
+  if (has_compiledicholders) {
+    add_relocation_section(elf, shstrings, compiledicholders_relocs, compiledicholders_section, symbol_section, ".rela.compiledicholders");
+  }
+
+  add_shstring_section(elf, ehdr, shstrings);
+
+
+  {
+    int64_t res = elf_update(elf, ELF_C_NULL);
+    assert(res >= 0, "");
+  }
+
+  {
+    int64_t res = elf_update(elf, ELF_C_WRITE);
+    if (res < 0) {
+      tty->print_cr("WWWWWW %s", elf_errmsg(elf_errno()));
+    }
+    assert(res >= 0, "");
+  }
+  elf_end(elf);
+  close(fd);
+}
+
+bool CodeCache::virtual_call_entry_and_holder(JavaThread* thread, RelocIterator &iter, nmethod* nm, address &entry,
+                                              CompiledICHolder** holder) {
+  virtual_call_Relocation* call = iter.virtual_call_reloc();
+  ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
+  methodHandle caller(thread, sd->method());
+  Bytecode_invoke invoke(caller, sd->bci());
+  Method* method = call->method_value();
+  Klass* defc = method->method_holder();
+  Symbol* name = method->name();
+  Symbol* type = method->signature();
+  LinkInfo link_info(defc, name, type);
+  if (invoke.is_invokevirtual()) {
+    Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+    int vtable_index = Method::invalid_vtable_index;
+    if (resolved_method->method_holder()->is_interface()) {
+      vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+    } else {
+      vtable_index = resolved_method->vtable_index();
+    }
+    if (holder != NULL) {
+      *holder = NULL;
+    }
+    entry = VtableStubs::find_vtable_stub(vtable_index);
+    return true;
+  } else {
+    Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
+    if (resolved_method->has_vtable_index()) {
+      int vtable_index = resolved_method->vtable_index();
+      if (holder != NULL) {
+        *holder = NULL;
+      }
+      entry = VtableStubs::find_vtable_stub(vtable_index);
+      return true;
+    } else if (resolved_method->has_itable_index()) {
+      int itable_index = resolved_method->itable_index();
+      if (holder != NULL) {
+        *holder = new CompiledICHolder(resolved_method->method_holder(),
+                                       link_info.resolved_klass(), false);
+      }
+      entry = VtableStubs::find_itable_stub(itable_index);
+      return true;
+    } else {
+      int index = resolved_method->vtable_index();
+//              ShouldNotReachHere();
+    }
+  }
+  return false;
+}
+
+
+#include "oops/klass.inline.hpp"
+#include "utilities/utf8.hpp"
+
+void CodeCache::restore_from_disk(JavaThread* thread) {
+  ResourceMark rm;
+  HandleMark hm(thread);
+
+//  if (UseSerialGC) {
+//    BarrierSet* bs = BarrierSet::barrier_set();
+//    CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+//    CardTable* ct = ctbs->card_table();
+//    card_table_base = ct->byte_map_base();
+//  }
+
+  stringStream ss;
+  ss.print("lib%s.so", CodeFileName);
+  void* shared_lib = dlopen(ss.as_string(), RTLD_NOW);
+  if (shared_lib == NULL) {
+    tty->print_cr("XXX %s", dlerror());
+  }
+  assert(shared_lib != NULL, "");
+
+  char* klasses_ptr = (char*) dlsym(shared_lib, "leydenLoadedKlasses");
+  assert(klasses_ptr != NULL, "");
+  int nb_loaded_klasses = *(int*)klasses_ptr;
+  klasses_ptr += sizeof(int);
+
+  for (int i = 0; i < nb_loaded_klasses; i++) {
+    Klass* k = restore_klass(klasses_ptr, thread);
+    klasses_ptr += strlen(klasses_ptr) + 1;
+  }
+
+  Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
+  assert(ase.not_null() && !thread->has_pending_exception(), "");
+  Handle cce = Handle(thread, InstanceKlass::cast(vmClasses::ClassCastException_klass())->allocate_instance(thread));
+  assert(ase.not_null() && !thread->has_pending_exception(), "");
+
+  {
+    LeydenCodeHeap*  heap = (LeydenCodeHeap*) dlsym(shared_lib, "leydenCodeHeap");
+    assert(heap != NULL, "");
+    MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+    _heaps->push(heap);
+
+    FOR_ALL_BLOBS(cb, heap) {
+      if (cb->is_leyden_nmethod()) {
+        LeydenNMethod* nm = cb->as_leyden_nmethod();
+        const char* klass_name = (const char*) nm->_method;
+        Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
+        Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
+                                                     Handle(), true, thread);
+        assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+        const char* method_name = klass_name + strlen(klass_name) + 1;
+        Symbol* method_sym = SymbolTable::new_symbol(method_name);
+        const char* signature = method_name + strlen(method_name) + 1;
+        Symbol* signature_sym = SymbolTable::new_symbol(signature);
+        address from_interpreted_entry = *(address*)(signature + strlen(signature) + 1);
+
+        Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
+        assert(m != NULL, "method not found");
+        nm->set_method(m);
+
+        if (!nm->is_native_method()) {
+          nm->_pc_desc_container.reset_to(nm->scopes_pcs_begin());
+        }
+
+        RelocIterator iter(nm);
+        while (iter.next()) {
+          if (iter.type() == relocInfo::metadata_type) {
+            metadata_Relocation* r = iter.metadata_reloc();
+            Metadata* md = r->metadata_value();
+            if (md != NULL) {
+              MetadataRecord rec = (MetadataRecord) *(char*) md;
+              if (rec == KLASS_RECORD) {
+                md = restore_klass((const char*) (((address) md) + 1), thread);
+              } else if (rec == METHOD_RECORD) {
+                md = restore_method((const char*) (((address) md) + 1), thread);
+              } else {
+                ShouldNotReachHere();
+              }
+              if (!nm->metadata_contains(r->metadata_addr())) {
+                *r->metadata_addr() = md;
+              }
+              if (nm->consts_contains(iter.addr())) {
+                *((Metadata**) iter.addr()) = md;
+              }
+            }
+          } else if (iter.type() == relocInfo::virtual_call_type) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            CompiledICLocker ml(nm);
+//            CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
+//            if (ic->cached_value() != NULL) {
+//              CompiledICHolder* holder = ic->cached_icholder();
+//              Klass* k1 = restore_klass((const char*)holder->holder_klass(), thread);
+//              Klass* k2 = restore_klass((const char*)holder->holder_metadata(), thread);
+//              holder->_holder_klass = k1;
+//              holder->_holder_metadata = k2;
+//            }
+            NativeCall* call = nativeCall_at(iter.addr());
+            NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
+            NativeInstruction* load = call_wrapper->get_load_instruction(iter.virtual_call_reloc());
+            CompiledICHolder* holder = (CompiledICHolder*)call_wrapper->get_data(load);
+            if (holder != Universe::non_oop_word()) {
+              Klass* k1 = restore_klass((const char*)holder->holder_klass(), thread);
+              Klass* k2 = restore_klass((const char*)holder->holder_metadata(), thread);
+              holder->_holder_klass = k1;
+              holder->_holder_metadata = k2;
+            }
+          } else if (iter.type() == relocInfo::oop_type) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            oop_Relocation* r = iter.oop_reloc();
+            char* ptr = *(char**) r->oop_addr();
+            oop o;
+            OopRecord record = (OopRecord) *ptr;
+            if (record == STRING_RECORD) {
+              Handle value = java_lang_String::create_from_str(ptr + 1, thread);
+              assert(!thread->has_pending_exception() && !value.is_null(), "");
+              o = value();
+              tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+            } else if (record == CLASS_RECORD) {
+              Klass* k = restore_klass(ptr + 1, thread);
+              assert(k->java_mirror() != NULL, "");
+              o = k->java_mirror();
+              tty->print_cr("### class record %s", k->external_name());
+            } else if (record == CLASSLOADER_RECORD) {
+              o = SystemDictionary::java_system_loader();
+            } else if (record == NPE_RECORD) {
+              o = Universe::null_ptr_exception_instance();
+            } else if (record == AE_RECORD) {
+              o = Universe::arithmetic_exception_instance();
+            } else if (record == ASE_RECORD) {
+              o = ase();
+            } else if (record == CCE_RECORD) {
+              o = cce();
+            } else {
+              ShouldNotReachHere();
+            }
+            if (!nm->oops_contains(r->oop_addr())) {
+              *r->oop_addr() = o;
+            }
+            if (nm->consts_contains(iter.addr())) {
+              *((oop*) iter.addr()) = o;
+            }
+          }
+        }
+        for (oop* p = nm->oops_begin(); p < nm->oops_end(); p++) {
+          const char* ptr = *(const char**) p;
+          OopRecord record = (OopRecord) *ptr;
+          if (record == STRING_RECORD) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            Handle value = java_lang_String::create_from_str(ptr + 1, thread);
+            assert(!thread->has_pending_exception() && !value.is_null(), "");
+            *p = value();
+            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+          } else if (record == CLASS_RECORD) {
+            Klass* k = restore_klass(ptr + 1, thread);
+            assert(k->java_mirror() != NULL, "");
+            *p = k->java_mirror();
+            tty->print_cr("### class record %s", k->external_name());
+          } else if (record == CLASSLOADER_RECORD) {
+            *p = SystemDictionary::java_system_loader();
+          } else if (record == NPE_RECORD) {
+            *p = Universe::null_ptr_exception_instance();
+          } else if (record == AE_RECORD) {
+            *p = Universe::arithmetic_exception_instance();
+          } else if (record == ASE_RECORD) {
+            *p = ase();
+          } else if (record == CCE_RECORD) {
+            *p = cce();
+          } else {
+            ShouldNotReachHere();
+          }
+        }
+
+
+        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+          const char* ptr = *(const char**) p;
+          MetadataRecord rec = (MetadataRecord) *ptr;
+          Metadata* md;
+          if (rec == KLASS_RECORD) {
+            md = restore_klass(ptr + 1, thread);
+          } else if (rec == METHOD_RECORD) {
+            md = restore_method(ptr + 1, thread);
+          } else {
+            ShouldNotReachHere();
+          }
+          *p = md;
+        }
+
+        {
+          MutexLocker ml(CompiledMethod_lock, Mutex::_no_safepoint_check_flag);
+          m->_code = nm;
+          m->set_highest_comp_level(nm->comp_level());
+          OrderAccess::storestore();
+          m->_from_compiled_entry = nm->verified_entry_point();
+          OrderAccess::storestore();
+          // Instantly compiled code can execute.
+           if (!m->is_method_handle_intrinsic())
+             m->_from_interpreted_entry = from_interpreted_entry;
+          m->_i2i_entry = (address)-1;
+        }
+        nm->_gc_data = NULL;
+
+        Universe::heap()->register_nmethod(nm);
+
+      }
+    }
+  }
+}
+
 //---<  END  >--- CodeHeap State Analytics.

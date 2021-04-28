@@ -423,3 +423,32 @@ bool Symbol::is_valid_id(vmSymbolID vm_symbol_id) {
   return vmSymbols::is_valid_id(vm_symbol_id);
 }
 #endif
+
+// Note: this comparison is used for vtable sorting only; it doesn't matter
+// what order it defines, as long as it is a total, time-invariant order
+// Since Symbol*s are in C_HEAP, their relative order in memory never changes,
+// so use address comparison for speed
+int Symbol::fast_compare(const Symbol* other) const {
+  if (DumpCodeToDisk || RestoreCodeFromDisk) {
+    int this_length = length();
+    int other_length = other->length();
+    const u1* this_base = base();
+    const u1* other_base = other->base();
+    int l = MIN2(this_length, other_length);
+    for (int i = 0; i < l; i++) {
+      if (this_base[i] < other_base[i]) {
+        return -1;
+      } else if (this_base[i] > other_base[i]) {
+        return 1;
+      }
+    }
+    if (this_length < other_length) {
+      return -1;
+    } else if (this_length > other_length) {
+      return 1;
+    }
+    return 0;
+  }
+  return (((uintptr_t)this < (uintptr_t)other) ? -1
+                                               : ((uintptr_t)this == (uintptr_t) other) ? 0 : 1);
+}

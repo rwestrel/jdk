@@ -1475,6 +1475,7 @@ methodHandle SharedRuntime::resolve_sub_helper(bool is_virtual, bool is_optimize
 
 // Inline caches exist only in compiled code
 JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_ic_miss(JavaThread* current))
+  assert(!RestoreCodeFromDisk, "");
 #ifdef ASSERT
   RegisterMap reg_map(current,
                       RegisterMap::UpdateMap::skip,
@@ -3059,6 +3060,10 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
       // static java call that is resolved in the runtime.
       if (PPC64_ONLY(method->is_continuation_enter_intrinsic() &&) true) {
         buffer.initialize_consts_size(8 PPC64_ONLY(+ 24));
+      }
+#else
+      if (DumpCodeToDisk) {
+        buffer.initialize_consts_size(8);
       }
 #endif
       buffer.stubs()->initialize_shared_locs((relocInfo*)&stubs_locs_buf, sizeof(stubs_locs_buf) / sizeof(relocInfo));

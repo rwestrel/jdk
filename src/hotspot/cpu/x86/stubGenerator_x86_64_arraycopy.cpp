@@ -57,6 +57,9 @@ BLOCK_COMMENT("inc_counter " #counter); \
 inc_counter_np(_masm, counter, rscratch);
 
 static void inc_counter_np(MacroAssembler* _masm, int& counter, Register rscratch) {
+  if (DumpCodeToDisk) {
+    return;
+  }
   __ incrementl(ExternalAddress((address)&counter), rscratch);
 }
 
@@ -213,7 +216,7 @@ void StubGenerator::array_overlap_test(address no_overlap_target, Label* NOLp, A
   __ cmpptr(to, from);
   __ lea(end_from, Address(from, count, sf, 0));
   if (NOLp == NULL) {
-    ExternalAddress no_overlap(no_overlap_target);
+    RuntimeAddress no_overlap(no_overlap_target);
     __ jump_cc(Assembler::belowEqual, no_overlap);
     __ cmpptr(to, end_from);
     __ jump_cc(Assembler::aboveEqual, no_overlap);
@@ -509,6 +512,14 @@ void StubGenerator::copy_bytes_backward(Register from, Register dest,
 address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const char *name,
                                                           int shift, bool aligned, bool is_oop,
                                                           bool dest_uninitialized) {
+  int insts_size = 512;
+  int locs_size  = 64;
+  
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
   __ align(CodeEntryAlignment);
   StubCodeMark mark(this, "StubRoutines", name);
   address start = __ pc();
@@ -530,8 +541,9 @@ address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const 
   __ enter(); // required for proper stackwalking of RuntimeStub frame
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset = 0;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
      // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -717,7 +729,17 @@ address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const 
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  return stub->entry_point();
 }
 
 
@@ -730,6 +752,14 @@ address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const 
 address StubGenerator::generate_conjoint_copy_avx3_masked(address* entry, const char *name, int shift,
                                                           address nooverlap_target, bool aligned,
                                                           bool is_oop, bool dest_uninitialized) {
+  int insts_size = 512;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
   __ align(CodeEntryAlignment);
   StubCodeMark mark(this, "StubRoutines", name);
   address start = __ pc();
@@ -752,8 +782,9 @@ address StubGenerator::generate_conjoint_copy_avx3_masked(address* entry, const 
   __ enter(); // required for proper stackwalking of RuntimeStub frame
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
      // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -894,7 +925,18 @@ address StubGenerator::generate_conjoint_copy_avx3_masked(address* entry, const 
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  return stub->entry_point();
+
 }
 
 void StubGenerator::arraycopy_avx3_special_cases(XMMRegister xmm, KRegister mask, Register from,
@@ -1599,6 +1641,14 @@ address StubGenerator::generate_conjoint_short_copy(bool aligned, address noover
 //
 address StubGenerator::generate_disjoint_int_oop_copy(bool aligned, bool is_oop, address* entry,
                                                       const char *name, bool dest_uninitialized) {
+  int insts_size = 512;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
   if ((!is_oop || bs->supports_avx3_masked_arraycopy()) && VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
@@ -1625,8 +1675,9 @@ address StubGenerator::generate_disjoint_int_oop_copy(bool aligned, bool is_oop,
   __ enter(); // required for proper stackwalking of RuntimeStub frame
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
     // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -1689,7 +1740,18 @@ __ BIND(L_exit);
     __ jmp(L_copy_4_bytes);
   }
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  return stub->entry_point();
+
 }
 
 
@@ -1711,6 +1773,13 @@ __ BIND(L_exit);
 address StubGenerator::generate_conjoint_int_oop_copy(bool aligned, bool is_oop, address nooverlap_target,
                                                       address *entry, const char *name,
                                                       bool dest_uninitialized) {
+  int insts_size = 512;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+    _masm = masm;
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
   if ((!is_oop || bs->supports_avx3_masked_arraycopy()) && VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
@@ -1732,8 +1801,9 @@ address StubGenerator::generate_conjoint_int_oop_copy(bool aligned, bool is_oop,
   __ enter(); // required for proper stackwalking of RuntimeStub frame
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
      // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -1804,7 +1874,17 @@ __ BIND(L_exit);
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  return stub->entry_point();
 }
 
 
@@ -1825,6 +1905,14 @@ __ BIND(L_exit);
 //
 address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop, address *entry,
                                                        const char *name, bool dest_uninitialized) {
+  int insts_size = 512 * 2;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
   if ((!is_oop || bs->supports_avx3_masked_arraycopy()) && VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize >= 32) {
@@ -1850,8 +1938,9 @@ address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop
   // Save no-overlap entry point for generate_conjoint_long_oop_copy()
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
     // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -1920,7 +2009,17 @@ address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  _masm = saved_masm;
+    return stub->entry_point();
 }
 
 
@@ -1938,6 +2037,14 @@ address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop
 address StubGenerator::generate_conjoint_long_oop_copy(bool aligned, bool is_oop, address nooverlap_target,
                                                        address *entry, const char *name,
                                                        bool dest_uninitialized) {
+  int insts_size = 512 * 2;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
   if ((!is_oop || bs->supports_avx3_masked_arraycopy()) && VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
@@ -1958,8 +2065,9 @@ address StubGenerator::generate_conjoint_long_oop_copy(bool aligned, bool is_oop
   __ enter(); // required for proper stackwalking of RuntimeStub frame
   assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+  uintptr_t offset;
   if (entry != NULL) {
-    *entry = __ pc();
+    offset = __ pc() - start;
     // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
     BLOCK_COMMENT("Entry:");
   }
@@ -2024,7 +2132,17 @@ address StubGenerator::generate_conjoint_long_oop_copy(bool aligned, bool is_oop
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  if (entry != NULL) {
+    *entry = stub->entry_point() + offset;
+  }
+  return stub->entry_point();
 }
 
 
@@ -2067,7 +2185,15 @@ void StubGenerator::generate_type_check(Register sub_klass,
 //
 address StubGenerator::generate_checkcast_copy(const char *name, address *entry, bool dest_uninitialized) {
 
-  Label L_load_element, L_store_element, L_do_card_marks, L_done;
+  int insts_size = 1024 * 2;
+  int locs_size  = 64;
+
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MacroAssembler* saved_masm = _masm;
+  _masm = masm;
+
+ Label L_load_element, L_store_element, L_do_card_marks, L_done;
 
   // Input registers (after setup_arg_regs)
   const Register from        = rdi;   // source array address
@@ -2255,7 +2381,14 @@ address StubGenerator::generate_checkcast_copy(const char *name, address *entry,
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                  new OopMapSet(), false);
+  _masm = saved_masm;
+  return stub->entry_point();
 }
 
 

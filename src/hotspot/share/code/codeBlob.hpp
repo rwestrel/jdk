@@ -85,12 +85,15 @@ class CodeBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCacheDumper;
+  friend class CodeCache;
 
 protected:
 
   // order fields from large to small to minimize padding between fields
   address    _code_begin;
   address    _code_end;
+  address    _old_code_begin;
+  address    _old_code_end;
   address    _content_begin;                     // address to where content region begins (this includes consts, insts, stubs)
                                                  // address    _content_end - not required, for all CodeBlobs _code_end == _content_end for now
   address    _data_end;
@@ -146,6 +149,7 @@ public:
   // Typing
   virtual bool is_buffer_blob() const                 { return false; }
   virtual bool is_nmethod() const                     { return false; }
+  virtual bool is_leyden_nmethod() const              { return false; }
   virtual bool is_runtime_stub() const                { return false; }
   virtual bool is_deoptimization_stub() const         { return false; }
   virtual bool is_uncommon_trap_stub() const          { return false; }
@@ -167,6 +171,8 @@ public:
   // Casting
   nmethod* as_nmethod_or_null()                { return is_nmethod() ? (nmethod*) this : nullptr; }
   nmethod* as_nmethod()                        { assert(is_nmethod(), "must be nmethod"); return (nmethod*) this; }
+  LeydenNMethod* as_leyden_nmethod_or_null()   { return is_leyden_nmethod() ? (LeydenNMethod*) this : nullptr; }
+  LeydenNMethod* as_leyden_nmethod()           { assert(is_leyden_nmethod(), "must be nmethod"); return (LeydenNMethod*) this; }
   CompiledMethod* as_compiled_method_or_null() { return is_compiled() ? (CompiledMethod*) this : nullptr; }
   CompiledMethod* as_compiled_method()         { assert(is_compiled(), "must be compiled"); return (CompiledMethod*) this; }
   CodeBlob* as_codeblob_or_null() const        { return (CodeBlob*) this; }
@@ -178,10 +184,13 @@ public:
   relocInfo* relocation_begin() const { return (relocInfo*) _relocation_begin; };
   relocInfo* relocation_end() const   { return (relocInfo*) _relocation_end; }
   address content_begin() const       { return _content_begin; }
-  address content_end() const         { return _code_end; } // _code_end == _content_end is true for all types of blobs for now, it is also checked in the constructor
+  address content_end() const         { return _old_code_end; } // _code_end == _content_end is true for all types of blobs for now, it is also checked in the constructor
   address code_begin() const          { return _code_begin;    }
   address code_end() const            { return _code_end; }
   address data_end() const            { return _data_end;      }
+
+  address old_code_begin() const { return _old_code_begin; }
+  address old_code_end() const { return _old_code_end; }
 
   // This field holds the beginning of the const section in the old code buffer.
   // It is needed to fix relocations of pc-relative loads when resizing the
@@ -200,13 +209,16 @@ public:
     _size = (int)used;
     _data_offset = (int)used;
     _code_end = (address)this + used;
+    _old_code_end = (address)this + used;
     _data_end = (address)this + used;
   }
 
   // Containment
-  bool blob_contains(address addr) const         { return header_begin()       <= addr && addr < data_end();       }
+  bool blob_contains(address addr) const         { return (header_begin() <= addr && addr < data_end()) ||
+            (RestoreCodeFromDisk && code_contains(addr));       }
   bool code_contains(address addr) const         { return code_begin()         <= addr && addr < code_end();       }
-  bool contains(address addr) const              { return content_begin()      <= addr && addr < content_end();    }
+  bool contains(address addr) const              { return (content_begin() <= addr && addr < content_end()) ||
+            (RestoreCodeFromDisk && code_contains(addr));    }
   bool is_frame_complete_at(address addr) const  { return _frame_complete_offset != CodeOffsets::frame_never_safe &&
                                                           code_contains(addr) && addr >= code_begin() + _frame_complete_offset; }
   int frame_complete_offset() const              { return _frame_complete_offset; }
@@ -237,6 +249,7 @@ public:
   virtual void print() const;
   virtual void print_on(outputStream* st) const;
   virtual void print_value_on(outputStream* st) const;
+
   void dump_for_addr(address addr, outputStream* st, bool verbose) const;
   void print_code();
 
@@ -352,6 +365,10 @@ public:
 
 class RuntimeBlob : public CodeBlob {
   friend class VMStructs;
+
+protected:
+  RuntimeBlob() {}
+
  public:
 
   // Creation
@@ -391,17 +408,19 @@ class WhiteBox;
 //----------------------------------------------------------------------------------------------------
 // BufferBlob: used to hold non-relocatable machine code such as the interpreter, stubroutines, etc.
 
-class BufferBlob: public RuntimeBlob {
+class JNIEXPORT BufferBlob : public RuntimeBlob  {
   friend class VMStructs;
   friend class AdapterBlob;
   friend class VtableBlob;
   friend class MethodHandlesAdapterBlob;
   friend class UpcallStub;
   friend class WhiteBox;
+  friend class CodeCache;
 
  private:
   // Creation support
   BufferBlob(const char* name, int size);
+  BufferBlob() {}
   BufferBlob(const char* name, int size, CodeBuffer* cb);
 
   // This ordinary operator delete is needed even though not used, so the
@@ -432,9 +451,11 @@ class BufferBlob: public RuntimeBlob {
 //----------------------------------------------------------------------------------------------------
 // AdapterBlob: used to hold C2I/I2C adapters
 
-class AdapterBlob: public BufferBlob {
+class JNIEXPORT AdapterBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   AdapterBlob(int size, CodeBuffer* cb);
+  AdapterBlob() {}
 
 public:
   // Creation
@@ -445,9 +466,11 @@ public:
 };
 
 //---------------------------------------------------------------------------------------------------
-class VtableBlob: public BufferBlob {
+class JNIEXPORT VtableBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   VtableBlob(const char*, int);
+  VtableBlob() {}
 
   void* operator new(size_t s, unsigned size) throw();
 
@@ -462,9 +485,11 @@ public:
 //----------------------------------------------------------------------------------------------------
 // MethodHandlesAdapterBlob: used to hold MethodHandles adapters
 
-class MethodHandlesAdapterBlob: public BufferBlob {
+class JNIEXPORT MethodHandlesAdapterBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   MethodHandlesAdapterBlob(int size): BufferBlob("MethodHandles adapters", size) {}
+  MethodHandlesAdapterBlob() {}
 
 public:
   // Creation
@@ -478,8 +503,9 @@ public:
 //----------------------------------------------------------------------------------------------------
 // RuntimeStub: describes stubs used by compiled code to call a (static) C++ runtime routine
 
-class RuntimeStub: public RuntimeBlob {
+class JNIEXPORT RuntimeStub: public RuntimeBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   RuntimeStub(
@@ -491,6 +517,8 @@ class RuntimeStub: public RuntimeBlob {
     OopMapSet*  oop_maps,
     bool        caller_must_gc_arguments
   );
+
+  RuntimeStub() {}
 
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
@@ -537,6 +565,7 @@ class SingletonBlob: public RuntimeBlob {
   // delete rather than an ordinary sized delete; see C++14 3.7.4.2/p2.
   void operator delete(void* p);
   void* operator new(size_t s, unsigned size) throw();
+  SingletonBlob() {}
 
  public:
    SingletonBlob(
@@ -563,9 +592,10 @@ class SingletonBlob: public RuntimeBlob {
 //----------------------------------------------------------------------------------------------------
 // DeoptimizationBlob
 
-class DeoptimizationBlob: public SingletonBlob {
+class JNIEXPORT DeoptimizationBlob: public SingletonBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
+  friend class CodeCache;
  private:
   int _unpack_offset;
   int _unpack_with_exception;
@@ -590,7 +620,9 @@ class DeoptimizationBlob: public SingletonBlob {
     int         frame_size
   );
 
- public:
+  DeoptimizationBlob() {}
+
+public:
   // Creation
   static DeoptimizationBlob* create(
     CodeBuffer* cb,
@@ -647,8 +679,9 @@ class DeoptimizationBlob: public SingletonBlob {
 
 #ifdef COMPILER2
 
-class UncommonTrapBlob: public SingletonBlob {
+class JNIEXPORT UncommonTrapBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   UncommonTrapBlob(
@@ -657,6 +690,7 @@ class UncommonTrapBlob: public SingletonBlob {
     OopMapSet*  oop_maps,
     int         frame_size
   );
+  UncommonTrapBlob() {}
 
  public:
   // Creation
@@ -677,8 +711,9 @@ class UncommonTrapBlob: public SingletonBlob {
 //----------------------------------------------------------------------------------------------------
 // ExceptionBlob: used for exception unwinding in compiled code (currently only used by Compiler 2)
 
-class ExceptionBlob: public SingletonBlob {
+class JNIEXPORT ExceptionBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   ExceptionBlob(
@@ -687,6 +722,8 @@ class ExceptionBlob: public SingletonBlob {
     OopMapSet*  oop_maps,
     int         frame_size
   );
+
+  ExceptionBlob() {}
 
  public:
   // Creation
@@ -708,8 +745,9 @@ class ExceptionBlob: public SingletonBlob {
 //----------------------------------------------------------------------------------------------------
 // SafepointBlob: handles illegal_instruction exceptions during a safepoint
 
-class SafepointBlob: public SingletonBlob {
+class JNIEXPORT SafepointBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   SafepointBlob(
@@ -718,6 +756,8 @@ class SafepointBlob: public SingletonBlob {
     OopMapSet*  oop_maps,
     int         frame_size
   );
+
+  SafepointBlob() {}
 
  public:
   // Creation

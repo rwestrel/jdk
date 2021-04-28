@@ -22,6 +22,34 @@
  *
  */
 
+#include "utilities/macros.hpp"
+#include "runtime/stubRoutines.hpp"
+#include "runtime/objectMonitor.hpp"
+#include "prims/unsafe.hpp"
+#include "opto/narrowptrnode.hpp"
+#include "opto/mathexactnode.hpp"
+#include "opto/library_call.hpp"
+#include "opto/countbitsnode.hpp"
+#include "opto/c2compiler.hpp"
+#include "opto/arraycopynode.hpp"
+#include "oops/objArrayKlass.hpp"
+#include "oops/klass.inline.hpp"
+#include "jfr/support/jfrIntrinsics.hpp"
+#include "classfile/vmIntrinsics.hpp"
+#include "ci/ciUtilities.inline.hpp"
+#include "asm/macroAssembler.hpp"
+#include "graphKit.hpp"
+#include "prims/methodHandles.hpp"
+#include "opto/subnode.hpp"
+#include "opto/mulnode.hpp"
+#include "opto/cfgnode.hpp"
+#include "opto/callGenerator.hpp"
+#include "interpreter/linkResolver.hpp"
+#include "compiler/compileBroker.hpp"
+#include "classfile/vmSymbols.hpp"
+#include "ci/ciSymbols.hpp"
+#include "ci/ciMethodHandle.hpp"
+#include "ci/ciCallSite.hpp"
 #include "precompiled.hpp"
 #include "ci/ciUtilities.hpp"
 #include "classfile/javaClasses.hpp"
@@ -4204,4 +4232,28 @@ Node* GraphKit::make_constant_from_field(ciField* field, Node* obj) {
     return makecon(con_type);
   }
   return nullptr;
+}
+
+void GraphKit::ensure_klass_initialization(ciInstanceKlass* holder_klass) {
+  kill_dead_locals();
+  Node* klass_to_init = makecon(TypeKlassPtr::make(holder_klass));
+  InitializeKlassNode* init_klass = new InitializeKlassNode(C, control(), reset_memory(), i_o(), klass_to_init);
+  Node* n = _gvn.transform(init_klass);
+  assert(n == init_klass, "shouldn't disappear");
+  add_safepoint_edges(init_klass);
+  set_control(_gvn.transform(new ProjNode(init_klass, TypeFunc::Control)));
+  set_i_o(_gvn.transform(new ProjNode(init_klass, TypeFunc::I_O, true)));
+  set_all_memory_call(init_klass, true);
+  make_slow_call_ex(init_klass, env()->Throwable_klass(), true, false);
+  set_i_o(_gvn.transform(new ProjNode(init_klass, TypeFunc::I_O) ));
+  set_all_memory(_gvn.transform(new ProjNode(init_klass, TypeFunc::Memory) ));
+}
+
+//---------------------------load_mirror_from_klass----------------------------
+// Given a klass oop, load its java mirror (a java.lang.Class oop).
+Node* GraphKit::load_mirror_from_klass(Node* klass) {
+  Node* p = basic_plus_adr(klass, in_bytes(Klass::java_mirror_offset()));
+  Node* load = make_load(NULL, p, TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
+  // mirror = ((OopHandle)mirror)->resolve();
+  return access_load(load, TypeInstPtr::MIRROR, T_OBJECT, IN_NATIVE);
 }

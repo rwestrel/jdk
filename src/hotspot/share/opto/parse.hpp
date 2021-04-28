@@ -621,6 +621,7 @@ class Parse : public GraphKit {
   void dump();
   void dump_bci(int bci);
 #endif
+
 };
 
 // Specialized uncommon_trap of unstable_if. C2 uses next_bci of path to update the live locals of it.

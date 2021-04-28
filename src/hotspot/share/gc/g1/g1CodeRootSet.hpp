@@ -51,7 +51,8 @@ class G1CodeRootSet {
   G1CodeRootSet() : _table(nullptr) DEBUG_ONLY(COMMA _is_iterating(false)) {}
   ~G1CodeRootSet();
 
-  void add(nmethod* method);
+  void add(CompiledMethod* method);
+
   bool remove(nmethod* method);
   bool contains(nmethod* method);
   void clear();

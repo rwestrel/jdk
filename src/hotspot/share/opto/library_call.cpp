@@ -58,6 +58,7 @@
 #include "runtime/stubRoutines.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
+#include "graphKit.hpp"
 
 //---------------------------make_vm_intrinsic----------------------------
 CallGenerator* Compile::make_vm_intrinsic(ciMethod* m, bool is_virtual) {
@@ -4297,7 +4298,7 @@ LibraryCallKit::generate_method_call(vmIntrinsics::ID method_id, bool is_virtual
                                 SharedRuntime::get_resolve_opt_virtual_call_stub(), method);
     slow_call->set_optimized_virtual(true);
   }
-  if (CallGenerator::is_inlined_method_handle_intrinsic(this->method(), bci(), callee())) {
+  if (CallGenerator::is_inlined_method_handle_intrinsic(this->method(), bci(), callee()) || DumpCodeToDisk) {
     // To be able to issue a direct call (optimized virtual or virtual)
     // and skip a call to MH.linkTo*/invokeBasic adapter, additional information
     // about the method being invoked should be attached to the call site to
@@ -4500,8 +4501,12 @@ bool LibraryCallKit::inline_native_Reflection_getCallerClass() {
         // We have reached the desired frame; return the holder class.
         // Acquire method holder as java.lang.Class and push as constant.
         ciInstanceKlass* caller_klass = caller_jvms->method()->holder();
-        ciInstance* caller_mirror = caller_klass->java_mirror();
-        set_result(makecon(TypeInstPtr::make(caller_mirror)));
+        if (DumpCodeToDisk && 0) {
+          set_result(load_mirror_from_klass(makecon(TypeKlassPtr::make(caller_klass))));
+        } else {
+          ciInstance* caller_mirror = caller_klass->java_mirror();
+          set_result(makecon(TypeInstPtr::make(caller_mirror)));
+        }
 
 #ifndef PRODUCT
         if ((C->print_intrinsics() || C->print_inlining()) && Verbose) {

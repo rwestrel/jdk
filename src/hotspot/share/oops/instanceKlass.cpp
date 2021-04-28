@@ -1184,7 +1184,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
 void InstanceKlass::set_initialization_state_and_notify(ClassState state, JavaThread* current) {
   MonitorLocker ml(current, _init_monitor);
 
-  if (state == linked && UseVtableBasedCHA && Universe::is_fully_initialized()) {
+  if (state == linked && UseVtableBasedCHA && Universe::is_fully_initialized() && !RestoreCodeFromDisk) {
     DeoptimizationScope deopt_scope;
     {
       // Now mark all code that assumes the class is not linked.
@@ -3454,7 +3454,7 @@ void InstanceKlass::print_on(outputStream* st) const {
 
   st->print(BULLET"arrays:            "); Metadata::print_value_on_maybe_null(st, array_klasses()); st->cr();
   st->print(BULLET"methods:           "); methods()->print_value_on(st);                  st->cr();
-  if (Verbose || WizardMode) {
+  if (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk) {
     Array<Method*>* method_array = methods();
     for (int i = 0; i < method_array->length(); i++) {
       st->print("%d : ", i); method_array->at(i)->print_value(); st->cr();
@@ -3526,9 +3526,9 @@ void InstanceKlass::print_on(outputStream* st) const {
     st->print_cr(BULLET"java mirror:       null");
   }
   st->print(BULLET"vtable length      %d  (start addr: " PTR_FORMAT ")", vtable_length(), p2i(start_of_vtable())); st->cr();
-  if (vtable_length() > 0 && (Verbose || WizardMode))  print_vtable(start_of_vtable(), vtable_length(), st);
+  if (vtable_length() > 0 && (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk))  print_vtable(start_of_vtable(), vtable_length(), st);
   st->print(BULLET"itable length      %d (start addr: " PTR_FORMAT ")", itable_length(), p2i(start_of_itable())); st->cr();
-  if (itable_length() > 0 && (Verbose || WizardMode))  print_vtable(start_of_itable(), itable_length(), st);
+  if (itable_length() > 0 && (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk))  print_vtable(start_of_itable(), itable_length(), st);
   st->print_cr(BULLET"---- static fields (%d words):", static_field_size());
   FieldPrinter print_static_field(st);
   ((InstanceKlass*)this)->do_local_static_fields(&print_static_field);

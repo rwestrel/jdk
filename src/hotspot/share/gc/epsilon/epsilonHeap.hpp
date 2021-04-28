@@ -121,9 +121,9 @@ public:
   void gc_threads_do(ThreadClosure* tc) const override {}
 
   // No nmethod handling
-  void register_nmethod(nmethod* nm) override {}
+  void register_nmethod(CompiledMethod* nm) override {}
   void unregister_nmethod(nmethod* nm) override {}
-  void verify_nmethod(nmethod* nm) override {}
+  void verify_nmethod(CompiledMethod* nm) override {}
 
   // No heap verification
   void prepare_for_verify() override {}

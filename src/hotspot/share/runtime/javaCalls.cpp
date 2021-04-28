@@ -341,7 +341,7 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
     args->verify(method, result->get_type());
   }
   // Ignore call if method is empty
-  if (JVMCI_ONLY(args->alternative_target().is_null() &&) method->is_empty_method()) {
+  if (!RestoreCodeFromDisk && JVMCI_ONLY(args->alternative_target().is_null() &&) method->is_empty_method()) {
     assert(result->get_type() == T_VOID, "an empty method must return a void value");
     return;
   }

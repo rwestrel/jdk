@@ -106,6 +106,7 @@ class Symbol : public MetaspaceObj {
   friend class SymbolTable;
   friend class vmSymbols;
   friend class JVMCIVMStructs;
+  friend class CodeCache;
 
  private:
 
@@ -246,7 +247,7 @@ class Symbol : public MetaspaceObj {
 
   // Three-way compare for sorting; returns -1/0/1 if receiver is </==/> than arg
   // note that the ordering is not alfabetical
-  inline int fast_compare(const Symbol* other) const;
+  /*inline*/ int fast_compare(const Symbol* other) const;
 
   // Returns receiver converted to null-terminated UTF-8 string; string is
   // allocated in resource area, or in the char buffer provided by caller.
@@ -312,12 +313,4 @@ class Symbol : public MetaspaceObj {
 #endif
 };
 
-// Note: this comparison is used for vtable sorting only; it doesn't matter
-// what order it defines, as long as it is a total, time-invariant order
-// Since Symbol*s are in C_HEAP, their relative order in memory never changes,
-// so use address comparison for speed
-int Symbol::fast_compare(const Symbol* other) const {
- return (((uintptr_t)this < (uintptr_t)other) ? -1
-   : ((uintptr_t)this == (uintptr_t) other) ? 0 : 1);
-}
 #endif // SHARE_OOPS_SYMBOL_HPP

@@ -177,8 +177,15 @@ static JNINativeMethod jdk_internal_misc_ScopedMemoryAccess_methods[] = {
 
 // This function is exported, used by NativeLookup.
 
-JVM_ENTRY(void, JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods(JNIEnv *env, jclass scopedMemoryAccessClass))
-  ThreadToNativeFromVM ttnfv(thread);
+//JVM_ENTRY(void, JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods(JNIEnv *env, jclass scopedMemoryAccessClass))
+extern "C" {
+JNIEXPORT void JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods(JNIEnv* env, jclass scopedMemoryAccessClass) {
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);;
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  JavaThread* __the_thread__ = thread;
+  os::verify_stack_alignment();  ThreadToNativeFromVM ttnfv(thread);
 
   int ok = env->RegisterNatives(scopedMemoryAccessClass, jdk_internal_misc_ScopedMemoryAccess_methods, sizeof(jdk_internal_misc_ScopedMemoryAccess_methods)/sizeof(JNINativeMethod));
   guarantee(ok == 0, "register jdk.internal.misc.ScopedMemoryAccess natives");

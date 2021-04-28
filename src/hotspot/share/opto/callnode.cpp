@@ -2239,3 +2239,21 @@ bool CallNode::may_modify_arraycopy_helper(const TypeOopPtr* dest_t, const TypeO
 
   return true;
 }
+
+InitializeKlassNode::InitializeKlassNode(Compile* C, Node* ctrl, Node* mem, Node* abio, Node* klass_node)
+        : CallNode(initialize_klass_type(), NULL, TypeRawPtr::BOTTOM)
+{
+  init_class_id(Class_InitializeKlass);
+  init_flags(Flag_is_macro);
+  Node *topnode = C->top();
+
+  init_req( TypeFunc::Control  , ctrl );
+  init_req( TypeFunc::I_O      , abio );
+  init_req( TypeFunc::Memory   , mem );
+  init_req( TypeFunc::ReturnAdr, topnode );
+  init_req( TypeFunc::FramePtr , topnode );
+  init_req( KlassNode          , klass_node);
+  C->add_macro_node(this);
+}
+
+uint InitializeKlassNode::size_of() const { return sizeof(*this); }

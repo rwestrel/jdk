@@ -500,9 +500,9 @@ public:
 // ---------- Code roots handling hooks
 //
 public:
-  void register_nmethod(nmethod* nm) override;
+  void register_nmethod(CompiledMethod* nm) override;
   void unregister_nmethod(nmethod* nm) override;
-  void verify_nmethod(nmethod* nm) override {}
+  void verify_nmethod(CompiledMethod* nm) override {}
 
 // ---------- Pinning hooks
 //

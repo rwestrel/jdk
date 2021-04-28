@@ -2319,6 +2319,7 @@ void MacroAssembler::jump_cc(Condition cc, AddressLiteral dst, Register rscratch
   if (reachable(dst)) {
     InstructionMark im(this);
     relocate(dst.reloc());
+//    relocate(dst.rspec(), call32_operand);
     const int short_size = 2;
     const int long_size = 6;
     int offs = (intptr_t)dst.target() - ((intptr_t)pc());
@@ -4471,11 +4472,13 @@ void MacroAssembler::check_klass_subtype_slow_path(Register sub_klass,
   if (!IS_A_TEMP(rdi)) { push(rdi); pushed_rdi = true; }
 
 #ifndef PRODUCT
-  int* pst_counter = &SharedRuntime::_partial_subtype_ctr;
-  ExternalAddress pst_counter_addr((address) pst_counter);
-  NOT_LP64(  incrementl(pst_counter_addr) );
-  LP64_ONLY( lea(rcx, pst_counter_addr) );
-  LP64_ONLY( incrementl(Address(rcx, 0)) );
+  if (!DumpCodeToDisk) {
+    int* pst_counter = &SharedRuntime::_partial_subtype_ctr;
+    ExternalAddress pst_counter_addr((address) pst_counter);
+    NOT_LP64(  incrementl(pst_counter_addr) );
+    LP64_ONLY( lea(rcx, pst_counter_addr) );
+    LP64_ONLY( incrementl(Address(rcx, 0)) );
+  }
 #endif //PRODUCT
 
   // We will consult the secondary-super array.

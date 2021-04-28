@@ -38,6 +38,18 @@
 #include "opto/subnode.hpp"
 #include "opto/type.hpp"
 #include "runtime/deoptimization.hpp"
+#include "ci/ciTypeFlow.hpp"
+#include "compiler/methodLiveness.hpp"
+#include "libadt/vectset.hpp"
+#include "oops/generateOopMap.hpp"
+#include "opto/graphKit.hpp"
+#include "ci/ciMethod.hpp"
+#include "classfile/javaClasses.hpp"
+#include "opto/callGenerator.hpp"
+#include "opto/castnode.hpp"
+#include "opto/convertnode.hpp"
+#include "opto/intrinsicnode.hpp"
+#include "opto/movenode.hpp"
 
 class BarrierSetC2;
 class FastLockNode;
@@ -58,7 +70,7 @@ class RootNode;
 class GraphKit : public Phase {
   friend class PreserveJVMState;
 
- protected:
+protected:
   ciEnv*            _env;       // Compilation environment
   PhaseGVN         &_gvn;       // Some optimizations while parsing
   SafePointNode*    _map;       // Parser map from JVM to Nodes
@@ -67,7 +79,9 @@ class GraphKit : public Phase {
   ciMethod*         _method;    // JVM Current Method
   BarrierSetC2*     _barrier_set;
 
- private:
+  Node* load_mirror_from_klass(Node* klass);
+
+private:
   int               _sp;        // JVM Expression Stack Pointer; don't modify directly!
 
  private:
@@ -677,7 +691,9 @@ class GraphKit : public Phase {
   }
 
   //--------------- stub generation -------------------
- public:
+  void ensure_klass_initialization(ciInstanceKlass* holder_klass);
+
+public:
   void gen_stub(address C_function,
                 const char *name,
                 int is_fancy_jump,

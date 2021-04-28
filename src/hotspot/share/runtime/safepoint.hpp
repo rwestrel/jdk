@@ -157,7 +157,7 @@ public:
   }
 
   // Exception handling for page polling
-  static void handle_polling_page_exception(JavaThread *thread);
+  static JNIEXPORT void handle_polling_page_exception(JavaThread *thread);
 
   static bool is_cleanup_needed();
   static void do_cleanup_tasks();

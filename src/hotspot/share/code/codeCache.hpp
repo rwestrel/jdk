@@ -25,6 +25,7 @@
 #ifndef SHARE_CODE_CODECACHE_HPP
 #define SHARE_CODE_CODECACHE_HPP
 
+#include <libelf.h>
 #include "code/codeBlob.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/gcBehaviours.hpp"
@@ -156,7 +157,7 @@ class CodeCache : AllStatic {
   static void free(CodeBlob* cb);                          // frees a CodeBlob
   static void free_unused_tail(CodeBlob* cb, size_t used); // frees the unused tail of a CodeBlob (only used by TemplateInterpreter::initialize())
   static bool contains(void *p);                           // returns whether p is included
-  static bool contains(nmethod* nm);                       // returns whether nm is included
+  static bool contains(CompiledMethod* nm);                       // returns whether nm is included
   static void blobs_do(void f(CodeBlob* cb));              // iterates over all CodeBlobs
   static void blobs_do(CodeBlobClosure* f);                // iterates over all CodeBlobs
   static void nmethods_do(void f(nmethod* nm));            // iterates over all nmethods
@@ -168,6 +169,7 @@ class CodeCache : AllStatic {
   static CodeBlob* find_blob_and_oopmap(void* start, int& slot);         // Returns the CodeBlob containing the given address
   static int find_oopmap_slot_fast(void* start);        // Returns a fast oopmap slot if there is any; -1 otherwise
   static nmethod*  find_nmethod(void* start);           // Returns the nmethod containing the given address
+  static LeydenNMethod*  find_leyden_nmethod(void* start);           // Returns the nmethod containing the given address
   static CompiledMethod* find_compiled(void* start);
 
   static int       blob_count();                        // Returns the total number of CodeBlobs in the cache
@@ -340,6 +342,14 @@ class CodeCache : AllStatic {
   static void print_space(outputStream *out);
   static void print_age(outputStream *out);
   static void print_names(outputStream *out);
+
+public:
+  static void dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread);
+
+  static void restore_from_disk(JavaThread* thread);
+
+  static bool virtual_call_entry_and_holder(JavaThread* thread, RelocIterator &iter, nmethod* nm, address &entry,
+                                            CompiledICHolder** holder);
 };
 
 

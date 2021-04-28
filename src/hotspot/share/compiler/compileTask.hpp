@@ -207,6 +207,12 @@ public:
                            msg, short_form, cr);
   }
   static void  print_ul(const nmethod* nm, const char* msg = nullptr);
+  static void  print(outputStream* st, const LeydenNMethod* nm, const char* msg = nullptr, bool short_form = false, bool cr = true) {
+    print_impl(st, nm->method(), nm->compile_id(), nm->comp_level(),
+                           nm->is_osr_method(), nm->is_osr_method() ? nm->osr_entry_bci() : -1, /*is_blocking*/ false,
+                           msg, short_form, cr);
+  }
+  static void  print_ul(const nmethod* nm, const char* msg = NULL);
 
   static void  print_inline_indent(int inline_level, outputStream* st = tty);
 

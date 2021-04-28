@@ -30,6 +30,7 @@
 #include "opto/addnode.hpp"
 #include "opto/subnode.hpp"
 #include "opto/type.hpp"
+#include "opto/mulnode.hpp"
 
 class PhaseGVN;
 class PhaseTransform;

@@ -153,6 +153,7 @@ class ReservedCodeSpace : public ReservedSpace {
 
 class VirtualSpace {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Reserved area
   char* _low_boundary;

@@ -169,9 +169,9 @@ class ParallelScavengeHeap : public CollectedHeap {
   // collection.
   bool is_maximal_no_gc() const override;
 
-  void register_nmethod(nmethod* nm) override;
+  void register_nmethod(CompiledMethod* nm) override;
   void unregister_nmethod(nmethod* nm) override;
-  void verify_nmethod(nmethod* nm) override;
+  void verify_nmethod(CompiledMethod* nm) override;
 
   void prune_scavengable_nmethods();
 

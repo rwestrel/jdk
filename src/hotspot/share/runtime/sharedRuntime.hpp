@@ -191,14 +191,14 @@ class SharedRuntime: AllStatic {
     IMPLICIT_DIVIDE_BY_ZERO,
     STACK_OVERFLOW
   };
-  static void    throw_AbstractMethodError(JavaThread* current);
-  static void    throw_IncompatibleClassChangeError(JavaThread* current);
-  static void    throw_ArithmeticException(JavaThread* current);
-  static void    throw_NullPointerException(JavaThread* current);
-  static void    throw_NullPointerException_at_call(JavaThread* current);
-  static void    throw_StackOverflowError(JavaThread* current);
-  static void    throw_delayed_StackOverflowError(JavaThread* current);
-  static void    throw_StackOverflowError_common(JavaThread* current, bool delayed);
+  static JNIEXPORT void    throw_AbstractMethodError(JavaThread* current);
+  static JNIEXPORT void    throw_IncompatibleClassChangeError(JavaThread* current);
+  static JNIEXPORT void    throw_ArithmeticException(JavaThread* current);
+  static JNIEXPORT void    throw_NullPointerException(JavaThread* current);
+  static JNIEXPORT void    throw_NullPointerException_at_call(JavaThread* current);
+  static JNIEXPORT void    throw_StackOverflowError(JavaThread* current);
+  static JNIEXPORT void    throw_delayed_StackOverflowError(JavaThread* current);
+  static JNIEXPORT void    throw_StackOverflowError_common(JavaThread* current, bool delayed);
   static address continuation_for_implicit_exception(JavaThread* current,
                                                      address faulting_pc,
                                                      ImplicitExceptionKind exception_kind);
@@ -291,7 +291,7 @@ class SharedRuntime: AllStatic {
 
 
   // used by native wrappers to re-enable yellow if overflow happened in native code
-  static void reguard_yellow_pages();
+  static JNIEXPORT void reguard_yellow_pages();
 
   // Fill in the "X cannot be cast to a Y" message for ClassCastException
   //
@@ -494,8 +494,8 @@ class SharedRuntime: AllStatic {
   static bool should_fixup_call_destination(address destination, address entry_point, address caller_pc, Method* moop, CodeBlob* cb);
 
   // Slow-path Locking and Unlocking
-  static void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
-  static void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static JNIEXPORT void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static JNIEXPORT void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
 
   // Resolving of calls
   static address resolve_static_call_C     (JavaThread* current);
@@ -503,7 +503,7 @@ class SharedRuntime: AllStatic {
   static address resolve_opt_virtual_call_C(JavaThread* current);
 
   // arraycopy, the non-leaf version.  (See StubRoutines for all the leaf calls.)
-  static void slow_arraycopy_C(oopDesc* src,  jint src_pos,
+  static JNIEXPORT void slow_arraycopy_C(oopDesc* src,  jint src_pos,
                                oopDesc* dest, jint dest_pos,
                                jint length, JavaThread* thread);
 
