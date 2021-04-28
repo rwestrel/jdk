@@ -3338,8 +3338,69 @@ void JavaThread::invoke_shutdown_hooks() {
 //   + Delete this thread
 //   + Return to caller
 
+#include "classfile/classLoaderDataGraph.hpp"
+
+GrowableArray<Method*>* compile_on_exit;
+GrowableArray<Klass*>* loaded_klasses;
+
+void maybe_compile_method(Method* m) {
+  Thread* thread = Thread::current();
+  methodHandle mh(thread, m);
+  if (CompilerOracle::has_option(mh, CompileCommand::CompileOnExit)) {
+    compile_on_exit->push(m);
+  }
+}
+
+void collect_loaded_klasses(Klass* const k) {
+  if ((k->is_instance_klass() && InstanceKlass::cast(k)->is_loaded()) || k->is_array_klass()) {
+    loaded_klasses->push(k);
+  }
+}
+
 void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
+
+  {
+    ResourceMark rm;
+    HandleMark hm(thread);
+    compile_on_exit = new GrowableArray<Method*>();
+
+    SystemDictionary::methods_do(maybe_compile_method);
+
+    for (GrowableArrayIterator<Method*> m = compile_on_exit->begin(); m != compile_on_exit->end(); ++m) {
+      methodHandle mh(thread, *m);
+      nmethod* nm = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
+                                                  CompileTask::Reason_Whitebox, thread);
+      assert(!thread->has_pending_exception() && nm != NULL, "");
+    }
+  }
+
+  if (UseNewCode) {
+    ResourceMark rm;
+    HandleMark hm(thread);
+    FILE* file = fopen("/home/roland/tmp/dump", "w");
+    assert(file != NULL, "fopen failed");
+
+    loaded_klasses = new GrowableArray<Klass*>();
+    {
+      MutexLocker ml(ClassLoaderDataGraph_lock);
+      ClassLoaderDataGraph::classes_do(collect_loaded_klasses);
+    }
+
+    int nb = loaded_klasses->length();
+    assert(nb >= 1, "");
+    int w = fwrite(&nb, sizeof(nb), 1, file);
+    assert(w == 1, "fwrite failed");
+    for (int i = 0; i < nb; i++) {
+      Symbol* klass_name = loaded_klasses->at(i)->name();
+      int l = klass_name->utf8_length();
+      w = fwrite(&l, sizeof(l), 1, file);
+      assert(w == 1, "fwrite failed");
+      w = fwrite(klass_name->as_utf8(), 1, l, file);
+      assert(w == l, "fwrite failed");
+    }
+    CodeCache::dump_to_disk(file);
+  }
 
 #ifdef ASSERT
   _vm_complete = false;

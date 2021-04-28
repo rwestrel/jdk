@@ -22,6 +22,8 @@
  *
  */
 
+#include <classfile/symbolTable.hpp>
+#include <classfile/systemDictionary.hpp>
 #include "precompiled.hpp"
 #include "jvm_io.h"
 #include "code/codeBlob.hpp"
@@ -1625,6 +1627,102 @@ void CodeCache::print_age(outputStream *out) {
 void CodeCache::print_names(outputStream *out) {
   FOR_ALL_ALLOCABLE_HEAPS(heap) {
     CodeHeapState::print_names(out, (*heap));
+  }
+}
+
+void CodeCache::dump_to_disk(FILE* file) {
+  ResourceMark rm;
+  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+  GrowableArray<CompiledMethod*> methods;
+  FOR_ALL_BLOBS(cb, heap) {
+    cb->print();
+    if (cb->is_compiled()) {
+      CompiledMethod* cm = cb->as_compiled_method();
+      methods.push(cm);
+    }
+  }
+  int nb = methods.length();
+  assert(nb >= 1, "");
+  int w = fwrite(&nb, sizeof(nb), 1, file);
+  assert(w == 1, "fwrite failed");
+  for (int i = 0; i < nb; i++) {
+    CompiledMethod* cm = methods.at(i);
+    Method* m = cm->method();
+    Symbol* klass_name = m->klass_name();
+    int l = klass_name->utf8_length();
+    w = fwrite(&l, sizeof(l), 1, file);
+    assert(w == 1, "fwrite failed");
+    w = fwrite(klass_name->as_utf8(), 1, l, file);
+    assert(w == l, "fwrite failed");
+    Symbol* method_name = m->name();
+    l = method_name->utf8_length();
+    w = fwrite(&l, sizeof(l), 1, file);
+    assert(w == 1, "fwrite failed");
+    w = fwrite(method_name->as_utf8(), 1, l, file);
+    assert(w == l, "fwrite failed");
+    Symbol* signature = m->signature();
+    l = signature->utf8_length();
+    w = fwrite(&l, sizeof(l), 1, file);
+    assert(w == 1, "fwrite failed");
+    w = fwrite(signature->as_utf8(), 1, l, file);
+    assert(w == l, "fwrite failed");
+    int cm_size = cm->size();
+    w = fwrite(&cm_size, sizeof(cm_size), 1, file);
+    assert(w == 1, "fwrite failed");
+    w = fwrite(cm, cm_size, 1, file);
+    assert(w == 1, "fwrite failed");
+  }
+//  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
+//  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
+//  assert(w == heap->high() - heap->low(), "fwrite failed");
+  fclose(file);
+}
+
+void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
+  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  ResourceMark rm;
+  int nb;
+  int r = fread(&nb, sizeof(nb), 1, file);
+  assert(r == 1, "fread failed");
+  for (int i = 0; i < nb; i++) {
+    int klass_l;
+    r = fread(&klass_l, sizeof(klass_l), 1, file);
+    assert(r == 1, "fread failed");
+    char* klass_name = NEW_RESOURCE_ARRAY(char, klass_l+1);
+    r = fread(klass_name, 1, klass_l, file);
+    assert(r == klass_l, "fread failed");
+    klass_name[klass_l] = '\0';
+    int method_l;
+    r = fread(&method_l, sizeof(method_l), 1, file);
+    assert(r == 1, "fread failed");
+    char* method_name = NEW_RESOURCE_ARRAY(char, method_l+1);
+    r = fread(method_name, 1, method_l, file);
+    assert(r == method_l, "fwrite failed");
+    method_name[method_l] = '\0';
+    int signature_l;
+    r = fread(&signature_l, sizeof(signature_l), 1, file);
+    assert(r == 1, "fwrite failed");
+    char* signature = NEW_RESOURCE_ARRAY(char, signature_l+1);
+    r = fread(signature, 1, signature_l, file);
+    assert(r == signature_l, "fwrite failed");
+    signature[signature_l] = '\0';
+    tty->print_cr("XXX %s %s %s", klass_name, method_name, signature);
+    Symbol* klass_sym = SymbolTable::new_symbol(klass_name, klass_l);
+    Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
+                                                 Handle(), true, thread);
+    assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+    Symbol* method_sym = SymbolTable::new_symbol(method_name, method_l);
+    Symbol* signature_sym = SymbolTable::new_symbol(signature, signature_l);
+    Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
+    assert(m != NULL, "method not found");
+
+    int cm_size;
+    r = fread(&cm_size, sizeof(cm_size), 1, file);
+    assert(r== 1, "fwrite failed");
+    nmethod* nm = (nmethod*)allocate(cm_size, CodeBlobType::MethodNonProfiled);
+    r = fread(nm, cm_size, 1, file);
+    assert(r == 1, "fwrite failed");
   }
 }
 //---<  END  >--- CodeHeap State Analytics.

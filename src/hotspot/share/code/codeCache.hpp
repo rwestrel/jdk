@@ -298,6 +298,11 @@ class CodeCache : AllStatic {
   static void print_space(outputStream *out);
   static void print_age(outputStream *out);
   static void print_names(outputStream *out);
+
+public:
+  static void dump_to_disk(FILE* file);
+
+  static void restore_from_disk(FILE* file, JavaThread* thread);
 };
 
 
