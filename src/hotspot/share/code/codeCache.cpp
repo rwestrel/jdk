@@ -1630,48 +1630,126 @@ void CodeCache::print_names(outputStream *out) {
   }
 }
 
+struct Vtables {
+  intptr_t nmethod;
+  intptr_t bufferblob;
+  intptr_t runtimestub;
+  intptr_t adapterblob;
+  intptr_t exceptionblob;
+  intptr_t methodhandlesadapterblob;
+  intptr_t safepointblob;
+  intptr_t uncommontrapblob;
+  intptr_t deoptimizationblob;
+};
+
+struct PerMethod {
+  intptr_t _from_interpreted_entry;
+};
+
+enum MetadataRecord {
+  METHOD_RECORD,
+  KLASS_RECORD
+};
+
 void CodeCache::dump_to_disk(FILE* file) {
+  Vtables vts;
+  {
+    nmethod nm;
+    vts.nmethod = *(intptr_t*)&nm;
+    BufferBlob bb;
+    vts.bufferblob = *(intptr_t*)&bb;
+    RuntimeStub rs;
+    vts.runtimestub = *(intptr_t*)&rs;
+    AdapterBlob ab;
+    vts.adapterblob = *(intptr_t*)&ab;
+    ExceptionBlob eb;
+    vts.exceptionblob = *(intptr_t*)&eb;
+    MethodHandlesAdapterBlob mhab;
+    vts.methodhandlesadapterblob = *(intptr_t*)&mhab;
+    SafepointBlob sb;
+    vts.safepointblob = *(intptr_t*)&sb;
+    UncommonTrapBlob utb;
+    vts.uncommontrapblob = *(intptr_t*)&utb;
+    DeoptimizationBlob db;
+    vts.deoptimizationblob = *(intptr_t*)&db;
+  }
+  int w = fwrite(&vts, sizeof(vts), 1, file);
+  assert(w == 1, "fwrite failed");
   ResourceMark rm;
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
-  GrowableArray<CompiledMethod*> methods;
   FOR_ALL_BLOBS(cb, heap) {
-    cb->print();
-    if (cb->is_compiled()) {
-      CompiledMethod* cm = cb->as_compiled_method();
-      methods.push(cm);
+    intptr_t vtbl = *(intptr_t*)cb;
+    if (vtbl != vts.nmethod &&
+        vtbl != vts.bufferblob &&
+        vtbl != vts.runtimestub &&
+        vtbl != vts.adapterblob &&
+        vtbl != vts.exceptionblob &&
+        vtbl != vts.methodhandlesadapterblob &&
+        vtbl != vts.safepointblob &&
+        vtbl != vts.uncommontrapblob &&
+        vtbl != vts.deoptimizationblob &&
+        true
+    ) {
+      ShouldNotReachHere();
     }
-  }
-  int nb = methods.length();
-  assert(nb >= 1, "");
-  int w = fwrite(&nb, sizeof(nb), 1, file);
-  assert(w == 1, "fwrite failed");
-  for (int i = 0; i < nb; i++) {
-    CompiledMethod* cm = methods.at(i);
-    Method* m = cm->method();
-    Symbol* klass_name = m->klass_name();
-    int l = klass_name->utf8_length();
-    w = fwrite(&l, sizeof(l), 1, file);
+    int cb_size = cb->size();
+    tty->print_cr(">>> %d", cb_size);
+    w = fwrite(&cb_size, sizeof(cb_size), 1, file);
     assert(w == 1, "fwrite failed");
-    w = fwrite(klass_name->as_utf8(), 1, l, file);
-    assert(w == l, "fwrite failed");
-    Symbol* method_name = m->name();
-    l = method_name->utf8_length();
-    w = fwrite(&l, sizeof(l), 1, file);
-    assert(w == 1, "fwrite failed");
-    w = fwrite(method_name->as_utf8(), 1, l, file);
-    assert(w == l, "fwrite failed");
-    Symbol* signature = m->signature();
-    l = signature->utf8_length();
-    w = fwrite(&l, sizeof(l), 1, file);
-    assert(w == 1, "fwrite failed");
-    w = fwrite(signature->as_utf8(), 1, l, file);
-    assert(w == l, "fwrite failed");
-    int cm_size = cm->size();
-    w = fwrite(&cm_size, sizeof(cm_size), 1, file);
-    assert(w == 1, "fwrite failed");
-    w = fwrite(cm, cm_size, 1, file);
-    assert(w == 1, "fwrite failed");
+
+    if (cb->is_nmethod()) {
+      nmethod* nm = cb->as_nmethod();
+      nmethod* nm_copy = (nmethod*)NEW_RESOURCE_ARRAY(char, cb_size);
+      memcpy((void*)nm_copy, nm, cb_size);
+      nm_copy->_code_begin = (address)(nm->_code_begin - (address)nm);
+      nm_copy->_code_end = (address)(nm->_code_end - (address) nm);
+      nm_copy->_content_begin = (address)(nm->_content_begin - (address)nm);
+      nm_copy->_data_end = (address) (nm->_data_end - (address) nm);
+      nm_copy->_relocation_begin = (address) (nm->_relocation_begin - (address) nm);
+      nm_copy->_relocation_end = (address) (nm->_relocation_end - (address) nm);
+
+      nm_copy->_scopes_data_begin = (address)(nm->_scopes_data_begin - (address)nm);
+      nm_copy->_deopt_handler_begin = (address)(nm->_deopt_handler_begin - (address)nm);
+      nm_copy->_deopt_mh_handler_begin = (address)(nm->_deopt_mh_handler_begin - (address)nm);
+      nm_copy->_entry_point = (address) (nm->_entry_point - (address) nm);
+      nm_copy->_verified_entry_point = (address) (nm->_verified_entry_point - (address) nm);
+      nm_copy->_osr_entry_point = (address) (nm->_osr_entry_point - (address) nm);
+
+      w = fwrite(nm_copy, cb_size, 1, file);
+      assert(w == 1, "fwrite failed");
+
+      Method* m = nm->method();
+      write_method(file, m);
+      int metadata_cnt = 0;
+      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+        metadata_cnt++;
+      }
+      w = fwrite(&metadata_cnt, sizeof(metadata_cnt), 1, file);
+      assert(w == 1, "fwrite failed");
+      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+        Metadata* md = *p;
+        if (md->is_method()) {
+          MetadataRecord rec = METHOD_RECORD;
+          w = fwrite(&rec, sizeof(rec), 1, file);
+          assert(w == 1, "fwrite failed");
+          write_method(file, (Method*) md);
+        } else {
+          ShouldNotReachHere();
+        }
+      }
+      PerMethod pm;
+      assert(heap->contains(m->from_interpreted_entry()), "");
+      pm._from_interpreted_entry = m->from_interpreted_entry() - (address)heap->low();
+      assert(pm._from_interpreted_entry >= 0, "");
+      w = fwrite(&pm, sizeof(pm), 1, file);
+      assert(w == 1, "fwrite failed");
+    } else {
+      w = fwrite(cb, cb_size, 1, file);
+      assert(w == 1, "fwrite failed");
+    }
   }
 //  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
 //  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
@@ -1679,50 +1757,198 @@ void CodeCache::dump_to_disk(FILE* file) {
   fclose(file);
 }
 
+void CodeCache::write_method(FILE* file, const Method* m) {
+  write_symbol(file, m->klass_name());
+  write_symbol(file, m->name());
+  write_symbol(file, m->signature());
+}
+
+void CodeCache::write_symbol(FILE* file, const Symbol* sym) {
+  int l = sym->utf8_length();
+  int w = fwrite(&l, sizeof(l), 1, file);
+  assert(w == 1, "fwrite failed");
+  w = fwrite(sym->as_utf8(), 1, l, file);
+  assert(w == l, "fwrite failed");
+}
+
 void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
+  Vtables vts;
+  int r = fread(&vts, sizeof(vts), 1, file);
+  assert(r == 1, "fwrite failed");
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   ResourceMark rm;
-  int nb;
-  int r = fread(&nb, sizeof(nb), 1, file);
-  assert(r == 1, "fread failed");
-  for (int i = 0; i < nb; i++) {
-    int klass_l;
-    r = fread(&klass_l, sizeof(klass_l), 1, file);
-    assert(r == 1, "fread failed");
-    char* klass_name = NEW_RESOURCE_ARRAY(char, klass_l+1);
-    r = fread(klass_name, 1, klass_l, file);
-    assert(r == klass_l, "fread failed");
-    klass_name[klass_l] = '\0';
-    int method_l;
-    r = fread(&method_l, sizeof(method_l), 1, file);
-    assert(r == 1, "fread failed");
-    char* method_name = NEW_RESOURCE_ARRAY(char, method_l+1);
-    r = fread(method_name, 1, method_l, file);
-    assert(r == method_l, "fwrite failed");
-    method_name[method_l] = '\0';
-    int signature_l;
-    r = fread(&signature_l, sizeof(signature_l), 1, file);
-    assert(r == 1, "fwrite failed");
-    char* signature = NEW_RESOURCE_ARRAY(char, signature_l+1);
-    r = fread(signature, 1, signature_l, file);
-    assert(r == signature_l, "fwrite failed");
-    signature[signature_l] = '\0';
-    tty->print_cr("XXX %s %s %s", klass_name, method_name, signature);
-    Symbol* klass_sym = SymbolTable::new_symbol(klass_name, klass_l);
-    Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
-                                                 Handle(), true, thread);
-    assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
-    Symbol* method_sym = SymbolTable::new_symbol(method_name, method_l);
-    Symbol* signature_sym = SymbolTable::new_symbol(signature, signature_l);
-    Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
-    assert(m != NULL, "method not found");
 
-    int cm_size;
-    r = fread(&cm_size, sizeof(cm_size), 1, file);
-    assert(r== 1, "fwrite failed");
-    nmethod* nm = (nmethod*)allocate(cm_size, CodeBlobType::MethodNonProfiled);
-    r = fread(nm, cm_size, 1, file);
-    assert(r == 1, "fwrite failed");
+  long cur = ftell(file);
+  fseek(file, 0, SEEK_END);
+  long end = ftell(file);
+  fseek(file, cur, SEEK_SET);
+
+  tty->print_cr("XXX %ld %ld", cur, end);
+  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+
+  while(ftell(file) != end) {
+    int cb_size;
+    r = fread(&cb_size, sizeof(cb_size), 1, file);
+    assert(r == 1, "fread failed");
+    tty->print_cr("<<< %d", cb_size);
+    CodeBlob* cb = (CodeBlob*) allocate(cb_size, CodeBlobType::MethodNonProfiled);
+    r = fread(cb, cb_size, 1, file);
+    assert(r == 1, "fread failed");
+    intptr_t vtbl = *(intptr_t*)cb;
+
+    if (vtbl == vts.nmethod) {
+      nmethod nm;
+      vtbl = *(intptr_t*)&nm;
+    } else if (vtbl == vts.bufferblob) {
+      BufferBlob bb;
+      vtbl = *(intptr_t*)&bb;
+    } else if (vtbl == vts.runtimestub) {
+      RuntimeStub rs;
+      vtbl = *(intptr_t*)&rs;
+    } else if (vtbl == vts.adapterblob) {
+      AdapterBlob ab;
+      vtbl = *(intptr_t*)&ab;
+    } else if (vtbl == vts.exceptionblob) {
+      ExceptionBlob eb;
+      vtbl = *(intptr_t*)&eb;
+    } else if (vtbl == vts.methodhandlesadapterblob) {
+      MethodHandlesAdapterBlob mhab;
+      vtbl = *(intptr_t*)&mhab;
+    } else if (vtbl == vts.safepointblob) {
+      SafepointBlob sb;
+      vtbl = *(intptr_t*)&sb;
+    } else if (vtbl == vts.uncommontrapblob) {
+      UncommonTrapBlob utb;
+      vtbl = *(intptr_t*)&utb;
+    } else if (vtbl == vts.deoptimizationblob) {
+      DeoptimizationBlob db;
+      vtbl = *(intptr_t*)&db;
+    } else {
+      ShouldNotReachHere();
+    }
+    *(intptr_t*)cb = vtbl;
+    if (cb->is_nmethod()) {
+      nmethod* nm = cb->as_nmethod();
+
+      nm->_code_begin = (address)nm + (intptr_t)nm->_code_begin;
+      nm->_code_end = (address)nm + (intptr_t)nm->_code_end;
+      nm->_content_begin = (address)nm + (intptr_t)nm->_content_begin;
+      nm->_data_end = (address)nm + (intptr_t)nm->_data_end;
+      nm->_relocation_begin = (address)nm + (intptr_t)nm->_relocation_begin;
+      nm->_relocation_end = (address)nm + (intptr_t)nm->_relocation_end;
+      nm->_scopes_data_begin = (address)nm + (intptr_t)nm->_scopes_data_begin;
+      nm->_deopt_handler_begin = (address)nm + (intptr_t)nm->_deopt_handler_begin;
+      nm->_deopt_mh_handler_begin = (address)nm + (intptr_t)nm->_deopt_mh_handler_begin;
+      nm->_entry_point = (address)nm + (intptr_t)nm->_entry_point;
+      nm->_verified_entry_point = (address)nm + (intptr_t)nm->_verified_entry_point;
+      nm->_osr_entry_point = (address)nm + (intptr_t)nm->_osr_entry_point;
+
+      Method* m = read_method(file, thread);
+      methodHandle mh(thread, m);
+
+      int metadata_cnt = 0;
+      r = fread(&metadata_cnt, sizeof(metadata_cnt), 1, file);
+      assert(r == 1, "fwrite failed");
+      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+        MetadataRecord rec;
+        r = fread(&rec, sizeof(rec), 1, file);
+        assert(r == 1, "fwrite failed");
+        if (rec == METHOD_RECORD) {
+          *p = read_method(file, thread);
+        } else {
+          ShouldNotReachHere();
+        }
+      }
+
+      nm->set_method(m);
+
+      PerMethod pm;
+      r = fread(&pm, sizeof(pm), 1, file);
+      assert(r == 1, "fread failed");
+
+      {
+        MutexLocker ml(CompiledMethod_lock, Mutex::_no_safepoint_check_flag);
+        mh->_code = nm;
+        mh->set_highest_comp_level(nm->comp_level());
+        OrderAccess::storestore();
+        mh->_from_compiled_entry = nm->verified_entry_point();
+        OrderAccess::storestore();
+        // Instantly compiled code can execute.
+        if (!mh->is_method_handle_intrinsic())
+          mh->_from_interpreted_entry = (address)(heap->low() + pm._from_interpreted_entry);
+        mh->_i2i_entry = (address)-1;
+      }
+      nm->print();
+    }
   }
+
+  fclose(file);
+
+#if 0
+  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+  FOR_ALL_BLOBS(cb, heap) {
+    intptr_t vtbl = *(intptr_t*) cb;
+    if (vtbl == vts.nmethod) {
+      nmethod nm;
+      vtbl = *(intptr_t*)&nm;
+    } else if (vtbl == vts.bufferblob) {
+      BufferBlob bb;
+      vtbl = *(intptr_t*)&bb;
+    } else if (vtbl == vts.runtimestub) {
+      RuntimeStub rs;
+      vtbl = *(intptr_t*)&rs;
+    } else if (vtbl == vts.adapterblob) {
+      AdapterBlob ab;
+      vtbl = *(intptr_t*)&ab;
+    } else if (vtbl == vts.exceptionblob) {
+      ExceptionBlob eb;
+      vtbl = *(intptr_t*)&eb;
+    } else if (vtbl == vts.methodhandlesadapterblob) {
+      MethodHandlesAdapterBlob mhab;
+      vtbl = *(intptr_t*)&mhab;
+    } else if (vtbl == vts.safepointblob) {
+      SafepointBlob sb;
+      vtbl = *(intptr_t*)&sb;
+    } else if (vtbl == vts.uncommontrapblob) {
+      UncommonTrapBlob utb;
+      vtbl = *(intptr_t*)&utb;
+    } else if (vtbl == vts.deoptimizationblob) {
+      DeoptimizationBlob db;
+      vtbl = *(intptr_t*)&db;
+    } else {
+      ShouldNotReachHere();
+    }
+    *(intptr_t*) cb = vtbl;
+  }
+#endif
+}
+
+Method* CodeCache::read_method(FILE* file, JavaThread* thread) {
+  Klass* k = read_klass(file, thread);
+  Symbol* method_sym = read_symbol(file);
+  Symbol* signature_sym = read_symbol(file);
+  Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
+  assert(m != NULL, "method not found");
+  return m;
+}
+
+Klass* CodeCache::read_klass(FILE* file, JavaThread* thread) {
+  Symbol* klass_sym = read_symbol(file);
+  Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
+                                               Handle(), true, thread);
+  assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+  return k;
+}
+
+Symbol* CodeCache::read_symbol(FILE* file) {
+  int l;
+  int r = fread(&l, sizeof(l), 1, file);
+  assert(r == 1, "fread failed");
+  char* name = NEW_RESOURCE_ARRAY(char, l + 1);
+  r = fread(name, 1, l, file);
+  assert(r == l, "fread failed");
+  name[l] = '\0';
+  return SymbolTable::new_symbol(name, l);
 }
 //---<  END  >--- CodeHeap State Analytics.

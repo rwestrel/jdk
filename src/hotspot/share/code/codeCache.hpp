@@ -303,6 +303,16 @@ public:
   static void dump_to_disk(FILE* file);
 
   static void restore_from_disk(FILE* file, JavaThread* thread);
+
+  static void write_symbol(FILE* file, const Symbol* sym);
+
+  static void write_method(FILE* file, const Method* m);
+
+  static Symbol* read_symbol(FILE* file);
+
+  static Klass* read_klass(FILE* file, JavaThread* thread);
+
+  static Method* read_method(FILE* file, JavaThread* thread);
 };
 
 
