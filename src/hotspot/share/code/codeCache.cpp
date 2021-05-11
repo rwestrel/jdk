@@ -24,6 +24,7 @@
 
 #include <classfile/symbolTable.hpp>
 #include <classfile/systemDictionary.hpp>
+#include <opto/runtime.hpp>
 #include "precompiled.hpp"
 #include "jvm_io.h"
 #include "code/codeBlob.hpp"
@@ -1651,6 +1652,12 @@ enum MetadataRecord {
   KLASS_RECORD
 };
 
+enum RuntimeCall {
+  OPTORUNTIME__INITIALIZE_KLASS_C,
+  MACROASSEMBLER__DEBUG64,
+  LAST_RUNTIMECALL
+};
+
 void CodeCache::dump_to_disk(FILE* file) {
   Vtables vts;
   {
@@ -1694,20 +1701,52 @@ void CodeCache::dump_to_disk(FILE* file) {
       ShouldNotReachHere();
     }
     int cb_size = cb->size();
-    tty->print_cr(">>> %d", cb_size);
+//    tty->print_cr(">>> %d", cb_size);
     w = fwrite(&cb_size, sizeof(cb_size), 1, file);
     assert(w == 1, "fwrite failed");
 
+    CodeBlob* next = next_blob(heap, cb);
+    int offset = next != NULL ? (address)next - (address)cb : 0;
+    tty->print_cr("XXX %s:%ld - %d %d - %p %p", cb->name(), (uintptr_t)cb - (uintptr_t)heap->low(), cb_size, offset, cb , next);
+    w = fwrite(&offset, sizeof(offset), 1, file);
+    assert(w == 1, "fwrite failed");
+
+    CodeBlob* cb_copy = (CodeBlob*)NEW_RESOURCE_ARRAY(char, cb_size);;
+    memcpy((void*)cb_copy, cb, cb_size);
+
+    cb_copy->_code_begin = (address)cb_copy + (cb->_code_begin - (address)cb);
+    cb_copy->_code_end = (address)cb_copy + (cb->_code_end - (address) cb);
+    cb_copy->_content_begin = (address)cb_copy + (cb->_content_begin - (address)cb);
+    cb_copy->_data_end = (address)cb_copy + (cb->_data_end - (address) cb);
+    cb_copy->_relocation_begin = (address)cb_copy + (cb->_relocation_begin - (address) cb);
+    cb_copy->_relocation_end = (address)cb_copy + (cb->_relocation_end - (address) cb);
+
+    RelocIterator iter(cb_copy);
+    while(iter.next()) {
+      if (iter.type() == relocInfo::runtime_call_type) {
+        runtime_call_Relocation* rt = iter.runtime_call_reloc();
+        if (rt->destination() == (address)OptoRuntime::initialize_klass_C) {
+          rt->set_destination((address) OPTORUNTIME__INITIALIZE_KLASS_C);
+        } else if (rt->destination() == (address)MacroAssembler::debug64) {
+          rt->set_destination((address) MACROASSEMBLER__DEBUG64);
+//        } else {
+//          assert(!cb->is_nmethod(), "");
+//        } else if (rt->) {
+
+        }
+      }
+    }
+
+    cb_copy->_code_begin = (address)(cb->_code_begin - (address)cb);
+    cb_copy->_code_end = (address)(cb->_code_end - (address) cb);
+    cb_copy->_content_begin = (address)(cb->_content_begin - (address)cb);
+    cb_copy->_data_end = (address) (cb->_data_end - (address) cb);
+    cb_copy->_relocation_begin = (address) (cb->_relocation_begin - (address) cb);
+    cb_copy->_relocation_end = (address) (cb->_relocation_end - (address) cb);
+
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
-      nmethod* nm_copy = (nmethod*)NEW_RESOURCE_ARRAY(char, cb_size);
-      memcpy((void*)nm_copy, nm, cb_size);
-      nm_copy->_code_begin = (address)(nm->_code_begin - (address)nm);
-      nm_copy->_code_end = (address)(nm->_code_end - (address) nm);
-      nm_copy->_content_begin = (address)(nm->_content_begin - (address)nm);
-      nm_copy->_data_end = (address) (nm->_data_end - (address) nm);
-      nm_copy->_relocation_begin = (address) (nm->_relocation_begin - (address) nm);
-      nm_copy->_relocation_end = (address) (nm->_relocation_end - (address) nm);
+      nmethod* nm_copy = (nmethod*)cb_copy;
 
       nm_copy->_scopes_data_begin = (address)(nm->_scopes_data_begin - (address)nm);
       nm_copy->_deopt_handler_begin = (address)(nm->_deopt_handler_begin - (address)nm);
@@ -1722,12 +1761,42 @@ void CodeCache::dump_to_disk(FILE* file) {
       Method* m = nm->method();
       write_method(file, m);
       int metadata_cnt = 0;
+      {
+        RelocIterator iter(nm, nm->oops_reloc_begin());
+        while (iter.next()) {
+          if (iter.type() == relocInfo::metadata_type) {
+            metadata_Relocation* r = iter.metadata_reloc();
+            if (r->metadata_value() != NULL) {
+              metadata_cnt++;
+            }
+          }
+        }
+      }
       for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
         if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
         metadata_cnt++;
       }
       w = fwrite(&metadata_cnt, sizeof(metadata_cnt), 1, file);
       assert(w == 1, "fwrite failed");
+      {
+        RelocIterator iter(nm, nm->oops_reloc_begin());
+        while (iter.next()) {
+          if (iter.type() == relocInfo::metadata_type) {
+            metadata_Relocation* r = iter.metadata_reloc();
+            Metadata* md = r->metadata_value();
+            if (md != NULL) {
+              if (md->is_klass()) {
+                MetadataRecord rec = KLASS_RECORD;
+                w = fwrite(&rec, sizeof(rec), 1, file);
+                assert(w == 1, "fwrite failed");
+                write_klass(file, (Klass*) md);
+              } else {
+                ShouldNotReachHere();
+              }
+            }
+          }
+        }
+      }
       for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
         if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
         Metadata* md = *p;
@@ -1736,20 +1805,41 @@ void CodeCache::dump_to_disk(FILE* file) {
           w = fwrite(&rec, sizeof(rec), 1, file);
           assert(w == 1, "fwrite failed");
           write_method(file, (Method*) md);
+        } else if (md->is_klass()) {
+            MetadataRecord rec = KLASS_RECORD;
+            w = fwrite(&rec, sizeof(rec), 1, file);
+            assert(w == 1, "fwrite failed");
+            write_klass(file, (Klass*) md);
         } else {
           ShouldNotReachHere();
         }
       }
       PerMethod pm;
       assert(heap->contains(m->from_interpreted_entry()), "");
-      pm._from_interpreted_entry = m->from_interpreted_entry() - (address)heap->low();
-      assert(pm._from_interpreted_entry >= 0, "");
+      pm._from_interpreted_entry = (address)cb - m->from_interpreted_entry();
       w = fwrite(&pm, sizeof(pm), 1, file);
       assert(w == 1, "fwrite failed");
+      nm->print();
+//      RelocIterator iter(nm, nm->oops_reloc_begin());
+//      while(iter.next()) {
+//        Relocation* r = iter.reloc();
+//        if (r->is_call()) {
+//          CallRelocation* cr = (CallRelocation*)r;
+//          assert(heap->contains(cr->destination()) || (intptr_t)cr->destination() < LAST_RUNTIMECALL, "");
+//        }
+//      }
+
     } else {
-      w = fwrite(cb, cb_size, 1, file);
+      w = fwrite(cb_copy, cb_size, 1, file);
       assert(w == 1, "fwrite failed");
     }
+
+    const char* name = cb->name();
+    int name_len = strlen(name);
+    w = fwrite(&name_len, sizeof(name_len), 1, file);
+    assert(w == 1, "fwrite failed");
+    w = fwrite(name, 1, name_len, file);
+    assert(w == name_len, "fwrite failed");
   }
 //  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
 //  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
@@ -1783,15 +1873,27 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
   long end = ftell(file);
   fseek(file, cur, SEEK_SET);
 
-  tty->print_cr("XXX %ld %ld", cur, end);
-  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+//  tty->print_cr("XXX %ld %ld", cur, end);
+  CodeHeap* heap = get_code_heap(CodeBlobType::AOT);
+  tty->print_cr("XXX %p", heap->_freelist);
+  heap->_freelist = NULL;
 
+  address prev = NULL;
+  int prev_offset = -1;
   while(ftell(file) != end) {
     int cb_size;
     r = fread(&cb_size, sizeof(cb_size), 1, file);
     assert(r == 1, "fread failed");
-    tty->print_cr("<<< %d", cb_size);
-    CodeBlob* cb = (CodeBlob*) allocate(cb_size, CodeBlobType::MethodNonProfiled);
+    int offset;
+    r = fread(&offset, sizeof(offset), 1, file);
+    assert(r == 1, "fwrite failed");
+
+    tty->print_cr("XXX %d %d", cb_size, offset);
+
+//    tty->print_cr("<<< %d", cb_size);
+    CodeBlob* cb = (CodeBlob*) allocate(offset > 0 ? offset - CodeHeap::header_size() : cb_size, CodeBlobType::AOT);
+    assert(prev == NULL || prev_offset == (address)cb - prev, "offset = %d differs from %d", prev_offset, (int)((address)cb - prev));
+
     r = fread(cb, cb_size, 1, file);
     assert(r == 1, "fread failed");
     intptr_t vtbl = *(intptr_t*)cb;
@@ -1827,15 +1929,30 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       ShouldNotReachHere();
     }
     *(intptr_t*)cb = vtbl;
+    cb->_code_begin = (address)cb + (intptr_t)cb->_code_begin;
+    cb->_code_end = (address)cb + (intptr_t)cb->_code_end;
+    cb->_content_begin = (address)cb + (intptr_t)cb->_content_begin;
+    cb->_data_end = (address)cb + (intptr_t)cb->_data_end;
+    cb->_relocation_begin = (address)cb + (intptr_t)cb->_relocation_begin;
+    cb->_relocation_end = (address)cb + (intptr_t)cb->_relocation_end;
+
+    RelocIterator iter(cb);
+    while(iter.next()) {
+      if (iter.type() == relocInfo::runtime_call_type) {
+        runtime_call_Relocation* rt = iter.runtime_call_reloc();
+        if (rt->destination() == (address)OPTORUNTIME__INITIALIZE_KLASS_C) {
+          rt->set_destination((address) OptoRuntime::initialize_klass_C);
+        } else if (rt->destination() == (address)MACROASSEMBLER__DEBUG64) {
+          rt->set_destination((address)MacroAssembler::debug64);
+        } else {
+          assert(!cb->is_nmethod() || heap->contains(rt->destination()), "");
+        }
+      }
+    }
+
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
 
-      nm->_code_begin = (address)nm + (intptr_t)nm->_code_begin;
-      nm->_code_end = (address)nm + (intptr_t)nm->_code_end;
-      nm->_content_begin = (address)nm + (intptr_t)nm->_content_begin;
-      nm->_data_end = (address)nm + (intptr_t)nm->_data_end;
-      nm->_relocation_begin = (address)nm + (intptr_t)nm->_relocation_begin;
-      nm->_relocation_end = (address)nm + (intptr_t)nm->_relocation_end;
       nm->_scopes_data_begin = (address)nm + (intptr_t)nm->_scopes_data_begin;
       nm->_deopt_handler_begin = (address)nm + (intptr_t)nm->_deopt_handler_begin;
       nm->_deopt_mh_handler_begin = (address)nm + (intptr_t)nm->_deopt_mh_handler_begin;
@@ -1846,16 +1963,40 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       Method* m = read_method(file, thread);
       methodHandle mh(thread, m);
 
-      int metadata_cnt = 0;
+      int metadata_cnt;
       r = fread(&metadata_cnt, sizeof(metadata_cnt), 1, file);
       assert(r == 1, "fwrite failed");
+      RelocIterator iter(nm, nm->oops_reloc_begin());
+      while (iter.next()) {
+        if (iter.type() == relocInfo::metadata_type) {
+          metadata_Relocation* r = iter.metadata_reloc();
+          Metadata* md = r->metadata_value();
+          if (md != NULL) {
+            assert(metadata_cnt > 0, "");
+            metadata_cnt--;
+            MetadataRecord rec;
+            int read = fread(&rec, sizeof(rec), 1, file);
+            assert(read == 1, "fwrite failed");
+            if (rec == KLASS_RECORD) {
+              Klass* k = read_klass(file, thread);
+              *r->metadata_addr() = k;
+            } else {
+              ShouldNotReachHere();
+            }
+          }
+        }
+      }
       for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
         if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+        assert(metadata_cnt > 0, "");
+        metadata_cnt--;
         MetadataRecord rec;
         r = fread(&rec, sizeof(rec), 1, file);
         assert(r == 1, "fwrite failed");
         if (rec == METHOD_RECORD) {
           *p = read_method(file, thread);
+        } else if (rec == KLASS_RECORD) {
+          *p = read_klass(file, thread);
         } else {
           ShouldNotReachHere();
         }
@@ -1876,12 +2017,37 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         OrderAccess::storestore();
         // Instantly compiled code can execute.
         if (!mh->is_method_handle_intrinsic())
-          mh->_from_interpreted_entry = (address)(heap->low() + pm._from_interpreted_entry);
+          mh->_from_interpreted_entry = (address)cb - pm._from_interpreted_entry;
         mh->_i2i_entry = (address)-1;
       }
       nm->print();
     }
+    int name_len;
+    r = fread(&name_len, sizeof(name_len), 1, file);
+    assert(r == 1, "fwrite failed");
+    char* name = NEW_C_HEAP_ARRAY(char, name_len+1, mtCode);
+    r = fread(name, 1, name_len, file);
+    assert(r == name_len, "fwrite failed");
+    name[name_len] = '\0';
+    cb->_name = name;
+
+    tty->print_cr("XXX %s:%ld", cb->name(), (uintptr_t)cb - (uintptr_t)heap->low());
+    prev = (address)cb;
+    prev_offset = offset;
   }
+//  FOR_ALL_BLOBS(cb, heap) {
+//    if (cb->is_nmethod()) {
+//      nmethod* nm = cb->as_nmethod();
+//      RelocIterator iter(nm, nm->oops_reloc_begin());
+//      while(iter.next()) {
+//        Relocation* r = iter.reloc();
+//        if (r->is_call()) {
+//          CallRelocation* cr = (CallRelocation*)r;
+//          assert(heap->contains(cr->destination()), "");
+//        }
+//      }
+//    }
+//  }
 
   fclose(file);
 
@@ -1950,5 +2116,9 @@ Symbol* CodeCache::read_symbol(FILE* file) {
   assert(r == l, "fread failed");
   name[l] = '\0';
   return SymbolTable::new_symbol(name, l);
+}
+
+void CodeCache::write_klass(FILE* file, Klass* klass) {
+  write_symbol(file, klass->name());
 }
 //---<  END  >--- CodeHeap State Analytics.

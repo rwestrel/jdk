@@ -593,6 +593,7 @@ class Parse : public GraphKit {
   void dump();
   void dump_bci(int bci);
 #endif
+
 };
 
 #endif // SHARE_OPTO_PARSE_HPP

@@ -9583,7 +9583,7 @@ bool Assembler::reachable(AddressLiteral adr) {
   }
 
   // Stress the correction code
-  if (ForceUnreachable) {
+  if (ForceUnreachable || UseNewCode) {
     // Must be runtimecall reloc, see if it is in the codecache
     // Flipping stuff in the codecache to be unreachable causes issues
     // with things like inline caches where the additional instructions

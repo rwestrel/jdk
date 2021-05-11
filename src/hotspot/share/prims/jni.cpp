@@ -3665,7 +3665,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
         r = fread(klass_name, 1, l, file);
         assert(r == l, "fread failed");
         klass_name[l] = '\0';
-        tty->print_cr("XXX %s", klass_name);
+//        tty->print_cr("XXX %s", klass_name);
         Symbol* sym = SymbolTable::new_symbol(klass_name, l);
         Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(thread, SystemDictionary::java_system_loader()),
                                                      Handle(), true, thread);

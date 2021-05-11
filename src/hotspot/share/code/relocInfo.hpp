@@ -520,7 +520,7 @@ class RelocIterator : public StackObj {
   address         _limit;   // stop producing relocations after this _addr
   relocInfo*      _current; // the current relocation information
   relocInfo*      _end;     // end marker; we're done iterating when _current == _end
-  CompiledMethod* _code;    // compiled method containing _addr
+  CodeBlob*       _code;    // compiled method containing _addr
   address         _addr;    // instruction to which the relocation applies
   short           _databuf; // spare buffer for compressed data
   short*          _data;    // pointer to the relocation's data
@@ -550,13 +550,14 @@ class RelocIterator : public StackObj {
 
   void initialize_misc();
 
-  void initialize(CompiledMethod* nm, address begin, address limit);
+  void initialize(CodeBlob* cb, address begin, address limit);
 
   RelocIterator() { initialize_misc(); }
 
  public:
   // constructor
   RelocIterator(CompiledMethod* nm, address begin = NULL, address limit = NULL);
+  RelocIterator(CodeBlob* cb, address begin = NULL, address limit = NULL);
   RelocIterator(CodeSection* cb, address begin = NULL, address limit = NULL);
 
   // get next reloc info, return !eos
@@ -589,7 +590,7 @@ class RelocIterator : public StackObj {
   relocType    type()         const { return current()->type(); }
   int          format()       const { return (relocInfo::have_format) ? current()->format() : 0; }
   address      addr()         const { return _addr; }
-  CompiledMethod*     code()  const { return _code; }
+  CompiledMethod*     code()  const;
   short*       data()         const { return _data; }
   int          datalen()      const { return _datalen; }
   bool     has_current()      const { return _datalen >= 0; }
@@ -1351,11 +1352,8 @@ inline name##_Relocation* RelocIterator::name##_reloc() {       \
   r->name##_Relocation::unpack_data();                          \
   return r;                                                     \
 }
-APPLY_TO_RELOCATIONS(EACH_CASE);
-#undef EACH_CASE
+APPLY_TO_RELOCATIONS(EACH_CASE)
 
-inline RelocIterator::RelocIterator(CompiledMethod* nm, address begin, address limit) {
-  initialize(nm, begin, limit);
-}
+#undef EACH_CASE
 
 #endif // SHARE_CODE_RELOCINFO_HPP

@@ -85,6 +85,7 @@ class CodeBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCacheDumper;
+  friend class CodeCache;
 
 protected:
 

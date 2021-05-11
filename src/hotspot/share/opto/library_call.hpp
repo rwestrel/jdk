@@ -135,7 +135,7 @@ class LibraryCallKit : public GraphKit {
   void  generate_string_range_check(Node* array, Node* offset,
                                     Node* length, bool char_count);
   Node* generate_current_thread(Node* &tls_output);
-  Node* load_mirror_from_klass(Node* klass);
+
   Node* load_klass_from_mirror_common(Node* mirror, bool never_see_null,
                                       RegionNode* region, int null_path,
                                       int offset);

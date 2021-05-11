@@ -313,6 +313,8 @@ public:
   static Klass* read_klass(FILE* file, JavaThread* thread);
 
   static Method* read_method(FILE* file, JavaThread* thread);
+
+  static void write_klass(FILE* file, Klass* klass);
 };
 
 

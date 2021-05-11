@@ -113,33 +113,46 @@ void relocInfo::change_reloc_info_for_address(RelocIterator *itr, address pc, re
 // ----------------------------------------------------------------------------------------------------
 // Implementation of RelocIterator
 
-void RelocIterator::initialize(CompiledMethod* nm, address begin, address limit) {
+RelocIterator::RelocIterator(CompiledMethod* nm, address begin, address limit) {
+  initialize(nm, begin, limit);
+}
+
+RelocIterator::RelocIterator(CodeBlob* cb, address begin, address limit) {
+  initialize(cb, begin, limit);
+}
+
+CompiledMethod* RelocIterator::code() const { return _code->as_compiled_method(); };
+
+void RelocIterator::initialize(CodeBlob* cb, address begin, address limit) {
   initialize_misc();
 
-  if (nm == NULL && begin != NULL) {
+  if (cb == NULL && begin != NULL) {
     // allow nmethod to be deduced from beginning address
     CodeBlob* cb = CodeCache::find_blob(begin);
-    nm = (cb != NULL) ? cb->as_compiled_method_or_null() : NULL;
+    cb = (cb != NULL) ? cb->as_compiled_method_or_null() : NULL;
   }
-  guarantee(nm != NULL, "must be able to deduce nmethod from other arguments");
+  guarantee(cb != NULL, "must be able to deduce nmethod from other arguments");
 
-  _code    = nm;
-  _current = nm->relocation_begin() - 1;
-  _end     = nm->relocation_end();
-  _addr    = nm->content_begin();
+  _code    = cb;
+  _current = cb->relocation_begin() - 1;
+  _end     = cb->relocation_end();
+  _addr    = cb->content_begin();
 
-  // Initialize code sections.
-  _section_start[CodeBuffer::SECT_CONSTS] = nm->consts_begin();
-  _section_start[CodeBuffer::SECT_INSTS ] = nm->insts_begin() ;
-  _section_start[CodeBuffer::SECT_STUBS ] = nm->stub_begin()  ;
+  if (cb->is_compiled()) {
+    CompiledMethod* cm = cb->as_compiled_method();
+    // Initialize code sections.
+    _section_start[CodeBuffer::SECT_CONSTS] = cm->consts_begin();
+    _section_start[CodeBuffer::SECT_INSTS ] = cm->insts_begin() ;
+    _section_start[CodeBuffer::SECT_STUBS ] = cm->stub_begin()  ;
 
-  _section_end  [CodeBuffer::SECT_CONSTS] = nm->consts_end()  ;
-  _section_end  [CodeBuffer::SECT_INSTS ] = nm->insts_end()   ;
-  _section_end  [CodeBuffer::SECT_STUBS ] = nm->stub_end()    ;
+    _section_end  [CodeBuffer::SECT_CONSTS] = cm->consts_end()  ;
+    _section_end  [CodeBuffer::SECT_INSTS ] = cm->insts_end()   ;
+    _section_end  [CodeBuffer::SECT_STUBS ] = cm->stub_end()    ;
+  }
 
   assert(!has_current(), "just checking");
-  assert(begin == NULL || begin >= nm->code_begin(), "in bounds");
-  assert(limit == NULL || limit <= nm->code_end(),   "in bounds");
+  assert(begin == NULL || begin >= cb->code_begin(), "in bounds");
+  assert(limit == NULL || limit <= cb->code_end(), "in bounds");
   set_limits(begin, limit);
 }
 

@@ -787,7 +787,7 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   // Pick up the return address
   __ movptr(rax, Address(rsp, 0));
 
-  if (VerifyAdapterCalls &&
+  if (VerifyAdapterCalls && !UseNewCode &&
       (Interpreter::code() != NULL || StubRoutines::code1() != NULL)) {
     // So, let's test for cascading c2i/i2c adapters right now.
     //  assert(Interpreter::contains($return_addr) ||

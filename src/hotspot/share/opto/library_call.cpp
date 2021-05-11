@@ -56,6 +56,7 @@
 #include "runtime/stubRoutines.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
+#include "graphKit.hpp"
 
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
@@ -2936,15 +2937,6 @@ bool LibraryCallKit::inline_native_currentThread() {
   Node* junk = NULL;
   set_result(generate_current_thread(junk));
   return true;
-}
-
-//---------------------------load_mirror_from_klass----------------------------
-// Given a klass oop, load its java mirror (a java.lang.Class oop).
-Node* LibraryCallKit::load_mirror_from_klass(Node* klass) {
-  Node* p = basic_plus_adr(klass, in_bytes(Klass::java_mirror_offset()));
-  Node* load = make_load(NULL, p, TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
-  // mirror = ((OopHandle)mirror)->resolve();
-  return access_load(load, TypeInstPtr::MIRROR, T_OBJECT, IN_NATIVE);
 }
 
 //-----------------------load_klass_from_mirror_common-------------------------
