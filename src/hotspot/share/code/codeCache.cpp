@@ -2018,7 +2018,7 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
   fseek(file, cur, SEEK_SET);
 
 //  tty->print_cr("XXX %ld %ld", cur, end);
-  CodeHeap* heap = get_code_heap(CodeBlobType::AOT);
+  CodeHeap* heap = get_code_heap(CodeBlobType::All);
   tty->print_cr("XXX %p", heap->_freelist);
   heap->_freelist = NULL;
 
@@ -2035,7 +2035,7 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     tty->print_cr("XXX %d %d", cb_size, offset);
 
 //    tty->print_cr("<<< %d", cb_size);
-    CodeBlob* cb = (CodeBlob*) allocate(offset > 0 ? offset - CodeHeap::header_size() : cb_size, CodeBlobType::AOT);
+    CodeBlob* cb = (CodeBlob*) allocate(offset > 0 ? offset - CodeHeap::header_size() : cb_size, CodeBlobType::All);
     assert(prev == NULL || prev_offset == (address)cb - prev, "offset = %d differs from %d", prev_offset, (int)((address)cb - prev));
 
     r = fread(cb, cb_size, 1, file);

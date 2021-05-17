@@ -154,7 +154,7 @@ bool OptoRuntime::generate(ciEnv* env) {
   gen(env, _slow_arraycopy_Java            , slow_arraycopy_Type          , SharedRuntime::slow_arraycopy_C ,    0 , false, false);
   gen(env, _register_finalizer_Java        , register_finalizer_Type      , register_finalizer              ,    0 , false, false);
 
-  gen(env, _initialize_klass_Java          , initialize_klass_Type        , initialize_klass_C              ,    0 , true , false, false);
+  gen(env, _initialize_klass_Java          , initialize_klass_Type        , initialize_klass_C              ,    0 , true , false);
 
   return true;
 }
