@@ -113,6 +113,7 @@ typedef const TypeFunc*(*TypeFunc_generator)();
 
 class OptoRuntime : public AllStatic {
   friend class Matcher;  // allow access to stub names
+  friend class CodeCache;
 
  private:
   // define stubs

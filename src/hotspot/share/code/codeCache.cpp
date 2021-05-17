@@ -74,6 +74,8 @@
 #include "opto/c2compiler.hpp"
 #include "opto/compile.hpp"
 #include "opto/node.hpp"
+#include "vtableStubs.hpp"
+
 #endif
 
 // Helper class for printing in CodeCache
@@ -1654,11 +1656,20 @@ enum MetadataRecord {
 
 enum RuntimeCall {
   OPTORUNTIME__INITIALIZE_KLASS_C,
+  OPTORUNTIME__NEW_ARRAY_C,
   MACROASSEMBLER__DEBUG64,
+  OPTORUNTIME__RETHROW_C,
+  SAFEPOINTSYNCHRONIZE__HANDLE_POLLING_PAGE_EXCEPTION,
+  OPTORUNTIME__HANDLE_EXCEPTION_C,
+  DEOPTIMIZATION__FETCH_UNROLL_INFO,
+  DEOPTIMIZATION__UNPACK_FRAMES,
+  DEOPTIMIZATION__UNCOMMON_TRAP,
+  OPTORUNTIME__NEW_INSTANCE_C,
+  SHAREDRUNTIME_HANDLE_WRONG_METHOD_IC_MISS,
   LAST_RUNTIMECALL
 };
 
-void CodeCache::dump_to_disk(FILE* file) {
+void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   Vtables vts;
   {
     nmethod nm;
@@ -1711,6 +1722,45 @@ void CodeCache::dump_to_disk(FILE* file) {
     w = fwrite(&offset, sizeof(offset), 1, file);
     assert(w == 1, "fwrite failed");
 
+    if (cb->is_nmethod()) {
+      RelocIterator iter(cb);
+      nmethod* nm = cb->as_nmethod();
+      while (iter.next()) {
+        if (iter.type() == relocInfo::static_call_type) {
+          static_call_Relocation* call = iter.static_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          assert(method->has_compiled_code(), "should be compiled");
+          call->set_destination(method->from_compiled_entry());
+        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          assert(method->has_compiled_code(), "should be compiled");
+          call->set_destination(method->from_compiled_entry());
+        } else if (iter.type() == relocInfo::virtual_call_type) {
+          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          virtual_call_Relocation* call = iter.virtual_call_reloc();
+          Method* method = call->method_value();
+          Klass* defc = method->method_holder();
+          Symbol* name = method->name();
+          Symbol* type = method->signature();
+          LinkInfo link_info(defc, name, type);
+          Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+          int vtable_index = Method::invalid_vtable_index;
+          if (resolved_method->method_holder()->is_interface()) {
+            vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+          } else {
+            vtable_index = resolved_method->vtable_index();
+          }
+          CompiledICLocker ml(nm);
+          CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+          address entry = VtableStubs::find_vtable_stub(vtable_index);
+          inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+        }
+      }
+    }
+
     CodeBlob* cb_copy = (CodeBlob*)NEW_RESOURCE_ARRAY(char, cb_size);;
     memcpy((void*)cb_copy, cb, cb_size);
 
@@ -1721,18 +1771,40 @@ void CodeCache::dump_to_disk(FILE* file) {
     cb_copy->_relocation_begin = (address)cb_copy + (cb->_relocation_begin - (address) cb);
     cb_copy->_relocation_end = (address)cb_copy + (cb->_relocation_end - (address) cb);
 
-    RelocIterator iter(cb_copy);
-    while(iter.next()) {
-      if (iter.type() == relocInfo::runtime_call_type) {
-        runtime_call_Relocation* rt = iter.runtime_call_reloc();
-        if (rt->destination() == (address)OptoRuntime::initialize_klass_C) {
-          rt->set_destination((address) OPTORUNTIME__INITIALIZE_KLASS_C);
-        } else if (rt->destination() == (address)MacroAssembler::debug64) {
-          rt->set_destination((address) MACROASSEMBLER__DEBUG64);
-//        } else {
-//          assert(!cb->is_nmethod(), "");
-//        } else if (rt->) {
-
+    {
+      RelocIterator iter(cb_copy);
+      while (iter.next()) {
+        if (iter.type() == relocInfo::runtime_call_type) {
+          runtime_call_Relocation* rt = iter.runtime_call_reloc();
+          if (rt->destination() == (address) OptoRuntime::initialize_klass_C) {
+            rt->set_destination((address) OPTORUNTIME__INITIALIZE_KLASS_C);
+          } else if (rt->destination() == (address) OptoRuntime::new_array_C) {
+            rt->set_destination((address) OPTORUNTIME__NEW_ARRAY_C);
+          } else if (rt->destination() == (address) MacroAssembler::debug64) {
+            rt->set_destination((address) MACROASSEMBLER__DEBUG64);
+          } else if (rt->destination() == (address) OptoRuntime::rethrow_C) {
+            rt->set_destination((address) OPTORUNTIME__RETHROW_C);
+          } else if (rt->destination() == (address) SafepointSynchronize::handle_polling_page_exception) {
+            rt->set_destination((address) SAFEPOINTSYNCHRONIZE__HANDLE_POLLING_PAGE_EXCEPTION);
+          } else if (rt->destination() == (address) OptoRuntime::handle_exception_C) {
+            rt->set_destination((address) OPTORUNTIME__HANDLE_EXCEPTION_C);
+          } else if (rt->destination() == (address) Deoptimization::fetch_unroll_info) {
+            rt->set_destination((address) DEOPTIMIZATION__FETCH_UNROLL_INFO);
+          } else if (rt->destination() == (address) Deoptimization::unpack_frames) {
+            rt->set_destination((address) DEOPTIMIZATION__UNPACK_FRAMES);
+          } else if (rt->destination() == (address)Deoptimization::uncommon_trap) {
+            rt->set_destination((address) DEOPTIMIZATION__UNCOMMON_TRAP);
+          } else if (rt->destination() == (address) OptoRuntime::new_instance_C) {
+            rt->set_destination((address) OPTORUNTIME__NEW_INSTANCE_C);
+          } else if (rt->destination() == (address) SharedRuntime::handle_wrong_method_ic_miss) {
+            rt->set_destination((address) SHAREDRUNTIME_HANDLE_WRONG_METHOD_IC_MISS);
+          }
+        } else if (iter.type() == relocInfo::card_mark_word_type) {
+          card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
+          BarrierSet* bs = BarrierSet::barrier_set();
+          CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+          CardTable* ct = ctbs->card_table();
+          assert(cm->value() == ct->byte_map_base(), "");
         }
       }
     }
@@ -1746,6 +1818,8 @@ void CodeCache::dump_to_disk(FILE* file) {
 
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
+      assert(nm->oops_end() - nm->oops_begin() == 1, "");
+      assert((*nm->oops_begin()) == SystemDictionary::java_system_loader(), "");
       nmethod* nm_copy = (nmethod*)cb_copy;
 
       nm_copy->_scopes_data_begin = (address)(nm->_scopes_data_begin - (address)nm);
@@ -1781,18 +1855,78 @@ void CodeCache::dump_to_disk(FILE* file) {
       {
         RelocIterator iter(nm, nm->oops_reloc_begin());
         while (iter.next()) {
-          if (iter.type() == relocInfo::metadata_type) {
-            metadata_Relocation* r = iter.metadata_reloc();
-            Metadata* md = r->metadata_value();
-            if (md != NULL) {
-              if (md->is_klass()) {
-                MetadataRecord rec = KLASS_RECORD;
-                w = fwrite(&rec, sizeof(rec), 1, file);
-                assert(w == 1, "fwrite failed");
-                write_klass(file, (Klass*) md);
-              } else {
-                ShouldNotReachHere();
+          switch (iter.type()) {
+            case relocInfo::metadata_type: {
+              metadata_Relocation* r = iter.metadata_reloc();
+              Metadata* md = r->metadata_value();
+              if (md != NULL) {
+                if (md->is_klass()) {
+                  MetadataRecord rec = KLASS_RECORD;
+                  w = fwrite(&rec, sizeof(rec), 1, file);
+                  assert(w == 1, "fwrite failed");
+                  write_klass(file, (Klass*) md);
+                } else {
+                  ShouldNotReachHere();
+                }
               }
+              break;
+            }
+            case relocInfo::oop_type:
+            case relocInfo::runtime_call_w_cp_type:
+              ShouldNotReachHere();
+            default:
+              break;
+          }
+        }
+      }
+      {
+        GrowableArray<CodeBlob*> cbs;
+        cbs.push(nm);
+        for (int i = 0; i < cbs.length(); i++) {
+          CodeBlob* cb = cbs.at(i);
+          RelocIterator iter(cb);
+          while (iter.next()) {
+            switch (iter.type()) {
+              case relocInfo::opt_virtual_call_type:
+              case relocInfo::virtual_call_type:
+              case relocInfo::static_call_type:
+              case relocInfo::runtime_call_type: {
+                address dest;
+                if (iter.type() == relocInfo::opt_virtual_call_type) {
+                  opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+                  dest = call->destination();
+                } else if (iter.type() == relocInfo::virtual_call_type) {
+                  virtual_call_Relocation* call = iter.virtual_call_reloc();
+                  dest = call->destination();
+                } else if (iter.type() == relocInfo::static_call_type) {
+                  static_call_Relocation* call = iter.static_call_reloc();
+                  dest = call->destination();
+                } else if (iter.type() == relocInfo::runtime_call_type) {
+                  runtime_call_Relocation* call = iter.runtime_call_reloc();
+                  dest = call->destination();
+                }
+                if (heap->contains(dest)) {
+                  CodeBlob* callee = CodeCache::find_blob(dest);
+                  if (!cbs.contains(callee)) {
+                    cbs.push(callee);
+                  }
+                } else if (dest != (address)OptoRuntime::initialize_klass_C &&
+                           dest != (address)OptoRuntime::new_array_C &&
+                           dest != (address)MacroAssembler::debug64 &&
+                           dest != (address)OptoRuntime::rethrow_C &&
+                           dest != (address)SafepointSynchronize::handle_polling_page_exception &&
+                           dest != (address)OptoRuntime::handle_exception_C &&
+                           dest != (address)Deoptimization::fetch_unroll_info &&
+                           dest != (address)Deoptimization::unpack_frames &&
+                           dest != (address)Deoptimization::uncommon_trap &&
+                           dest != (address)OptoRuntime::new_instance_C &&
+                           dest != (address)SharedRuntime::handle_wrong_method_ic_miss &&
+                           dest != (address)-1) {
+                  ShouldNotReachHere();
+                }
+              }
+              default:
+                break;
             }
           }
         }
@@ -1806,10 +1940,10 @@ void CodeCache::dump_to_disk(FILE* file) {
           assert(w == 1, "fwrite failed");
           write_method(file, (Method*) md);
         } else if (md->is_klass()) {
-            MetadataRecord rec = KLASS_RECORD;
-            w = fwrite(&rec, sizeof(rec), 1, file);
-            assert(w == 1, "fwrite failed");
-            write_klass(file, (Klass*) md);
+          MetadataRecord rec = KLASS_RECORD;
+          w = fwrite(&rec, sizeof(rec), 1, file);
+          assert(w == 1, "fwrite failed");
+          write_klass(file, (Klass*) md);
         } else {
           ShouldNotReachHere();
         }
@@ -1840,6 +1974,16 @@ void CodeCache::dump_to_disk(FILE* file) {
     assert(w == 1, "fwrite failed");
     w = fwrite(name, 1, name_len, file);
     assert(w == name_len, "fwrite failed");
+
+    ImmutableOopMapSet* oopmaps = cb->oop_maps();
+    int oopmaps_len = oopmaps == NULL ? 0 : oopmaps->nr_of_bytes();
+    w = fwrite(&oopmaps_len, sizeof(oopmaps_len), 1, file);
+    assert(w == 1, "fwrite failed");
+    if (oopmaps_len > 0) {
+      w = fwrite(oopmaps, oopmaps_len, 1, file);
+      assert(w == 1, "fwrite failed");
+    }
+
   }
 //  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
 //  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
@@ -1942,16 +2086,43 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         runtime_call_Relocation* rt = iter.runtime_call_reloc();
         if (rt->destination() == (address)OPTORUNTIME__INITIALIZE_KLASS_C) {
           rt->set_destination((address) OptoRuntime::initialize_klass_C);
+        } else if (rt->destination() == (address) OPTORUNTIME__NEW_ARRAY_C) {
+          rt->set_destination((address)OptoRuntime::new_array_C);
         } else if (rt->destination() == (address)MACROASSEMBLER__DEBUG64) {
           rt->set_destination((address)MacroAssembler::debug64);
+        } else if (rt->destination() == (address)OPTORUNTIME__RETHROW_C) {
+          rt->set_destination((address) OptoRuntime::rethrow_C);
+        } else if (rt->destination() == (address)SAFEPOINTSYNCHRONIZE__HANDLE_POLLING_PAGE_EXCEPTION) {
+          rt->set_destination((address) SafepointSynchronize::handle_polling_page_exception);
+        } else if (rt->destination() == (address)OPTORUNTIME__HANDLE_EXCEPTION_C) {
+          rt->set_destination((address)OptoRuntime::handle_exception_C);
+        } else if (rt->destination() == (address) DEOPTIMIZATION__FETCH_UNROLL_INFO) {
+          rt->set_destination((address)Deoptimization::fetch_unroll_info);
+        } else if (rt->destination() == (address)DEOPTIMIZATION__UNPACK_FRAMES) {
+          rt->set_destination((address)Deoptimization::unpack_frames);
+        } else if (rt->destination() == (address)DEOPTIMIZATION__UNCOMMON_TRAP) {
+          rt->set_destination((address) Deoptimization::uncommon_trap);
+        } else if (rt->destination() == (address)OPTORUNTIME__NEW_INSTANCE_C) {
+          rt->set_destination((address) OptoRuntime::new_instance_C);
+        } else if (rt->destination() == (address) SHAREDRUNTIME_HANDLE_WRONG_METHOD_IC_MISS) {
+          rt->set_destination((address) SharedRuntime::handle_wrong_method_ic_miss);
         } else {
-          assert(!cb->is_nmethod() || heap->contains(rt->destination()), "");
+          assert(!cb->is_nmethod() || rt->destination() == (address)-1 || heap->contains(rt->destination()), "");
         }
+      } else if (iter.type() == relocInfo::card_mark_word_type) {
+        card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
+        BarrierSet* bs = BarrierSet::barrier_set();
+        CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+        CardTable* ct = ctbs->card_table();
+        cm->set_value(ct->byte_map_base());
       }
     }
 
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
+
+      (*nm->oops_begin()) = SystemDictionary::java_system_loader();
+      nm->_pc_desc_container.reset_to(nm->scopes_pcs_begin());
 
       nm->_scopes_data_begin = (address)nm + (intptr_t)nm->_scopes_data_begin;
       nm->_deopt_handler_begin = (address)nm + (intptr_t)nm->_deopt_handler_begin;
@@ -2020,16 +2191,33 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
           mh->_from_interpreted_entry = (address)cb - pm._from_interpreted_entry;
         mh->_i2i_entry = (address)-1;
       }
+      nm->_gc_data = NULL;
+
+      Universe::heap()->register_nmethod(nm);
+      CodeCache::commit(nm);
+
       nm->print();
     }
     int name_len;
     r = fread(&name_len, sizeof(name_len), 1, file);
-    assert(r == 1, "fwrite failed");
+    assert(r == 1, "fread failed");
     char* name = NEW_C_HEAP_ARRAY(char, name_len+1, mtCode);
     r = fread(name, 1, name_len, file);
-    assert(r == name_len, "fwrite failed");
+    assert(r == name_len, "fread failed");
     name[name_len] = '\0';
     cb->_name = name;
+
+    int oopmaps_len;
+    r = fread(&oopmaps_len, sizeof(oopmaps_len), 1, file);
+    assert(r == 1, "fread failed");
+    if (oopmaps_len > 0) {
+      ImmutableOopMapSet* oopmaps = (ImmutableOopMapSet*)NEW_C_HEAP_ARRAY(char, oopmaps_len, mtCode);
+      r = fread(oopmaps, oopmaps_len, 1, file);
+      assert(r == 1, "fread failed");
+      cb->_oop_maps = oopmaps;
+    } else {
+      cb->_oop_maps = NULL;
+    }
 
     tty->print_cr("XXX %s:%ld", cb->name(), (uintptr_t)cb - (uintptr_t)heap->low());
     prev = (address)cb;

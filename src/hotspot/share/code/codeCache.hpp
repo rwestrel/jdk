@@ -300,7 +300,7 @@ class CodeCache : AllStatic {
   static void print_names(outputStream *out);
 
 public:
-  static void dump_to_disk(FILE* file);
+  static void dump_to_disk(FILE* file, JavaThread* pThread);
 
   static void restore_from_disk(FILE* file, JavaThread* thread);
 

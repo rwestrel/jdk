@@ -48,6 +48,7 @@ public:
   virtual bool array_copy_requires_gc_barriers(bool tightly_coupled_alloc, BasicType type, bool is_clone, bool is_clone_instance, ArrayCopyPhase phase) const;
 
   bool use_ReduceInitialCardMarks() const;
+  virtual relocInfo::relocType reloc(const Type* pType) const;
 };
 
 #endif // SHARE_GC_SHARED_C2_CARDTABLEBARRIERSETC2_HPP

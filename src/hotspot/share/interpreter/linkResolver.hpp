@@ -198,6 +198,7 @@ class LinkInfo : public StackObj {
 class LinkResolver: AllStatic {
   friend class klassVtable;
   friend class klassItable;
+  friend class CodeCache;
 
  private:
 

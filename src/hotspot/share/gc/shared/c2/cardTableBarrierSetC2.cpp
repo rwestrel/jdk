@@ -46,6 +46,18 @@ Node* CardTableBarrierSetC2::byte_map_base_node(GraphKit* kit) const {
    }
 }
 
+relocInfo::relocType CardTableBarrierSetC2::reloc(const Type* type) const {
+  if (!type->isa_rawptr() || type->is_rawptr()->ptr() != TypePtr::Constant) {
+    return relocInfo::none;
+  }
+  CardTable::CardValue* card_table_base = ci_card_table_address();
+  if (card_table_base != NULL && type->is_rawptr()->get_con() == (intptr_t)card_table_base) {
+    return relocInfo::card_mark_word_type;
+  }
+  return relocInfo::none;
+}
+
+
 // vanilla post barrier
 // Insert a write-barrier store.  This is to let generational GC work; we have
 // to flag all oop-stores before the next GC point.

@@ -268,7 +268,8 @@ class relocInfo {
     trampoline_stub_type    = 13, // stub-entry for trampoline
     runtime_call_w_cp_type  = 14, // Runtime call which may load its target from the constant pool
     data_prefix_tag         = 15, // tag for a prefix (carries data arguments)
-    type_mask               = 15  // A mask which selects only the above values
+    card_mark_word_type     = 16,
+    type_mask               = 31  // A mask which selects only the above values
   };
 
  private:
@@ -307,12 +308,13 @@ class relocInfo {
     visitor(poll_return) \
     visitor(section_word) \
     visitor(trampoline_stub) \
+    visitor(card_mark_word) \
 
 
  public:
   enum {
     value_width             = sizeof(unsigned short) * BitsPerByte,
-    type_width              = 4,   // == log2(type_mask+1)
+    type_width              = 5,   // == log2(type_mask+1)
     nontype_width           = value_width - type_width,
     datalen_width           = nontype_width-1,
     datalen_tag             = 1 << datalen_width,  // or-ed into _value
@@ -1258,6 +1260,24 @@ class external_word_Relocation : public DataRelocation {
   address  target();        // if _target==NULL, fetch addr from code stream
   address  value()          { return target(); }
 };
+
+class card_mark_word_Relocation : public DataRelocation {
+public:
+  static RelocationHolder spec() {
+    RelocationHolder rh = newHolder();
+    new(rh) card_mark_word_Relocation();
+    return rh;
+  }
+
+private:
+
+  friend class RelocIterator;
+  card_mark_word_Relocation() : DataRelocation(relocInfo::card_mark_word_type) { }
+
+public:
+  address  value()          { return pd_get_address_from_code(); }
+};
+
 
 class internal_word_Relocation : public DataRelocation {
 

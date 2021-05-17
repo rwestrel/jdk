@@ -159,6 +159,7 @@ void Deoptimization::UnrollBlock::print() {
 // The actual reallocation of previously eliminated objects occurs in realloc_objects,
 // which is called from the method fetch_unroll_info_helper below.
 JRT_BLOCK_ENTRY(Deoptimization::UnrollBlock*, Deoptimization::fetch_unroll_info(JavaThread* current, int exec_mode))
+  assert(!UseNewCode2, "");
   // fetch_unroll_info() is called at the beginning of the deoptimization
   // handler. Note this fact before we start generating temporary frames
   // that can confuse an asynchronous stack walker. This counter is
@@ -677,6 +678,7 @@ void Deoptimization::unwind_callee_save_values(frame* f, vframeArray* vframe_arr
 
 // Return BasicType of value being returned
 JRT_LEAF(BasicType, Deoptimization::unpack_frames(JavaThread* thread, int exec_mode))
+  assert(!UseNewCode2, "");
 
   // We are already active in the special DeoptResourceMark any ResourceObj's we
   // allocate will be freed at the end of the routine.
@@ -2360,6 +2362,7 @@ Deoptimization::update_method_data_from_interpreter(MethodData* trap_mdo, int tr
 }
 
 Deoptimization::UnrollBlock* Deoptimization::uncommon_trap(JavaThread* current, jint trap_request, jint exec_mode) {
+  assert(!UseNewCode2, "");
   // Enable WXWrite: current function is called from methods compiled by C2 directly
   MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, current));
 

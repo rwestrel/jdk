@@ -3399,7 +3399,7 @@ void Threads::destroy_vm() {
       w = fwrite(klass_name->as_utf8(), 1, l, file);
       assert(w == l, "fwrite failed");
     }
-    CodeCache::dump_to_disk(file);
+    CodeCache::dump_to_disk(file, thread);
   }
 
 #ifdef ASSERT

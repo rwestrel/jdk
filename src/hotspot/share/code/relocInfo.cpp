@@ -874,6 +874,7 @@ void RelocIterator::print_current() {
   case relocInfo::external_word_type:
   case relocInfo::internal_word_type:
   case relocInfo::section_word_type:
+  case relocInfo::card_mark_word_type:
     {
       DataRelocation* r = (DataRelocation*) reloc();
       tty->print(" | [target=" INTPTR_FORMAT "]", p2i(r->value())); //value==target

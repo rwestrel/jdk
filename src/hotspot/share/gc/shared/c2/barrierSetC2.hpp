@@ -303,6 +303,7 @@ public:
   virtual void emit_stubs(CodeBuffer& cb) const { }
 
   static int arraycopy_payload_base_offset(bool is_array);
+  virtual relocInfo::relocType reloc(const Type* pType) const { return relocInfo::none; }
 };
 
 #endif // SHARE_GC_SHARED_C2_BARRIERSETC2_HPP
