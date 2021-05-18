@@ -1643,6 +1643,7 @@ struct Vtables {
   intptr_t safepointblob;
   intptr_t uncommontrapblob;
   intptr_t deoptimizationblob;
+  intptr_t vtableblob;
 };
 
 struct PerMethod {
@@ -1669,6 +1670,8 @@ enum RuntimeCall {
   LAST_RUNTIMECALL
 };
 
+#include "code/scopeDesc.hpp"
+
 void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   Vtables vts;
   {
@@ -1690,12 +1693,67 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     vts.uncommontrapblob = *(intptr_t*)&utb;
     DeoptimizationBlob db;
     vts.deoptimizationblob = *(intptr_t*)&db;
+    VtableBlob vb;
+    vts.vtableblob = *(intptr_t*)&vb;
   }
   int w = fwrite(&vts, sizeof(vts), 1, file);
   assert(w == 1, "fwrite failed");
   ResourceMark rm;
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+
+  FOR_ALL_BLOBS(cb, heap) {
+    if (cb->is_nmethod()) {
+      RelocIterator iter(cb);
+      nmethod* nm = cb->as_nmethod();
+      while (iter.next()) {
+        if (iter.type() == relocInfo::virtual_call_type) {
+          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          virtual_call_Relocation* call = iter.virtual_call_reloc();
+          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
+          methodHandle caller(thread, sd->method());
+          Bytecode_invoke invoke(caller, sd->bci());
+          Method* method = call->method_value();
+          Klass* defc = method->method_holder();
+          Symbol* name = method->name();
+          Symbol* type = method->signature();
+          LinkInfo link_info(defc, name, type);
+          if (invoke.is_invokevirtual()) {
+            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+            int vtable_index = Method::invalid_vtable_index;
+            if (resolved_method->method_holder()->is_interface()) {
+              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+            } else {
+              vtable_index = resolved_method->vtable_index();
+            }
+            CompiledICLocker ml(nm);
+            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+            address entry = VtableStubs::find_vtable_stub(vtable_index);
+            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+          } else {
+            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
+            if (resolved_method->has_vtable_index()) {
+              int vtable_index = resolved_method->vtable_index();
+              ShouldNotReachHere();
+            } else if (resolved_method->has_itable_index()) {
+              int itable_index = resolved_method->itable_index();
+              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
+                                                              link_info.resolved_klass(), false);
+
+              CompiledICLocker ml(nm);
+              address entry = VtableStubs::find_itable_stub(itable_index);
+              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
+            } else {
+              int index = resolved_method->vtable_index();
+              ShouldNotReachHere();
+            }
+          }
+        }
+      }
+    }
+  }
+
   FOR_ALL_BLOBS(cb, heap) {
     intptr_t vtbl = *(intptr_t*)cb;
     if (vtbl != vts.nmethod &&
@@ -1707,6 +1765,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
         vtbl != vts.safepointblob &&
         vtbl != vts.uncommontrapblob &&
         vtbl != vts.deoptimizationblob &&
+        vtbl != vts.vtableblob &&
         true
     ) {
       ShouldNotReachHere();
@@ -1738,25 +1797,6 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           assert(method != NULL, "can't resolve the call");
           assert(method->has_compiled_code(), "should be compiled");
           call->set_destination(method->from_compiled_entry());
-        } else if (iter.type() == relocInfo::virtual_call_type) {
-          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          virtual_call_Relocation* call = iter.virtual_call_reloc();
-          Method* method = call->method_value();
-          Klass* defc = method->method_holder();
-          Symbol* name = method->name();
-          Symbol* type = method->signature();
-          LinkInfo link_info(defc, name, type);
-          Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
-          int vtable_index = Method::invalid_vtable_index;
-          if (resolved_method->method_holder()->is_interface()) {
-            vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
-          } else {
-            vtable_index = resolved_method->vtable_index();
-          }
-          CompiledICLocker ml(nm);
-          CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-          address entry = VtableStubs::find_vtable_stub(vtable_index);
-          inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
         }
       }
     }
@@ -1818,8 +1858,8 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
 
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
-      assert(nm->oops_end() - nm->oops_begin() == 1, "");
-      assert((*nm->oops_begin()) == SystemDictionary::java_system_loader(), "");
+      assert(nm->oops_end() - nm->oops_begin() <= 1, "");
+      assert(nm->oops_end() - nm->oops_begin() == 0 || (*nm->oops_begin()) == SystemDictionary::java_system_loader(), "");
       nmethod* nm_copy = (nmethod*)cb_copy;
 
       nm_copy->_scopes_data_begin = (address)(nm->_scopes_data_begin - (address)nm);
@@ -1834,24 +1874,6 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
 
       Method* m = nm->method();
       write_method(file, m);
-      int metadata_cnt = 0;
-      {
-        RelocIterator iter(nm, nm->oops_reloc_begin());
-        while (iter.next()) {
-          if (iter.type() == relocInfo::metadata_type) {
-            metadata_Relocation* r = iter.metadata_reloc();
-            if (r->metadata_value() != NULL) {
-              metadata_cnt++;
-            }
-          }
-        }
-      }
-      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-        metadata_cnt++;
-      }
-      w = fwrite(&metadata_cnt, sizeof(metadata_cnt), 1, file);
-      assert(w == 1, "fwrite failed");
       {
         RelocIterator iter(nm, nm->oops_reloc_begin());
         while (iter.next()) {
@@ -1874,6 +1896,19 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             case relocInfo::oop_type:
             case relocInfo::runtime_call_w_cp_type:
               ShouldNotReachHere();
+            case relocInfo::virtual_call_type: {
+              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+              CompiledICLocker ml(nm);
+              CompiledIC* ic = CompiledIC_at(nm, iter.addr());
+              CompiledICHolder* holder = ic->cached_icholder();
+              if (holder != NULL) {
+                assert(!holder->_is_metadata_method, "");
+                write_klass(file, holder->holder_klass());
+                assert(holder->holder_metadata()->is_klass(), "");
+                write_klass(file, (Klass*)holder->holder_metadata());
+              }
+              break;
+            }
             default:
               break;
           }
@@ -2069,6 +2104,9 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     } else if (vtbl == vts.deoptimizationblob) {
       DeoptimizationBlob db;
       vtbl = *(intptr_t*)&db;
+    } else if (vtbl == vts.vtableblob) {
+      VtableBlob vb;
+      vtbl = *(intptr_t*)&vb;
     } else {
       ShouldNotReachHere();
     }
@@ -2121,7 +2159,9 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
 
-      (*nm->oops_begin()) = SystemDictionary::java_system_loader();
+      if (nm->oops_end() > nm->oops_begin()) {
+        (*nm->oops_begin()) = SystemDictionary::java_system_loader();
+      }
       nm->_pc_desc_container.reset_to(nm->scopes_pcs_begin());
 
       nm->_scopes_data_begin = (address)nm + (intptr_t)nm->_scopes_data_begin;
@@ -2134,17 +2174,12 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       Method* m = read_method(file, thread);
       methodHandle mh(thread, m);
 
-      int metadata_cnt;
-      r = fread(&metadata_cnt, sizeof(metadata_cnt), 1, file);
-      assert(r == 1, "fwrite failed");
       RelocIterator iter(nm, nm->oops_reloc_begin());
       while (iter.next()) {
         if (iter.type() == relocInfo::metadata_type) {
           metadata_Relocation* r = iter.metadata_reloc();
           Metadata* md = r->metadata_value();
           if (md != NULL) {
-            assert(metadata_cnt > 0, "");
-            metadata_cnt--;
             MetadataRecord rec;
             int read = fread(&rec, sizeof(rec), 1, file);
             assert(read == 1, "fwrite failed");
@@ -2155,12 +2190,22 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
               ShouldNotReachHere();
             }
           }
+        } else if (iter.type() == relocInfo::virtual_call_type) {
+          MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          CompiledICLocker ml(nm);
+          CompiledIC* ic = CompiledIC_at(nm, iter.addr());
+          CompiledICHolder* holder = ic->cached_icholder();
+          if (holder != NULL) {
+            Klass* k1 = read_klass(file, thread);
+            Klass* k2 = read_klass(file, thread);
+            CompiledICHolder* holder = new CompiledICHolder(k2, k1, false);
+            CompiledIC* ic = CompiledIC_at(nm, iter.addr());
+            ic->set_data((intptr_t)holder);
+          }
         }
       }
       for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
         if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-        assert(metadata_cnt > 0, "");
-        metadata_cnt--;
         MetadataRecord rec;
         r = fread(&rec, sizeof(rec), 1, file);
         assert(r == 1, "fwrite failed");
@@ -2197,6 +2242,11 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       CodeCache::commit(nm);
 
       nm->print();
+    } else if (cb->is_vtable_blob()) {
+      MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      MutexLocker ml(VtableStubs_lock, Mutex::_no_safepoint_check_flag);
+      VtableStub* stub = (VtableStub*)cb->content_begin();
+      VtableStubs::enter(stub->is_vtable_stub(), stub->index(), stub);
     }
     int name_len;
     r = fread(&name_len, sizeof(name_len), 1, file);

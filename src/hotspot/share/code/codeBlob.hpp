@@ -446,8 +446,10 @@ public:
 
 //---------------------------------------------------------------------------------------------------
 class VtableBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   VtableBlob(const char*, int);
+  VtableBlob() {}
 
   void* operator new(size_t s, unsigned size) throw();
 

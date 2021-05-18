@@ -125,6 +125,7 @@ class BytecodePrinter: public BytecodeClosure {
     // the next bytecode.
     _is_wide = (code == Bytecodes::_wide);
     _code = Bytecodes::_illegal;
+    assert(!UseNewCode2, "");
   }
 
   // Used for Method*::print_codes().  The input bcp comes from

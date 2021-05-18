@@ -23,6 +23,7 @@
  *
  */
 
+#include <classfile/symbolTable.hpp>
 #include "precompiled.hpp"
 #include "jvm.h"
 #include "cds/dynamicArchive.hpp"
@@ -2881,6 +2882,31 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
+
+  if (UseNewCode2) {
+    ResourceMark rm;
+    HandleMark hm(THREAD);
+    FILE* file = fopen("/home/roland/tmp/dump", "r");
+    assert(file != NULL, "fopen failed");
+    int nb;
+    int r = fread(&nb, sizeof(nb), 1, file);
+    assert(r == 1, "fread failed");
+    for (int i = 0; i < nb; i++) {
+      int l;
+      r = fread(&l, sizeof(l), 1, file);
+      assert(r == 1, "fread failed");
+      char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
+      r = fread(klass_name, 1, l, file);
+      assert(r == l, "fread failed");
+      klass_name[l] = '\0';
+//        tty->print_cr("XXX %s", klass_name);
+      Symbol* sym = SymbolTable::new_symbol(klass_name, l);
+      Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
+                                                   Handle(), true, THREAD);
+      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+    }
+    CodeCache::restore_from_disk(file, THREAD);
+  }
 
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
