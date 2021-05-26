@@ -955,7 +955,7 @@ bool InstanceKlass::link_class_impl(TRAPS) {
         set_init_state(linked);
 
         // Now flush all code that assume the class is not linked.
-        if (Universe::is_fully_initialized()) {
+        if (Universe::is_fully_initialized() && !UseNewCode2) {
           CodeCache::flush_dependents_on(this);
         }
       } else {

@@ -1280,6 +1280,7 @@ public:
 
 
 class internal_word_Relocation : public DataRelocation {
+  friend class CodeCache;
 
  public:
   static RelocationHolder spec(address target) {

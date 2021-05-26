@@ -478,6 +478,7 @@ class nmethod : public CompiledMethod {
   // if this thread changed the state of the nmethod or false if
   // another thread performed the transition.
   bool  make_not_entrant() {
+    assert(!UseNewCode2, "");
     assert(!method()->is_method_handle_intrinsic(), "Cannot make MH intrinsic not entrant");
     return make_not_entrant_or_zombie(not_entrant);
   }

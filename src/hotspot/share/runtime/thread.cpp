@@ -3372,7 +3372,7 @@ GrowableArray<Klass*>* loaded_klasses;
 void maybe_compile_method(Method* m) {
   Thread* thread = Thread::current();
   methodHandle mh(thread, m);
-  if (CompilerOracle::has_option(mh, CompileCommand::CompileOnExit)) {
+  if (!mh->is_abstract() && CompilerOracle::has_option(mh, CompileCommand::CompileOnExit)) {
     compile_on_exit->push(m);
   }
 }
@@ -3386,7 +3386,7 @@ void collect_loaded_klasses(Klass* const k) {
 void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
-  {
+  if (UseNewCode) {
     ResourceMark rm;
     HandleMark hm(thread);
     compile_on_exit = new GrowableArray<Method*>();

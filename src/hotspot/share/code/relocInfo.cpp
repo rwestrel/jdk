@@ -182,7 +182,7 @@ RelocIterator::RelocIterator(CodeSection* cs, address begin, address limit) {
 
 bool RelocIterator::addr_in_const() const {
   const int n = CodeBuffer::SECT_CONSTS;
-  return section_start(n) <= addr() && addr() < section_end(n);
+  return _section_start[n] != NULL && section_start(n) <= addr() && addr() < section_end(n);
 }
 
 

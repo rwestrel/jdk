@@ -315,6 +315,12 @@ public:
   static Method* read_method(FILE* file, JavaThread* thread);
 
   static void write_klass(FILE* file, Klass* klass);
+
+  static void write_string_object(FILE* file, JavaThread* thread, oop o);
+
+  static void write_class_object(FILE* file, oop o);
+
+  static Handle read_string_object(FILE* file, JavaThread* thread);
 };
 
 

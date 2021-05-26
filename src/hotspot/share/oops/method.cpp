@@ -997,7 +997,7 @@ void Method::set_native_function(address function, bool post_event_flag) {
   // use the latest registered method -> check if a stub already has been generated.
   // If so, we have to make it not_entrant.
   CompiledMethod* nm = code(); // Put it into local variable to guard against concurrent updates
-  if (nm != NULL) {
+  if (nm != NULL && !UseNewCode2) {
     nm->make_not_entrant();
   }
 }

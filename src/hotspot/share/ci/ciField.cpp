@@ -298,6 +298,9 @@ void ciField::initialize_from(fieldDescriptor* fd) {
       _is_constant = false;
     }
   }
+  if (UseNewCode) {
+    _is_constant = false;
+  }
 }
 
 // ------------------------------------------------------------------
