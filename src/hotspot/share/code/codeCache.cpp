@@ -2156,6 +2156,8 @@ void CodeCache::write_symbol(FILE* file, const Symbol* sym) {
   assert(w == l, "fwrite failed");
 }
 
+#include "oops/klass.inline.hpp"
+
 void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
   Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
   assert(ase.not_null() && !thread->has_pending_exception(), "");
