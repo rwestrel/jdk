@@ -1735,7 +1735,10 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
             if (resolved_method->has_vtable_index()) {
               int vtable_index = resolved_method->vtable_index();
-              ShouldNotReachHere();
+              CompiledICLocker ml(nm);
+              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+              address entry = VtableStubs::find_vtable_stub(vtable_index);
+              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
             } else if (resolved_method->has_itable_index()) {
               int itable_index = resolved_method->itable_index();
               CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),

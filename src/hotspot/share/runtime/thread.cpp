@@ -3383,6 +3383,8 @@ void collect_loaded_klasses(Klass* const k) {
   }
 }
 
+#include "oops/method.inline.hpp"
+
 void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
@@ -3398,6 +3400,25 @@ void Threads::destroy_vm() {
       nmethod* nm = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
                                                   CompileTask::Reason_Whitebox, thread);
       assert(!thread->has_pending_exception() && nm != NULL, "");
+      RelocIterator iter(nm);
+      while (iter.next()) {
+        if (iter.type() == relocInfo::static_call_type) {
+          static_call_Relocation* call = iter.static_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        }
+      }
+
     }
   }
 
