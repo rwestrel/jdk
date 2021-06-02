@@ -1846,7 +1846,14 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
 
     CompiledMethod* nm = cvf->code();
 
-      assert(!UseNewCode2, "");
+    if (UseNewCode2) {
+      ResourceMark rm;
+      stringStream ss;
+      nm->method()->print_short_name(&ss);
+
+      tty->print_cr("XXX %s %s %p %ld", ss.as_string(), _trap_reason_name[reason], fr.pc(), fr.pc() - nm->code_begin());
+    }
+    assert(!UseNewCode2, "");
 
     ScopeDesc*      trap_scope  = cvf->scope();
 
