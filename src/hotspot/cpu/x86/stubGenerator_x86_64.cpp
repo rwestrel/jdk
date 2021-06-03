@@ -1384,6 +1384,14 @@ class StubGenerator: public StubCodeGenerator {
 
   address generate_disjoint_copy_avx3_masked(address* entry, const char *name, int shift,
                                              bool aligned, bool is_oop, bool dest_uninitialized) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
@@ -1590,7 +1598,14 @@ class StubGenerator: public StubCodeGenerator {
     __ vzeroupper();
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
   }
 
   // Inputs:
@@ -1602,6 +1617,14 @@ class StubGenerator: public StubCodeGenerator {
   address generate_conjoint_copy_avx3_masked(address* entry, const char *name, int shift,
                                              address nooverlap_target, bool aligned, bool is_oop,
                                              bool dest_uninitialized) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
@@ -1764,7 +1787,15 @@ class StubGenerator: public StubCodeGenerator {
     __ vzeroupper();
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
+
   }
 #endif // COMPILER2_OR_JVMCI
 
@@ -2251,6 +2282,14 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_disjoint_int_oop_copy(bool aligned, bool is_oop, address* entry,
                                          const char *name, bool dest_uninitialized = false) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
+
 #if COMPILER2_OR_JVMCI
     if (VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
        return generate_disjoint_copy_avx3_masked(entry, "jint_disjoint_arraycopy_avx3", 2,
@@ -2337,11 +2376,19 @@ class StubGenerator: public StubCodeGenerator {
     {
       UnsafeCopyMemoryMark ucmm(this, !is_oop && !aligned, false, ucme_exit_pc);
       // Copy in multi-bytes chunks
-      copy_bytes_forward(end_from, end_to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
+      copy_bytes_forward(masm, end_from, end_to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
       __ jmp(L_copy_4_bytes);
     }
 
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
+
   }
 
   // Arguments:
@@ -2362,6 +2409,13 @@ class StubGenerator: public StubCodeGenerator {
   address generate_conjoint_int_oop_copy(bool aligned, bool is_oop, address nooverlap_target,
                                          address *entry, const char *name,
                                          bool dest_uninitialized = false) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
 #if COMPILER2_OR_JVMCI
     if (VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
        return generate_conjoint_copy_avx3_masked(entry, "jint_conjoint_arraycopy_avx3", 2,
@@ -2455,7 +2509,14 @@ class StubGenerator: public StubCodeGenerator {
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
 
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
   }
 
   // Arguments:
@@ -2475,6 +2536,14 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_disjoint_long_oop_copy(bool aligned, bool is_oop, address *entry,
                                           const char *name, bool dest_uninitialized = false) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
+
 #if COMPILER2_OR_JVMCI
     if (VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
        return generate_disjoint_copy_avx3_masked(entry, "jlong_disjoint_arraycopy_avx3", 3,
@@ -2568,7 +2637,14 @@ class StubGenerator: public StubCodeGenerator {
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
 
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
   }
 
   // Arguments:
@@ -2585,6 +2661,14 @@ class StubGenerator: public StubCodeGenerator {
   address generate_conjoint_long_oop_copy(bool aligned, bool is_oop,
                                           address nooverlap_target, address *entry,
                                           const char *name, bool dest_uninitialized = false) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
+
 #if COMPILER2_OR_JVMCI
     if (VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
        return generate_conjoint_copy_avx3_masked(entry, "jlong_conjoint_arraycopy_avx3", 3,
@@ -2669,7 +2753,14 @@ class StubGenerator: public StubCodeGenerator {
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
 
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
   }
 
 
@@ -2712,6 +2803,13 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_checkcast_copy(const char *name, address *entry,
                                   bool dest_uninitialized = false) {
+    int insts_size = 512;
+    int locs_size  = 64;
+
+    CodeBuffer code(name, insts_size, locs_size);
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* saved_masm = _masm;
+    _masm = masm;
 
     Label L_load_element, L_store_element, L_do_card_marks, L_done;
 
@@ -2887,7 +2985,14 @@ class StubGenerator: public StubCodeGenerator {
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(0);
 
-    return start;
+    RuntimeStub* stub =
+            RuntimeStub::new_runtime_stub(name,
+                                          &code,
+                                          CodeOffsets::frame_never_safe,
+                                          (4 >> (LogBytesPerWord - LogBytesPerInt)),
+                                          new OopMapSet(), false);
+    _masm = saved_masm;
+    return stub->entry_point();
   }
 
   //

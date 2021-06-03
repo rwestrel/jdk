@@ -65,8 +65,8 @@ void CardTableBarrierSetAssembler::gen_write_ref_array_post_barrier(MacroAssembl
   __ subptr(end, addr); // end --> cards count
 
   __ mov64(tmp, disp);
-  __ relocate(relocInfo::card_mark_word_type);
-  __ lea(tmp, AddressLiteral((address) disp, relocInfo::card_mark_word_type));
+//  __ relocate(relocInfo::card_mark_word_type);
+//  __ lea(tmp, AddressLiteral((address) disp, relocInfo::card_mark_word_type));
   __ addptr(addr, tmp);
 __ BIND(L_loop);
   __ movb(Address(addr, count, Address::times_1), 0);
