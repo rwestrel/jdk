@@ -2222,7 +2222,7 @@ void MacroAssembler::jump(AddressLiteral dst) {
 }
 
 void MacroAssembler::jump_cc(Condition cc, AddressLiteral dst) {
-  if (reachable(dst)) {
+  if (reachable(dst) && (dst.reloc() != relocInfo::external_word_type /*|| !UseNewCode*/)) {
     InstructionMark im(this);
     relocate(dst.reloc());
     const int short_size = 2;

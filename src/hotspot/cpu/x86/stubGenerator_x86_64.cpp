@@ -1412,8 +1412,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset = 0;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -1605,6 +1606,9 @@ class StubGenerator: public StubCodeGenerator {
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
     _masm = saved_masm;
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     return stub->entry_point();
   }
 
@@ -1646,8 +1650,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -1794,6 +1799,9 @@ class StubGenerator: public StubCodeGenerator {
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
     _masm = saved_masm;
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     return stub->entry_point();
 
   }
@@ -2315,8 +2323,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -2376,7 +2385,7 @@ class StubGenerator: public StubCodeGenerator {
     {
       UnsafeCopyMemoryMark ucmm(this, !is_oop && !aligned, false, ucme_exit_pc);
       // Copy in multi-bytes chunks
-      copy_bytes_forward(masm, end_from, end_to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
+      copy_bytes_forward(end_from, end_to, qword_count, rax, L_copy_bytes, L_copy_8_bytes);
       __ jmp(L_copy_4_bytes);
     }
 
@@ -2387,6 +2396,9 @@ class StubGenerator: public StubCodeGenerator {
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
     _masm = saved_masm;
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     return stub->entry_point();
 
   }
@@ -2436,8 +2448,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -2516,6 +2529,9 @@ class StubGenerator: public StubCodeGenerator {
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
     _masm = saved_masm;
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     return stub->entry_point();
   }
 
@@ -2568,8 +2584,9 @@ class StubGenerator: public StubCodeGenerator {
     // Save no-overlap entry point for generate_conjoint_long_oop_copy()
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -2643,6 +2660,9 @@ class StubGenerator: public StubCodeGenerator {
                                           CodeOffsets::frame_never_safe,
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     _masm = saved_masm;
     return stub->entry_point();
   }
@@ -2688,8 +2708,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter(); // required for proper stackwalking of RuntimeStub frame
     assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
 
+    uintptr_t offset;
     if (entry != NULL) {
-      *entry = __ pc();
+      offset = __ pc() - start;
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
@@ -2760,6 +2781,9 @@ class StubGenerator: public StubCodeGenerator {
                                           (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                           new OopMapSet(), false);
     _masm = saved_masm;
+    if (entry != NULL) {
+      *entry = stub->entry_point() + offset;
+    }
     return stub->entry_point();
   }
 
