@@ -1851,7 +1851,7 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
       stringStream ss;
       nm->method()->print_short_name(&ss);
 
-      tty->print_cr("XXX %s %s %p %ld", ss.as_string(), _trap_reason_name[reason], fr.pc(), fr.pc() - nm->code_begin());
+      tty->print_cr("XXX %s %s %p %ld %d", ss.as_string(), _trap_reason_name[reason], fr.pc(), fr.pc() - nm->code_begin(), unloaded_class_index);
     }
     assert(!UseNewCode2, "");
 

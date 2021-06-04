@@ -1741,6 +1741,16 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
             } else if (resolved_method->has_itable_index()) {
               int itable_index = resolved_method->itable_index();
+              {
+                ResourceMark rm;
+                stringStream ss;
+                resolved_method->print_short_name(&ss);
+                tty->print_cr("XXX itable index for %s %d", ss.as_string(), itable_index);
+                resolved_method->method_holder()->print_on(tty);
+                if (!strcmp(ss.as_string(), " java.util.function.Function::apply")) {
+                  tty->print_cr("Here! Here! %p", resolved_method->method_holder()->methods()->adr_at(0));
+                }
+              }
               CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
                                                               link_info.resolved_klass(), false);
 

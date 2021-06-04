@@ -2417,7 +2417,7 @@ void Method::print_value_on(outputStream* st) const {
   signature()->print_value_on(st);
   st->print(" in ");
   method_holder()->print_value_on(st);
-  if (WizardMode) st->print("#%d", _vtable_index);
+  if (WizardMode || UseNewCode || UseNewCode2) st->print("#%d", _vtable_index);
   if (WizardMode) st->print("[%d,%d]", size_of_parameters(), max_locals());
   if (WizardMode && code() != NULL) st->print(" ((nmethod*)%p)", code());
 }

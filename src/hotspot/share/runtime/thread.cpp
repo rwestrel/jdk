@@ -3388,6 +3388,33 @@ void collect_loaded_klasses(Klass* const k) {
 void Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
 
+
+#ifdef ASSERT
+  _vm_complete = false;
+#endif
+  // Wait until we are the last non-daemon thread to execute
+  {
+    MonitorLocker nu(Threads_lock);
+    while (Threads::number_of_non_daemon_threads() > 1)
+      // This wait should make safepoint checks, wait without a timeout.
+      nu.wait(0);
+  }
+
+  EventShutdown e;
+  if (e.should_commit()) {
+    e.set_reason("No remaining non-daemon Java threads");
+    e.commit();
+  }
+
+  // Hang forever on exit if we are reporting an error.
+  if (ShowMessageBoxOnError && VMError::is_error_reported()) {
+    os::infinite_sleep();
+  }
+  os::wait_for_keypress_at_exit();
+
+  // run Java level shutdown hooks
+  thread->invoke_shutdown_hooks();
+
   if (UseNewCode) {
     ResourceMark rm;
     HandleMark hm(thread);
@@ -3448,32 +3475,6 @@ void Threads::destroy_vm() {
     }
     CodeCache::dump_to_disk(file, thread);
   }
-
-#ifdef ASSERT
-  _vm_complete = false;
-#endif
-  // Wait until we are the last non-daemon thread to execute
-  {
-    MonitorLocker nu(Threads_lock);
-    while (Threads::number_of_non_daemon_threads() > 1)
-      // This wait should make safepoint checks, wait without a timeout.
-      nu.wait(0);
-  }
-
-  EventShutdown e;
-  if (e.should_commit()) {
-    e.set_reason("No remaining non-daemon Java threads");
-    e.commit();
-  }
-
-  // Hang forever on exit if we are reporting an error.
-  if (ShowMessageBoxOnError && VMError::is_error_reported()) {
-    os::infinite_sleep();
-  }
-  os::wait_for_keypress_at_exit();
-
-  // run Java level shutdown hooks
-  thread->invoke_shutdown_hooks();
 
   before_exit(thread);
 
