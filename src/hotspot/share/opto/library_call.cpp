@@ -3934,7 +3934,7 @@ bool LibraryCallKit::inline_native_Reflection_getCallerClass() {
         // We have reached the desired frame; return the holder class.
         // Acquire method holder as java.lang.Class and push as constant.
         ciInstanceKlass* caller_klass = caller_jvms->method()->holder();
-        if (UseNewCode) {
+        if (UseNewCode && 0) {
           set_result(load_mirror_from_klass(makecon(TypeKlassPtr::make(caller_klass))));
         } else {
           ciInstance* caller_mirror = caller_klass->java_mirror();

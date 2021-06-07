@@ -95,7 +95,7 @@ void Parse::do_field_access(bool is_get, bool is_field) {
     }
   } else {
     ensure_klass_initialization(field_holder);
-    if (UseNewCode) {
+    if (UseNewCode && 0) {
       obj = load_mirror_from_klass(makecon(TypeKlassPtr::make(field_holder)));
     } else {
       const TypeInstPtr* tip = TypeInstPtr::make(field_holder->java_mirror());
