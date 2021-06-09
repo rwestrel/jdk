@@ -412,6 +412,7 @@ void ClassLoaderData::packages_do(void f(PackageEntry*)) {
   }
 }
 #ifndef LEYDEN
+#ifndef LEYDEN
 void ClassLoaderData::record_dependency(const Klass* k) {
   assert(k != NULL, "invariant");
 
