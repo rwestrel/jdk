@@ -3813,7 +3813,7 @@ bool Compile::final_graph_reshaping() {
 bool Compile::too_many_traps(ciMethod* method,
                              int bci,
                              Deoptimization::DeoptReason reason) {
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     return true;
   }
   ciMethodData* md = method->method_data();
@@ -3841,7 +3841,7 @@ bool Compile::too_many_traps(ciMethod* method,
 // Less-accurate variant which does not require a method and bci.
 bool Compile::too_many_traps(Deoptimization::DeoptReason reason,
                              ciMethodData* logmd) {
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     return true;
   }
   if (trap_count(reason) >= Deoptimization::per_method_trap_limit(reason)) {
@@ -3868,7 +3868,7 @@ bool Compile::too_many_traps(Deoptimization::DeoptReason reason,
 bool Compile::too_many_recompiles(ciMethod* method,
                                   int bci,
                                   Deoptimization::DeoptReason reason) {
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     return true;
   }
   ciMethodData* md = method->method_data();

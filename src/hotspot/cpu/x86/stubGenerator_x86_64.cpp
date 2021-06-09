@@ -82,7 +82,7 @@ class StubGenerator: public StubCodeGenerator {
 #define inc_counter_np(counter) ((void)0)
 #else
   void inc_counter_np_(int& counter) {
-    if (UseNewCode) {
+    if (DumpCodeToDisk) {
       return;
     }
     // This can destroy rscratch1 if counter is far from the code cache

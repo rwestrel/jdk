@@ -159,7 +159,7 @@ void Deoptimization::UnrollBlock::print() {
 // The actual reallocation of previously eliminated objects occurs in realloc_objects,
 // which is called from the method fetch_unroll_info_helper below.
 JRT_BLOCK_ENTRY(Deoptimization::UnrollBlock*, Deoptimization::fetch_unroll_info(JavaThread* current, int exec_mode))
-  assert(!UseNewCode2, "");
+  assert(!RestoreCodeFromDisk, "");
   // fetch_unroll_info() is called at the beginning of the deoptimization
   // handler. Note this fact before we start generating temporary frames
   // that can confuse an asynchronous stack walker. This counter is
@@ -678,7 +678,7 @@ void Deoptimization::unwind_callee_save_values(frame* f, vframeArray* vframe_arr
 
 // Return BasicType of value being returned
 JRT_LEAF(BasicType, Deoptimization::unpack_frames(JavaThread* thread, int exec_mode))
-  assert(!UseNewCode2, "");
+  assert(!RestoreCodeFromDisk, "");
 
   // We are already active in the special DeoptResourceMark any ResourceObj's we
   // allocate will be freed at the end of the routine.
@@ -1846,14 +1846,14 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
 
     CompiledMethod* nm = cvf->code();
 
-    if (UseNewCode2) {
+    if (RestoreCodeFromDisk) {
       ResourceMark rm;
       stringStream ss;
       nm->method()->print_short_name(&ss);
 
       tty->print_cr("XXX %s %s %p %ld %d", ss.as_string(), _trap_reason_name[reason], fr.pc(), fr.pc() - nm->code_begin(), unloaded_class_index);
     }
-    assert(!UseNewCode2, "");
+    assert(!RestoreCodeFromDisk, "");
 
     ScopeDesc*      trap_scope  = cvf->scope();
 

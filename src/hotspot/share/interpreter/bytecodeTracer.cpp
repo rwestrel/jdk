@@ -125,7 +125,7 @@ class BytecodePrinter: public BytecodeClosure {
     // the next bytecode.
     _is_wide = (code == Bytecodes::_wide);
     _code = Bytecodes::_illegal;
-    if (UseNewCode3) {
+    if (UpdateCompileList) {
       FILE* f = fopen("/home/roland/tmp/commands2", "a");
       assert(f != NULL, "");
       ResourceMark rm;
@@ -134,7 +134,7 @@ class BytecodePrinter: public BytecodeClosure {
       fprintf(f, "compileonexit %s\n", ss.as_string());
       fclose(f);
     }
-    assert(!UseNewCode2, "");
+    assert(!RestoreCodeFromDisk, "");
   }
 
   // Used for Method*::print_codes().  The input bcp comes from

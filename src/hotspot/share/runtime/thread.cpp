@@ -2883,7 +2883,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 
-  if (UseNewCode2) {
+  if (RestoreCodeFromDisk) {
     ResourceMark rm;
     HandleMark hm(THREAD);
     FILE* file = fopen("/home/roland/tmp/dump", "r");
@@ -3415,7 +3415,7 @@ void Threads::destroy_vm() {
   // run Java level shutdown hooks
   thread->invoke_shutdown_hooks();
 
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     ResourceMark rm;
     HandleMark hm(thread);
     compile_on_exit = new GrowableArray<Method*>();
@@ -3449,7 +3449,7 @@ void Threads::destroy_vm() {
     }
   }
 
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     ResourceMark rm;
     HandleMark hm(thread);
     FILE* file = fopen("/home/roland/tmp/dump", "w");

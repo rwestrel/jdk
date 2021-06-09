@@ -298,7 +298,7 @@ void ciField::initialize_from(fieldDescriptor* fd) {
       _is_constant = false;
     }
   }
-  if (UseNewCode) {
+  if (DumpCodeToDisk) {
     _is_constant = false;
   }
 }

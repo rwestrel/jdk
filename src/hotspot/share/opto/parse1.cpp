@@ -1234,7 +1234,7 @@ void Parse::do_method_entry() {
     // Setup Object Pointer
     Node *lock_obj = NULL;
     if(method()->is_static()) {
-      if (UseNewCode && 0) {
+      if (DumpCodeToDisk && 0) {
         lock_obj = load_mirror_from_klass(makecon(TypeKlassPtr::make(_method->holder())));
       } else {
         ciInstance* mirror = _method->holder()->java_mirror();
