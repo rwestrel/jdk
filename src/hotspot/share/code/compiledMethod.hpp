@@ -141,6 +141,7 @@ public:
 class CompiledMethod : public CodeBlob {
   friend class VMStructs;
   friend class NMethodSweeper;
+  friend class CodeCache;
 
   void init_defaults();
 protected:

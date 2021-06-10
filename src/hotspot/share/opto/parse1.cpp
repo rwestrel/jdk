@@ -1207,9 +1207,13 @@ void Parse::do_method_entry() {
     // Setup Object Pointer
     Node *lock_obj = NULL;
     if(method()->is_static()) {
-      ciInstance* mirror = _method->holder()->java_mirror();
-      const TypeInstPtr *t_lock = TypeInstPtr::make(mirror);
-      lock_obj = makecon(t_lock);
+      if (DumpCodeToDisk && 0) {
+        lock_obj = load_mirror_from_klass(makecon(TypeKlassPtr::make(_method->holder())));
+      } else {
+        ciInstance* mirror = _method->holder()->java_mirror();
+        const TypeInstPtr *t_lock = TypeInstPtr::make(mirror);
+        lock_obj = makecon(t_lock);
+      }
     } else {                  // Else pass the "this" pointer,
       lock_obj = local(0);    // which is Parm0 from StartNode
     }

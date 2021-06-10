@@ -973,7 +973,7 @@ void Method::set_native_function(address function, bool post_event_flag) {
   // use the latest registered method -> check if a stub already has been generated.
   // If so, we have to make it not_entrant.
   CompiledMethod* nm = code(); // Put it into local variable to guard against concurrent updates
-  if (nm != NULL) {
+  if (nm != NULL && !RestoreCodeFromDisk) {
     nm->make_not_entrant();
   }
 }
@@ -2528,7 +2528,7 @@ void Method::print_value_on(outputStream* st) const {
   signature()->print_value_on(st);
   st->print(" in ");
   method_holder()->print_value_on(st);
-  if (WizardMode) st->print("#%d", _vtable_index);
+  if (WizardMode || DumpCodeToDisk || RestoreCodeFromDisk) st->print("#%d", _vtable_index);
   if (WizardMode) st->print("[%d,%d]", size_of_parameters(), max_locals());
   if (WizardMode && code() != NULL) st->print(" ((nmethod*)%p)", code());
 }

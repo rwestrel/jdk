@@ -1286,7 +1286,7 @@ int  InstanceKlass::nof_implementors() const {
 //
 // The _implementor field only exists for interfaces.
 void InstanceKlass::add_implementor(Klass* k) {
-  if (Universe::is_fully_initialized()) {
+  if (Universe::is_fully_initialized() && !RestoreCodeFromDisk) {
     assert_lock_strong(Compile_lock);
   }
   assert(is_interface(), "not interface");
@@ -3443,7 +3443,7 @@ void InstanceKlass::print_on(outputStream* st) const {
 
   st->print(BULLET"arrays:            "); Metadata::print_value_on_maybe_null(st, array_klasses()); st->cr();
   st->print(BULLET"methods:           "); methods()->print_value_on(st);                  st->cr();
-  if (Verbose || WizardMode) {
+  if (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk) {
     Array<Method*>* method_array = methods();
     for (int i = 0; i < method_array->length(); i++) {
       st->print("%d : ", i); method_array->at(i)->print_value(); st->cr();
@@ -3522,9 +3522,9 @@ void InstanceKlass::print_on(outputStream* st) const {
     st->print_cr(BULLET"java mirror:       NULL");
   }
   st->print(BULLET"vtable length      %d  (start addr: " INTPTR_FORMAT ")", vtable_length(), p2i(start_of_vtable())); st->cr();
-  if (vtable_length() > 0 && (Verbose || WizardMode))  print_vtable(start_of_vtable(), vtable_length(), st);
+  if (vtable_length() > 0 && (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk))  print_vtable(start_of_vtable(), vtable_length(), st);
   st->print(BULLET"itable length      %d (start addr: " INTPTR_FORMAT ")", itable_length(), p2i(start_of_itable())); st->cr();
-  if (itable_length() > 0 && (Verbose || WizardMode))  print_vtable(start_of_itable(), itable_length(), st);
+  if (itable_length() > 0 && (Verbose || WizardMode || DumpCodeToDisk || RestoreCodeFromDisk))  print_vtable(start_of_itable(), itable_length(), st);
 #ifndef LEYDEN
   st->print_cr(BULLET"---- static fields (%d words):", static_field_size());
   FieldPrinter print_static_field(st);

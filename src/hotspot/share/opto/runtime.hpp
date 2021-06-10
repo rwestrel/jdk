@@ -137,6 +137,7 @@ typedef const TypeFunc*(*TypeFunc_generator)();
 class OptoRuntime : public AllStatic {
   friend class Matcher;  // allow access to stub names
   friend class Threads;
+  friend class CodeCache;
 
  private:
 #ifndef LEYDEN
@@ -162,6 +163,8 @@ class OptoRuntime : public AllStatic {
   static address _slow_arraycopy_Java;
   static address _register_finalizer_Java;
 #endif
+
+  static address _initialize_klass_Java;
 
   //
   // Implementation of runtime methods
@@ -240,6 +243,8 @@ private:
 
   static address slow_arraycopy_Java()                   { return _slow_arraycopy_Java; }
   static address register_finalizer_Java()               { return _register_finalizer_Java; }
+
+  static address initialize_klass_Java()                 { return _initialize_klass_Java; }
 
   static ExceptionBlob*    exception_blob()                      { return _exception_blob; }
 
@@ -341,6 +346,12 @@ private:
  static void          print_named_counters();
 #endif
 
+#ifndef LEYDEN
+
+  static const TypeFunc* initialize_klass_Type();
+  static void initialize_klass_C(Klass* instance_klass, JavaThread* current);
+
+#endif
 };
 
 #endif // SHARE_OPTO_RUNTIME_HPP

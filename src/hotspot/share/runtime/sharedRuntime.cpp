@@ -1470,6 +1470,7 @@ methodHandle SharedRuntime::resolve_sub_helper(JavaThread *thread,
 
 // Inline caches exist only in compiled code
 JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_ic_miss(JavaThread* thread))
+  assert(!RestoreCodeFromDisk, "");
 #ifdef ASSERT
   RegisterMap reg_map(thread, false);
   frame stub_frame = thread->last_frame();

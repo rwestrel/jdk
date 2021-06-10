@@ -768,7 +768,7 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   // Pick up the return address
   __ movptr(rax, Address(rsp, 0));
 
-  if (VerifyAdapterCalls &&
+  if (VerifyAdapterCalls && !DumpCodeToDisk &&
       (Interpreter::code() != NULL || StubRoutines::code1() != NULL)) {
     // So, let's test for cascading c2i/i2c adapters right now.
     //  assert(Interpreter::contains($return_addr) ||
@@ -2150,8 +2150,15 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     if (method->is_static()) {
 
-      //  load oop into a register
-      __ movoop(oop_handle_reg, JNIHandles::make_local(method->method_holder()->java_mirror()));
+      if (DumpCodeToDisk) {
+        __ mov_metadata(oop_handle_reg, method->method_holder());
+        const int mirror_offset = in_bytes(Klass::java_mirror_offset());
+        __ movptr(oop_handle_reg, Address(oop_handle_reg, mirror_offset));
+        __ resolve_oop_handle(oop_handle_reg, rbx);
+      } else {
+        //  load oop into a register
+        __ movoop(oop_handle_reg, JNIHandles::make_local(method->method_holder()->java_mirror()));
+      }
 
       // Now handlize the static class mirror it's known not-null.
       __ movptr(Address(rsp, klass_offset), oop_handle_reg);
@@ -2183,7 +2190,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // We have all of the arguments setup at this point. We must not touch any register
   // argument registers at this point (what if we save/restore them there are no oop?
 
-  {
+  if (!DumpCodeToDisk){
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);
     // protect the args we've loaded
     save_args(masm, total_c_args, c_arg, out_regs);
@@ -2424,7 +2431,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ bind(done);
 
   }
-  {
+  if (!DumpCodeToDisk) {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);
     save_native_result(masm, ret_type, stack_slots);
     __ mov_metadata(c_rarg1, method());

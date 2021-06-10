@@ -23,6 +23,7 @@
  */
 
 #include <opto/runtime.hpp>
+#include <classfile/symbolTable.hpp>
 #include "precompiled.hpp"
 #include "jvm.h"
 #include "aot/aotLoader.hpp"
@@ -3535,6 +3536,39 @@ static void leyden_fix_name_signature_holder(Method* m) {
   m->_holder = m->method_holder();
 }
 
+#ifndef LEYDEN
+
+static void record_method(JavaThread* thread, Klass* klass, Symbol* name, Symbol* signature, GrowableArray<CompiledCode> &nmethods, bool is_static) {
+  CompiledCode cc;
+  cc.klass = klass;
+  cc.name = name;
+  cc.signature = signature;
+  HandleMark hm(thread);
+  CallInfo callinfo;
+  LinkInfo link_info(cc.klass, cc.name, cc.signature);
+  if (is_static) {
+    LinkResolver::resolve_static_call(callinfo, link_info, false, thread);
+  } else {
+    LinkResolver::resolve_special_call(callinfo, Handle(), link_info, thread);
+  }
+  assert(!thread->has_pending_exception(), "");
+  methodHandle method(thread, callinfo.selected_method());
+  assert(method.not_null(), "should have thrown exception");
+  cc.method = method();
+  nmethods.push(cc);
+}
+
+#endif
+
+jobject (*JVM_GetStackAccessControlContext_reduced) (JNIEnv *, jclass );
+jobject (*JVM_GetInheritedAccessControlContext_reduced) (JNIEnv *env, jclass cls);
+void (*JVM_SetThreadPriority_reduced) (JNIEnv* env, jobject jthread, jint prio);
+jobjectArray (*JVM_GetProperties_reduced)(JNIEnv *env);
+jlong (*JVM_MaxMemory_reduced) ();
+void (* JVM_MonitorWait_reduced)(JNIEnv*, jobject, jlong);
+void (*JVM_MonitorNotifyAll_reduced)(JNIEnv* , jobject );
+void (*JVM_DefineArchivedModules_reduced)(JNIEnv*, jobject, jobject);
+
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #ifdef LEYDEN
 #define copy_in(c, f) do {  c::f = leydenStaticData.c##__##f; } while (0)
@@ -3837,6 +3871,199 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 #endif
+#ifndef LEYDEN
+  if (RestoreCodeFromDisk) {
+    ResourceMark rm;
+    HandleMark hm(THREAD);
+    FILE* file = fopen("/home/roland/tmp/dump", "r");
+    assert(file != NULL, "fopen failed");
+    int nb;
+    int r = fread(&nb, sizeof(nb), 1, file);
+    assert(r == 1, "fread failed");
+    for (int i = 0; i < nb; i++) {
+      int l;
+      r = fread(&l, sizeof(l), 1, file);
+      assert(r == 1, "fread failed");
+      char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
+      r = fread(klass_name, 1, l, file);
+      assert(r == l, "fread failed");
+      klass_name[l] = '\0';
+//        tty->print_cr("XXX %s", klass_name);
+      Symbol* sym = SymbolTable::new_symbol(klass_name, l);
+      Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
+                                                   Handle(), true, THREAD);
+      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+    }
+    CodeCache::restore_from_disk(file, THREAD->as_Java_thread());
+  }
+  if (UseNewCode) {
+    ResourceMark rm;
+    JavaThread* thread = THREAD->as_Java_thread();
+    HandleMark hm(thread);
+
+    GrowableArray<CompiledCode> nmethods;
+    record_method(thread, vmClasses::ThreadGroup_klass(), vmSymbols::object_initializer_name(), vmSymbols::threadgroup_string_void_signature(), nmethods, false );
+    record_method(thread, vmClasses::Thread_klass(), vmSymbols::object_initializer_name(), vmSymbols::threadgroup_string_void_signature(), nmethods, false);
+    record_method(thread, vmClasses::ThreadGroup_klass(), vmSymbols::object_initializer_name(), vmSymbols::void_method_signature(), nmethods, false);
+    record_method(thread, vmClasses::System_klass(), vmSymbols::initPhase1_name(), vmSymbols::void_method_signature(), nmethods, true);
+    record_method(thread, vmClasses::ThreadGroup_klass(),vmSymbols::add_method_name(), vmSymbols::thread_void_signature(), nmethods, false);
+    record_method(thread, vmClasses::System_klass(), vmSymbols::initPhase2_name(), vmSymbols::boolean_boolean_int_signature(), nmethods, true);
+
+    leydenStaticData.nmethods = NEW_C_HEAP_ARRAY(CompiledCode, nmethods.length(), mtOther);
+    for (int i = 0; i < nmethods.length(); ++i) {
+      leydenStaticData.nmethods[i] = nmethods.at(i);
+    }
+    leydenStaticData.nmethods_size = nmethods.length();
+
+    // leydenStaticData.nmethods = NEW_C_HEAP_ARRAY(CompiledCode, nmethods.length(), mtOther);
+    // for (int i = 0; i < nmethods.length(); ++i) {
+    //   leydenStaticData.nmethods[i] = nmethods.at(i);
+    // }
+    // leydenStaticData.nmethods_size = nmethods.length();
+
+#define copy_out(c, f) do { leydenStaticData.c##__##f = c::f; } while (0)
+#define copy_out_array(c, f) memcpy(leydenStaticData.c##__##f, c::f, sizeof(leydenStaticData.c##__##f));
+
+    copy_out(VM_Version, _cpuinfo_segv_addr);
+    copy_out(VM_Version, _cpuinfo_cont_addr);
+    copy_out(java_lang_String, _value_offset);
+    copy_out(java_lang_String, _hash_offset);
+    copy_out(java_lang_String, _hashIsZero_offset);
+    copy_out(java_lang_String, _coder_offset);
+    copy_out(java_lang_String, _initialized);
+    copy_out_array(vmClasses, _klasses);
+    copy_out_array(vmClasses, _box_klasses);
+    copy_out(CompressedKlassPointers, _narrow_klass);
+    copy_out(CompressedKlassPointers, _range);
+    copy_out_array(Universe, _typeArrayKlassObjs);
+    copy_out(Universe, _objectArrayKlassObj);
+    copy_out(Universe, _the_array_interfaces_array);
+    copy_out(ClassLoaderDataGraph, _head);
+    copy_out(java_lang_Throwable, _detailMessage_offset);
+    copy_out(java_lang_Throwable, _backtrace_offset);
+    copy_out(java_lang_Throwable, _stackTrace_offset);
+    copy_out(java_lang_Throwable, _depth_offset);
+    copy_out(java_lang_Throwable, _static_unassigned_stacktrace_offset);
+    copy_out_array(Symbol, _vm_symbols);
+    copy_out(ClassLoaderData, _the_null_class_loader_data);
+    copy_out(StubRoutines, _call_stub_entry);
+    copy_out(StubRoutines, _call_stub_return_address);
+    copy_out(CodeCache, _heaps);
+    copy_out(java_lang_Class, _klass_offset);
+    copy_out(java_lang_Class, _array_klass_offset);
+    copy_out(java_lang_Class, _oop_size_offset);
+    copy_out(java_lang_Class, _static_oop_field_count_offset);
+    copy_out(java_lang_Class, _protection_domain_offset);
+    copy_out(java_lang_Class, _init_lock_offset);
+    copy_out(java_lang_Class, _signers_offset);
+    copy_out(java_lang_Class, _class_loader_offset);
+    copy_out(java_lang_Class, _module_offset);
+    copy_out(java_lang_Class, _component_mirror_offset);
+    copy_out(java_lang_Class, _name_offset);
+    copy_out(java_lang_Class, _source_file_offset);
+    copy_out(java_lang_Class, _classData_offset);
+    copy_out(java_lang_Class, _classRedefinedCount_offset);
+    copy_out(java_lang_Class, _offsets_computed);
+    copy_out(java_lang_Class, _fixup_mirror_list);
+    copy_out(java_lang_Class, _fixup_module_field_list);
+    copy_out(java_security_AccessControlContext, _context_offset);
+    copy_out(java_security_AccessControlContext, _privilegedContext_offset);
+    copy_out(java_security_AccessControlContext, _isPrivileged_offset);
+    copy_out(java_security_AccessControlContext, _isAuthorized_offset);
+    copy_out(java_lang_Thread, _name_offset);
+    copy_out(java_lang_Thread, _group_offset);
+    copy_out(java_lang_Thread, _contextClassLoader_offset);
+    copy_out(java_lang_Thread, _inheritedAccessControlContext_offset);
+    copy_out(java_lang_Thread, _priority_offset);
+    copy_out(java_lang_Thread, _eetop_offset);
+    copy_out(java_lang_Thread, _interrupted_offset);
+    copy_out(java_lang_Thread, _daemon_offset);
+    copy_out(java_lang_Thread, _stillborn_offset);
+    copy_out(java_lang_Thread, _stackSize_offset);
+    copy_out(java_lang_Thread, _tid_offset);
+    copy_out(java_lang_Thread, _thread_status_offset);
+    copy_out(java_lang_Thread, _park_blocker_offset);
+    copy_out(SymbolTable, _local_table);
+    copy_out(InstanceMirrorKlass, _offset_of_static_fields);
+    copy_out(MetaspaceContext, _nonclass_space_context);
+    copy_out(MetaspaceContext, _class_space_context);
+
+
+    {
+      ObjArrayKlass dummy;
+      leydenStaticData.ObjArrayKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      TypeArrayKlass dummy;
+      leydenStaticData.TypeArrayKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceKlass dummy;
+      leydenStaticData.InstanceKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceKlass dummy;
+      leydenStaticData.InstanceKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceClassLoaderKlass dummy;
+      leydenStaticData.InstanceClassLoaderKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceMirrorKlass dummy;
+      leydenStaticData.InstanceMirrorKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      InstanceRefKlass dummy;
+      leydenStaticData.InstanceRefKlass_vtbl = *(uintptr_t*)&dummy;
+    }
+    {
+      Method dummy;
+      leydenStaticData.Method_vtbl = *(uintptr_t*)&dummy;
+    }
+
+    ClassLoaderData* cld = ClassLoaderDataGraph::_head;
+    while (cld != NULL) {
+      cld->methods_do(leyden_fix_name_signature_holder);
+      cld = cld->next();
+    }
+
+#undef copy_out
+
+    void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so",
+                            RTLD_NOW | RTLD_LOCAL);
+    printf("XXX %p\n", minimal);
+    void* sym = dlsym(minimal, "JNI_CreateJavaVM");
+    printf("XXX %p\n", sym);
+    jint (*CreateJavaVM)(JavaVM **, void **, void *) = (jint (*)(JavaVM **, void **, void *))sym;
+    printf("XXX %p\n", sym);
+//    leydenStaticData_reduced = (LeydenStaticData*)dlsym(minimal, "leydenStaticData");
+//    memcpy(leydenStaticData_reduced, &leydenStaticData, sizeof(leydenStaticData));
+//    printf("WWW %p %p\n", &leydenStaticData, leydenStaticData_reduced);
+
+//    printf("XXX %p\n", sym);
+    JVM_GetStackAccessControlContext_reduced = (jobject (*) (JNIEnv *, jclass ))dlsym(minimal, "JVM_GetStackAccessControlContext");
+    JVM_GetInheritedAccessControlContext_reduced = (jobject (*) (JNIEnv *, jclass ))dlsym(minimal, "JVM_GetInheritedAccessControlContext");
+    JVM_SetThreadPriority_reduced = (void (*) (JNIEnv* , jobject , jint ))dlsym(minimal, "JVM_SetThreadPriority");
+    JVM_GetProperties_reduced = (jobjectArray (*)(JNIEnv*))dlsym(minimal, "JVM_GetProperties");
+    JVM_MaxMemory_reduced = (jlong (*)())dlsym(minimal, "JVM_MaxMemory");
+    JVM_MonitorWait_reduced = (void (*)(JNIEnv*, jobject, jlong))dlsym(minimal, "JVM_MonitorWait");
+    JVM_MonitorNotifyAll_reduced = (void (*)(JNIEnv* , jobject))dlsym(minimal, "JVM_MonitorNotifyAll");
+    JVM_DefineArchivedModules_reduced = (void (*)(JNIEnv*, jobject, jobject))dlsym(minimal, "JVM_DefineArchivedModules");
+
+    struct sigaction sa;
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGSEGV, &sa, NULL);
+
+    JavaVMInitArgs args;
+    memset(&args, 0, sizeof(args));
+    args.version  = JNI_VERSION_1_2;
+    JavaVM *vm;
+    JNIEnv *env = 0;
+    CreateJavaVM(&vm, (void**)&env, &args);
+  }
+#endif
+
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
 #ifndef LEYDEN
@@ -4394,21 +4621,37 @@ static nmethod* compile_method(JavaThread* thread, Klass* klass, Symbol* name, S
   return nm;
 }
 
+#endif
+
+//   + Return to caller
+
+#include "classfile/classLoaderDataGraph.hpp"
+
+#ifndef LEYDEN
+GrowableArray<Method*>* compile_on_exit;
+GrowableArray<Klass*>* loaded_klasses;
+
+void maybe_compile_method(Method* m) {
+  Thread* thread = Thread::current();
+  methodHandle mh(thread, m);
+  if (!mh->is_abstract() && CompilerOracle::has_option(mh, CompileCommand::CompileOnExit)) {
+    compile_on_exit->push(m);
+  }
+}
+
+void collect_loaded_klasses(Klass* const k) {
+  if ((k->is_instance_klass() && InstanceKlass::cast(k)->is_loaded()) || k->is_array_klass()) {
+    loaded_klasses->push(k);
+  }
+}
 
 #endif
 
-jobject (*JVM_GetStackAccessControlContext_reduced) (JNIEnv *, jclass );
-jobject (*JVM_GetInheritedAccessControlContext_reduced) (JNIEnv *env, jclass cls);
-void (*JVM_SetThreadPriority_reduced) (JNIEnv* env, jobject jthread, jint prio);
-jobjectArray (*JVM_GetProperties_reduced)(JNIEnv *env);
-jlong (*JVM_MaxMemory_reduced) ();
-void (* JVM_MonitorWait_reduced)(JNIEnv*, jobject, jlong);
-void (*JVM_MonitorNotifyAll_reduced)(JNIEnv* , jobject );
-void (*JVM_DefineArchivedModules_reduced)(JNIEnv*, jobject, jobject);
-//LeydenStaticData* leydenStaticData_reduced;
+#include "oops/method.inline.hpp"
 
 bool Threads::destroy_vm() {
   JavaThread* thread = JavaThread::current();
+
 
 #ifndef LEYDEN
   Klass* VM_klass;
@@ -4425,7 +4668,7 @@ bool Threads::destroy_vm() {
   int BootLoader_klass_CLASS_LOADER_VALUE_MAP_copy;
 
 //  Handle VM_mirror;
-  if (UseNewCode) {
+  if (UseNewCode && 0) {
     ResourceMark rm;
     HandleMark hm(thread);
 
@@ -4609,6 +4852,69 @@ bool Threads::destroy_vm() {
   // run Java level shutdown hooks
   thread->invoke_shutdown_hooks();
 
+#ifndef LEYDEN
+  if (DumpCodeToDisk) {
+    ResourceMark rm;
+    HandleMark hm(thread);
+    compile_on_exit = new GrowableArray<Method*>();
+
+    SystemDictionary::methods_do(maybe_compile_method);
+
+    for (GrowableArrayIterator<Method*> m = compile_on_exit->begin(); m != compile_on_exit->end(); ++m) {
+      methodHandle mh(thread, *m);
+      nmethod* nm = CompileBroker::compile_method(mh, InvocationEntryBci, CompLevel_full_optimization, mh, 0,
+                                                  CompileTask::Reason_Whitebox, thread);
+      assert(!thread->has_pending_exception() && nm != NULL, "");
+      RelocIterator iter(nm);
+      while (iter.next()) {
+        if (iter.type() == relocInfo::static_call_type) {
+          static_call_Relocation* call = iter.static_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code() && !compile_on_exit->contains(method)) {
+            compile_on_exit->push(method);
+          }
+        }
+      }
+
+    }
+  }
+
+  if (DumpCodeToDisk) {
+    ResourceMark rm;
+    HandleMark hm(thread);
+    FILE* file = fopen("/home/roland/tmp/dump", "w");
+    assert(file != NULL, "fopen failed");
+
+    loaded_klasses = new GrowableArray<Klass*>();
+    {
+      MutexLocker ml(ClassLoaderDataGraph_lock);
+      ClassLoaderDataGraph::classes_do(collect_loaded_klasses);
+    }
+
+    int nb = loaded_klasses->length();
+    assert(nb >= 1, "");
+    int w = fwrite(&nb, sizeof(nb), 1, file);
+    assert(w == 1, "fwrite failed");
+    for (int i = 0; i < nb; i++) {
+      Symbol* klass_name = loaded_klasses->at(i)->name();
+      int l = klass_name->utf8_length();
+      w = fwrite(&l, sizeof(l), 1, file);
+      assert(w == 1, "fwrite failed");
+      w = fwrite(klass_name->as_utf8(), 1, l, file);
+      assert(w == l, "fwrite failed");
+    }
+    CodeCache::dump_to_disk(file, thread);
+  }
+#endif
+
   before_exit(thread);
 
   thread->exit(true);
@@ -4677,7 +4983,7 @@ bool Threads::destroy_vm() {
   LogConfiguration::finalize();
 
 #ifndef LEYDEN
-  if (UseNewCode) {
+  if (UseNewCode && 0) {
     VM_klass->java_mirror()->int_field_put(VM_klass_intLevel, 0);
     FileDescriptor_in->obj_field_put(FileDescriptor_klass_parent, NULL);
     FileDescriptor_out->obj_field_put(FileDescriptor_klass_parent, NULL);

@@ -44,6 +44,7 @@
 
 class CompiledICHolder : public CHeapObj<mtCompiler> {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   static volatile int _live_count; // allocated
   static volatile int _live_not_claimed_count; // allocated but not yet in use so not

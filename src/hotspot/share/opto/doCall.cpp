@@ -42,6 +42,7 @@
 #include "prims/methodHandles.hpp"
 #include "prims/nativeLookup.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "graphKit.hpp"
 
 void trace_type_profile(Compile* C, ciMethod *method, int depth, int bci, ciMethod *prof_method, ciKlass *prof_klass, int site_count, int receiver_count) {
   if (TraceTypeProfile || C->print_inlining()) {
@@ -528,6 +529,12 @@ void Parse::do_call() {
     }
     return;
   }
+
+  if ((bc() == Bytecodes::_invokestatic)) {
+    ensure_klass_initialization(holder_klass);
+  }
+
+
   assert(holder_klass->is_loaded(), "");
   //assert((bc_callee->is_static() || is_invokedynamic) == !has_receiver , "must match bc");  // XXX invokehandle (cur_bc_raw)
   // Note: this takes into account invokeinterface of methods declared in java/lang/Object,

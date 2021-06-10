@@ -87,6 +87,7 @@ class CodeBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCacheDumper;
+  friend class CodeCache;
 
 protected:
 
@@ -353,6 +354,10 @@ public:
 
 class RuntimeBlob : public CodeBlob {
   friend class VMStructs;
+
+protected:
+  RuntimeBlob() {}
+
  public:
 
 #ifndef LEYDEN
@@ -412,10 +417,12 @@ class BufferBlob: public RuntimeBlob {
   friend class VtableBlob;
   friend class MethodHandlesAdapterBlob;
   friend class WhiteBox;
+  friend class CodeCache;
 
  private:
   // Creation support
   BufferBlob(const char* name, int size);
+  BufferBlob() {}
   BufferBlob(const char* name, int size, CodeBuffer* cb);
 
   // This ordinary operator delete is needed even though not used, so the
@@ -452,8 +459,10 @@ class BufferBlob: public RuntimeBlob {
 // AdapterBlob: used to hold C2I/I2C adapters
 
 class AdapterBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   AdapterBlob(int size, CodeBuffer* cb);
+  AdapterBlob() {}
 
 public:
   // Creation
@@ -465,8 +474,10 @@ public:
 
 //---------------------------------------------------------------------------------------------------
 class VtableBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   VtableBlob(const char*, int);
+  VtableBlob() {}
 
   void* operator new(size_t s, unsigned size) throw();
 
@@ -482,8 +493,10 @@ public:
 // MethodHandlesAdapterBlob: used to hold MethodHandles adapters
 
 class MethodHandlesAdapterBlob: public BufferBlob {
+  friend class CodeCache;
 private:
   MethodHandlesAdapterBlob(int size)                 : BufferBlob("MethodHandles adapters", size) {}
+  MethodHandlesAdapterBlob() {}
 
 public:
   // Creation
@@ -499,6 +512,7 @@ public:
 
 class RuntimeStub: public RuntimeBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   RuntimeStub(
@@ -510,6 +524,8 @@ class RuntimeStub: public RuntimeBlob {
     OopMapSet*  oop_maps,
     bool        caller_must_gc_arguments
   );
+
+  RuntimeStub() {}
 
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
@@ -558,6 +574,7 @@ class SingletonBlob: public RuntimeBlob {
   void* operator new(size_t s, unsigned size) throw();
 
 #endif
+  SingletonBlob() {}
 
  public:
 #ifndef LEYDEN
@@ -596,6 +613,7 @@ class SingletonBlob: public RuntimeBlob {
 class DeoptimizationBlob: public SingletonBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
+  friend class CodeCache;
  private:
   int _unpack_offset;
   int _unpack_with_exception;
@@ -620,7 +638,9 @@ class DeoptimizationBlob: public SingletonBlob {
     int         frame_size
   );
 
- public:
+  DeoptimizationBlob() {}
+
+public:
   // Creation
   static DeoptimizationBlob* create(
     CodeBuffer* cb,
@@ -679,6 +699,7 @@ class DeoptimizationBlob: public SingletonBlob {
 
 class UncommonTrapBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   UncommonTrapBlob(
@@ -687,6 +708,7 @@ class UncommonTrapBlob: public SingletonBlob {
     OopMapSet*  oop_maps,
     int         frame_size
   );
+  UncommonTrapBlob() {}
 
  public:
   // Creation
@@ -709,6 +731,7 @@ class UncommonTrapBlob: public SingletonBlob {
 
 class ExceptionBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
   // Creation support
   ExceptionBlob(
@@ -717,6 +740,8 @@ class ExceptionBlob: public SingletonBlob {
     OopMapSet*  oop_maps,
     int         frame_size
   );
+
+  ExceptionBlob() {}
 
  public:
   // Creation
@@ -740,6 +765,7 @@ class ExceptionBlob: public SingletonBlob {
 
 class SafepointBlob: public SingletonBlob {
   friend class VMStructs;
+  friend class CodeCache;
  private:
 #ifndef LEYDEN
 
@@ -752,6 +778,8 @@ class SafepointBlob: public SingletonBlob {
   );
 
 #endif
+
+  SafepointBlob() {}
 
  public:
 #ifndef LEYDEN

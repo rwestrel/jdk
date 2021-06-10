@@ -52,6 +52,7 @@ class methodHandle;
   option(Inline,  "inline", Bool) \
   option(DontInline,  "dontinline", Bool) \
   option(CompileOnly, "compileonly", Bool)\
+  option(CompileOnExit, "compileonexit", Bool)\
   option(Exclude, "exclude", Bool) \
   option(Break, "break", Bool) \
   option(BreakAtExecute, "BreakAtExecute", Bool) \

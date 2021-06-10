@@ -85,6 +85,7 @@ class IfProjNode;
 class IfFalseNode;
 class IfTrueNode;
 class InitializeNode;
+class InitializeKlassNode;
 class JVMState;
 class JumpNode;
 class JumpProjNode;
@@ -641,7 +642,8 @@ public:
             DEFINE_CLASS_ID(Unlock,           AbstractLock, 1)
           DEFINE_CLASS_ID(ArrayCopy,        Call, 4)
           DEFINE_CLASS_ID(CallNative,       Call, 5)
-      DEFINE_CLASS_ID(MultiBranch, Multi, 1)
+          DEFINE_CLASS_ID(InitializeKlass,  Call, 6)
+    DEFINE_CLASS_ID(MultiBranch, Multi, 1)
         DEFINE_CLASS_ID(PCTable,     MultiBranch, 0)
           DEFINE_CLASS_ID(Catch,       PCTable, 0)
           DEFINE_CLASS_ID(Jump,        PCTable, 1)
@@ -863,6 +865,7 @@ public:
   DEFINE_CLASS_QUERY(IfFalse)
   DEFINE_CLASS_QUERY(IfTrue)
   DEFINE_CLASS_QUERY(Initialize)
+  DEFINE_CLASS_QUERY(InitializeKlass)
   DEFINE_CLASS_QUERY(Jump)
   DEFINE_CLASS_QUERY(JumpProj)
   DEFINE_CLASS_QUERY(LongCountedLoop)

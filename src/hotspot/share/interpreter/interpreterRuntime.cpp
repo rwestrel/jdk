@@ -801,6 +801,7 @@ JRT_END
 void InterpreterRuntime::resolve_invoke(JavaThread* thread, Bytecodes::Code bytecode) {
   Thread* THREAD = thread;
   LastFrameAccessor last_frame(thread);
+
   // extract receiver from the outgoing argument list if necessary
   Handle receiver(thread, NULL);
   if (bytecode == Bytecodes::_invokevirtual || bytecode == Bytecodes::_invokeinterface ||

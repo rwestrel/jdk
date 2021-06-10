@@ -70,6 +70,7 @@ class InterpreterOopMap;
 class Method : public Metadata {
  friend class VMStructs;
  friend class JVMCIVMStructs;
+ friend class CodeCache;
  private:
   // If you add a new field that points to any metaspace object, you
   // must add this field to Method::metaspace_pointers_do().

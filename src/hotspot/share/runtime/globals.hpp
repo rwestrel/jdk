@@ -2092,6 +2092,16 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   product(ccstr, PreLoadAndPreCompileFile, NULL,                            \
           "")                                                               \
+                                                                            \
+  product(bool, DumpCodeToDisk, false, DIAGNOSTIC,                          \
+          "")                                                               \
+                                                                            \
+  product(bool, RestoreCodeFromDisk, false, DIAGNOSTIC,                     \
+          "")                                                               \
+                                                                            \
+  product(bool, UpdateCompileList, false, DIAGNOSTIC,                       \
+          "")                                                               \
+                                                                            \
 
 // end of RUNTIME_FLAGS
 

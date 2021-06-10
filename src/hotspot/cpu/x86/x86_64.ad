@@ -2080,7 +2080,7 @@ encode %{
   enc_class Java_To_Runtime(method meth) %{
     // No relocation needed
     MacroAssembler _masm(&cbuf);
-    __ mov64(r10, (int64_t) $meth$$method);
+    __ lea(r10, RuntimeAddress((address)$meth$$method));
     __ call(r10);
   %}
 

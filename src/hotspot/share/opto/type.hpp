@@ -419,7 +419,7 @@ public:
   uint ideal_reg() const             { return _type_info[_base].ideal_reg; }
   const char* msg() const            { return _type_info[_base].msg; }
   bool isa_oop_ptr() const           { return _type_info[_base].isa_oop; }
-  relocInfo::relocType reloc() const { return _type_info[_base].reloc; }
+  relocInfo::relocType reloc() const;
 
   // Mapping from CI type system to compiler type:
   static const Type* get_typeflow_type(ciType* type);
@@ -1802,7 +1802,6 @@ inline bool Type::is_ptr_to_boxing_obj() const {
          tp->klass()->is_instance_klass()  &&
          tp->klass()->as_instance_klass()->is_box_klass();
 }
-
 
 // ===============================================================
 // Things that need to be 64-bits in the 64-bit build but

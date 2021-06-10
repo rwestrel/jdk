@@ -1954,7 +1954,7 @@ const Type* LoadNode::Value(PhaseGVN* phase) const {
     const TypeKlassPtr* tkls = phase->type(adr2)->isa_klassptr();
     if (tkls != NULL && !StressReflectiveCode) {
       ciKlass* klass = tkls->klass();
-      if (klass->is_loaded() && tkls->klass_is_exact() && tkls->offset() == in_bytes(Klass::java_mirror_offset())) {
+      if (klass->is_loaded() && tkls->klass_is_exact() && tkls->offset() == in_bytes(Klass::java_mirror_offset()) /*&& !DumpCodeToDisk*/) {
         assert(adr->Opcode() == Op_LoadP, "must load an oop from _java_mirror");
         assert(Opcode() == Op_LoadP, "must load an oop from _java_mirror");
         return TypeInstPtr::make(klass->java_mirror());
