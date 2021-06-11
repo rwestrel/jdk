@@ -588,8 +588,8 @@ public:
 
   // initialization (virtuals from Klass)
   bool should_be_initialized() const;  // means that initialize should be called
-#ifndef LEYDEN
   void initialize(TRAPS);
+#ifndef LEYDEN
   void link_class(TRAPS);
   bool link_class_or_fail(TRAPS); // returns false on failure
 #endif
@@ -1303,9 +1303,7 @@ private:
 #endif
   bool verify_code                               (TRAPS);
   void initialize_impl                           (TRAPS);
-#ifndef LEYDEN
   void initialize_super_interfaces               (TRAPS);
-#endif
 #ifndef LEYDEN
   void eager_initialize_impl                     ();
 #endif

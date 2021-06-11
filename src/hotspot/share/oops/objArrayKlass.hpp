@@ -125,12 +125,8 @@ class ObjArrayKlass : public ArrayKlass {
   static int header_size()                { return sizeof(ObjArrayKlass)/wordSize; }
   int size() const                        { return ArrayKlass::static_size(header_size()); }
 
-#ifndef LEYDEN
-
   // Initialization (virtual from Klass)
   void initialize(TRAPS);
-
-#endif
 
   // Oop fields (and metadata) iterators
   //

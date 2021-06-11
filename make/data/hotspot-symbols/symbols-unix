@@ -205,3 +205,6 @@ JVM_AddReadsModule
 JVM_DefineArchivedModules
 JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
+
+_ZN11OptoRuntime18initialize_klass_CEP5KlassP10JavaThread
+

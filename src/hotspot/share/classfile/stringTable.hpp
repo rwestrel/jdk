@@ -42,11 +42,14 @@ class StringTable;
 class StringTableConfig;
 class StringTableCreateEntry;
 
+#include "utilities//concurrentHashTable.hpp"
+
 class StringTable : public CHeapObj<mtSymbol>{
   friend class VMStructs;
   friend class Symbol;
   friend class StringTableConfig;
   friend class StringTableCreateEntry;
+  friend class Threads;
 
   static volatile bool _has_work;
 
@@ -119,6 +122,9 @@ class StringTable : public CHeapObj<mtSymbol>{
   // Debugging
   static size_t verify_and_compare_entries();
   static void verify();
+
+  typedef ConcurrentHashTable<StringTableConfig, mtSymbol> StringTableHash;
+  static StringTableHash* _local_table;
 };
 
 #endif

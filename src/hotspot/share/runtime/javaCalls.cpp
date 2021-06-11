@@ -334,11 +334,7 @@ void JavaCalls::call_static(JavaValue* result, Klass* klass, Symbol* name, Symbo
 // ============ allocate and initialize new object instance ============
 
 Handle JavaCalls::construct_new_instance(InstanceKlass* klass, Symbol* constructor_signature, JavaCallArguments* args, TRAPS) {
-#ifndef LEYDEN
   klass->initialize(CHECK_NH); // Quick no-op if already initialized.
-#else
-  assert(klass->is_initialized(), "");
-#endif
   Handle obj = klass->allocate_instance_handle(CHECK_NH);
   JavaValue void_result(T_VOID);
   args->set_receiver(obj); // inserts <obj> as the first argument.

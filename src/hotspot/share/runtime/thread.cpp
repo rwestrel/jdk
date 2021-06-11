@@ -3568,6 +3568,7 @@ jlong (*JVM_MaxMemory_reduced) ();
 void (* JVM_MonitorWait_reduced)(JNIEnv*, jobject, jlong);
 void (*JVM_MonitorNotifyAll_reduced)(JNIEnv* , jobject );
 void (*JVM_DefineArchivedModules_reduced)(JNIEnv*, jobject, jobject);
+void (*OptoRuntime__initialize_klass_C_reduced)(Klass* klass, JavaThread* thread);
 
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #ifdef LEYDEN
@@ -3637,6 +3638,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   copy_in(InstanceMirrorKlass, _offset_of_static_fields);
   copy_in(MetaspaceContext, _nonclass_space_context);
   copy_in(MetaspaceContext, _class_space_context);
+  copy_in(StringTable, _local_table);
 
 
 #undef copy_in
@@ -3654,7 +3656,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   leydenStaticData.OptoRuntime__new_instance_C = OptoRuntime::new_instance_C;
   leydenStaticData.OptoRuntime__new_array_C = OptoRuntime::new_array_C;
 
-  UseEpsilonGC = true;
+  FLAG_SET_CMDLINE(UseEpsilonGC, true);
+  FLAG_SET_CMDLINE(UseCompressedOops, false);
+  FLAG_SET_CMDLINE(UseCompressedClassPointers, false);
 
 #endif
 
@@ -3893,6 +3897,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
       Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
                                                    Handle(), true, THREAD);
       assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+      if (k->is_instance_klass()) {
+        InstanceKlass::cast(k)->link_class(THREAD);
+        assert(!THREAD->has_pending_exception(), "link failure");
+      }
     }
     CodeCache::restore_from_disk(file, THREAD->as_Java_thread());
   }
@@ -3987,6 +3995,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     copy_out(InstanceMirrorKlass, _offset_of_static_fields);
     copy_out(MetaspaceContext, _nonclass_space_context);
     copy_out(MetaspaceContext, _class_space_context);
+    copy_out(StringTable, _local_table);
 
 
     {
@@ -4050,6 +4059,8 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     JVM_MonitorWait_reduced = (void (*)(JNIEnv*, jobject, jlong))dlsym(minimal, "JVM_MonitorWait");
     JVM_MonitorNotifyAll_reduced = (void (*)(JNIEnv* , jobject))dlsym(minimal, "JVM_MonitorNotifyAll");
     JVM_DefineArchivedModules_reduced = (void (*)(JNIEnv*, jobject, jobject))dlsym(minimal, "JVM_DefineArchivedModules");
+    OptoRuntime__initialize_klass_C_reduced = (void (*)(Klass* , JavaThread*))dlsym(minimal, "_ZN11OptoRuntime18initialize_klass_CEP5KlassP10JavaThread");
+    assert(OptoRuntime__initialize_klass_C_reduced != NULL, "");
 
     struct sigaction sa;
     sa.sa_handler = SIG_DFL;

@@ -385,6 +385,8 @@ class Universe: AllStatic {
 #include "oops/compressedOops.hpp"
 #include "oops/symbol.hpp"
 #include "classfile/vmSymbols.hpp"
+#include "classfile/stringTable.hpp"
+
 struct CompiledCode {
   Klass* klass;
   Symbol* name;
@@ -460,6 +462,8 @@ struct LeydenStaticData {
   int InstanceMirrorKlass___offset_of_static_fields;
   metaspace::MetaspaceContext* MetaspaceContext___nonclass_space_context;
   metaspace::MetaspaceContext* MetaspaceContext___class_space_context;
+  StringTable::StringTableHash* StringTable___local_table;
+
 
 
   CompiledCode* nmethods;

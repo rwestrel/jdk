@@ -1741,11 +1741,9 @@ static void trace_exception(outputStream* st, oop exception_oop, address excepti
 }
 #endif
 
-#ifndef LEYDEN
-
-JRT_ENTRY(void, OptoRuntime::initialize_klass_C(Klass* klass, JavaThread* thread))
+extern "C" {
+JNIEXPORT JRT_ENTRY(void, OptoRuntime::initialize_klass_C(Klass * klass, JavaThread * thread))
   klass->initialize(thread);
 JRT_END
-
-#endif
+}
 

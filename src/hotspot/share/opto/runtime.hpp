@@ -349,9 +349,9 @@ private:
 #ifndef LEYDEN
 
   static const TypeFunc* initialize_klass_Type();
-  static void initialize_klass_C(Klass* instance_klass, JavaThread* current);
 
 #endif
+  static void initialize_klass_C(Klass* instance_klass, JavaThread* current);
 };
 
 #endif // SHARE_OPTO_RUNTIME_HPP

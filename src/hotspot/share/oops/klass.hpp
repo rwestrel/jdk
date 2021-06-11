@@ -492,11 +492,7 @@ protected:
   // tells if the class should be initialized
   virtual bool should_be_initialized() const    { return false; }
   // initializes the klass
-#ifndef LEYDEN
-
   virtual void initialize(TRAPS);
-
-#endif
   virtual Klass* find_field(Symbol* name, Symbol* signature, fieldDescriptor* fd) const;
   virtual Method* uncached_lookup_method(const Symbol* name, const Symbol* signature,
                                          OverpassLookupMode overpass_mode,

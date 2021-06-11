@@ -796,7 +796,7 @@ objArrayOop InstanceKlass::signers() const {
   // return the signers from the mirror
   return java_lang_Class::signers(java_mirror());
 }
-
+#endif
 oop InstanceKlass::init_lock() const {
   // return the init lock from the mirror
   oop lock = java_lang_Class::init_lock(java_mirror());
@@ -806,7 +806,6 @@ oop InstanceKlass::init_lock() const {
          "only fully initialized state can have a null lock");
   return lock;
 }
-
 // Set the initialization lock to null so the object can be GC'ed.  Any racing
 // threads to get this lock will see a null lock and will not lock.
 // That's okay because they all check for initialized state after getting
@@ -818,6 +817,7 @@ void InstanceKlass::fence_and_clear_init_lock() {
   assert(!is_not_initialized(), "class must be initialized now");
 }
 
+#ifndef LEYDEN
 void InstanceKlass::eager_initialize_impl() {
   EXCEPTION_MARK;
   HandleMark hm(THREAD);
@@ -849,7 +849,7 @@ void InstanceKlass::eager_initialize_impl() {
     }
   }
 }
-
+#endif
 
 // See "The Virtual Machine Specification" section 2.16.5 for a detailed explanation of the class initialization
 // process. The step comments refers to the procedure described in that section.
@@ -865,7 +865,7 @@ void InstanceKlass::initialize(TRAPS) {
   }
 }
 
-
+#ifndef LEYDEN
 bool InstanceKlass::verify_code(TRAPS) {
   // 1) Verify the bytecodes
   return Verifier::verify(this, should_verify_class(), THREAD);
@@ -1045,7 +1045,7 @@ void InstanceKlass::link_methods(TRAPS) {
     m->link_method(m, CHECK);
   }
 }
-
+#endif
 // Eagerly initialize superinterfaces that declare default methods (concrete instance: any access)
 void InstanceKlass::initialize_super_interfaces(TRAPS) {
   assert (has_nonstatic_concrete_methods(), "caller should have checked this");
@@ -1071,8 +1071,15 @@ void InstanceKlass::initialize_impl(TRAPS) {
 
   // Make sure klass is linked (verified) before initialization
   // A class could already be verified, since it has been reflected upon.
+#ifndef LEYDEN
   link_class(CHECK);
-
+#else
+  if (!is_linked()) {
+    ResourceMark rm;
+    tty->print_cr("%s", external_name());
+  }
+  assert(is_linked(), "");
+#endif
   DTRACE_CLASSINIT_PROBE(required, -1);
 
   bool wait = false;
@@ -1171,18 +1178,22 @@ void InstanceKlass::initialize_impl(TRAPS) {
     if (class_initializer() != NULL) {
       // Timer includes any side effects of class initialization (resolution,
       // etc), but not recursive entry into call_class_initializer().
+#ifndef LEYDEN
       PerfClassTraceTime timer(ClassLoader::perf_class_init_time(),
                                ClassLoader::perf_class_init_selftime(),
                                ClassLoader::perf_classes_inited(),
                                jt->get_thread_stat()->perf_recursion_counts_addr(),
                                jt->get_thread_stat()->perf_timers_addr(),
                                PerfClassTraceTime::CLASS_CLINIT);
+#endif
       call_class_initializer(THREAD);
     } else {
       // The elapsed time is so small it's not worth counting.
+#ifndef LEYDEN
       if (UsePerfData) {
         ClassLoader::perf_classes_inited()->inc();
       }
+#endif
       call_class_initializer(THREAD);
     }
   }
@@ -1222,7 +1233,6 @@ void InstanceKlass::initialize_impl(TRAPS) {
   DTRACE_CLASSINIT_PROBE_WAIT(end, -1, wait);
 }
 
-
 void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS) {
   Handle h_init_lock(THREAD, init_lock());
   if (h_init_lock() != NULL) {
@@ -1237,7 +1247,6 @@ void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS)
     set_init_state(state);
   }
 }
-#endif
 
 Klass* InstanceKlass::implementor() const {
   Klass* volatile* k = adr_implementor();

@@ -81,8 +81,7 @@ static CompactHashtable<
 
 // --------------------------------------------------------------------------
 #endif
-typedef ConcurrentHashTable<StringTableConfig, mtSymbol> StringTableHash;
-static StringTableHash* _local_table = NULL;
+StringTable::StringTableHash* StringTable::_local_table = NULL;
 volatile bool StringTable::_has_work = false;
 volatile bool StringTable::_needs_rehashing = false;
 OopStorage*   StringTable::_oop_storage;

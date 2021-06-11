@@ -1425,7 +1425,6 @@ JVM_ENTRY(jboolean, JVM_IsArrayClass(JNIEnv *env, jclass cls))
   return (k != NULL) && k->is_array_klass() ? true : false;
 JVM_END
 
-
 JVM_ENTRY(jboolean, JVM_IsPrimitiveClass(JNIEnv *env, jclass cls))
   oop mirror = JNIHandles::resolve_non_null(cls);
   return (jboolean) java_lang_Class::is_primitive(mirror);
