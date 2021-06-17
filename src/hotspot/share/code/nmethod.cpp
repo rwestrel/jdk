@@ -434,13 +434,13 @@ int nmethod::total_size() const {
 address* nmethod::orig_pc_addr(const frame* fr) {
   return (address*) ((address)fr->unextended_sp() + _orig_pc_offset);
 }
-
+#endif
 const char* nmethod::compile_kind() const {
   if (is_osr_method())     return "osr";
   if (method() != NULL && is_native_method())  return "c2n";
   return NULL;
 }
-
+#ifndef LEYDEN
 // Fill in default values for various flag fields
 void nmethod::init_defaults() {
   _state                      = not_installed;
@@ -1533,14 +1533,14 @@ void nmethod::flush() {
   CodeBlob::flush();
   CodeCache::free(this);
 }
-
+#endif
 oop nmethod::oop_at(int index) const {
   if (index == 0) {
     return NULL;
   }
   return NativeAccess<AS_NO_KEEPALIVE>::oop_load(oop_addr_at(index));
 }
-
+#ifndef LEYDEN
 oop nmethod::oop_at_phantom(int index) const {
   if (index == 0) {
     return NULL;
@@ -1675,7 +1675,7 @@ void nmethod::post_compiled_method_unload() {
   // event is enabled at the time the nmethod is made a zombie.
   set_unload_reported();
 }
-
+#endif
 // Iterate over metadata calling this function.   Used by RedefineClasses
 void nmethod::metadata_do(MetadataClosure* f) {
   {
@@ -1722,7 +1722,7 @@ void nmethod::metadata_do(MetadataClosure* f) {
   // Visit metadata not embedded in the other places.
   if (_method != NULL) f->do_metadata(_method);
 }
-
+#ifndef LEYDEN
 // The _is_unloading_state encodes a tuple comprising the unloading cycle
 // and the result of IsUnloadingBehaviour::is_unloading() fpr that cycle.
 // This is the bit layout of the _is_unloading_state byte: 00000CCU
@@ -2375,10 +2375,11 @@ class VerifyMetadataClosure: public MetadataClosure {
     }
   }
 };
-
+#endif
 
 void nmethod::verify() {
 
+#ifndef LEYDEN
   // Hmm. OSR methods can be deopted but not marked as zombie or not_entrant
   // seems odd.
 
@@ -2446,9 +2447,10 @@ void nmethod::verify() {
   CompiledICLocker nm_verify(this);
   VerifyMetadataClosure vmc;
   metadata_do(&vmc);
+#endif
 }
 
-
+#ifndef LEYDEN
 void nmethod::verify_interrupt_point(address call_site) {
 
   // Verify IC only when nmethod installation is finished.
@@ -2624,9 +2626,10 @@ void nmethod::print_dependencies() {
   }
 }
 #endif
-
+#endif
 #if defined(SUPPORT_DATA_STRUCTS)
 
+#ifndef LEYDEN
 // Print the oops from the underlying CodeBlob.
 void nmethod::print_oops(outputStream* st) {
   ResourceMark m;
@@ -2651,7 +2654,6 @@ void nmethod::print_oops(outputStream* st) {
     st->print_cr(" <list empty>");
   }
 }
-
 // Print metadata pool.
 void nmethod::print_metadata(outputStream* st) {
   ResourceMark m;
@@ -2702,6 +2704,7 @@ void nmethod::print_relocations() {
   iter.print();
 }
 #endif
+#endif
 
 void nmethod::print_pcs_on(outputStream* st) {
   ResourceMark m;       // in case methods get printed via debugger
@@ -2716,6 +2719,7 @@ void nmethod::print_pcs_on(outputStream* st) {
   }
 }
 
+#ifndef LEYDEN
 void nmethod::print_native_invokers() {
   ResourceMark m;       // in case methods get printed via debugger
   tty->print_cr("Native invokers:");
@@ -2778,7 +2782,9 @@ void nmethod::print_recorded_metadata() {
   }
 }
 #endif
+#endif
 
+#ifndef LEYDEN
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
 
 void nmethod::print_constant_pool(outputStream* st) {
@@ -3000,9 +3006,9 @@ void nmethod::decode2(outputStream* ost) const {
   }
 #endif
 }
-
+#endif
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
-
+#ifndef LEYDEN
 const char* nmethod::reloc_string_for(u_char* begin, u_char* end) {
   RelocIterator iter(this, begin, end);
   bool have_one = false;
@@ -3113,6 +3119,7 @@ ScopeDesc* nmethod::scope_desc_in(address begin, address end) {
   }
   return NULL;
 }
+#endif
 
 const char* nmethod::nmethod_section_label(address pos) const {
   const char* label = NULL;
@@ -3127,8 +3134,8 @@ const char* nmethod::nmethod_section_label(address pos) const {
   if (JVMCI_ONLY(_deopt_handler_begin != NULL &&) pos == deopt_handler_begin()) label = "[Deopt Handler Code]";
   return label;
 }
-
 void nmethod::print_nmethod_labels(outputStream* stream, address block_begin, bool print_section_labels) const {
+#ifndef LEYDEN
   if (print_section_labels) {
     const char* label = nmethod_section_label(block_begin);
     if (label != NULL) {
@@ -3228,8 +3235,9 @@ void nmethod::print_nmethod_labels(outputStream* stream, address block_begin, bo
       }
     }
   }
+#endif
 }
-
+#ifndef LEYDEN
 // Returns whether this nmethod has code comments.
 bool nmethod::has_code_comment(address begin, address end) {
   // scopes?
@@ -3387,7 +3395,7 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
 }
 
 #endif
-
+#endif
 class DirectNativeCallWrapper: public NativeCallWrapper {
 private:
   NativeCall* _call;
@@ -3397,6 +3405,8 @@ public:
 
   virtual address destination() const { return _call->destination(); }
   virtual address instruction_address() const { return _call->instruction_address(); }
+
+#ifndef LEYDEN
   virtual address next_instruction_address() const { return _call->next_instruction_address(); }
   virtual address return_address() const { return _call->return_address(); }
 
@@ -3434,13 +3444,13 @@ public:
       csc->set_to_interpreted(method, info.entry());
     }
   }
-
+#endif
   virtual void verify() const {
     // make sure code pattern is actually a call imm32 instruction
     _call->verify();
     _call->verify_alignment();
   }
-
+#ifndef LEYDEN
   virtual void verify_resolve_call(address dest) const {
     CodeBlob* db = CodeCache::find_blob_unsafe(dest);
     assert(db != NULL && !db->is_adapter_blob(), "must use stub!");
@@ -3452,24 +3462,25 @@ public:
   }
 
   virtual bool is_safe_for_patching() const { return false; }
-
+#endif
   virtual NativeInstruction* get_load_instruction(virtual_call_Relocation* r) const {
     return nativeMovConstReg_at(r->cached_value());
   }
-
   virtual void *get_data(NativeInstruction* instruction) const {
     return (void*)((NativeMovConstReg*) instruction)->data();
   }
-
+#ifndef LEYDEN
   virtual void set_data(NativeInstruction* instruction, intptr_t data) {
     ((NativeMovConstReg*) instruction)->set_data(data);
   }
+
+#endif
 };
 
 NativeCallWrapper* nmethod::call_wrapper_at(address call) const {
   return new DirectNativeCallWrapper((NativeCall*) call);
 }
-
+#ifndef LEYDEN
 NativeCallWrapper* nmethod::call_wrapper_before(address return_pc) const {
   return new DirectNativeCallWrapper(nativeCall_before(return_pc));
 }

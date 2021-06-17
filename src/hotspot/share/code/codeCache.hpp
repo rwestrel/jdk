@@ -328,6 +328,8 @@ public:
   static void write_class_object(FILE* file, oop o);
 
   static Handle read_string_object(FILE* file, JavaThread* thread);
+
+  static void fix_vtbl();
 };
 
 

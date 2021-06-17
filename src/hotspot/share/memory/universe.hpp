@@ -389,12 +389,15 @@ class Universe: AllStatic {
 
 struct CompiledCode {
   Klass* klass;
+  Klass* receiver_klass;
   Symbol* name;
   Symbol* signature;
   Method* method;
 };
 
 class CodeHeap;
+class ModuleEntry;
+class ModuleClassPathList;
 
 struct LeydenStaticData {
   void* VM_Version__get_cpu_info_stub;
@@ -413,6 +416,7 @@ struct LeydenStaticData {
   Klass* Universe___typeArrayKlassObjs[T_LONG+1];
   Klass* Universe___objectArrayKlassObj;
   Array<Klass*>*  Universe___the_array_interfaces_array;
+  oop Universe___mirrors[T_VOID+1];
   ClassLoaderData* volatile ClassLoaderDataGraph___head;
   int java_lang_Throwable___backtrace_offset;
   int java_lang_Throwable___detailMessage_offset;
@@ -463,8 +467,18 @@ struct LeydenStaticData {
   metaspace::MetaspaceContext* MetaspaceContext___nonclass_space_context;
   metaspace::MetaspaceContext* MetaspaceContext___class_space_context;
   StringTable::StringTableHash* StringTable___local_table;
-
-
+  OopStorage* StringTable___oop_storage;
+  int java_lang_Module___loader_offset;
+  int java_lang_Module___name_offset;
+  int java_lang_Module___module_entry_offset;
+  ModuleEntry* ModuleEntryTable___javabase_module;
+  GrowableArray<ModuleClassPathList*>* ClassLoader___exploded_entries;
+  int  java_lang_ClassLoader___loader_data_offset;
+  int  java_lang_ClassLoader___parallelCapable_offset;
+  int  java_lang_ClassLoader___name_offset;
+  int  java_lang_ClassLoader___nameAndId_offset;
+  int  java_lang_ClassLoader___unnamedModule_offset;
+  int  java_lang_ClassLoader___parent_offset;
 
   CompiledCode* nmethods;
   uint nmethods_size;
@@ -476,9 +490,22 @@ struct LeydenStaticData {
   uintptr_t InstanceMirrorKlass_vtbl;
   uintptr_t InstanceRefKlass_vtbl;
   uintptr_t Method_vtbl;
+  uintptr_t nmethod_vtbl;
+  uintptr_t bufferblob_vtbl;
+  uintptr_t runtimestub_vtbl;
+  uintptr_t adapterblob_vtbl;
+  uintptr_t exceptionblob_vtbl;
+  uintptr_t methodhandlesadapterblob_vtbl;
+  uintptr_t safepointblob_vtbl;
+  uintptr_t uncommontrapblob_vtbl;
+  uintptr_t deoptimizationblob_vtbl;
+  uintptr_t vtableblob_vtbl;
+
 
   void (* OptoRuntime__new_instance_C)(Klass*, JavaThread*);
   void (*OptoRuntime__new_array_C)(Klass*, int, JavaThread*);
+
+  CollectedHeap* Universe___collectedHeap;
 };
 
 #endif // SHARE_MEMORY_UNIVERSE_HPP

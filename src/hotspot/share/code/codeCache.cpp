@@ -654,6 +654,9 @@ bool CodeCache::contains(nmethod *nm) {
 CodeBlob* CodeCache::find_blob(void* start) {
   CodeBlob* result = find_blob_unsafe(start);
   // We could potentially look up non_entrant methods
+  if (!(result == NULL || !result->is_zombie() || result->is_locked_by_vm() || VMError::is_error_reported())) {
+    tty->print_cr("XXX %p %d %d %d %d", result, (int)(result == NULL), (int)!result->is_zombie(), (int)result->is_locked_by_vm(), (int)VMError::is_error_reported());
+  }
   guarantee(result == NULL || !result->is_zombie() || result->is_locked_by_vm() || VMError::is_error_reported(), "unsafe access to zombie method");
   return result;
 }
@@ -2601,5 +2604,54 @@ Symbol* CodeCache::read_symbol(FILE* file) {
 void CodeCache::write_klass(FILE* file, Klass* klass) {
   write_symbol(file, klass->name());
 }
+
+
 //---<  END  >--- CodeHeap State Analytics.
 #endif
+
+extern "C" LeydenStaticData leydenStaticData;
+void CodeCache::fix_vtbl() {
+  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+
+  FOR_ALL_HEAPS(heap) {
+    FOR_ALL_BLOBS(cb, *heap) {
+      uintptr_t vtbl = *(uintptr_t*)cb;
+
+      if (vtbl == leydenStaticData.nmethod_vtbl) {
+        nmethod nm;
+        vtbl = *(intptr_t*)&nm;
+      } else if (vtbl == leydenStaticData.bufferblob_vtbl) {
+        BufferBlob bb;
+        vtbl = *(intptr_t*)&bb;
+      } else if (vtbl == leydenStaticData.runtimestub_vtbl) {
+        RuntimeStub rs;
+        vtbl = *(intptr_t*)&rs;
+      } else if (vtbl == leydenStaticData.adapterblob_vtbl) {
+        AdapterBlob ab;
+        vtbl = *(intptr_t*)&ab;
+      } else if (vtbl == leydenStaticData.exceptionblob_vtbl) {
+        ExceptionBlob eb;
+        vtbl = *(intptr_t*)&eb;
+      } else if (vtbl == leydenStaticData.methodhandlesadapterblob_vtbl) {
+        MethodHandlesAdapterBlob mhab;
+        vtbl = *(intptr_t*)&mhab;
+      } else if (vtbl == leydenStaticData.safepointblob_vtbl) {
+        SafepointBlob sb;
+        vtbl = *(intptr_t*)&sb;
+      } else if (vtbl == leydenStaticData.uncommontrapblob_vtbl) {
+//        UncommonTrapBlob utb;
+//        vtbl = *(intptr_t*)&utb;
+      } else if (vtbl == leydenStaticData.deoptimizationblob_vtbl) {
+//        DeoptimizationBlob db;
+//        vtbl = *(intptr_t*)&db;
+      } else if (vtbl == leydenStaticData.vtableblob_vtbl) {
+        VtableBlob vb;
+        vtbl = *(intptr_t*)&vb;
+      } else {
+        ShouldNotReachHere();
+      }
+      *(uintptr_t*)cb = vtbl;
+    }
+  }
+}
+

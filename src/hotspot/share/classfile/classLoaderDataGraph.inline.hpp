@@ -42,6 +42,7 @@ inline ClassLoaderData *ClassLoaderDataGraph::find_or_create(Handle loader) {
 #ifndef LEYDEN
   return ClassLoaderDataGraph::add(loader, false);
 #else
+  ShouldNotReachHere();
   return NULL;
 #endif
 }

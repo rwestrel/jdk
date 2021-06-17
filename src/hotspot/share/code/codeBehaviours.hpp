@@ -27,7 +27,7 @@
 
 #include "memory/allocation.hpp"
 
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 class CompiledMethod;
 

@@ -396,7 +396,8 @@ UNSAFE_ENTRY(void, Unsafe_SetMemory0(JNIEnv *env, jobject unsafe, jobject obj, j
 } UNSAFE_END
 
 UNSAFE_ENTRY(void, Unsafe_CopyMemory0(JNIEnv *env, jobject unsafe, jobject srcObj, jlong srcOffset, jobject dstObj, jlong dstOffset, jlong size)) {
-  size_t sz = (size_t)size;
+#ifndef LEYDEN
+    size_t sz = (size_t)size;
 
   oop srcp = JNIHandles::resolve(srcObj);
   oop dstp = JNIHandles::resolve(dstObj);
@@ -411,6 +412,9 @@ UNSAFE_ENTRY(void, Unsafe_CopyMemory0(JNIEnv *env, jobject unsafe, jobject srcOb
       Copy::conjoint_memory_atomic(src, dst, sz);
     }
   }
+#else
+ShouldNotReachHere();
+#endif
 } UNSAFE_END
 
 // This function is a leaf since if the source and destination are both in native memory
@@ -450,7 +454,8 @@ UNSAFE_LEAF(void, Unsafe_CopySwapMemory0(JNIEnv *env, jobject unsafe, jobject sr
 } UNSAFE_END
 
 UNSAFE_LEAF (void, Unsafe_WriteBack0(JNIEnv *env, jobject unsafe, jlong line)) {
-  assert(VM_Version::supports_data_cache_line_flush(), "should not get here");
+#ifndef LEYDEN
+    assert(VM_Version::supports_data_cache_line_flush(), "should not get here");
 #ifdef ASSERT
   if (TraceMemoryWriteback) {
     tty->print_cr("Unsafe: writeback 0x%p", addr_from_java(line));
@@ -459,12 +464,19 @@ UNSAFE_LEAF (void, Unsafe_WriteBack0(JNIEnv *env, jobject unsafe, jlong line)) {
 
   assert(StubRoutines::data_cache_writeback() != NULL, "sanity");
   (StubRoutines::DataCacheWriteback_stub())(addr_from_java(line));
+#else
+  ShouldNotReachHere();
+#endif
 } UNSAFE_END
 
 static void doWriteBackSync0(bool is_pre)
 {
+#ifndef LEYDEN
   assert(StubRoutines::data_cache_writeback_sync() != NULL, "sanity");
   (StubRoutines::DataCacheWritebackSync_stub())(is_pre);
+#else
+  ShouldNotReachHere();
+#endif
 }
 
 UNSAFE_LEAF (void, Unsafe_WriteBackPreSync0(JNIEnv *env, jobject unsafe)) {
@@ -515,6 +527,7 @@ static jlong find_field_offset(jclass clazz, jstring name, TRAPS) {
 }
 
 static jlong find_field_offset(jobject field, int must_be_static, TRAPS) {
+#ifndef LEYDEN
   assert(field != NULL, "field must not be NULL");
 
   oop reflected   = JNIHandles::resolve_non_null(field);
@@ -532,22 +545,38 @@ static jlong find_field_offset(jobject field, int must_be_static, TRAPS) {
 
   int offset = InstanceKlass::cast(k)->field_offset(slot);
   return field_offset_from_byte_offset(offset);
+#else
+  ShouldNotReachHere();
+  return 0;
+#endif
 }
 
 UNSAFE_ENTRY(jlong, Unsafe_ObjectFieldOffset0(JNIEnv *env, jobject unsafe, jobject field)) {
   return find_field_offset(field, 0, THREAD);
 } UNSAFE_END
 
-UNSAFE_ENTRY(jlong, Unsafe_ObjectFieldOffset1(JNIEnv *env, jobject unsafe, jclass c, jstring name)) {
+extern "C" {
+  JNIEXPORT jlong Unsafe_ObjectFieldOffset1(JNIEnv* env, jobject unsafe, jclass c, jstring name) {
+  extern jlong (*Unsafe_ObjectFieldOffset1_reduced)(JNIEnv* env, jobject unsafe, jclass c, jstring name);
+  if (Unsafe_ObjectFieldOffset1_reduced != NULL) {
+    return Unsafe_ObjectFieldOffset1_reduced(env, unsafe, c, name);
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   return find_field_offset(c, name, THREAD);
-} UNSAFE_END
+UNSAFE_END
 
 UNSAFE_ENTRY(jlong, Unsafe_StaticFieldOffset0(JNIEnv *env, jobject unsafe, jobject field)) {
   return find_field_offset(field, 1, THREAD);
 } UNSAFE_END
 
 UNSAFE_ENTRY(jobject, Unsafe_StaticFieldBase0(JNIEnv *env, jobject unsafe, jobject field)) {
-  assert(field != NULL, "field must not be NULL");
+#ifndef LEYDEN
+    assert(field != NULL, "field must not be NULL");
 
   // Note:  In this VM implementation, a field address is always a short
   // offset from the base of a a klass metaobject.  Thus, the full dynamic
@@ -566,9 +595,31 @@ UNSAFE_ENTRY(jobject, Unsafe_StaticFieldBase0(JNIEnv *env, jobject unsafe, jobje
   }
 
   return JNIHandles::make_local(THREAD, mirror);
+#else
+  ShouldNotReachHere();
+  return NULL;
+#endif
 } UNSAFE_END
 
-UNSAFE_ENTRY(void, Unsafe_EnsureClassInitialized0(JNIEnv *env, jobject unsafe, jobject clazz)) {
+extern "C" {
+JNIEXPORT void Unsafe_EnsureClassInitialized0(JNIEnv* env, jobject unsafe, jobject clazz) {
+  {
+    static void (*Unsafe_EnsureClassInitialized0_reduced)(JNIEnv* env, jobject unsafe, jobject clazz);
+    if (Unsafe_EnsureClassInitialized0_reduced == NULL && UseNewCode) {
+      void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so", RTLD_NOW | RTLD_LOCAL);
+      Unsafe_EnsureClassInitialized0_reduced = (void (*)(JNIEnv* , jobject , jobject ))dlsym(minimal, "Unsafe_EnsureClassInitialized0");
+      assert(Unsafe_EnsureClassInitialized0_reduced != NULL, "");
+    }
+    if (Unsafe_EnsureClassInitialized0_reduced != NULL) {
+      return Unsafe_EnsureClassInitialized0_reduced(env, unsafe, clazz);
+    }
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   assert(clazz != NULL, "clazz must not be NULL");
 
   oop mirror = JNIHandles::resolve_non_null(clazz);
@@ -578,7 +629,6 @@ UNSAFE_ENTRY(void, Unsafe_EnsureClassInitialized0(JNIEnv *env, jobject unsafe, j
     InstanceKlass* k = InstanceKlass::cast(klass);
     k->initialize(CHECK);
   }
-}
 UNSAFE_END
 
 UNSAFE_ENTRY(jboolean, Unsafe_ShouldBeInitialized0(JNIEnv *env, jobject unsafe, jobject clazz)) {
@@ -616,15 +666,37 @@ static void getBaseAndScale(int& base, int& scale, jclass clazz, TRAPS) {
   }
 }
 
-UNSAFE_ENTRY(jint, Unsafe_ArrayBaseOffset0(JNIEnv *env, jobject unsafe, jclass clazz)) {
+extern "C" {
+JNIEXPORT jint Unsafe_ArrayBaseOffset0(JNIEnv* env, jobject unsafe, jclass clazz) {
+  extern jint (*Unsafe_ArrayBaseOffset0_reduced)(JNIEnv* env, jobject unsafe, jclass clazz);
+  if (Unsafe_ArrayBaseOffset0_reduced != NULL) {
+    return Unsafe_ArrayBaseOffset0_reduced(env, unsafe, clazz);
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   int base = 0, scale = 0;
   getBaseAndScale(base, scale, clazz, CHECK_0);
 
   return field_offset_from_byte_offset(base);
-} UNSAFE_END
+UNSAFE_END
 
 
-UNSAFE_ENTRY(jint, Unsafe_ArrayIndexScale0(JNIEnv *env, jobject unsafe, jclass clazz)) {
+extern "C" {
+JNIEXPORT jint Unsafe_ArrayIndexScale0(JNIEnv* env, jobject unsafe, jclass clazz) {
+  extern jint (*Unsafe_ArrayIndexScale0_reduced)(JNIEnv* env, jobject unsafe, jclass clazz);
+  if (Unsafe_ArrayIndexScale0_reduced != NULL) {
+    return Unsafe_ArrayIndexScale0_reduced(env, unsafe, clazz);
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   int base = 0, scale = 0;
   getBaseAndScale(base, scale, clazz, CHECK_0);
 
@@ -643,7 +715,7 @@ UNSAFE_ENTRY(jint, Unsafe_ArrayIndexScale0(JNIEnv *env, jobject unsafe, jclass c
   // The following allows for a pretty general fieldOffset cookie scheme,
   // but requires it to be linear in byte offset.
   return field_offset_from_byte_offset(scale) - field_offset_from_byte_offset(0);
-} UNSAFE_END
+UNSAFE_END
 
 
 static inline void throw_new(JNIEnv *env, const char *ename) {
@@ -658,6 +730,7 @@ static inline void throw_new(JNIEnv *env, const char *ename) {
 }
 
 static jclass Unsafe_DefineClass_impl(JNIEnv *env, jstring name, jbyteArray data, int offset, int length, jobject loader, jobject pd) {
+#ifndef LEYDEN
   // Code lifted from JDK 1.3 ClassLoader.c
 
   jbyte *body;
@@ -713,6 +786,9 @@ static jclass Unsafe_DefineClass_impl(JNIEnv *env, jstring name, jbyteArray data
  free_body:
   FREE_C_HEAP_ARRAY(jbyte, body);
   return result;
+#else
+  return NULL;
+#endif
 }
 
 
@@ -781,6 +857,7 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
                                  jclass host_class, jbyteArray data, jobjectArray cp_patches_jh,
                                  u1** temp_alloc,
                                  TRAPS) {
+#ifndef LEYDEN
   assert(host_class != NULL, "host_class must not be NULL");
   assert(data != NULL, "data must not be NULL");
 
@@ -871,10 +948,15 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
   }
 
   return InstanceKlass::cast(anonk);
+#else
+  ShouldNotReachHere();
+  return NULL;
+#endif
 }
 
 UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass0(JNIEnv *env, jobject unsafe, jclass host_class, jbyteArray data, jobjectArray cp_patches_jh)) {
-  ResourceMark rm(THREAD);
+#ifndef LEYDEN
+    ResourceMark rm(THREAD);
 
   jobject res_jh = NULL;
   u1* temp_alloc = NULL;
@@ -897,6 +979,10 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass0(JNIEnv *env, jobject unsafe, j
   // let caller initialize it as needed...
 
   return (jclass) res_jh;
+#else
+  ShouldNotReachHere();
+  return NULL;
+#endif
 } UNSAFE_END
 
 
@@ -1148,10 +1234,21 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
 // The Unsafe_xxx functions above are called only from the interpreter.
 // The optimizer looks at names and signatures to recognize
 // individual functions.
-
-JVM_ENTRY(void, JVM_RegisterJDKInternalMiscUnsafeMethods(JNIEnv *env, jclass unsafeclass)) {
+extern "C" {
+void JVM_RegisterJDKInternalMiscUnsafeMethods(JNIEnv* env, jclass unsafeclass) {
+  extern void (*JVM_RegisterJDKInternalMiscUnsafeMethods_reduced)(JNIEnv* env, jclass unsafeclass);
+  if (JVM_RegisterJDKInternalMiscUnsafeMethods_reduced != NULL) {
+    JVM_RegisterJDKInternalMiscUnsafeMethods_reduced(env, unsafeclass);
+    return;
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   ThreadToNativeFromVM ttnfv(thread);
 
   int ok = env->RegisterNatives(unsafeclass, jdk_internal_misc_Unsafe_methods, sizeof(jdk_internal_misc_Unsafe_methods)/sizeof(JNINativeMethod));
   guarantee(ok == 0, "register jdk.internal.misc.Unsafe natives");
-} JVM_END
+JVM_END

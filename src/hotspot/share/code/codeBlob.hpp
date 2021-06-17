@@ -379,11 +379,10 @@ protected:
     OopMapSet*  oop_maps,
     bool        caller_must_gc_arguments = false
   );
+#endif
 
   // GC support
   virtual bool is_alive() const                  = 0;
-
-#endif
 
   void verify();
 
@@ -406,7 +405,6 @@ protected:
 #endif
 };
 
-#ifndef LEYDEN
 class WhiteBox;
 //----------------------------------------------------------------------------------------------------
 // BufferBlob: used to hold non-relocatable machine code such as the interpreter, stubroutines, etc.
@@ -418,12 +416,18 @@ class BufferBlob: public RuntimeBlob {
   friend class MethodHandlesAdapterBlob;
   friend class WhiteBox;
   friend class CodeCache;
+  friend class Threads;
 
  private:
   // Creation support
+#ifndef LEYDEN
   BufferBlob(const char* name, int size);
+#endif
   BufferBlob() {}
+
+#ifndef LEYDEN
   BufferBlob(const char* name, int size, CodeBuffer* cb);
+#endif
 
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
@@ -438,15 +442,16 @@ class BufferBlob: public RuntimeBlob {
 #ifndef LEYDEN
   static BufferBlob* create(const char* name, int buffer_size);
   static BufferBlob* create(const char* name, CodeBuffer* cb);
-#endif
-
   static void free(BufferBlob* buf);
+#endif
 
   // Typing
   virtual bool is_buffer_blob() const            { return true; }
 
   // GC/Verification support
+#ifndef LEYDEN
   void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f)  { /* nothing to do */ }
+#endif
   bool is_alive() const                          { return true; }
 
   void verify();
@@ -460,13 +465,23 @@ class BufferBlob: public RuntimeBlob {
 
 class AdapterBlob: public BufferBlob {
   friend class CodeCache;
+  friend class Threads;
+
 private:
+#ifndef LEYDEN
+
   AdapterBlob(int size, CodeBuffer* cb);
+
+#endif
   AdapterBlob() {}
 
 public:
   // Creation
+#ifndef LEYDEN
+
   static AdapterBlob* create(CodeBuffer* cb);
+
+#endif
 
   // Typing
   virtual bool is_adapter_blob() const { return true; }
@@ -475,32 +490,57 @@ public:
 //---------------------------------------------------------------------------------------------------
 class VtableBlob: public BufferBlob {
   friend class CodeCache;
+  friend class Threads;
+
 private:
+#ifndef LEYDEN
+
   VtableBlob(const char*, int);
+
+#endif
   VtableBlob() {}
+
+#ifndef LEYDEN
 
   void* operator new(size_t s, unsigned size) throw();
 
+#endif
+
 public:
+#ifndef LEYDEN
+
   // Creation
   static VtableBlob* create(const char* name, int buffer_size);
+
+#endif
 
   // Typing
   virtual bool is_vtable_blob() const { return true; }
 };
+
 
 //----------------------------------------------------------------------------------------------------
 // MethodHandlesAdapterBlob: used to hold MethodHandles adapters
 
 class MethodHandlesAdapterBlob: public BufferBlob {
   friend class CodeCache;
+  friend class Threads;
+
 private:
+#ifndef LEYDEN
+
   MethodHandlesAdapterBlob(int size)                 : BufferBlob("MethodHandles adapters", size) {}
+
+#endif
   MethodHandlesAdapterBlob() {}
 
 public:
+#ifndef LEYDEN
+
   // Creation
   static MethodHandlesAdapterBlob* create(int buffer_size);
+
+#endif
 
   // Typing
   virtual bool is_method_handles_adapter_blob() const { return true; }
@@ -513,7 +553,11 @@ public:
 class RuntimeStub: public RuntimeBlob {
   friend class VMStructs;
   friend class CodeCache;
- private:
+  friend class Threads;
+
+private:
+#ifndef LEYDEN
+
   // Creation support
   RuntimeStub(
     const char* name,
@@ -525,7 +569,11 @@ class RuntimeStub: public RuntimeBlob {
     bool        caller_must_gc_arguments
   );
 
+#endif
+
   RuntimeStub() {}
+
+#ifndef LEYDEN
 
   // This ordinary operator delete is needed even though not used, so the
   // below two-argument operator delete will be treated as a placement
@@ -533,7 +581,11 @@ class RuntimeStub: public RuntimeBlob {
   void operator delete(void* p);
   void* operator new(size_t s, unsigned size) throw();
 
+#endif
+
  public:
+#ifndef LEYDEN
+
   // Creation
   static RuntimeStub* new_runtime_stub(
     const char* stub_name,
@@ -544,20 +596,25 @@ class RuntimeStub: public RuntimeBlob {
     bool        caller_must_gc_arguments
   );
 
+#endif
+
   // Typing
   bool is_runtime_stub() const                   { return true; }
 
   address entry_point() const                    { return code_begin(); }
 
   // GC/Verification support
+#ifndef LEYDEN
+
   void preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f)  { /* nothing to do */ }
+
+#endif
   bool is_alive() const                          { return true; }
 
   void verify();
   void print_on(outputStream* st) const;
   void print_value_on(outputStream* st) const;
 };
-#endif
 
 //----------------------------------------------------------------------------------------------------
 // Super-class for all blobs that exist in only one instance. Implements default behaviour.
@@ -593,9 +650,9 @@ class SingletonBlob: public RuntimeBlob {
 
   address entry_point()                          { return code_begin(); }
 
-#ifndef LEYDEN
-
   bool is_alive() const                          { return true; }
+
+#ifndef LEYDEN
 
   // GC/Verification support
   void preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f)  { /* nothing to do */ }
@@ -614,7 +671,9 @@ class DeoptimizationBlob: public SingletonBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCache;
- private:
+  friend class Threads;
+
+private:
   int _unpack_offset;
   int _unpack_with_exception;
   int _unpack_with_reexecution;
@@ -690,17 +749,21 @@ public:
   address implicit_exception_uncommon_trap() const { return code_begin() + _implicit_exception_uncommon_trap_offset; }
 #endif // INCLUDE_JVMCI
 };
-
+#endif
 
 //----------------------------------------------------------------------------------------------------
 // UncommonTrapBlob (currently only used by Compiler 2)
 
 #ifdef COMPILER2
 
+#ifndef LEYDEN
+
 class UncommonTrapBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
- private:
+  friend class Threads;
+
+private:
   // Creation support
   UncommonTrapBlob(
     CodeBuffer* cb,
@@ -725,6 +788,7 @@ class UncommonTrapBlob: public SingletonBlob {
   bool is_uncommon_trap_stub() const             { return true; }
 };
 
+#endif
 
 //----------------------------------------------------------------------------------------------------
 // ExceptionBlob: used for exception unwinding in compiled code (currently only used by Compiler 2)
@@ -732,7 +796,11 @@ class UncommonTrapBlob: public SingletonBlob {
 class ExceptionBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
- private:
+  friend class Threads;
+
+private:
+#ifndef LEYDEN
+
   // Creation support
   ExceptionBlob(
     CodeBuffer* cb,
@@ -741,9 +809,13 @@ class ExceptionBlob: public SingletonBlob {
     int         frame_size
   );
 
+#endif
+
   ExceptionBlob() {}
 
  public:
+#ifndef LEYDEN
+
   // Creation
   static ExceptionBlob* create(
     CodeBuffer* cb,
@@ -754,19 +826,22 @@ class ExceptionBlob: public SingletonBlob {
   // GC for args
   void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f)  { /* nothing to do */ }
 
+#endif
+
   // Typing
   bool is_exception_stub() const                 { return true; }
 };
 #endif // COMPILER2
 
-#endif
 //----------------------------------------------------------------------------------------------------
 // SafepointBlob: handles illegal_instruction exceptions during a safepoint
 
 class SafepointBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
- private:
+  friend class Threads;
+
+private:
 #ifndef LEYDEN
 
   // Creation support

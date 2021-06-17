@@ -1663,7 +1663,6 @@ void InstanceKlass::methods_do(void f(Method* method)) {
   }
 }
 
-#ifndef LEYDEN
 void InstanceKlass::do_local_static_fields(FieldClosure* cl) {
   for (JavaFieldStream fs(this); !fs.done(); fs.next()) {
     if (fs.access_flags().is_static()) {
@@ -1674,6 +1673,7 @@ void InstanceKlass::do_local_static_fields(FieldClosure* cl) {
 }
 
 
+#ifndef LEYDEN
 void InstanceKlass::do_local_static_fields(void f(fieldDescriptor*, Handle, TRAPS), Handle mirror, TRAPS) {
   for (JavaFieldStream fs(this); !fs.done(); fs.next()) {
     if (fs.access_flags().is_static()) {
@@ -1790,6 +1790,7 @@ inline int InstanceKlass::quick_search(const Array<Method*>* methods, const Symb
       h = mid - 1;
     }
   }
+  assert(linear_search(methods, name) == -1, "");
   return -1;
 }
 
@@ -2169,7 +2170,6 @@ jmethodID InstanceKlass::get_jmethod_id(const methodHandle& method_h) {
   if (jmeths == NULL ||   // no cache yet
       length <= idnum ||  // cache is too short
       id == NULL) {       // cache doesn't contain entry
-#ifndef LEYDEN
     // This function can be called by the VMThread so we have to do all
     // things that might block on a safepoint before grabbing the lock.
     // Otherwise, we can deadlock with the VMThread or have a cache
@@ -2222,9 +2222,6 @@ jmethodID InstanceKlass::get_jmethod_id(const methodHandle& method_h) {
     if (to_dealloc_id != NULL) {
       Method::destroy_jmethod_id(class_loader_data(), to_dealloc_id);
     }
-#else
-    ShouldNotReachHere();
-#endif
   }
   return id;
 }
@@ -2249,7 +2246,7 @@ void InstanceKlass::ensure_space_for_methodids(int start_offset) {
     Method::ensure_jmethod_ids(class_loader_data(), new_jmeths);
   }
 }
-
+#endif
 // Common code to fetch the jmethodID from the cache or update the
 // cache with the new jmethodID. This function should never do anything
 // that causes the caller to go to a safepoint or we can deadlock with
@@ -2302,7 +2299,6 @@ jmethodID InstanceKlass::get_jmethod_id_fetch_or_update(
   }
   return id;
 }
-#endif
 
 // Common code to get the jmethodID cache length and the jmethodID
 // value at index idnum if there is one.

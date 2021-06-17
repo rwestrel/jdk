@@ -29,7 +29,7 @@
 #include "utilities/macros.hpp"
 #include "oops/klass.hpp"
 #include "oops/method.hpp"
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 // A CompiledICHolder* is a helper object for the inline cache implementation.
 // It holds:

@@ -175,7 +175,11 @@ protected:
 
   void* _gc_data;
 
+#ifndef LEYDEN
+
   virtual void flush() = 0;
+
+#endif
 protected:
   CompiledMethod(Method* method, const char* name, CompilerType type, const CodeBlobLayout& layout, int frame_complete_offset, int frame_size, ImmutableOopMapSet* oop_maps, bool caller_must_gc_arguments);
   CompiledMethod(Method* method, const char* name, CompilerType type, int size, int header_size, CodeBuffer* cb, int frame_complete_offset, int frame_size, OopMapSet* oop_maps, bool caller_must_gc_arguments);
@@ -216,13 +220,28 @@ public:
   virtual int   compile_id() const = 0;
 
   virtual address verified_entry_point() const = 0;
+
+#ifndef LEYDEN
+
   virtual void log_identity(xmlStream* log) const = 0;
   virtual void log_state_change() const = 0;
+
+#endif
+
+#ifndef LEYDEN
+
   virtual bool make_not_used() = 0;
   virtual bool make_not_entrant() = 0;
   virtual bool make_entrant() = 0;
+
+#endif
   virtual address entry_point() const = 0;
+
+#ifndef LEYDEN
+
   virtual bool make_zombie() = 0;
+
+#endif
   virtual bool is_osr_method() const = 0;
   virtual int osr_entry_bci() const = 0;
   Method* method() const                          { return _method; }
@@ -336,7 +355,11 @@ public:
 
 #endif
 
+#ifndef LEYDEN
+
   virtual bool can_convert_to_zombie() = 0;
+
+#endif
   virtual const char* compile_kind() const = 0;
   virtual int get_state() const = 0;
 
@@ -395,12 +418,16 @@ public:
 #endif
 
   virtual NativeCallWrapper* call_wrapper_at(address call) const = 0;
-  virtual NativeCallWrapper* call_wrapper_before(address return_pc) const = 0;
-  virtual address call_instruction_address(address pc) const = 0;
 
+#ifndef LEYDEN
+  virtual NativeCallWrapper* call_wrapper_before(address return_pc) const = 0;
+
+  virtual address call_instruction_address(address pc) const = 0;
   virtual CompiledStaticCall* compiledStaticCall_at(Relocation* call_site) const = 0;
+
   virtual CompiledStaticCall* compiledStaticCall_at(address addr) const = 0;
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const = 0;
+#endif
 
 #ifndef LEYDEN
   Method* attached_method(address call_pc);
@@ -430,8 +457,8 @@ public:
 
 #ifndef LEYDEN
   bool unload_nmethod_caches(bool class_unloading_occurred);
-#endif
   virtual void do_unloading(bool unloading_occurred) = 0;
+#endif
 
 private:
   PcDesc* find_pc_desc(address pc, bool approximate) {

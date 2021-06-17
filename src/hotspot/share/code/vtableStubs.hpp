@@ -92,7 +92,9 @@ class VtableStubs : AllStatic {
   static VtableStub* create_itable_stub(int vtable_index);
   static VtableStub* lookup            (bool is_vtable_stub, int vtable_index);
   static void        enter             (bool is_vtable_stub, int vtable_index, VtableStub* s);
+  #endif
   static inline uint hash              (bool is_vtable_stub, int vtable_index);
+#ifndef LEYDEN
   static address     find_stub         (bool is_vtable_stub, int vtable_index);
   static void        bookkeeping(MacroAssembler* masm, outputStream* out, VtableStub* s,
                                  address npe_addr, address ame_addr,   bool is_vtable_stub,
@@ -112,8 +114,8 @@ class VtableStubs : AllStatic {
   static address     find_vtable_stub(int vtable_index) { return find_stub(true,  vtable_index); }
   static address     find_itable_stub(int itable_index) { return find_stub(false, itable_index); }
 
-  static VtableStub* entry_point(address pc);                        // vtable stub entry point for a pc
 #endif
+  static VtableStub* entry_point(address pc);                        // vtable stub entry point for a pc
   static bool        contains(address pc);                           // is pc within any stub?
   static VtableStub* stub_containing(address pc);                    // stub containing pc or NULL
 #ifndef LEYDEN
@@ -163,8 +165,8 @@ class VtableStub {
   address code_begin() const                     { return (address)(this + 1); }
   address code_end() const                       { return code_begin() + VtableStubs::code_size_limit(_is_vtable_stub); }
   address entry_point() const                    { return code_begin(); }
-#ifndef LEYDEN
   static int entry_offset()                      { return sizeof(class VtableStub); }
+#ifndef LEYDEN
 
   bool matches(bool is_vtable_stub, int index) const {
     return _index == index && _is_vtable_stub == is_vtable_stub;

@@ -190,7 +190,7 @@ ClassLoaderData::ChunkedHandleList::~ChunkedHandleList() {
     c = next;
   }
 }
-
+#endif
 OopHandle ClassLoaderData::ChunkedHandleList::add(oop o) {
   if (_head == NULL || _head->_size == Chunk::CAPACITY) {
     Chunk* next = new Chunk(_head);
@@ -201,7 +201,7 @@ OopHandle ClassLoaderData::ChunkedHandleList::add(oop o) {
   Atomic::release_store(&_head->_size, _head->_size + 1);
   return OopHandle(handle);
 }
-
+#ifndef LEYDEN
 int ClassLoaderData::ChunkedHandleList::count() const {
   int count = 0;
   Chunk* chunk = _head;
@@ -313,14 +313,14 @@ void ClassLoaderData::inc_keep_alive() {
     _keep_alive++;
   }
 }
-
+#endif
 void ClassLoaderData::dec_keep_alive() {
   if (has_class_mirror_holder()) {
     assert(_keep_alive > 0, "Invalid keep alive decrement count");
     _keep_alive--;
   }
 }
-#endif
+
 void ClassLoaderData::oops_do(OopClosure* f, int claim_value, bool clear_mod_oops) {
   if (claim_value != ClassLoaderData::_claim_none && !try_claim(claim_value)) {
     return;
@@ -560,7 +560,7 @@ void ClassLoaderData::unload() {
   // Clean up global class iterator for compiler
   ClassLoaderDataGraph::adjust_saved_class(this);
 }
-
+#endif
 ModuleEntryTable* ClassLoaderData::modules() {
   // Lazily create the module entry table at first request.
   // Lock-free access requires load_acquire.
@@ -580,7 +580,7 @@ ModuleEntryTable* ClassLoaderData::modules() {
   }
   return modules;
 }
-
+#ifndef LEYDEN
 const int _boot_loader_dictionary_size    = 1009;
 const int _default_loader_dictionary_size = 107;
 
@@ -789,13 +789,13 @@ ClassLoaderMetaspace* ClassLoaderData::metaspace_non_null() {
   }
   return metaspace;
 }
-
+#endif
 OopHandle ClassLoaderData::add_handle(Handle h) {
   MutexLocker ml(metaspace_lock(),  Mutex::_no_safepoint_check_flag);
   record_modified_oops();
   return _handles.add(h());
 }
-
+#ifndef LEYDEN
 void ClassLoaderData::remove_handle(OopHandle h) {
   assert(!is_unloading(), "Do not remove a handle for a CLD that is unloading");
   oop* ptr = h.ptr_raw();

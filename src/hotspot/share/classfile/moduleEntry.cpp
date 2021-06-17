@@ -49,9 +49,7 @@
 
 ModuleEntry* ModuleEntryTable::_javabase_module = NULL;
 
-#ifndef LEYDEN
 oop ModuleEntry::module() const { return _module.resolve(); }
-
 void ModuleEntry::set_location(Symbol* location) {
   if (_location != NULL) {
     // _location symbol's refcounts are managed by ModuleEntry,
@@ -68,7 +66,7 @@ void ModuleEntry::set_location(Symbol* location) {
       });
   }
 }
-#endif
+
 // Return true if the module's version should be displayed in error messages,
 // logging, etc.
 // Return false if the module's version is null, if it is unnamed, or if the
@@ -99,7 +97,6 @@ bool ModuleEntry::should_show_version() {
   return true;
 }
 
-#ifndef LEYDEN
 void ModuleEntry::set_version(Symbol* version) {
   if (_version != NULL) {
     // _version symbol's refcounts are managed by ModuleEntry,
@@ -114,6 +111,7 @@ void ModuleEntry::set_version(Symbol* version) {
   }
 }
 
+#ifndef LEYDEN
 // Returns the shared ProtectionDomain
 oop ModuleEntry::shared_protection_domain() {
   return _shared_pd.resolve();
@@ -206,13 +204,14 @@ void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
     }
   }
 }
-
+#endif
 // Set whether the module is open, i.e. all its packages are unqualifiedly exported
 void ModuleEntry::set_is_open(bool is_open) {
   assert_lock_strong(Module_lock);
   _is_open = is_open;
 }
 
+#ifndef LEYDEN
 // Returns true if the module has a non-empty reads list. As such, the unnamed
 // module will return false.
 bool ModuleEntry::has_reads_list() const {
@@ -331,12 +330,12 @@ void ModuleEntry::delete_unnamed_module() {
   FREE_C_HEAP_OBJ(this);
 }
 
-
+#endif
 ModuleEntryTable::ModuleEntryTable(int table_size)
   : Hashtable<Symbol*, mtModule>(table_size, sizeof(ModuleEntry))
 {
 }
-
+#ifndef LEYDEN
 ModuleEntryTable::~ModuleEntryTable() {
   // Walk through all buckets and all entries in each bucket,
   // freeing each entry.
@@ -576,7 +575,7 @@ void ModuleEntryTable::restore_archived_oops(ClassLoaderData* loader_data, Array
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
 
-
+#endif
 ModuleEntry* ModuleEntryTable::new_entry(unsigned int hash, Handle module_handle,
                                          bool is_open, Symbol* name,
                                          Symbol* version, Symbol* location,
@@ -639,7 +638,6 @@ ModuleEntry* ModuleEntryTable::locked_create_entry(Handle module_handle,
   return entry;
 }
 
-
 // lookup_only by Symbol* to find a ModuleEntry.
 ModuleEntry* ModuleEntryTable::lookup_only(Symbol* name) {
   assert(name != NULL, "name cannot be NULL");
@@ -651,7 +649,7 @@ ModuleEntry* ModuleEntryTable::lookup_only(Symbol* name) {
   }
   return NULL;
 }
-
+#ifndef LEYDEN
 // Remove dead modules from all other alive modules' reads list.
 // This should only occur at class unloading.
 void ModuleEntryTable::purge_all_module_reads() {
@@ -665,7 +663,7 @@ void ModuleEntryTable::purge_all_module_reads() {
   }
 }
 
-
+#endif
 void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, Symbol* location) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
   ClassLoaderData* boot_loader_data = ClassLoaderData::the_null_class_loader_data();
@@ -724,6 +722,7 @@ void ModuleEntryTable::patch_javabase_entries(Handle module_handle) {
   delete java_lang_Class::fixup_module_field_list();
   java_lang_Class::set_fixup_module_field_list(NULL);
 }
+#ifndef LEYDEN
 
 
 void ModuleEntryTable::print(outputStream* st) {

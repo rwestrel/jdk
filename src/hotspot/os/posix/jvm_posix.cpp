@@ -40,7 +40,7 @@
  * to the console window.
  */
 
-JVM_ENTRY_NO_ENV(void*, JVM_RegisterSignal(jint sig, void* handler))
+JVM_ENTRY_NO_ENV2(void*, JVM_RegisterSignal, (jint sig, void* handler), (sig, handler))
   // Copied from classic vm
   // signals_md.c       1.4 98/08/23
   void* newHandler = handler == (void *)2
@@ -91,7 +91,7 @@ JVM_ENTRY_NO_ENV(void*, JVM_RegisterSignal(jint sig, void* handler))
 JVM_END
 
 
-JVM_ENTRY_NO_ENV(jboolean, JVM_RaiseSignal(jint sig))
+JVM_ENTRY_NO_ENV2(jboolean, JVM_RaiseSignal, (jint sig), (sig))
   if (ReduceSignalUsage) {
     // do not allow SHUTDOWN1_SIGNAL,SHUTDOWN2_SIGNAL,SHUTDOWN3_SIGNAL,
     // BREAK_SIGNAL to be raised when ReduceSignalUsage is set, since

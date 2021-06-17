@@ -29,7 +29,7 @@
 #include "interpreter/linkResolver.hpp"
 #include "oops/compiledICHolder.hpp"
 #include "runtime/safepointVerifiers.hpp"
-#ifndef LEYDEN
+#if 1 //ndef LEYDEN
 
 //-----------------------------------------------------------------------------
 // The CompiledIC represents a compiled inline cache.
@@ -77,6 +77,8 @@ public:
   static bool is_safe(CompiledMethod* method);
   static bool is_safe(address code);
 };
+
+#ifndef LEYDEN
 
 class CompiledICInfo : public StackObj {
  private:
@@ -156,27 +158,36 @@ class CompiledICInfo : public StackObj {
     }
   }
 };
+#endif
 
 class NativeCallWrapper: public ResourceObj {
 public:
   virtual address destination() const = 0;
+
   virtual address instruction_address() const = 0;
+#ifndef LEYDEN
   virtual address next_instruction_address() const = 0;
   virtual address return_address() const = 0;
   virtual address get_resolve_call_stub(bool is_optimized) const = 0;
   virtual void set_destination_mt_safe(address dest) = 0;
   virtual void set_to_interpreted(const methodHandle& method, CompiledICInfo& info) = 0;
+#endif
   virtual void verify() const = 0;
+#ifndef LEYDEN
   virtual void verify_resolve_call(address dest) const = 0;
 
   virtual bool is_call_to_interpreted(address dest) const = 0;
   virtual bool is_safe_for_patching() const = 0;
 
+#endif
   virtual NativeInstruction* get_load_instruction(virtual_call_Relocation* r) const = 0;
-
   virtual void *get_data(NativeInstruction* instruction) const = 0;
+#ifndef LEYDEN
   virtual void set_data(NativeInstruction* instruction, intptr_t data) = 0;
+
+#endif
 };
+
 
 class CompiledIC: public ResourceObj {
   friend class InlineCacheBuffer;
@@ -189,13 +200,14 @@ class CompiledIC: public ResourceObj {
   bool          _is_optimized;  // an optimized virtual call (i.e., no compiled IC)
   CompiledMethod* _method;
 
+#ifndef LEYDEN
+
   CompiledIC(CompiledMethod* cm, NativeCall* ic_call);
+#endif
   CompiledIC(RelocIterator* iter);
-
   void initialize_from_iter(RelocIterator* iter);
-
   static bool is_icholder_entry(address entry);
-
+#ifndef LEYDEN
   // low-level inline-cache manipulation. Cannot be accessed directly, since it might not be MT-safe
   // to change an inline-cache. These changes the underlying inline-cache directly. They *newer* make
   // changes to a transition stub.
@@ -220,16 +232,20 @@ class CompiledIC: public ResourceObj {
   // associated with the inline cache.
   address stub_address() const;
   bool is_in_transition_state() const;  // Use InlineCacheBuffer
+#endif
 
  public:
+#ifndef LEYDEN
+
   // conversion (machine PC to CompiledIC*)
   friend CompiledIC* CompiledIC_before(CompiledMethod* nm, address return_addr);
   friend CompiledIC* CompiledIC_at(CompiledMethod* nm, address call_site);
   friend CompiledIC* CompiledIC_at(Relocation* call_site);
+#endif
   friend CompiledIC* CompiledIC_at(RelocIterator* reloc_iter);
-
+#ifndef LEYDEN
   static bool is_icholder_call_site(virtual_call_Relocation* call_site, const CompiledMethod* cm);
-
+#endif
   // Return the cached_metadata/destination associated with this inline cache. If the cache currently points
   // to a transition stub, it will read the values from the transition stub.
   void* cached_value() const;
@@ -241,27 +257,29 @@ class CompiledIC: public ResourceObj {
     assert(!is_icholder_call(), "must be");
     return (Metadata*) cached_value();
   }
-
   void* get_data() const {
     return _call->get_data(_value);
   }
 
+#ifndef LEYDEN
   void set_data(intptr_t data) {
     _call->set_data(_value, data);
   }
-
+#endif
   address ic_destination() const;
-
   bool is_optimized() const   { return _is_optimized; }
+#ifndef LEYDEN
 
   // State
   bool is_clean() const;
+#endif
   bool is_megamorphic() const;
   bool is_call_to_compiled() const;
+#ifndef LEYDEN
   bool is_call_to_interpreted() const;
-
+#endif
   bool is_icholder_call() const;
-
+#ifndef LEYDEN
   address end_of_call() { return  _call->return_address(); }
 
   // MT-safe patching of inline caches. Note: Only safe to call is_xxx when holding the CompiledIC_ock
@@ -283,15 +301,19 @@ class CompiledIC: public ResourceObj {
   static void compute_monomorphic_entry(const methodHandle& method, Klass* receiver_klass,
                                         bool is_optimized, bool static_bound, bool caller_is_nmethod,
                                         CompiledICInfo& info, TRAPS);
-
+#endif
   // Location
   address instruction_address() const { return _call->instruction_address(); }
-
+#ifndef LEYDEN
   // Misc
   void print()             PRODUCT_RETURN;
   void print_compiled_ic() PRODUCT_RETURN;
+#endif
+
   void verify()            PRODUCT_RETURN;
 };
+
+#ifndef LEYDEN
 
 inline CompiledIC* CompiledIC_before(CompiledMethod* nm, address return_addr) {
   CompiledIC* c_ic = new CompiledIC(nm, nativeCall_before(return_addr));
@@ -312,8 +334,8 @@ inline CompiledIC* CompiledIC_at(Relocation* call_site) {
   c_ic->verify();
   return c_ic;
 }
-
-inline CompiledIC* CompiledIC_at(RelocIterator* reloc_iter) {
+#endif
+inline CompiledIC*  CompiledIC_at(RelocIterator* reloc_iter) {
   assert(reloc_iter->type() == relocInfo::virtual_call_type ||
       reloc_iter->type() == relocInfo::opt_virtual_call_type, "wrong reloc. info");
   CompiledIC* c_ic = new CompiledIC(reloc_iter);
@@ -337,6 +359,8 @@ inline CompiledIC* CompiledIC_at(RelocIterator* reloc_iter) {
 //  Interpreted code: Calls to stub that set Method* reference
 //
 //
+
+#ifndef LEYDEN
 
 class StaticCallInfo {
  private:
@@ -454,6 +478,8 @@ private:
   virtual address resolve_call_stub() const;
   virtual const char* name() const { return "CompiledDirectStaticCall"; }
 };
+
+#endif
 #endif
 #endif // SHARE_CODE_COMPILEDIC_HPP
 

@@ -85,14 +85,12 @@ typedef int (*canonicalize_fn_t)(const char *orig, char *out, int len);
 static canonicalize_fn_t CanonicalizeEntry  = NULL;
 
 // Entry points in zip.dll for loading zip/jar file entries
-
 typedef void * * (*ZipOpen_t)(const char *name, char **pmsg);
 typedef void     (*ZipClose_t)(jzfile *zip);
 typedef jzentry* (*FindEntry_t)(jzfile *zip, const char *name, jint *sizeP, jint *nameLen);
 typedef jboolean (*ReadEntry_t)(jzfile *zip, jzentry *entry, unsigned char *buf, char *namebuf);
 typedef jzentry* (*GetNextEntry_t)(jzfile *zip, jint n);
 typedef jint     (*Crc32_t)(jint crc, const jbyte *buf, jint len);
-
 static ZipOpen_t         ZipOpen            = NULL;
 static ZipClose_t        ZipClose           = NULL;
 static FindEntry_t       FindEntry          = NULL;
@@ -102,12 +100,14 @@ static Crc32_t           Crc32              = NULL;
 int ClassLoader::_libzip_loaded = 0;
 
 // Entry points for jimage.dll for loading jimage file entries
-
 static JImageOpen_t                    JImageOpen             = NULL;
 static JImageClose_t                   JImageClose            = NULL;
+#ifndef LEYDEN
 static JImagePackageToModule_t         JImagePackageToModule  = NULL;
+#endif
 static JImageFindResource_t            JImageFindResource     = NULL;
 static JImageGetResource_t             JImageGetResource      = NULL;
+#ifndef LEYDEN
 static JImageResourceIterator_t        JImageResourceIterator = NULL;
 
 // Globals
@@ -134,10 +134,11 @@ PerfCounter*    ClassLoader::_perf_define_appclass_selftime = NULL;
 PerfCounter*    ClassLoader::_perf_app_classfile_bytes_read = NULL;
 PerfCounter*    ClassLoader::_perf_sys_classfile_bytes_read = NULL;
 PerfCounter*    ClassLoader::_unsafe_defineClassCallCounter = NULL;
-
+#endif
 GrowableArray<ModuleClassPathList*>* ClassLoader::_patch_mod_entries = NULL;
 GrowableArray<ModuleClassPathList*>* ClassLoader::_exploded_entries = NULL;
 ClassPathEntry* ClassLoader::_jrt_entry = NULL;
+#ifndef LEYDEN
 
 ClassPathEntry* volatile ClassLoader::_first_append_entry_list = NULL;
 ClassPathEntry* volatile ClassLoader::_last_append_entry  = NULL;
@@ -157,6 +158,7 @@ bool string_starts_with(const char* str, const char* str_to_find) {
   }
   return (strncmp(str, str_to_find, str_to_find_len) == 0);
 }
+#endif
 
 static const char* get_jimage_version_string() {
   static char version_string[10] = "";
@@ -167,6 +169,7 @@ static const char* get_jimage_version_string() {
   return (const char*)version_string;
 }
 
+#ifndef LEYDEN
 bool ClassLoader::string_ends_with(const char* str, const char* str_to_find) {
   size_t str_len = strlen(str);
   size_t str_to_find_len = strlen(str_to_find);
@@ -175,7 +178,7 @@ bool ClassLoader::string_ends_with(const char* str, const char* str_to_find) {
   }
   return (strncmp(str + (str_len - str_to_find_len), str_to_find, str_to_find_len) == 0);
 }
-
+#endif
 // Used to obtain the package name from a fully qualified class name.
 Symbol* ClassLoader::package_from_class_name(const Symbol* name, bool* bad_class_name) {
   if (name == NULL) {
@@ -236,7 +239,7 @@ const char* ClassPathEntry::copy_path(const char* path) {
   strcpy(copy, path);
   return copy;
 }
-
+#ifndef LEYDEN
 ClassFileStream* ClassPathDirEntry::open_stream(const char* name, TRAPS) {
   // construct full path name
   assert((_dir != NULL) && (name != NULL), "sanity");
@@ -272,19 +275,19 @@ ClassFileStream* ClassPathDirEntry::open_stream(const char* name, TRAPS) {
   FREE_RESOURCE_ARRAY(char, path, path_len);
   return NULL;
 }
-
+#endif
 ClassPathZipEntry::ClassPathZipEntry(jzfile* zip, const char* zip_name,
                                      bool is_boot_append, bool from_class_path_attr) : ClassPathEntry() {
   _zip = zip;
   _zip_name = copy_path(zip_name);
   _from_class_path_attr = from_class_path_attr;
 }
-
 ClassPathZipEntry::~ClassPathZipEntry() {
   (*ZipClose)(_zip);
   FREE_C_HEAP_ARRAY(char, _zip_name);
 }
 
+#ifndef LEYDEN
 u1* ClassPathZipEntry::open_entry(const char* name, jint* filesize, bool nul_terminate, TRAPS) {
     // enable call to C land
   JavaThread* thread = JavaThread::current();
@@ -341,7 +344,7 @@ void ClassPathZipEntry::contents_do(void f(const char* name, void* context), voi
     (*f)(ze->name, context);
   }
 }
-
+#endif
 DEBUG_ONLY(ClassPathImageEntry* ClassPathImageEntry::_singleton = NULL;)
 
 void ClassPathImageEntry::close_jimage() {
@@ -374,9 +377,13 @@ ClassPathImageEntry::~ClassPathImageEntry() {
   }
 }
 
+#ifndef LEYDEN
+
 ClassFileStream* ClassPathImageEntry::open_stream(const char* name, TRAPS) {
   return open_stream_for_loader(name, ClassLoaderData::the_null_class_loader_data(), THREAD);
 }
+
+#endif
 
 // For a class in a named module, look it up in the jimage file using this syntax:
 //    /<module-name>/<package-name>/<base-class>
@@ -385,6 +392,8 @@ ClassFileStream* ClassPathImageEntry::open_stream(const char* name, TRAPS) {
 //     1. There are no unnamed modules in the jimage file.
 //     2. A package is in at most one module in the jimage file.
 //
+#ifndef LEYDEN
+
 ClassFileStream* ClassPathImageEntry::open_stream_for_loader(const char* name, ClassLoaderData* loader_data, TRAPS) {
   jlong size;
   JImageLocationRef location = (*JImageFindResource)(_jimage, "", get_jimage_version_string(), name, &size);
@@ -430,13 +439,15 @@ ClassFileStream* ClassPathImageEntry::open_stream_for_loader(const char* name, C
   return NULL;
 }
 
+#endif
+#ifndef LEYDEN
 JImageLocationRef ClassLoader::jimage_find_resource(JImageFile* jf,
                                                     const char* module_name,
                                                     const char* file_name,
                                                     jlong &size) {
   return ((*JImageFindResource)(jf, module_name, get_jimage_version_string(), file_name, &size));
 }
-
+#endif
 bool ClassPathImageEntry::is_modules_image() const {
   assert(this == _singleton, "VM supports a single jimage");
   assert(this == (ClassPathImageEntry*)ClassLoader::get_jrt_entry(), "must be used for jrt entry");
@@ -456,7 +467,7 @@ ModuleClassPathList::ModuleClassPathList(Symbol* module_name) {
   _module_first_entry = NULL;
   _module_last_entry = NULL;
 }
-
+#ifndef LEYDEN
 ModuleClassPathList::~ModuleClassPathList() {
   // Clean out each ClassPathEntry on list
   ClassPathEntry* e = _module_first_entry;
@@ -466,7 +477,7 @@ ModuleClassPathList::~ModuleClassPathList() {
     e = next_entry;
   }
 }
-
+#endif
 void ModuleClassPathList::add_to_list(ClassPathEntry* new_entry) {
   if (new_entry != NULL) {
     if (_module_last_entry == NULL) {
@@ -477,7 +488,7 @@ void ModuleClassPathList::add_to_list(ClassPathEntry* new_entry) {
     }
   }
 }
-
+#ifndef LEYDEN
 void ClassLoader::trace_class_path(const char* msg, const char* name) {
   LogTarget(Info, class, path) lt;
   if (lt.is_enabled()) {
@@ -615,7 +626,7 @@ void ClassLoader::setup_patch_mod_entries() {
     }
   }
 }
-
+#endif
 // Determine whether the module has been patched via the command-line
 // option --patch-module
 bool ClassLoader::is_in_patch_mod_entries(Symbol* module_name) {
@@ -631,6 +642,7 @@ bool ClassLoader::is_in_patch_mod_entries(Symbol* module_name) {
   return false;
 }
 
+#ifndef LEYDEN
 // Set up the _jrt_entry if present and boot append path
 void ClassLoader::setup_boot_search_path(const char *class_path) {
   EXCEPTION_MARK;
@@ -679,6 +691,7 @@ void ClassLoader::setup_boot_search_path(const char *class_path) {
     }
   }
 }
+#endif
 
 // During an exploded modules build, each module defined to the boot loader
 // will be added to the ClassLoader::_exploded_entries array.
@@ -781,6 +794,7 @@ ClassPathEntry* ClassLoader::create_class_path_entry(const char *path, const str
   return new_entry;
 }
 
+#ifndef LEYDEN
 
 // Create a class path zip entry for a given path (return NULL if not found
 // or zip/JAR file cannot be opened)
@@ -952,7 +966,7 @@ void ClassLoader::print_bootclasspath() {
   }
   tty->print_cr("]");
 }
-
+#endif
 void* ClassLoader::dll_lookup(void* lib, const char* name, const char* path) {
   void* func = os::dll_lookup(lib, name);
   if (func == NULL) {
@@ -962,7 +976,7 @@ void* ClassLoader::dll_lookup(void* lib, const char* name, const char* path) {
   }
   return func;
 }
-
+#ifndef LEYDEN
 void ClassLoader::load_java_library() {
   assert(CanonicalizeEntry == NULL, "should not load java library twice");
   void *javalib_handle = os::native_java_library();
@@ -972,7 +986,7 @@ void ClassLoader::load_java_library() {
 
   CanonicalizeEntry = CAST_TO_FN_PTR(canonicalize_fn_t, dll_lookup(javalib_handle, "JDK_Canonicalize", NULL));
 }
-
+#endif
 void ClassLoader::release_load_zip_library() {
   MutexLocker locker(Zip_lock, Monitor::_no_safepoint_check_flag);
   if (_libzip_loaded == 0) {
@@ -1000,7 +1014,7 @@ void ClassLoader::load_zip_library() {
   GetNextEntry = CAST_TO_FN_PTR(GetNextEntry_t, dll_lookup(handle, "ZIP_GetNextEntry", path));
   Crc32 = CAST_TO_FN_PTR(Crc32_t, dll_lookup(handle, "ZIP_CRC32", path));
 }
-
+#ifndef LEYDEN
 void ClassLoader::load_jimage_library() {
   assert(JImageOpen == NULL, "should not load jimage library twice");
   char path[JVM_MAXPATHLEN];
@@ -1598,7 +1612,7 @@ void ClassLoader::classLoader_init2(TRAPS) {
     add_to_exploded_build_list(vmSymbols::java_base(), CHECK);
   }
 }
-
+#endif
 bool ClassLoader::get_canonical_path(const char* orig, char* out, int len) {
   assert(orig != NULL && out != NULL && len > 0, "bad arguments");
   JavaThread* THREAD = JavaThread::current();
@@ -1613,6 +1627,7 @@ bool ClassLoader::get_canonical_path(const char* orig, char* out, int len) {
   return true;
 }
 
+#ifndef LEYDEN
 void ClassLoader::create_javabase() {
   Thread* THREAD = Thread::current();
 
@@ -1696,3 +1711,5 @@ PerfClassTraceTime::~PerfClassTraceTime() {
   // reset the timer
   _timers[_event_type].reset();
 }
+
+#endif

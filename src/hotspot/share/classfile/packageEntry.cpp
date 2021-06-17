@@ -325,7 +325,7 @@ void PackageEntryTable::load_archived_entries(Array<PackageEntry*>* archived_pac
 }
 
 #endif // INCLUDE_CDS_JAVA_HEAP
-
+#endif
 PackageEntry* PackageEntryTable::new_entry(unsigned int hash, Symbol* name, ModuleEntry* module) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
   PackageEntry* entry = (PackageEntry*)Hashtable<Symbol*, mtModule>::allocate_new_entry(hash, name);
@@ -362,7 +362,7 @@ void PackageEntryTable::locked_create_entry_if_not_exist(Symbol* name, ModuleEnt
     locked_create_entry(name, module);
   }
 }
-
+#ifndef LEYDEN
 PackageEntry* PackageEntryTable::lookup(Symbol* name, ModuleEntry* module) {
   MutexLocker ml(Module_lock);
   PackageEntry* p = locked_lookup_only(name);
@@ -375,7 +375,7 @@ PackageEntry* PackageEntryTable::lookup(Symbol* name, ModuleEntry* module) {
     return entry;
   }
 }
-
+#endif
 PackageEntry* PackageEntryTable::lookup_only(Symbol* name) {
   assert(!Module_lock->owned_by_self(), "should not have the Module_lock - use locked_lookup_only");
   MutexLocker ml(Module_lock);
@@ -412,7 +412,7 @@ void PackageEntryTable::verify_javabase_packages(GrowableArray<Symbol*> *pkg_lis
     }
   }
 }
-
+#ifndef LEYDEN
 // iteration of qualified exports
 void PackageEntry::package_exports_do(ModuleClosure* f) {
   assert_locked_or_safepoint(Module_lock);

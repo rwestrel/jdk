@@ -2185,7 +2185,21 @@ void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThrea
 }
 
 // Handles the uncommon cases of monitor unlocking in compiled code
-JRT_LEAF(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* thread))
+void SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* thread) {
+  {
+    static void (*SharedRuntime__complete_monitor_unlocking_C_reduced)(oopDesc* obj, BasicLock* lock, JavaThread* thread);
+    if (SharedRuntime__complete_monitor_unlocking_C_reduced == NULL && UseNewCode) {
+      void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so", RTLD_NOW | RTLD_LOCAL);
+      SharedRuntime__complete_monitor_unlocking_C_reduced = (void (*)(oopDesc* , BasicLock* , JavaThread* ))dlsym(minimal, "_ZN13SharedRuntime28complete_monitor_unlocking_CEP7oopDescP9BasicLockP10JavaThread");
+      assert(SharedRuntime__complete_monitor_unlocking_C_reduced != NULL, "");
+    }
+    if (SharedRuntime__complete_monitor_unlocking_C_reduced != NULL) {
+      return SharedRuntime__complete_monitor_unlocking_C_reduced(obj, lock, thread);
+    }
+  }
+  NoHandleMark __hm;
+  os::verify_stack_alignment();
+  NoSafepointVerifier __nsv;
   SharedRuntime::monitor_exit_helper(obj, lock, thread);
 JRT_END
 

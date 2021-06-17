@@ -304,6 +304,7 @@ void initialize_basic_type_klass(Klass* k, TRAPS) {
 }
 #endif
 
+extern "C" LeydenStaticData leydenStaticData;
 void Universe::genesis(TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark   hm(THREAD);
@@ -339,6 +340,10 @@ void Universe::genesis(TRAPS) {
     vmSymbols::initialize(CHECK);
     vmSymbols::initialize(CHECK);
     SystemDictionary::initialize(CHECK);
+#else
+    for (int i = 0; i < T_VOID+1; i++) {
+      Universe::_mirrors[i] = OopHandle(Universe::vm_global(), leydenStaticData.Universe___mirrors[i]);
+    }
 #endif
     // Create string constants
     oop s = StringTable::intern("null", CHECK);

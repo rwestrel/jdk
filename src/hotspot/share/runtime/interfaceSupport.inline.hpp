@@ -380,7 +380,6 @@ class VMNativeEntryWrapper {
   VM_LEAF_BASE(result_type, header)                                  \
   debug_only(NoSafepointVerifier __nsv;)
 
-
 #define JRT_ENTRY_NO_ASYNC(result_type, header)                      \
   result_type header {                                               \
     ThreadInVMfromJavaNoAsyncException __tiv(thread);                \
@@ -448,6 +447,32 @@ extern "C" {                                                         \
     debug_only(VMNativeEntryWrapper __vew;)                          \
     VM_ENTRY_BASE(result_type, header, thread)
 
+#ifndef LEYDEN
+#define JVM_ENTRY2(result_type, header, args, args2)                 \
+extern "C" {                                                         \
+  result_type JNICALL header args {                                   \
+    static result_type (*header##_reduced) args;                     \
+    if (UseNewCode && header##_reduced == NULL) {                    \
+      void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so", RTLD_NOW | RTLD_LOCAL);\
+      header##_reduced = (result_type (*) args)dlsym(minimal, #header);\
+      if (header##_reduced == NULL) { ShouldNotReachHere(); };       \
+    }                                                                \
+    if (header##_reduced != NULL) {                                  \
+      return header##_reduced args2;                                 \
+    }                                                                \
+    JavaThread* thread=JavaThread::thread_from_jni_environment(env); \
+    ThreadInVMfromNative __tiv(thread);                              \
+    debug_only(VMNativeEntryWrapper __vew;)                          \
+    VM_ENTRY_BASE(result_type, header args, thread)
+#else
+#define JVM_ENTRY2(result_type, header, args, args2)                 \
+extern "C" {                                                         \
+  result_type JNICALL header args {                                   \
+    JavaThread* thread=JavaThread::thread_from_jni_environment(env); \
+    ThreadInVMfromNative __tiv(thread);                              \
+    debug_only(VMNativeEntryWrapper __vew;)                          \
+    VM_ENTRY_BASE(result_type, header args, thread)
+#endif
 
 #define JVM_ENTRY_NO_ENV(result_type, header)                        \
 extern "C" {                                                         \
@@ -457,6 +482,32 @@ extern "C" {                                                         \
     debug_only(VMNativeEntryWrapper __vew;)                          \
     VM_ENTRY_BASE(result_type, header, thread)
 
+#ifndef LEYDEN
+#define JVM_ENTRY_NO_ENV2(result_type, header, args, args2)          \
+extern "C" {                                                         \
+  result_type JNICALL header args {                                  \
+    static result_type (*header##_reduced) args;                     \
+    if (UseNewCode && header##_reduced == NULL) {                    \
+      void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so", RTLD_NOW | RTLD_LOCAL);\
+      header##_reduced = (result_type (*) args)dlsym(minimal, #header);\
+      assert(header##_reduced != NULL, "");                          \
+    }                                                                \
+    if (header##_reduced != NULL) {                                  \
+      return header##_reduced args2;                                 \
+    }                                                                \
+    JavaThread* thread = JavaThread::current();                      \
+    ThreadInVMfromNative __tiv(thread);                              \
+    debug_only(VMNativeEntryWrapper __vew;)                          \
+    VM_ENTRY_BASE(result_type, header args, thread)
+#else
+#define JVM_ENTRY_NO_ENV2(result_type, header, args, args2)          \
+extern "C" {                                                         \
+  result_type JNICALL header args {                                  \
+    JavaThread* thread = JavaThread::current();                      \
+    ThreadInVMfromNative __tiv(thread);                              \
+    debug_only(VMNativeEntryWrapper __vew;)                          \
+    VM_ENTRY_BASE(result_type, header args, thread)
+#endif
 
 #define JVM_LEAF(result_type, header)                                \
 extern "C" {                                                         \

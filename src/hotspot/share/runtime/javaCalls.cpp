@@ -192,10 +192,23 @@ void JavaCalls::call_virtual(JavaValue* result, Klass* spec_klass, Symbol* name,
   methodHandle method(THREAD, callinfo.selected_method());
   assert(method.not_null(), "should have thrown exception");
 
+
   // Invoke the method
   JavaCalls::call(result, method, args, CHECK);
 #else
-  ShouldNotReachHere();
+  extern LeydenStaticData leydenStaticData;
+  Handle receiver = args->receiver();
+  Klass* recvrKlass = receiver.is_null() ? (Klass*)NULL : receiver->klass();
+
+  uint i;
+  for (i = 0; i < leydenStaticData.nmethods_size; i++) {
+    CompiledCode cc = leydenStaticData.nmethods[i];
+    if (cc.klass == spec_klass && cc.name == name && cc.signature == signature && cc.receiver_klass == recvrKlass) {
+      JavaCalls::call(result, methodHandle(THREAD, cc.method), args, CHECK);
+      break;
+    }
+  }
+  assert(i < leydenStaticData.nmethods_size, "");
 #endif
 }
 

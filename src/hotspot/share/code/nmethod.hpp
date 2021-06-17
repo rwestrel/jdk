@@ -27,7 +27,6 @@
 
 #include "code/compiledMethod.hpp"
 
-#ifndef LEYDEN
 class DepChange;
 class DirectiveSet;
 class DebugInformationRecorder;
@@ -137,7 +136,7 @@ class nmethod : public CompiledMethod {
   // and "other" thread respectively.
   //
   struct oops_do_mark_link; // Opaque data type.
-
+#ifndef LEYDEN
   // States used for claiming nmethods during root processing.
   static const uint claim_weak_request_tag = 0;
   static const uint claim_weak_done_tag = 1;
@@ -189,18 +188,17 @@ class nmethod : public CompiledMethod {
   void oops_do_set_strong_done(nmethod* old_head);
 
   static nmethod* volatile _oops_do_mark_nmethods;
+#endif
   oops_do_mark_link* volatile _oops_do_mark_link;
 
   // offsets for entry points
   address _entry_point;                      // entry point with class check
   address _verified_entry_point;             // entry point without class check
   address _osr_entry_point;                  // entry point for on stack replacement
-
   // Offsets for different nmethod parts
   int  _exception_offset;
   // Offset of the unwind handler if it exists
   int _unwind_handler_offset;
-
   int _consts_offset;
   int _stub_offset;
   int _oops_offset;                       // offset to where embedded oop table begins (inside data)
@@ -216,8 +214,11 @@ class nmethod : public CompiledMethod {
   int _jvmci_data_offset;
 #endif
   int _nmethod_end_offset;
+#ifndef LEYDEN
 
   int code_offset() const { return (address) code_begin() - header_begin(); }
+
+#endif
 
   // location in frame (offset for sp) that deopt can store the original
   // pc during a deopt.
@@ -283,7 +284,7 @@ class nmethod : public CompiledMethod {
   // for non-static native wrapper frames.
   ByteSize _native_receiver_sp_offset;
   ByteSize _native_basic_lock_sp_offset;
-
+#ifndef LEYDEN
   friend class nmethodLocker;
 
   // For native wrappers
@@ -333,7 +334,9 @@ class nmethod : public CompiledMethod {
   // Returns true if this thread changed the state of the nmethod or
   // false if another thread performed the transition.
   bool make_not_entrant_or_zombie(int state);
+#endif
   bool make_entrant() { Unimplemented(); return false; }
+#ifndef LEYDEN
   void inc_decompile_count();
 
   // Inform external interfaces that a compiled method has been unloaded
@@ -374,13 +377,18 @@ class nmethod : public CompiledMethod {
 #endif
   );
 
+#endif
+
   // Only used for unit tests.
   nmethod()
     : CompiledMethod(),
       _is_unloading_state(0),
       _native_receiver_sp_offset(in_ByteSize(-1)),
-      _native_basic_lock_sp_offset(in_ByteSize(-1)) {}
+      _native_basic_lock_sp_offset(in_ByteSize(-1))
+  {}
 
+
+#ifndef LEYDEN
 
   static nmethod* new_native_nmethod(const methodHandle& method,
                                      int compile_id,
@@ -393,6 +401,7 @@ class nmethod : public CompiledMethod {
                                      OopMapSet* oop_maps);
 
   // type info
+#endif
   bool is_nmethod() const                         { return true; }
   bool is_osr_method() const                      { return _entry_bci != InvocationEntryBci; }
 
@@ -402,45 +411,50 @@ class nmethod : public CompiledMethod {
   address stub_begin            () const          { return           header_begin() + _stub_offset          ; }
   address stub_end              () const          { return           header_begin() + _oops_offset          ; }
   address exception_begin       () const          { return           header_begin() + _exception_offset     ; }
+#ifndef LEYDEN
   address unwind_handler_begin  () const          { return _unwind_handler_offset != -1 ? (header_begin() + _unwind_handler_offset) : NULL; }
+#endif
   oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset)         ; }
   oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset)     ; }
-
   Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset)     ; }
   Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
-
   address scopes_data_end       () const          { return           header_begin() + _scopes_pcs_offset    ; }
   PcDesc* scopes_pcs_begin      () const          { return (PcDesc*)(header_begin() + _scopes_pcs_offset   ); }
   PcDesc* scopes_pcs_end        () const          { return (PcDesc*)(header_begin() + _dependencies_offset) ; }
+#ifndef LEYDEN
   address dependencies_begin    () const          { return           header_begin() + _dependencies_offset  ; }
   address dependencies_end      () const          { return           header_begin() + _native_invokers_offset ; }
   BufferBlob** native_invokers_begin() const         { return (BufferBlob**)(header_begin() + _native_invokers_offset) ; }
   BufferBlob** native_invokers_end  () const         { return (BufferBlob**)(header_begin() + _handler_table_offset); }
+#endif
   address handler_table_begin   () const          { return           header_begin() + _handler_table_offset ; }
   address handler_table_end     () const          { return           header_begin() + _nul_chk_table_offset ; }
   address nul_chk_table_begin   () const          { return           header_begin() + _nul_chk_table_offset ; }
 #if INCLUDE_JVMCI
   address nul_chk_table_end     () const          { return           header_begin() + _speculations_offset  ; }
+#ifndef LEYDEN
   address speculations_begin    () const          { return           header_begin() + _speculations_offset  ; }
   address speculations_end      () const          { return           header_begin() + _jvmci_data_offset   ; }
   address jvmci_data_begin      () const          { return           header_begin() + _jvmci_data_offset    ; }
   address jvmci_data_end        () const          { return           header_begin() + _nmethod_end_offset   ; }
+
+#endif
 #else
   address nul_chk_table_end     () const          { return           header_begin() + _nmethod_end_offset   ; }
 #endif
-
   // Sizes
   int oops_size         () const                  { return (address)  oops_end         () - (address)  oops_begin         (); }
   int metadata_size     () const                  { return (address)  metadata_end     () - (address)  metadata_begin     (); }
+#ifndef LEYDEN
   int dependencies_size () const                  { return            dependencies_end () -            dependencies_begin (); }
 #if INCLUDE_JVMCI
   int speculations_size () const                  { return            speculations_end () -            speculations_begin (); }
   int jvmci_data_size   () const                  { return            jvmci_data_end   () -            jvmci_data_begin   (); }
 #endif
-
+#endif
   int     oops_count() const { assert(oops_size() % oopSize == 0, "");  return (oops_size() / oopSize) + 1; }
   int metadata_count() const { assert(metadata_size() % wordSize == 0, ""); return (metadata_size() / wordSize) + 1; }
-
+#ifndef LEYDEN
   int total_size        () const;
 
   void dec_hotness_counter()        { _hotness_counter--; }
@@ -452,7 +466,7 @@ class nmethod : public CompiledMethod {
   bool metadata_contains     (Metadata** addr) const   { return metadata_begin     () <= addr && addr < metadata_end     (); }
   bool scopes_data_contains  (address addr) const { return scopes_data_begin  () <= addr && addr < scopes_data_end  (); }
   bool scopes_pcs_contains   (PcDesc* addr) const { return scopes_pcs_begin   () <= addr && addr < scopes_pcs_end   (); }
-
+#endif
   // entry points
   address entry_point() const                     { return _entry_point;             } // normal entry point
   address verified_entry_point() const            { return _verified_entry_point;    } // if klass is correct
@@ -465,10 +479,12 @@ class nmethod : public CompiledMethod {
   bool  is_zombie() const                         { return _state == zombie; }
   bool  is_unloaded() const                       { return _state == unloaded; }
 
+#ifndef LEYDEN
   void clear_unloading_state();
   virtual bool is_unloading();
   virtual void do_unloading(bool unloading_occurred);
-
+#endif
+#ifndef LEYDEN
 #if INCLUDE_RTM_OPT
   // rtm state accessing and manipulating
   RTMState  rtm_state() const                     { return _rtm_state; }
@@ -483,17 +499,36 @@ class nmethod : public CompiledMethod {
   // if this thread changed the state of the nmethod or false if
   // another thread performed the transition.
   bool  make_not_entrant() {
+#ifndef LEYDEN
     assert(!RestoreCodeFromDisk, "");
     assert(!method()->is_method_handle_intrinsic(), "Cannot make MH intrinsic not entrant");
     return make_not_entrant_or_zombie(not_entrant);
+#else
+    ShouldNotReachHere();
+    return false;
+#endif
   }
-  bool  make_not_used()    { return make_not_entrant(); }
-  bool  make_zombie()      { return make_not_entrant_or_zombie(zombie); }
-
+  bool  make_not_used()    {
+#ifndef LEYDEN
+    return make_not_entrant();
+#else
+    ShouldNotReachHere();
+    return false;
+#endif
+  }
+  bool  make_zombie()      {
+#ifndef LEYDEN
+    return make_not_entrant_or_zombie(zombie);
+#else
+    ShouldNotReachHere();
+    return false;
+#endif
+  }
+#endif
   int get_state() const {
     return _state;
   }
-
+#ifndef LEYDEN
   void  make_unloaded();
 
   bool has_dependencies()                         { return dependencies_size() != 0; }
@@ -504,15 +539,17 @@ class nmethod : public CompiledMethod {
     assert(!has_flushed_dependencies(), "should only happen once");
     _has_flushed_dependencies = 1;
   }
-
+#endif
   int   comp_level() const                        { return _comp_level; }
-
+#ifndef LEYDEN
   void unlink_from_method();
-
+#endif
   // Support for oops in scopes and relocs:
   // Note: index 0 is reserved for null.
   oop   oop_at(int index) const;
+#ifndef LEYDEN
   oop   oop_at_phantom(int index) const; // phantom reference
+#endif
   oop*  oop_addr_at(int index) const {  // for GC
     // relocation indexes are biased by 1 (because 0 is reserved)
     assert(index > 0 && index <= oops_count(), "must be a valid non-zero index");
@@ -528,7 +565,7 @@ class nmethod : public CompiledMethod {
     assert(index > 0 && index <= metadata_count(), "must be a valid non-zero index");
     return &metadata_begin()[index - 1];
   }
-
+#ifndef LEYDEN
   void copy_values(GrowableArray<jobject>* oops);
   void copy_values(GrowableArray<Metadata*>* metadata);
 
@@ -546,9 +583,10 @@ public:
   // Sweeper support
   long  stack_traversal_mark()                    { return _stack_traversal_mark; }
   void  set_stack_traversal_mark(long l)          { _stack_traversal_mark = l; }
-
+#endif
   // On-stack replacement support
   int   osr_entry_bci() const                     { assert(is_osr_method(), "wrong kind of nmethod"); return _entry_bci; }
+#ifndef LEYDEN
   address  osr_entry() const                      { assert(is_osr_method(), "wrong kind of nmethod"); return _osr_entry_point; }
   void  invalidate_osr_method();
   nmethod* osr_link() const                       { return _osr_link; }
@@ -560,10 +598,13 @@ public:
   // unlink and deallocate this nmethod
   // Only NMethodSweeper class is expected to use this. NMethodSweeper is not
   // expected to use any other private methods/data in this class.
-
+#endif
  protected:
+#ifndef LEYDEN
+
   void flush();
 
+#endif
  public:
   // When true is returned, it is unsafe to remove this nmethod even if
   // it is a zombie, since the VM or the ServiceThread might still be
@@ -571,9 +612,13 @@ public:
   bool is_locked_by_vm() const                    { return _lock_count >0; }
 
   // See comment at definition of _last_seen_on_stack
-  void mark_as_seen_on_stack();
-  bool can_convert_to_zombie();
+#ifndef LEYDEN
 
+  void mark_as_seen_on_stack();
+
+  bool can_convert_to_zombie();
+#endif
+#ifndef LEYDEN
   // Evolution support. We make old (discarded) compiled methods point to new Method*s.
   void set_method(Method* method) { _method = method; }
 
@@ -621,12 +666,11 @@ public:
 
   static void oops_do_marking_prologue();
   static void oops_do_marking_epilogue();
-
+#endif
  private:
+#ifndef LEYDEN
   ScopeDesc* scope_desc_in(address begin, address end);
-
   address* orig_pc_addr(const frame* fr);
-
   // used by jvmti to track if the load and unload events has been reported
   bool  unload_reported() const                   { return _unload_reported; }
   void  set_unload_reported()                     { _unload_reported = true; }
@@ -637,16 +681,31 @@ public:
   // copying of debugging information
   void copy_scopes_pcs(PcDesc* pcs, int count);
   void copy_scopes_data(address buffer, int size);
-
+#endif
   // Accessor/mutator for the original pc of a frame before a frame was deopted.
-  address get_original_pc(const frame* fr) { return *orig_pc_addr(fr); }
-  void    set_original_pc(const frame* fr, address pc) { *orig_pc_addr(fr) = pc; }
-
+  address get_original_pc(const frame* fr) {
+#ifndef LEYDEN
+    return *orig_pc_addr(fr);
+#else
+    ShouldNotReachHere();
+    return NULL;
+#endif
+  }
+  void    set_original_pc(const frame* fr, address pc) {
+#ifndef LEYDEN
+    *orig_pc_addr(fr) = pc;
+#else
+    ShouldNotReachHere();
+#endif
+  }
+#ifndef LEYDEN
   // jvmti support:
   void post_compiled_method_load_event(JvmtiThreadState* state = NULL);
 
+#endif
   // verify operations
   void verify();
+#ifndef LEYDEN
   void verify_scopes();
   void verify_interrupt_point(address interrupt_point);
 
@@ -661,12 +720,15 @@ public:
   void print()                          const;
   void print(outputStream* st)          const;
   void print_code();
-
+#endif
 #if defined(SUPPORT_DATA_STRUCTS)
+#ifndef LEYDEN
   // print output in opt build for disassembler library
   void print_relocations()                        PRODUCT_RETURN;
+#endif
   void print_pcs() { print_pcs_on(tty); }
   void print_pcs_on(outputStream* st);
+#ifndef LEYDEN
   void print_scopes() { print_scopes_on(tty); }
   void print_scopes_on(outputStream* st)          PRODUCT_RETURN;
   void print_value_on(outputStream* st) const;
@@ -678,26 +740,30 @@ public:
 
   void print_oops(outputStream* st);     // oops from the underlying CodeBlob.
   void print_metadata(outputStream* st); // metadata in metadata pool.
+#endif
 #else
   // void print_pcs()                             PRODUCT_RETURN;
   void print_pcs()                                { return; }
 #endif
-
+#ifndef LEYDEN
   void print_calls(outputStream* st)              PRODUCT_RETURN;
   static void print_statistics()                  PRODUCT_RETURN;
 
   void maybe_print_nmethod(DirectiveSet* directive);
   void print_nmethod(bool print_code);
-
+#endif
   // need to re-define this from CodeBlob else the overload hides it
   virtual void print_on(outputStream* st) const { CodeBlob::print_on(st); }
+#ifndef LEYDEN
   void print_on(outputStream* st, const char* msg) const;
 
   // Logging
+#endif
+#ifndef LEYDEN
   void log_identity(xmlStream* log) const;
   void log_new_nmethod() const;
   void log_state_change() const;
-
+#endif
   // Prints block-level comments, including nmethod specific block labels:
   virtual void print_block_comment(outputStream* stream, address block_begin) const {
 #if defined(SUPPORT_ASSEMBLY) || defined(SUPPORT_ABSTRACT_ASSEMBLY)
@@ -705,21 +771,22 @@ public:
     CodeBlob::print_block_comment(stream, block_begin);
 #endif
   }
-
   void print_nmethod_labels(outputStream* stream, address block_begin, bool print_section_labels=true) const;
   const char* nmethod_section_label(address pos) const;
+#ifndef LEYDEN
 
   // returns whether this nmethod has code comments.
   bool has_code_comment(address begin, address end);
   // Prints a comment for one native instruction (reloc info, pc desc)
   void print_code_comment_on(outputStream* st, int column, address begin, address end);
-
+#endif
   // Compiler task identification.  Note that all OSR methods
   // are numbered in an independent sequence if CICountOSR is true,
   // and native method wrappers are also numbered independently if
   // CICountNative is true.
   virtual int compile_id() const { return _compile_id; }
   const char* compile_kind() const;
+#ifndef LEYDEN
 
   // tells if any of this method's dependencies have been invalidated
   // (this is expensive!)
@@ -728,12 +795,12 @@ public:
   // tells if this compiled method is dependent on the given changes,
   // and the changes have invalidated it
   bool check_dependency_on(DepChange& changes);
-
+#endif
+#ifndef LEYDEN
   // Fast breakpoint support. Tells if this compiled method is
   // dependent on the given method. Returns true if this nmethod
   // corresponds to the given method as well.
   virtual bool is_dependent_on_method(Method* dependee);
-
   // is it ok to patch at address?
   bool is_patchable_at(address instr_address);
 
@@ -749,18 +816,22 @@ public:
   static int verified_entry_point_offset()        { return offset_of(nmethod, _verified_entry_point); }
   static int osr_entry_point_offset()             { return offset_of(nmethod, _osr_entry_point); }
   static int state_offset()                       { return offset_of(nmethod, _state); }
-
+#endif
   virtual void metadata_do(MetadataClosure* f);
 
   NativeCallWrapper* call_wrapper_at(address call) const;
-  NativeCallWrapper* call_wrapper_before(address return_pc) const;
-  address call_instruction_address(address pc) const;
 
+#ifndef LEYDEN
+  NativeCallWrapper* call_wrapper_before(address return_pc) const;
+
+  address call_instruction_address(address pc) const;
   virtual CompiledStaticCall* compiledStaticCall_at(Relocation* call_site) const;
   virtual CompiledStaticCall* compiledStaticCall_at(address addr) const;
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const;
+#endif
 };
 
+#ifndef LEYDEN
 // Locks an nmethod so its code will not get removed and it will not
 // be made into a zombie, even if it is a not_entrant method. After the
 // nmethod becomes a zombie, if CompiledMethodUnload event processing

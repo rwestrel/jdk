@@ -111,13 +111,14 @@ PlaceholderTable* _placeholders   = NULL;
 
 #ifndef LEYDEN
 static PlaceholderTable*   placeholders() { return _placeholders; }
-
+#endif
 // ----------------------------------------------------------------------------
 // Java-level SystemLoader and PlatformLoader
 oop SystemDictionary::java_system_loader() {
   return _java_system_loader.resolve();
 }
 
+#ifndef LEYDEN
 oop SystemDictionary::java_platform_loader() {
   return _java_platform_loader.resolve();
 }
@@ -149,6 +150,8 @@ ClassLoaderData* SystemDictionary::register_loader(Handle class_loader, bool cre
     // Add a new class loader data to the graph.
     return ClassLoaderDataGraph::add(class_loader, true);
   } else {
+#else
+    assert(!create_mirror_cld, "");
 #endif
     return (class_loader() == NULL) ? ClassLoaderData::the_null_class_loader_data() :
                                       ClassLoaderDataGraph::find_or_create(class_loader);
@@ -205,7 +208,7 @@ Handle SystemDictionary::compute_loader_lock_object(Thread* thread, Handle class
     return class_loader;
   }
 }
-
+#endif
 // ----------------------------------------------------------------------------
 // Resolving of classes
 
@@ -230,6 +233,7 @@ Symbol* SystemDictionary::class_name_symbol(const char* name, Symbol* exception,
   return SymbolTable::new_symbol(name);
 }
 
+#ifndef LEYDEN
 #ifdef ASSERT
 // Used to verify that class loading succeeded in adding k to the dictionary.
 void verify_dictionary_entry(Symbol* class_name, InstanceKlass* k) {

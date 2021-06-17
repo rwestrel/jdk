@@ -753,6 +753,7 @@ class java_lang_reflect_Parameter {
   macro(java_lang_Module, module_entry, intptr_signature, false)
 
 class java_lang_Module {
+  friend class Threads;
   private:
     static int _loader_offset;
     static int _name_offset;
@@ -1323,6 +1324,7 @@ class java_security_AccessControlContext: AllStatic {
   macro(java_lang_ClassLoader, loader_data,  intptr_signature, false)
 
 class java_lang_ClassLoader : AllStatic {
+  friend class Threads;
  private:
   static int _loader_data_offset;
   static int _parent_offset;

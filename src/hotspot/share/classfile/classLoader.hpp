@@ -65,11 +65,14 @@ public:
   ClassPathEntry() : _next(NULL) {}
   // Attempt to locate file_name through this class path entry.
   // Returns a class file parsing stream if successfull.
+#ifndef LEYDEN
   virtual ClassFileStream* open_stream(const char* name, TRAPS) = 0;
   // Open the stream for a specific class loader
   virtual ClassFileStream* open_stream_for_loader(const char* name, ClassLoaderData* loader_data, TRAPS) {
     return open_stream(name, THREAD);
   }
+
+#endif
 };
 
 class ClassPathDirEntry: public ClassPathEntry {
@@ -81,7 +84,12 @@ class ClassPathDirEntry: public ClassPathEntry {
     _dir = copy_path(dir);
   }
   virtual ~ClassPathDirEntry() {}
+
+#ifndef LEYDEN
+
   ClassFileStream* open_stream(const char* name, TRAPS);
+
+#endif
 };
 
 // Type definitions for zip file and zip file entry
@@ -109,7 +117,12 @@ class ClassPathZipEntry: public ClassPathEntry {
   ClassPathZipEntry(jzfile* zip, const char* zip_name, bool is_boot_append, bool from_class_path_attr);
   virtual ~ClassPathZipEntry();
   u1* open_entry(const char* name, jint* filesize, bool nul_terminate, TRAPS);
+
+#ifndef LEYDEN
+
   ClassFileStream* open_stream(const char* name, TRAPS);
+
+#endif
   void contents_do(void f(const char* name, void* context), void* context);
 };
 
@@ -128,8 +141,13 @@ public:
   void close_jimage();
   ClassPathImageEntry(JImageFile* jimage, const char* name);
   virtual ~ClassPathImageEntry();
+#ifndef LEYDEN
+
   ClassFileStream* open_stream(const char* name, TRAPS);
+
   ClassFileStream* open_stream_for_loader(const char* name, ClassLoaderData* loader_data, TRAPS);
+
+#endif
 };
 
 // ModuleClassPathList contains a linked list of ClassPathEntry's
@@ -151,6 +169,7 @@ public:
 };
 
 class ClassLoader: AllStatic {
+  friend class Threads;
  public:
   enum ClassLoaderType {
     BOOT_LOADER = 1,      /* boot loader */

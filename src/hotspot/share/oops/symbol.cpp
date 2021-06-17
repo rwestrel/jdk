@@ -432,7 +432,7 @@ bool Symbol::is_valid_id(vmSymbolID vm_symbol_id) {
 // Since Symbol*s are in C_HEAP, their relative order in memory never changes,
 // so use address comparison for speed
 int Symbol::fast_compare(const Symbol* other) const {
-  if (DumpCodeToDisk || RestoreCodeFromDisk) {
+  if (DumpCodeToDisk || RestoreCodeFromDisk LEYDEN_PRESENT(|| true)) {
     int this_length = length();
     int other_length = other->length();
     const u1* this_base = base();

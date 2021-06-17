@@ -1742,7 +1742,18 @@ static void trace_exception(outputStream* st, oop exception_oop, address excepti
 #endif
 
 extern "C" {
-JNIEXPORT JRT_ENTRY(void, OptoRuntime::initialize_klass_C(Klass * klass, JavaThread * thread))
+JNIEXPORT void OptoRuntime::initialize_klass_C(Klass * klass, JavaThread * thread) {
+  extern void (*OptoRuntime__initialize_klass_C_reduced)(Klass* klass, JavaThread* thread);
+  if (OptoRuntime__initialize_klass_C_reduced != NULL) {
+    OptoRuntime__initialize_klass_C_reduced(klass, thread);
+    return;
+  }
+  ThreadInVMfromJava __tiv(thread);
+  HandleMarkCleaner __hm(thread);
+  Thread* THREAD = thread;
+  os::verify_stack_alignment();
+  debug_only(VMEntryWrapper __vew;)
+
   klass->initialize(thread);
 JRT_END
 }

@@ -676,7 +676,6 @@ void RuntimeBlob::verify() {
   ShouldNotReachHere();
 }
 
-#ifndef LEYDEN
 void BufferBlob::verify() {
   // unimplemented
 }
@@ -705,7 +704,6 @@ void RuntimeStub::print_on(outputStream* st) const {
 void RuntimeStub::print_value_on(outputStream* st) const {
   st->print("RuntimeStub (" INTPTR_FORMAT "): ", p2i(this)); st->print("%s", name());
 }
-#endif
 
 void SingletonBlob::verify() {
   // unimplemented

@@ -83,6 +83,7 @@ public:
 
   void do_thread(Thread* thread) {
 
+#ifndef LEYDEN
     JavaThread* jt = (JavaThread*)thread;
 
     if (!jt->has_last_Java_frame()) {
@@ -136,6 +137,9 @@ public:
       }
 #endif
     }
+#else
+    ShouldNotReachHere();
+#endif
   }
 };
 
@@ -178,7 +182,19 @@ static JNINativeMethod jdk_internal_misc_ScopedMemoryAccess_methods[] = {
 
 // This function is exported, used by NativeLookup.
 
-JVM_ENTRY(void, JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods(JNIEnv *env, jclass scopedMemoryAccessClass))
+extern "C" {
+JNIEXPORT void JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods(JNIEnv* env, jclass scopedMemoryAccessClass) {
+  extern void (*JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods_reduced)(JNIEnv* env, jclass scopedMemoryAccessClass);
+  if (JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods_reduced != NULL) {
+    JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods_reduced(env, scopedMemoryAccessClass);
+    return;
+  }
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  Thread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   ThreadToNativeFromVM ttnfv(thread);
 
   int ok = env->RegisterNatives(scopedMemoryAccessClass, jdk_internal_misc_ScopedMemoryAccess_methods, sizeof(jdk_internal_misc_ScopedMemoryAccess_methods)/sizeof(JNINativeMethod));

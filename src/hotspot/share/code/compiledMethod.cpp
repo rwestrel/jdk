@@ -313,8 +313,6 @@ ScopeDesc* CompiledMethod::scope_desc_near(address pc) {
   return new ScopeDesc(this, pd);
 }
 
-#ifndef LEYDEN
-
 address CompiledMethod::oops_reloc_begin() const {
   // If the method is not entrant or zombie then a JMP is plastered over the
   // first few bytes.  If an oop in the old code was there, that oop
@@ -344,8 +342,6 @@ address CompiledMethod::oops_reloc_begin() const {
   }
   return low_boundary;
 }
-
-#endif
 
 #ifndef LEYDEN
 int CompiledMethod::verify_icholder_relocations() {

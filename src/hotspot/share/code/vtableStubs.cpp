@@ -255,14 +255,14 @@ address VtableStubs::find_stub(bool is_vtable_stub, int vtable_index) {
   return s->entry_point();
 }
 
-
+#endif
 inline uint VtableStubs::hash(bool is_vtable_stub, int vtable_index){
   // Assumption: receiver_location < 4 in most cases.
   int hash = ((vtable_index << 2) ^ VtableStub::receiver_location()->value()) + vtable_index;
   return (is_vtable_stub ? ~hash : hash)  & mask;
 }
 
-
+#ifndef LEYDEN
 VtableStub* VtableStubs::lookup(bool is_vtable_stub, int vtable_index) {
   assert_lock_strong(VtableStubs_lock);
   unsigned hash = VtableStubs::hash(is_vtable_stub, vtable_index);
@@ -282,6 +282,8 @@ void VtableStubs::enter(bool is_vtable_stub, int vtable_index, VtableStub* s) {
   _number_of_vtable_stubs++;
 }
 
+#endif
+
 VtableStub* VtableStubs::entry_point(address pc) {
   MutexLocker ml(VtableStubs_lock, Mutex::_no_safepoint_check_flag);
   VtableStub* stub = (VtableStub*)(pc - VtableStub::entry_offset());
@@ -290,8 +292,6 @@ VtableStub* VtableStubs::entry_point(address pc) {
   for (s = _table[hash]; s != NULL && s != stub; s = s->next()) {}
   return (s == stub) ? s : NULL;
 }
-
-#endif
 
 bool VtableStubs::contains(address pc) {
   // simple solution for now - we may want to use

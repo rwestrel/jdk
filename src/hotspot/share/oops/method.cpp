@@ -421,7 +421,6 @@ void Method::set_itable_index(int index) {
   assert(valid_itable_index(), "");
 }
 
-#ifndef LEYDEN
 // The RegisterNatives call being attempted tried to register with a method that
 // is not native.  Ask JVM TI what prefixes have been specified.  Then check
 // to see if the native method is now wrapped with the prefixes.  See the
@@ -489,7 +488,11 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   if (entry != NULL) {
     method->set_native_function(entry, native_bind_event_is_interesting);
   } else {
+#ifndef LEYDEN
     method->clear_native_function();
+#else
+    ShouldNotReachHere();
+#endif
   }
   if (log_is_enabled(Debug, jni, resolve)) {
     ResourceMark rm(THREAD);
@@ -499,7 +502,7 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   }
   return true;
 }
-
+#ifndef LEYDEN
 bool Method::was_executed_more_than(int n) {
   // Invocation counter is reset when the Method* is compiled.
   // If the method has compiled code we therefore assume it has
@@ -947,7 +950,7 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   }
   return is_klass_loaded_by_klass_index(klass_index);
 }
-
+#endif
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
   assert(!is_method_handle_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
@@ -973,11 +976,13 @@ void Method::set_native_function(address function, bool post_event_flag) {
   // use the latest registered method -> check if a stub already has been generated.
   // If so, we have to make it not_entrant.
   CompiledMethod* nm = code(); // Put it into local variable to guard against concurrent updates
+#ifndef LEYDEN
   if (nm != NULL && !RestoreCodeFromDisk) {
     nm->make_not_entrant();
   }
+#endif
 }
-
+#ifndef LEYDEN
 
 bool Method::has_native_function() const {
   if (is_method_handle_intrinsic())
@@ -985,7 +990,6 @@ bool Method::has_native_function() const {
   address func = native_function();
   return (func != NULL && func != SharedRuntime::native_method_throw_unsatisfied_link_error_entry());
 }
-
 
 void Method::clear_native_function() {
   // Note: is_method_handle_intrinsic() is allowed here.
@@ -1469,14 +1473,18 @@ enum {
 bool Method::is_compiled_lambda_form() const {
   return intrinsic_id() == vmIntrinsics::_compiledLambdaForm;
 }
-
+#endif
 // Test if this method is an internal MH primitive method.
 bool Method::is_method_handle_intrinsic() const {
+#ifndef LEYDEN
   vmIntrinsics::ID iid = intrinsic_id();
   return (MethodHandles::is_signature_polymorphic(iid) &&
           MethodHandles::is_signature_polymorphic_intrinsic(iid));
+#else
+  return false;
+#endif
 }
-
+#ifndef LEYDEN
 bool Method::has_member_arg() const {
   vmIntrinsics::ID iid = intrinsic_id();
   return (MethodHandles::is_signature_polymorphic(iid) &&
@@ -2287,6 +2295,7 @@ void Method::ensure_jmethod_ids(ClassLoaderData* loader_data, int capacity) {
     }
   }
 }
+#endif
 
 // Add a method id to the jmethod_ids
 jmethodID Method::make_jmethod_id(ClassLoaderData* loader_data, Method* m) {
@@ -2311,14 +2320,12 @@ jmethodID Method::make_jmethod_id(ClassLoaderData* loader_data, Method* m) {
     return (jmethodID)cld->jmethod_ids()->add_method(m);
   }
 }
-#endif
 
 jmethodID Method::jmethod_id() {
   methodHandle mh(Thread::current(), this);
   return method_holder()->get_jmethod_id(mh);
 }
 
-#ifndef LEYDEN
 // Mark a jmethodID as free.  This is called when there is a data race in
 // InstanceKlass while creating the jmethodID cache.
 void Method::destroy_jmethod_id(ClassLoaderData* loader_data, jmethodID m) {
@@ -2328,6 +2335,7 @@ void Method::destroy_jmethod_id(ClassLoaderData* loader_data, jmethodID m) {
   cld->jmethod_ids()->destroy_method(ptr);
 }
 
+#ifndef LEYDEN
 void Method::change_method_associated_with_jmethod_id(jmethodID jmid, Method* new_method) {
   // Can't assert the method_holder is the same because the new method has the
   // scratch method holder.

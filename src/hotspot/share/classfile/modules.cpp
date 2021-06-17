@@ -51,16 +51,21 @@
 #include "utilities/stringUtils.hpp"
 #include "utilities/utf8.hpp"
 
+
 static bool verify_module_name(const char *module_name, int len) {
   assert(module_name != NULL, "invariant");
   return (len > 0 && len <= Symbol::max_length());
 }
 
 static bool verify_package_name(const char* package_name, int len) {
+#ifndef LEYDEN
   assert(package_name != NULL, "Package name derived from non-null jstring can't be NULL");
   return (len > 0 && len <= Symbol::max_length() &&
     ClassFileParser::verify_unqualified_name(package_name, len,
     ClassFileParser::LegalClass));
+#else
+  return true;
+#endif
 }
 
 static char* get_module_name(oop module, int& len, TRAPS) {
@@ -75,7 +80,6 @@ static char* get_module_name(oop module, int& len, TRAPS) {
   }
   return module_name;
 }
-
 static Symbol* as_symbol(jstring str_object) {
   if (str_object == NULL) {
     return NULL;
@@ -98,7 +102,7 @@ static PackageEntryTable* get_package_entry_table(Handle h_loader) {
   ClassLoaderData *loader_cld = SystemDictionary::register_loader(h_loader);
   return loader_cld->packages();
 }
-
+#ifndef LEYDEN
 static ModuleEntry* get_module_entry(jobject module, TRAPS) {
   oop m = JNIHandles::resolve_non_null(module);
   if (!java_lang_Module::is_instance(m)) {
@@ -136,6 +140,7 @@ bool Modules::is_package_defined(Symbol* package, Handle h_loader, TRAPS) {
   PackageEntry* res = get_package_entry_by_name(package, h_loader, CHECK_false);
   return res != NULL;
 }
+#endif
 
 // Converts the String oop to an internal package
 // Will use the provided buffer if it's sufficiently large, otherwise allocates
@@ -455,6 +460,7 @@ void Modules::define_module(jobject module, jboolean is_open, jstring version,
     ClassLoader::add_to_exploded_build_list(module_symbol, CHECK);
   }
 
+#ifndef LEYDEN
 #ifdef COMPILER2
   // Special handling of jdk.incubator.vector
   if (strcmp(module_name, "jdk.incubator.vector") == 0) {
@@ -472,8 +478,9 @@ void Modules::define_module(jobject module, jboolean is_open, jstring version,
     log_info(compilation)("EnableVectorAggressiveReboxing=%s", (EnableVectorAggressiveReboxing ? "true" : "false"));
   }
 #endif // COMPILER2
+#endif
 }
-
+#ifndef LEYDEN
 #if INCLUDE_CDS_JAVA_HEAP
 void Modules::define_archived_modules(jobject platform_loader, jobject system_loader, TRAPS) {
   assert(UseSharedSpaces && MetaspaceShared::use_full_module_graph(), "must be");
@@ -513,7 +520,7 @@ void Modules::check_cds_restrictions(TRAPS) {
   }
 }
 #endif // INCLUDE_CDS_JAVA_HEAP
-
+#endif
 void Modules::set_bootloader_unnamed_module(jobject module, TRAPS) {
   ResourceMark rm(THREAD);
 
@@ -550,7 +557,7 @@ void Modules::set_bootloader_unnamed_module(jobject module, TRAPS) {
   // Store pointer to the ModuleEntry in the unnamed module's java.lang.Module object.
   java_lang_Module::set_module_entry(module_handle(), unnamed_module);
 }
-
+#ifndef LEYDEN
 void Modules::add_module_exports(jobject from_module, jstring package_name, jobject to_module, TRAPS) {
   check_cds_restrictions(CHECK);
 
@@ -784,3 +791,5 @@ void Modules::add_module_exports_to_all_unnamed(jobject module, jstring package_
                        module_entry->name()->as_C_string());
   }
 }
+
+#endif

@@ -239,6 +239,7 @@ void java_lang_String::serialize_offsets(SerializeClosure* f) {
   f->do_bool(&_initialized);
 }
 #endif
+#endif
 
 class CompactStringsFixup : public FieldClosure {
 private:
@@ -261,7 +262,6 @@ void java_lang_String::set_compact_strings(bool value) {
   CompactStringsFixup fix(value);
   vmClasses::String_klass()->do_local_static_fields(&fix);
 }
-#endif
 
 Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   assert(_initialized, "Must be initialized");
@@ -1377,14 +1377,10 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 
 #endif
 
-#ifndef LEYDEN
-
 void java_lang_Class::fixup_module_field(Klass* k, Handle module) {
   assert(_module_offset != 0, "must have been computed already");
   java_lang_Class::set_module(k->java_mirror(), module());
 }
-
-#endif
 
 int  java_lang_Class::oop_size(oop java_class) {
   assert(_oop_size_offset != 0, "must be set");
@@ -3469,11 +3465,11 @@ oop java_lang_Module::loader(oop module) {
 void java_lang_Module::set_loader(oop module, oop value) {
   module->obj_field_put(_loader_offset, value);
 }
-
+#endif
 oop java_lang_Module::name(oop module) {
   return module->obj_field(_name_offset);
 }
-
+#ifndef LEYDEN
 void java_lang_Module::set_name(oop module, oop value) {
   module->obj_field_put(_name_offset, value);
 }
@@ -3490,7 +3486,6 @@ ModuleEntry* java_lang_Module::module_entry_raw(oop module) {
 
 ModuleEntry* java_lang_Module::module_entry(oop module) {
   ModuleEntry* module_entry = module_entry_raw(module);
-#ifndef LEYDEN
   if (module_entry == NULL) {
     // If the inject field containing the ModuleEntry* is null then return the
     // class loader's unnamed module.
@@ -3499,11 +3494,9 @@ ModuleEntry* java_lang_Module::module_entry(oop module) {
     ClassLoaderData* loader_cld = SystemDictionary::register_loader(h_loader);
     return loader_cld->unnamed_module();
   }
-#endif
   return module_entry;
 }
 
-#ifndef LEYDEN
 void java_lang_Module::set_module_entry(oop module, ModuleEntry* module_entry) {
   assert(_module_entry_offset != 0, "Uninitialized module_entry_offset");
   assert(module != NULL, "module can't be null");
@@ -3511,6 +3504,7 @@ void java_lang_Module::set_module_entry(oop module, ModuleEntry* module_entry) {
   module->address_field_put(_module_entry_offset, (address)module_entry);
 }
 
+#ifndef LEYDEN
 Handle reflect_ConstantPool::create(TRAPS) {
   assert(Universe::is_fully_initialized(), "Need to find another solution to the reflection problem");
   InstanceKlass* k = vmClasses::reflect_ConstantPool_klass();
@@ -4320,11 +4314,7 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   assert(_isPrivileged_offset != 0, "offsets should have been initialized");
   assert(_isAuthorized_offset != 0, "offsets should have been initialized");
   // Ensure klass is initialized
-#ifndef LEYDEN
   vmClasses::AccessControlContext_klass()->initialize(CHECK_NULL);
-#else
-  assert(vmClasses::AccessControlContext_klass()->is_initialized(), "");
-#endif
   // Allocate result
   oop result = vmClasses::AccessControlContext_klass()->allocate_instance(CHECK_NULL);
   // Fill in values
@@ -4508,6 +4498,7 @@ void java_lang_System::serialize_offsets(SerializeClosure* f) {
    SYSTEM_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
+#endif
 
 // Support for jdk_internal_misc_UnsafeConstants
 //
@@ -4555,7 +4546,6 @@ void jdk_internal_misc_UnsafeConstants::set_unsafe_constants() {
   vmClasses::UnsafeConstants_klass()->do_local_static_fields(&fixup);
 }
 
-#endif
 // java_lang_StackTraceElement
 
 int java_lang_StackTraceElement::_methodName_offset;

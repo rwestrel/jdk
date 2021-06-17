@@ -306,7 +306,6 @@ JNI_END
 DT_RETURN_MARK_DECL(FindClass, jclass
                     , HOTSPOT_JNI_FINDCLASS_RETURN(_ret_ref));
 
-#ifndef LEYDEN
 JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
   HOTSPOT_JNI_FINDCLASS_ENTRY(env, (char *)name);
 
@@ -357,7 +356,6 @@ JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
 
   return result;
 JNI_END
-#endif
 
 DT_RETURN_MARK_DECL(FromReflectedMethod, jmethodID
                     , HOTSPOT_JNI_FROMREFLECTEDMETHOD_RETURN((uintptr_t)_ret_ref));
@@ -1093,11 +1091,7 @@ static jmethodID get_method_id(JNIEnv *env, jclass clazz, const char *name_str,
 
   // Make sure class is linked and initialized before handing id's out to
   // Method*s.
-#ifndef LEYDEN
   klass->initialize(CHECK_NULL);
-#else
-  assert(!klass->is_instance_klass() || InstanceKlass::cast(klass)->is_initialized(), "");
-#endif
 
   Method* m;
   if (name == vmSymbols::object_initializer_name() ||
@@ -1801,12 +1795,8 @@ JNI_ENTRY(jfieldID, jni_GetFieldID(JNIEnv *env, jclass clazz,
     THROW_MSG_0(vmSymbols::java_lang_NoSuchFieldError(), err_msg("%s.%s %s", k->external_name(), name, sig));
   }
 
-#ifndef LEYDEN
   // Make sure class is initialized before handing id's out to fields
   k->initialize(CHECK_NULL);
-#else
-  assert(!k->is_instance_klass() || InstanceKlass::cast(k)->is_initialized(), "");
-#endif
 
   fieldDescriptor fd;
   if (!k->is_instance_klass() ||
@@ -2666,7 +2656,6 @@ DEFINE_SETSCALARARRAYREGION(T_DOUBLE,  jdouble,  Double,  double
 DT_RETURN_MARK_DECL(RegisterNatives, jint
                     , HOTSPOT_JNI_REGISTERNATIVES_RETURN(_ret_ref));
 
-#ifndef LEYDEN
 JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
                                     const JNINativeMethod *methods,
                                     jint nMethods))
@@ -2733,7 +2722,6 @@ JNI_ENTRY(jint, jni_RegisterNatives(JNIEnv *env, jclass clazz,
   }
   return ret;
 JNI_END
-#endif
 
 
 #ifndef LEYDEN
@@ -3186,11 +3174,10 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
 #ifndef LEYDEN
     jni_DefineClass,
-    jni_FindClass,
 #else
         NULL,
-        NULL,
 #endif
+    jni_FindClass,
 
 #ifndef LEYDEN
     jni_FromReflectedMethod,
@@ -3440,11 +3427,10 @@ struct JNINativeInterface_ jni_NativeInterface = {
     jni_SetFloatArrayRegion,
     jni_SetDoubleArrayRegion,
 
-#ifndef LEYDEN
     jni_RegisterNatives,
+#ifndef LEYDEN
     jni_UnregisterNatives,
 #else
-NULL,
 NULL,
 #endif
 

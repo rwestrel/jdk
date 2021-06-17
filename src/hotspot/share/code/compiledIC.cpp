@@ -45,6 +45,7 @@
 #include "utilities/events.hpp"
 
 
+#ifndef LEYDEN
 // Every time a compiled IC is changed or its type is being accessed,
 // either the CompiledIC_lock must be set or we must be at a safe point.
 
@@ -59,18 +60,18 @@ CompiledICLocker::~CompiledICLocker() {
     _behaviour->unlock(_method);
   }
 }
-
+#endif
 bool CompiledICLocker::is_safe(CompiledMethod* method) {
   return CompiledICProtectionBehaviour::current()->is_safe(method);
 }
-
+#ifndef LEYDEN
 bool CompiledICLocker::is_safe(address code) {
   CodeBlob* cb = CodeCache::find_blob_unsafe(code);
   assert(cb != NULL && cb->is_compiled(), "must be compiled");
   CompiledMethod* cm = cb->as_compiled_method();
   return CompiledICProtectionBehaviour::current()->is_safe(cm);
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Low-level access to an inline cache. Private, since they might not be
 // MT-safe to use.
@@ -79,18 +80,22 @@ void* CompiledIC::cached_value() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
   assert (!is_optimized(), "an optimized virtual call does not have a cached metadata");
 
+#ifndef LEYDEN
   if (!is_in_transition_state()) {
+#endif
     void* data = get_data();
     // If we let the metadata value here be initialized to zero...
     assert(data != NULL || Universe::non_oop_word() == NULL,
            "no raw nulls in CompiledIC metadatas, because of patching races");
     return (data == (void*)Universe::non_oop_word()) ? NULL : data;
+#ifndef LEYDEN
   } else {
     return InlineCacheBuffer::cached_value_for((CompiledIC *)this);
   }
+#endif
 }
 
-
+#ifndef LEYDEN
 void CompiledIC::internal_set_ic_destination(address entry_point, bool is_icstub, void* cache, bool is_icholder) {
   assert(entry_point != NULL, "must set legal entry point");
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
@@ -149,28 +154,32 @@ void CompiledIC::set_ic_destination(ICStub* stub) {
 }
 
 
-
+#endif
 address CompiledIC::ic_destination() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
+#ifndef LEYDEN
   if (!is_in_transition_state()) {
+#endif
     return _call->destination();
+#ifndef LEYDEN
   } else {
     return InlineCacheBuffer::ic_destination_for((CompiledIC *)this);
   }
+#endif
 }
 
-
+#ifndef LEYDEN
 bool CompiledIC::is_in_transition_state() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
   return InlineCacheBuffer::contains(_call->destination());;
 }
 
-
+#endif
 bool CompiledIC::is_icholder_call() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
   return !_is_optimized && is_icholder_entry(ic_destination());
 }
-
+#ifndef LEYDEN
 // Returns native address of 'call' instruction in inline-cache. Used by
 // the InlineCacheBuffer when it needs to find the stub.
 address CompiledIC::stub_address() const {
@@ -188,7 +197,7 @@ void CompiledIC::clear_ic_stub() {
 
 //-----------------------------------------------------------------------------
 // High-level access to an inline cache. Guaranteed to be MT-safe.
-
+#endif
 void CompiledIC::initialize_from_iter(RelocIterator* iter) {
   assert(iter->addr() == _call->instruction_address(), "must find ic_call");
 
@@ -202,7 +211,7 @@ void CompiledIC::initialize_from_iter(RelocIterator* iter) {
     _value = NULL;
   }
 }
-
+#ifndef LEYDEN
 CompiledIC::CompiledIC(CompiledMethod* cm, NativeCall* call)
   : _method(cm)
 {
@@ -221,7 +230,7 @@ CompiledIC::CompiledIC(CompiledMethod* cm, NativeCall* call)
 
   initialize_from_iter(&iter);
 }
-
+#endif
 CompiledIC::CompiledIC(RelocIterator* iter)
   : _method(iter->code())
 {
@@ -235,7 +244,7 @@ CompiledIC::CompiledIC(RelocIterator* iter)
 
   initialize_from_iter(iter);
 }
-
+#ifndef LEYDEN
 // This function may fail for two reasons: either due to running out of vtable
 // stubs, or due to running out of IC stubs in an attempted transition to a
 // transitional state. The needs_ic_stub_refill value will be set if the failure
@@ -301,7 +310,7 @@ bool CompiledIC::set_to_megamorphic(CallInfo* call_info, Bytecodes::Code bytecod
   return true;
 }
 
-
+#endif
 // true if destination is megamorphic stub
 bool CompiledIC::is_megamorphic() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
@@ -310,7 +319,6 @@ bool CompiledIC::is_megamorphic() const {
   // Cannot rely on cached_value. It is either an interface or a method.
   return VtableStubs::entry_point(ic_destination()) != NULL;
 }
-
 bool CompiledIC::is_call_to_compiled() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
 
@@ -336,7 +344,7 @@ bool CompiledIC::is_call_to_compiled() const {
   return is_monomorphic;
 }
 
-
+#ifndef LEYDEN
 bool CompiledIC::is_call_to_interpreted() const {
   assert(CompiledICLocker::is_safe(_method), "mt unsafe call");
   // Call to interpreter if destination is either calling to a stub (if it
@@ -562,7 +570,7 @@ void CompiledIC::compute_monomorphic_entry(const methodHandle& method,
   assert(info.is_optimized() == is_optimized, "must agree");
 }
 
-
+#endif
 bool CompiledIC::is_icholder_entry(address entry) {
   CodeBlob* cb = CodeCache::find_blob_unsafe(entry);
   if (cb != NULL && cb->is_adapter_blob()) {
@@ -576,7 +584,7 @@ bool CompiledIC::is_icholder_entry(address entry) {
 
   return false;
 }
-
+#ifndef LEYDEN
 bool CompiledIC::is_icholder_call_site(virtual_call_Relocation* call_site, const CompiledMethod* cm) {
   // This call site might have become stale so inspect it carefully.
   address dest = cm->call_wrapper_at(call_site->addr())->destination();
@@ -705,17 +713,21 @@ address CompiledDirectStaticCall::find_stub(bool is_aot) {
 address CompiledDirectStaticCall::resolve_call_stub() const {
   return SharedRuntime::get_resolve_static_call_stub();
 }
-
+#endif
 //-----------------------------------------------------------------------------
 // Non-product mode code
 #ifndef PRODUCT
 
 void CompiledIC::verify() {
   _call->verify();
+#ifndef LEYDEN
   assert(is_clean() || is_call_to_compiled() || is_call_to_interpreted()
           || is_optimized() || is_megamorphic(), "sanity check");
+#else
+  assert(is_call_to_compiled() || is_optimized() || is_megamorphic(), "sanity check");
+#endif
 }
-
+#ifndef LEYDEN
 void CompiledIC::print() {
   print_compiled_ic();
   tty->cr();
@@ -760,4 +772,5 @@ void CompiledDirectStaticCall::verify_mt_safe(const methodHandle& callee, addres
          || old_method->is_old(),  // may be race patching deoptimized nmethod due to redefinition.
          "b) MT-unsafe modification of inline cache");
 }
+#endif
 #endif // !PRODUCT
