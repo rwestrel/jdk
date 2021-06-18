@@ -102,7 +102,6 @@ static PackageEntryTable* get_package_entry_table(Handle h_loader) {
   ClassLoaderData *loader_cld = SystemDictionary::register_loader(h_loader);
   return loader_cld->packages();
 }
-#ifndef LEYDEN
 static ModuleEntry* get_module_entry(jobject module, TRAPS) {
   oop m = JNIHandles::resolve_non_null(module);
   if (!java_lang_Module::is_instance(m)) {
@@ -111,7 +110,6 @@ static ModuleEntry* get_module_entry(jobject module, TRAPS) {
   }
   return java_lang_Module::module_entry(m);
 }
-
 
 static PackageEntry* get_locked_package_entry(ModuleEntry* module_entry, const char* package_name, int len, TRAPS) {
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
@@ -124,6 +122,7 @@ static PackageEntry* get_locked_package_entry(ModuleEntry* module_entry, const c
   return package_entry;
 }
 
+#ifndef LEYDEN
 static PackageEntry* get_package_entry_by_name(Symbol* package,
                                                Handle h_loader,
                                                TRAPS) {
@@ -557,7 +556,7 @@ void Modules::set_bootloader_unnamed_module(jobject module, TRAPS) {
   // Store pointer to the ModuleEntry in the unnamed module's java.lang.Module object.
   java_lang_Module::set_module_entry(module_handle(), unnamed_module);
 }
-#ifndef LEYDEN
+
 void Modules::add_module_exports(jobject from_module, jstring package_name, jobject to_module, TRAPS) {
   check_cds_restrictions(CHECK);
 
@@ -624,7 +623,6 @@ void Modules::add_module_exports(jobject from_module, jstring package_name, jobj
   }
 }
 
-
 void Modules::add_module_exports_qualified(jobject from_module, jstring package,
                                            jobject to_module, TRAPS) {
   check_cds_restrictions(CHECK);
@@ -672,7 +670,7 @@ void Modules::add_reads_module(jobject from_module, jobject to_module, TRAPS) {
     from_module_entry->add_read(to_module_entry);
   }
 }
-
+#ifndef LEYDEN
 // This method is called by JFR and JNI.
 jobject Modules::get_module(jclass clazz, TRAPS) {
   assert(ModuleEntryTable::javabase_defined(),

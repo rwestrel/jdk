@@ -927,12 +927,10 @@ InstanceKlass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
 
   return loaded_class;
 #else
-  ShouldNotReachHere();
   return NULL;
 #endif
 }
 
-#ifndef LEYDEN
 // This routine does not lock the system dictionary.
 //
 // Since readers don't hold a lock, we must make sure that system
@@ -968,6 +966,7 @@ Klass* SystemDictionary::find(Symbol* class_name,
 }
 
 
+#ifndef LEYDEN
 // Look for a loaded instance or array klass by name.  Do not do any loading.
 // return NULL in case of error.
 Klass* SystemDictionary::find_instance_or_array_klass(Symbol* class_name,

@@ -205,8 +205,6 @@ bool ClassLoaderDataGraph::_safepoint_cleanup_needed = false;
 bool ClassLoaderDataGraph::_metaspace_oom = false;
 #endif
 
-#ifndef LEYDEN
-
 // Add a new class loader data node to the list.  Assign the newly created
 // ClassLoaderData into the java/lang/ClassLoader object as a hidden field
 ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool has_class_mirror_holder) {
@@ -259,7 +257,7 @@ ClassLoaderData* ClassLoaderDataGraph::add(Handle loader, bool has_class_mirror_
   ClassLoaderData* loader_data = add_to_graph(loader, has_class_mirror_holder);
   return loader_data;
 }
-
+#ifndef LEYDEN
 void ClassLoaderDataGraph::cld_unloading_do(CLDClosure* cl) {
   assert_locked_or_safepoint_weak(ClassLoaderDataGraph_lock);
   for (ClassLoaderData* cld = _unloading; cld != NULL; cld = cld->next()) {
@@ -604,7 +602,7 @@ void ClassLoaderDataGraph::purge(bool at_safepoint) {
     Service_lock->notify_all();
   }
 }
-
+#endif
 int ClassLoaderDataGraph::resize_dictionaries() {
   assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint!");
   int resized = 0;
@@ -616,7 +614,7 @@ int ClassLoaderDataGraph::resize_dictionaries() {
   }
   return resized;
 }
-
+#ifndef LEYDEN
 ClassLoaderDataGraphKlassIteratorAtomic::ClassLoaderDataGraphKlassIteratorAtomic()
     : _next_klass(NULL) {
   assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint!");

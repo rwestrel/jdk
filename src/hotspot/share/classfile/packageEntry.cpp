@@ -56,7 +56,7 @@ bool PackageEntry::is_qexported_to(ModuleEntry* m) const {
     return _qualified_exports->contains(m);
   }
 }
-
+#endif
 
 // Add a module to the package's qualified export list.
 void PackageEntry::add_qexport(ModuleEntry* m) {
@@ -117,7 +117,7 @@ void PackageEntry::set_exported(ModuleEntry* m) {
   }
 }
 
-
+#ifndef LEYDEN
 // Set the package as exported to all unnamed modules unless the package is
 // already unqualifiedly exported.
 void PackageEntry::set_is_exported_allUnnamed() {
@@ -174,12 +174,12 @@ void PackageEntry::delete_qualified_exports() {
   }
   _qualified_exports = NULL;
 }
-
+#endif
 PackageEntryTable::PackageEntryTable(int table_size)
   : Hashtable<Symbol*, mtModule>(table_size, sizeof(PackageEntry))
 {
 }
-
+#ifndef LEYDEN
 PackageEntryTable::~PackageEntryTable() {
   // Walk through all buckets and all entries in each bucket,
   // freeing each entry.

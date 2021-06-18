@@ -63,6 +63,7 @@ class JDK_Version {
   friend class VMStructs;
   friend class Universe;
   friend void JDK_Version_init();
+  friend class Threads;
  private:
 
   static JDK_Version _current;

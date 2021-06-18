@@ -747,7 +747,7 @@ void SymbolTable::do_concurrent_work(JavaThread* jt) {
   }
   _has_work = false;
 }
-
+#endif
 // Rehash
 bool SymbolTable::do_rehash() {
   if (!_local_table->is_safepoint_safe()) {
@@ -803,7 +803,7 @@ void SymbolTable::rehash_table() {
 
   _needs_rehashing = false;
 }
-
+#ifndef LEYDEN
 //---------------------------------------------------------------------------
 // Non-product code
 

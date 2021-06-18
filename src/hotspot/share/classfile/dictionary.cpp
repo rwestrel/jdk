@@ -46,7 +46,6 @@
 // needs resizing, which is costly to do at Safepoint.
 bool Dictionary::_some_dictionary_needs_resizing = false;
 
-#ifndef LEYDEN
 
 Dictionary::Dictionary(ClassLoaderData* loader_data, int table_size, bool resizable)
   : Hashtable<InstanceKlass*, mtClass>(table_size, (int)sizeof(DictionaryEntry)),
@@ -54,6 +53,7 @@ Dictionary::Dictionary(ClassLoaderData* loader_data, int table_size, bool resiza
 };
 
 
+#ifndef LEYDEN
 Dictionary::Dictionary(ClassLoaderData* loader_data,
                        int table_size, HashtableBucket<mtClass>* t,
                        int number_of_entries, bool resizable)
@@ -99,11 +99,11 @@ void Dictionary::free_entry(DictionaryEntry* entry) {
 
 
 const int _resize_load_trigger = 5;       // load factor that will trigger the resize
-
+#endif
 bool Dictionary::does_any_dictionary_needs_resizing() {
   return Dictionary::_some_dictionary_needs_resizing;
 }
-
+#ifndef LEYDEN
 void Dictionary::check_if_needs_resize() {
   if (_resizable == true) {
     if (number_of_entries() > (_resize_load_trigger*table_size())) {
@@ -112,7 +112,7 @@ void Dictionary::check_if_needs_resize() {
     }
   }
 }
-
+#endif
 bool Dictionary::resize_if_needed() {
   assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint");
   int desired_size = 0;
@@ -134,7 +134,6 @@ bool Dictionary::resize_if_needed() {
 
   return (desired_size != 0);
 }
-#endif
 
 #if 1 //ndef LEYDEN
 

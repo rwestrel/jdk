@@ -398,6 +398,7 @@ struct CompiledCode {
 class CodeHeap;
 class ModuleEntry;
 class ModuleClassPathList;
+class ClassPathEntry;
 
 struct LeydenStaticData {
   void* VM_Version__get_cpu_info_stub;
@@ -479,6 +480,14 @@ struct LeydenStaticData {
   int  java_lang_ClassLoader___nameAndId_offset;
   int  java_lang_ClassLoader___unnamedModule_offset;
   int  java_lang_ClassLoader___parent_offset;
+  ClassPathEntry* ClassLoader___jrt_entry;
+  const char* JDK_Version___java_version;
+  address StubRoutines___safefetch32_entry;
+  address StubRoutines___safefetch32_fault_pc;
+  address StubRoutines___safefetch32_continuation_pc;
+  address StubRoutines___safefetchN_entry;
+  address StubRoutines___safefetchN_fault_pc;
+  address StubRoutines___safefetchN_continuation_pc;
 
   CompiledCode* nmethods;
   uint nmethods_size;

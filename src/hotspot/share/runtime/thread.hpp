@@ -2111,7 +2111,7 @@ class Threads: AllStatic {
   static void deoptimized_wrt_marked_nmethods();
 
   struct Test;                  // For private gtest access.
-  static void leyden_init(Thread* __the_thread__);
+  static bool leyden_init(Thread* __the_thread__, jint &ret);
 };
 
 class UnlockFlagSaver {

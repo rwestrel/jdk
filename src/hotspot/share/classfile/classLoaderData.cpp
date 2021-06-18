@@ -99,7 +99,7 @@ ClassLoaderData * ClassLoaderData::_the_null_class_loader_data = NULL;
     ls.cr();
   }
 }
-
+#endif
 // Obtain and set the class loader's name within the ClassLoaderData so
 // it will be available for error messages, logging, JFR, etc.  The name
 // and klass are available after the class_loader oop is no longer alive,
@@ -181,7 +181,7 @@ ClassLoaderData::ClassLoaderData(Handle h_class_loader, bool has_class_mirror_ho
 
   JFR_ONLY(INIT_ID(this);)
 }
-
+#ifndef LEYDEN
 ClassLoaderData::ChunkedHandleList::~ChunkedHandleList() {
   Chunk* c = _head;
   while (c != NULL) {
@@ -201,7 +201,7 @@ OopHandle ClassLoaderData::ChunkedHandleList::add(oop o) {
   Atomic::release_store(&_head->_size, _head->_size + 1);
   return OopHandle(handle);
 }
-#ifndef LEYDEN
+
 int ClassLoaderData::ChunkedHandleList::count() const {
   int count = 0;
   Chunk* chunk = _head;
@@ -211,7 +211,7 @@ int ClassLoaderData::ChunkedHandleList::count() const {
   }
   return count;
 }
-#endif
+
 inline void ClassLoaderData::ChunkedHandleList::oops_do_chunk(OopClosure* f, Chunk* c, const juint size) {
   for (juint i = 0; i < size; i++) {
     if (c->_data[i] != NULL) {
@@ -496,14 +496,14 @@ void ClassLoaderData::add_class(Klass* k, bool publicize /* true */) {
     }
   }
 }
-
+#endif
 void ClassLoaderData::initialize_holder(Handle loader_or_mirror) {
   if (loader_or_mirror() != NULL) {
     assert(_holder.is_null(), "never replace holders");
     _holder = WeakHandle(Universe::vm_weak(), loader_or_mirror);
   }
 }
-
+#ifndef LEYDEN
 // Remove a klass from the _klasses list for scratch_class during redefinition
 // or parsed class in the case of an error.
 void ClassLoaderData::remove_class(Klass* scratch_class) {
@@ -580,7 +580,6 @@ ModuleEntryTable* ClassLoaderData::modules() {
   }
   return modules;
 }
-#ifndef LEYDEN
 const int _boot_loader_dictionary_size    = 1009;
 const int _default_loader_dictionary_size = 107;
 
@@ -605,7 +604,6 @@ Dictionary* ClassLoaderData::create_dictionary() {
   }
   return new Dictionary(this, size, resizable);
 }
-#endif
 
 // Tell the GC to keep this klass alive while iterating ClassLoaderDataGraph
 oop ClassLoaderData::holder_phantom() const {
@@ -922,7 +920,7 @@ const char* ClassLoaderData::loader_name_and_id() const {
     return _class_loader_klass->external_name();
   }
 }
-#ifndef LEYDEN
+
 void ClassLoaderData::print_value_on(outputStream* out) const {
   if (!is_unloading() && class_loader() != NULL) {
     out->print("loader data: " INTPTR_FORMAT " for instance ", p2i(this));
@@ -957,7 +955,6 @@ void ClassLoaderData::print_on(outputStream* out) const {
 #endif // PRODUCT
 
 void ClassLoaderData::print() const { print_on(tty); }
-#endif
 
 void ClassLoaderData::verify() {
   assert_locked_or_safepoint(_metaspace_lock);

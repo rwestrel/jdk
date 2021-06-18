@@ -159,7 +159,7 @@ bool ModuleEntry::can_read(ModuleEntry* m) const {
     return _reads->contains(m);
   }
 }
-
+#endif
 // Add a new module to this module's reads list
 void ModuleEntry::add_read(ModuleEntry* m) {
   // Unnamed module is special cased and can read all modules
@@ -204,7 +204,7 @@ void ModuleEntry::set_read_walk_required(ClassLoaderData* m_loader_data) {
     }
   }
 }
-#endif
+
 // Set whether the module is open, i.e. all its packages are unqualifiedly exported
 void ModuleEntry::set_is_open(bool is_open) {
   assert_lock_strong(Module_lock);
@@ -266,7 +266,7 @@ void ModuleEntry::delete_reads() {
   _reads = NULL;
 }
 
-
+#endif
 ModuleEntry* ModuleEntry::create_unnamed_module(ClassLoaderData* cld) {
   // The java.lang.Module for this loader's
   // corresponding unnamed module can be found in the java.lang.ClassLoader object.
@@ -324,7 +324,7 @@ ModuleEntry* ModuleEntry::new_unnamed_module_entry(Handle module_handle, ClassLo
 
   return entry;
 }
-
+#ifndef LEYDEN
 void ModuleEntry::delete_unnamed_module() {
   // Do not need unlink_entry() since the unnamed module is not in the hashtable
   FREE_C_HEAP_OBJ(this);

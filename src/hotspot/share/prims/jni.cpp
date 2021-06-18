@@ -3848,6 +3848,19 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 
   result = Threads::create_vm((JavaVMInitArgs*) args, &can_try_again);
   if (result == JNI_OK) {
+    if (UseNewCode) {
+      void* minimal = dlopen("/home/roland/leyden-exps/build/linux-x86_64-server-slowdebug/images/jdk/lib/server/libjvm-leyden.so",
+                             RTLD_NOW | RTLD_LOCAL);
+      printf("XXX %p\n", minimal);
+      void* sym = dlsym(minimal, "JNI_CreateJavaVM");
+      printf("XXX %p\n", sym);
+      jint (*CreateJavaVM)(JavaVM **, void **, void *) = (jint (*)(JavaVM **, void **, void *))sym;
+      JavaVMInitArgs args;
+      memset(&args, 0, sizeof(args));
+      args.version  = JNI_VERSION_1_2;
+
+      return CreateJavaVM(vm, penv, &args);
+    }
     JavaThread *thread = JavaThread::current();
     assert(!thread->has_pending_exception(), "should have returned not OK");
     /* thread is thread_in_vm here */

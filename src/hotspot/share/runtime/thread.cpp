@@ -912,7 +912,6 @@ char java_runtime_vendor_version[128] = "";
 char java_runtime_vendor_vm_bug_url[128] = "";
 
 // extract the JRE version string from java.lang.VersionProps.java_version
-#ifndef LEYDEN
 static const char* get_java_version(TRAPS) {
   Klass* k = SystemDictionary::find(vmSymbols::java_lang_VersionProps(),
                                     Handle(), Handle(), CHECK_AND_CLEAR_NULL);
@@ -1021,7 +1020,6 @@ static const char* get_java_runtime_vendor_vm_bug_url(TRAPS) {
     return NULL;
   }
 }
-#endif
 
 // General purpose hook into Java code, run once when the VM is initialized.
 // The Java library method itself may be changed independently from the VM.
@@ -3427,7 +3425,6 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // Phase 1 of the system initialization in the library, java.lang.System class initialization
   call_initPhase1(CHECK);
 
-#ifndef LEYDEN
   // get the Java runtime name, version, and vendor info after java.lang.System is initialized
   JDK_Version::set_java_version(get_java_version(THREAD));
   JDK_Version::set_runtime_name(get_java_runtime_name(THREAD));
@@ -3445,6 +3442,7 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   initialize_class(vmSymbols::java_lang_IllegalMonitorStateException(), CHECK);
   initialize_class(vmSymbols::java_lang_IllegalArgumentException(), CHECK);
 
+#ifndef LEYDEN
   // Eager box cache initialization only if AOT is on and any library is loaded.
   AOTLoader::initialize_box_caches(CHECK);
 #endif
@@ -3668,6 +3666,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   copy_in(java_lang_ClassLoader, _nameAndId_offset);
   copy_in(java_lang_ClassLoader, _unnamedModule_offset);
   copy_in(java_lang_ClassLoader, _parent_offset);
+  copy_in(ClassLoader, _jrt_entry);
+  copy_in(JDK_Version, _java_version);
+  copy_in(StubRoutines, _safefetch32_entry);
+  copy_in(StubRoutines, _safefetch32_fault_pc);
+  copy_in(StubRoutines, _safefetch32_continuation_pc);
+  copy_in(StubRoutines, _safefetchN_entry);
+  copy_in(StubRoutines, _safefetchN_fault_pc);
+  copy_in(StubRoutines, _safefetchN_continuation_pc);
 
 //  copy_in(Universe, _collectedHeap);
 //  for (int i = 0; i < T_VOID+1; i++) {
@@ -3845,6 +3851,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     return status;
   }
 
+  jint ret;
+  if (leyden_init(Thread::current(), ret)) {
+    return ret;
+  }
+
   JFR_ONLY(Jfr::on_create_vm_1();)
 
   // Should be done after the heap is fully created
@@ -3908,7 +3919,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 #endif
-  leyden_init(__the_thread__);
+//  jint ret;
+//  if (leyden_init(__the_thread__, ret)) {
+//    return ret;
+//  }
 
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
 
@@ -4102,7 +4116,8 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   return JNI_OK;
 }
 
-void Threads::leyden_init(Thread* __the_thread__) {
+bool Threads::leyden_init(Thread* __the_thread__, jint &ret) {
+  HandleMark hm(THREAD);
 #ifndef LEYDEN
   if (RestoreCodeFromDisk) {
     ResourceMark rm;
@@ -4152,6 +4167,12 @@ void Threads::leyden_init(Thread* __the_thread__) {
     k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()), Handle(), true, thread);
     assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
     record_method(thread, vmClasses::Thread_klass(), vmSymbols::run_method_name(), vmSymbols::void_method_signature(), nmethods, false, k);
+    record_method(thread, vmClasses::System_klass(), vmSymbols::initPhase3_name(), vmSymbols::void_method_signature(), nmethods, true, NULL);
+    record_method(thread, vmClasses::System_klass(), vmSymbols::getProperty_name(), vmSymbols::string_string_signature(), nmethods, true, NULL);
+    record_method(thread, vmClasses::Thread_klass(), vmSymbols::exit_method_name(), vmSymbols::void_method_signature(), nmethods, false, vmClasses::Thread_klass());
+    k = SystemDictionary::resolve_or_null(vmSymbols::java_lang_Shutdown(), thread);
+    assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+    record_method(thread, k, vmSymbols::shutdown_name(), vmSymbols::void_method_signature(), nmethods, true, NULL);
 
     leydenStaticData.nmethods = NEW_C_HEAP_ARRAY(CompiledCode, nmethods.length(), mtOther);
     for (int i = 0; i < nmethods.length(); ++i) {
@@ -4245,6 +4266,14 @@ void Threads::leyden_init(Thread* __the_thread__) {
     copy_out(java_lang_ClassLoader, _nameAndId_offset);
     copy_out(java_lang_ClassLoader, _unnamedModule_offset);
     copy_out(java_lang_ClassLoader, _parent_offset);
+    copy_out(ClassLoader, _jrt_entry);
+    copy_out(JDK_Version, _java_version);
+    copy_out(StubRoutines, _safefetch32_entry);
+    copy_out(StubRoutines, _safefetch32_fault_pc);
+    copy_out(StubRoutines, _safefetch32_continuation_pc);
+    copy_out(StubRoutines, _safefetchN_entry);
+    copy_out(StubRoutines, _safefetchN_fault_pc);
+    copy_out(StubRoutines, _safefetchN_continuation_pc);
 
     for (int i = 0; i < T_VOID+1; i++) {
       leydenStaticData.Universe___mirrors[i] = Universe::_mirrors[i].peek();
@@ -4376,17 +4405,18 @@ void Threads::leyden_init(Thread* __the_thread__) {
     sa.sa_handler = SIG_DFL;
     sigaction(SIGSEGV, &sa, NULL);
 
-    JavaVMInitArgs args;
-    memset(&args, 0, sizeof(args));
-    args.version  = JNI_VERSION_1_2;
-    JavaVM *vm;
-    JNIEnv *env = 0;
-    CreateJavaVM(&vm, (void**)&env, &args);
+//    JavaVMInitArgs args;
+//    memset(&args, 0, sizeof(args));
+//    args.version  = JNI_VERSION_1_2;
+//    JavaVM *vm;
+//    JNIEnv *env = 0;
+//    ret = CreateJavaVM(&vm, (void**)&env, &args);
+    return true;
   }
 #else
   CodeCache::fix_vtbl();
 #endif
-
+  return false;
 }
 
 // type for the Agent_OnLoad and JVM_OnLoad entry points

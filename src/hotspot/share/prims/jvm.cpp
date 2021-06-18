@@ -827,7 +827,6 @@ jclass JVM_FindPrimitiveClass(JNIEnv* env, const char* utf) {
 JVM_END
 
 
-#ifndef LEYDEN
 // Returns a class loaded by the bootstrap class loader; or null
 // if not found.  ClassNotFoundException is not thrown.
 // FindClassFromBootLoader is exported to the launcher for windows.
@@ -852,7 +851,6 @@ JVM_ENTRY2(jclass, JVM_FindClassFromBootLoader, (JNIEnv* env,
   }
   return (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
 JVM_END
-#endif
 
 // Find a class with this name in this loader, using the caller's protection domain.
 extern "C" {
@@ -1200,14 +1198,15 @@ JVM_END
 JVM_ENTRY2(void, JVM_SetBootLoaderUnnamedModule, (JNIEnv *env, jobject module), (env, module))
   Modules::set_bootloader_unnamed_module(module, CHECK);
 JVM_END
-#ifndef LEYDEN
+
 JVM_ENTRY2(void, JVM_AddModuleExports, (JNIEnv *env, jobject from_module, jstring package, jobject to_module), (env, from_module, package, to_module))
   Modules::add_module_exports_qualified(from_module, package, to_module, CHECK);
 JVM_END
-
+#ifndef LEYDEN
 JVM_ENTRY2(void, JVM_AddModuleExportsToAllUnnamed, (JNIEnv *env, jobject from_module, jstring package), (env, from_module, package))
   Modules::add_module_exports_to_all_unnamed(from_module, package, CHECK);
 JVM_END
+#endif
 
 JVM_ENTRY2(void, JVM_AddModuleExportsToAll, (JNIEnv *env, jobject from_module, jstring package), (env, from_module, package))
   Modules::add_module_exports(from_module, package, NULL, CHECK);
@@ -1216,7 +1215,6 @@ JVM_END
 JVM_ENTRY2 (void, JVM_AddReadsModule, (JNIEnv *env, jobject from_module, jobject source_module), (env, from_module, source_module))
   Modules::add_reads_module(from_module, source_module, CHECK);
 JVM_END
-#endif
 
 extern "C" {
 void JVM_DefineArchivedModules(JNIEnv* env, jobject platform_loader, jobject system_loader) {

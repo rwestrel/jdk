@@ -125,7 +125,7 @@ class UnsafeCopyMemoryMark : public StackObj {
 #endif
 
 class StubRoutines: AllStatic {
-
+  friend class Threads;
  public:
   // Dependencies
   friend class StubGenerator;
@@ -270,14 +270,12 @@ class StubRoutines: AllStatic {
   static address _dlibm_tan_cot_huge;
   static address _dtan;
 
+#endif
   // Safefetch stubs.
   static address _safefetch32_entry;
-#endif
   static address _safefetch32_fault_pc;
   static address _safefetch32_continuation_pc;
-#ifndef LEYDEN
   static address _safefetchN_entry;
-#endif
   static address _safefetchN_fault_pc;
   static address _safefetchN_continuation_pc;
 
@@ -470,6 +468,7 @@ class StubRoutines: AllStatic {
   static address dtan()                { return _dtan; }
 
   static address select_fill_function(BasicType t, bool aligned, const char* &name);
+#endif
 
   //
   // Safefetch stub support
@@ -480,7 +479,6 @@ class StubRoutines: AllStatic {
 
   static SafeFetch32Stub SafeFetch32_stub() { return CAST_TO_FN_PTR(SafeFetch32Stub, _safefetch32_entry); }
   static SafeFetchNStub  SafeFetchN_stub()  { return CAST_TO_FN_PTR(SafeFetchNStub,  _safefetchN_entry); }
-#endif
   static bool is_safefetch_fault(address pc) {
     return pc != NULL &&
           (pc == _safefetch32_fault_pc ||
@@ -524,37 +522,21 @@ class StubRoutines: AllStatic {
 // Safefetch allows to load a value from a location that's not known
 // to be valid. If the load causes a fault, the error value is returned.
 inline int SafeFetch32(int* adr, int errValue) {
-#ifndef LEYDEN
   assert(StubRoutines::SafeFetch32_stub(), "stub not yet generated");
   return StubRoutines::SafeFetch32_stub()(adr, errValue);
-#else
-  return 0;
-#endif
 }
 inline intptr_t SafeFetchN(intptr_t* adr, intptr_t errValue) {
-#ifndef LEYDEN
   assert(StubRoutines::SafeFetchN_stub(), "stub not yet generated");
   return StubRoutines::SafeFetchN_stub()(adr, errValue);
-#else
-  return 0;
-#endif
 }
 
 // returns true if SafeFetch32 and SafeFetchN can be used safely (stubroutines are already generated)
 inline bool CanUseSafeFetch32() {
-#ifndef LEYDEN
   return StubRoutines::SafeFetch32_stub() ? true : false;
-#else
-  return false;
-#endif
 }
 
 inline bool CanUseSafeFetchN() {
-#ifndef LEYDEN
   return StubRoutines::SafeFetchN_stub() ? true : false;
-#else
-  return false;
-#endif
 }
 
 #endif // SHARE_RUNTIME_STUBROUTINES_HPP
