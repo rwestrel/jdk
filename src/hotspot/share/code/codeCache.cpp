@@ -1672,8 +1672,15 @@ enum OopRecord {
 };
 
 #include "code/scopeDesc.hpp"
+#include <libelf.h>
 
 void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
+  if (elf_version(EV_CURRENT) == EV_NONE) {
+    ShouldNotReachHere();
+  }
+  int fd = open("/home/roland/tmp/lib.o", O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  assert(fd > 0, "");
+
   Vtables vts;
   {
     nmethod nm;
@@ -1700,6 +1707,77 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   int w = fwrite(&vts, sizeof(vts), 1, file);
   assert(w == 1, "fwrite failed");
   ResourceMark rm;
+
+  Elf* elf = elf_begin(fd, ELF_C_WRITE, (Elf *)0);
+  assert(elf != NULL, "");
+
+  Elf64_Ehdr* ehdr = elf64_newehdr(elf);
+  assert(ehdr != NULL, "");
+
+
+//  ehdr->e_ident[EI_MAG0] = ELFMAG0;
+//  ehdr->e_ident[EI_MAG1] = ELFMAG1;
+//  ehdr->e_ident[EI_MAG2] = ELFMAG2;
+//  ehdr->e_ident[EI_MAG3] = ELFMAG3;
+//  ehdr->e_ident[EI_CLASS] = ELFCLASS64;
+  ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+//  ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+//  ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
+  ehdr->e_type = ET_REL;
+  ehdr->e_machine = EM_X86_64;
+  ehdr->e_version = EV_CURRENT;
+//  ehdr->e_entry =
+//  ehdr->e_phoff =
+//  ehdr->e_shoff = // <-
+//  ehdr->e_flags =
+//  ehdr->e_ehsize = sizeof(Elf64_Ehdr);
+//  ehdr->e_phentsize =
+//  ehdr->e_phnum =
+//  ehdr->e_shentsize = sizeof(Elf64_Shdr);
+//  ehdr->e_shnum =// <-
+//  ehdr->e_shstrndx = // <-
+
+  GrowableArray<char> shstrings;
+  GrowableArray<char> strings;
+  GrowableArray<Elf64_Sym> symbols;
+
+  Elf_Scn* text_section = elf_newscn(elf);
+  assert(text_section != NULL, "");
+  Elf64_Shdr* text_hdr = elf64_getshdr(text_section);
+  assert(text_hdr != NULL, "");
+
+  text_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".text");
+  text_hdr->sh_type = SHT_PROGBITS;
+  text_hdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+  text_hdr->sh_addr = 0;
+  text_hdr->sh_offset = 0;
+  text_hdr->sh_entsize = 0;
+  text_hdr->sh_addralign = CodeEntryAlignment;
+
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, "");
+  sym.st_info = 0;		/* Symbol type and binding */
+  sym.st_other =0 ;		/* Symbol visibility */
+  sym.st_shndx = SHN_UNDEF;		/* Section index */
+  sym.st_value = 0;		/* Symbol value */
+  sym.st_size = 0;		/* Symbol size */
+  symbols.push(sym);
+
+//sh_type
+//sh_flags
+//sh_addr
+//sh_offset
+//Only when ELF_F_LAYOUT asserted
+//sh_size
+//Only when ELF_F_LAYOUT asserted
+//sh_link
+//sh_info
+//sh_addralign
+//Only when ELF_F_LAYOUT asserted
+//sh_entsize
+
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
 
@@ -1864,8 +1942,21 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               int func_offset;
               bool success = os::dll_address_to_library_name(dest, lib_name, sizeof(lib_name), &lib_offset);
               assert(success, "");
-              success = os::dll_address_to_function_name(dest, func_name, sizeof(func_name), &func_offset);
+              success = os::dll_address_to_function_name(dest, func_name, sizeof(func_name), &func_offset, false);
               assert(success, "");
+
+              tty->print_cr("YYY %s %d", func_name, func_offset);
+
+//              Elf64_Sym sym;
+//              sym.st_name = strings.length();
+//              push_array(strings, func_name);
+//              sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
+//              sym.st_other = 0;
+//              sym.st_shndx = elf_ndxscn(text_section);
+//              sym.st_value = 0;
+//              sym.st_size = 0;
+//              symbols.push(sym);
+
 
               RuntimeCallLib lib = LIBJVM;
               int l = strlen(lib_name);
@@ -2124,12 +2215,124 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       w = fwrite(oopmaps, oopmaps_len, 1, file);
       assert(w == 1, "fwrite failed");
     }
+
+    text_hdr->sh_size = cb->code_size();
+    Elf_Data* text_data = elf_newdata(text_section);
+    text_data->d_buf = cb->code_begin();
+    text_data->d_type = ELF_T_BYTE;
+    text_data->d_size = cb->code_size();
+    text_data->d_off = cb->code_begin() - first_blob(heap)->code_begin();
+    text_data->d_align = 1;
+    text_data->d_version = EV_CURRENT;
+
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    if (cb->is_nmethod()) {
+      push_array(strings, cb->as_nmethod()->method()->external_name());
+    } else {
+      stringStream ss;
+      ss.print("%p", cb);
+      push_array(strings, ss.as_string());
+    }
+    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(text_section);
+    sym.st_value = 0;
+    sym.st_size = cb->code_size();
+    symbols.push(sym);
+
   }
 
 //  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
 //  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
 //  assert(w == heap->high() - heap->low(), "fwrite failed");
   fclose(file);
+
+  Elf_Scn* string_section = elf_newscn(elf);
+  assert(string_section != NULL, "");
+  Elf64_Shdr* string_hdr = elf64_getshdr(string_section);
+  assert(string_hdr != NULL, "");
+
+  string_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".strtab");
+  string_hdr->sh_type = SHT_STRTAB;
+  string_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  string_hdr->sh_addr = 0;
+  string_hdr->sh_offset = 0;
+  string_hdr->sh_entsize = 0;
+  string_hdr->sh_addralign = 1;
+  string_hdr->sh_size = strings.length();
+
+  Elf_Data* string_data = elf_newdata(string_section);
+  string_data->d_buf = strings.adr_at(0);
+  string_data->d_type = ELF_T_BYTE;
+  string_data->d_size = strings.length();
+  string_data->d_off = 0;
+  string_data->d_align = 1;
+  string_data->d_version = EV_CURRENT;
+
+  Elf_Scn* symbol_section = elf_newscn(elf);
+  assert(symbol_section != NULL, "");
+  Elf64_Shdr* symbol_hdr = elf64_getshdr(symbol_section);
+  assert(symbol_hdr != NULL, "");
+
+  symbol_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".symtab");
+  symbol_hdr->sh_type = SHT_SYMTAB;
+  symbol_hdr->sh_flags = 0;
+  symbol_hdr->sh_addr = 0;
+  symbol_hdr->sh_offset = 0;
+  symbol_hdr->sh_entsize = sizeof(Elf64_Sym);
+  symbol_hdr->sh_addralign = 8;
+  symbol_hdr->sh_size = symbols.length();
+
+  Elf_Data* symbol_data = elf_newdata(symbol_section);
+  symbol_data->d_buf = symbols.adr_at(0);
+  symbol_data->d_type = ELF_T_SYM;
+  symbol_data->d_size = symbols.length() * sizeof(Elf64_Sym);
+  symbol_data->d_off = 0;
+  symbol_data->d_align = 8;
+  symbol_data->d_version = EV_CURRENT;
+
+  symbol_hdr->sh_link = elf_ndxscn(string_section);
+  symbol_hdr->sh_info = 1;
+
+  Elf_Scn* shstring_section = elf_newscn(elf);
+  assert(shstring_section != NULL, "");
+  Elf64_Shdr* shstring_hdr = elf64_getshdr(shstring_section);
+  assert(shstring_hdr != NULL, "");
+
+  shstring_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".shstrtab");
+  shstring_hdr->sh_type = SHT_STRTAB;
+  shstring_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  shstring_hdr->sh_addr = 0;
+  shstring_hdr->sh_offset = 0;
+  shstring_hdr->sh_entsize = 0;
+  shstring_hdr->sh_addralign = 1;
+  shstring_hdr->sh_size = shstrings.length();
+
+  Elf_Data* shstring_data = elf_newdata(shstring_section);
+  shstring_data->d_buf = shstrings.adr_at(0);
+  shstring_data->d_type = ELF_T_BYTE;
+  shstring_data->d_size = shstrings.length();
+  shstring_data->d_off = 0;
+  shstring_data->d_align = 1;
+  shstring_data->d_version = EV_CURRENT;
+
+  ehdr->e_shstrndx = elf_ndxscn(shstring_section);
+
+
+  int64_t res = elf_update(elf, ELF_C_NULL);
+  assert(res >= 0, "");
+
+  res = elf_update(elf, ELF_C_WRITE);
+  if (res < 0) {
+    tty->print_cr("WWWWWW %s", elf_errmsg(elf_errno()));
+  }
+  assert(res >= 0, "");
+  elf_end(elf);
+  close(fd);
 }
 
 void CodeCache::write_class_object(FILE* file, oop o) {
@@ -2172,6 +2375,10 @@ void CodeCache::write_symbol(FILE* file, const Symbol* sym) {
 #include "oops/klass.inline.hpp"
 
 void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
+
+  void* shared_lib = dlopen("/home/roland/tmp/lib.so", RTLD_NOW);
+  assert(shared_lib != NULL, "");
+
   Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
   assert(ase.not_null() && !thread->has_pending_exception(), "");
   Handle cce = Handle(thread, InstanceKlass::cast(vmClasses::ClassCastException_klass())->allocate_instance(thread));
@@ -2316,8 +2523,12 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       nm->_verified_entry_point = (address)nm + (intptr_t)nm->_verified_entry_point;
       nm->_osr_entry_point = (address)nm + (intptr_t)nm->_osr_entry_point;
 
-      Method* m = read_method(file, thread);
-      methodHandle mh(thread, m);
+      methodHandle mh;
+      {
+        MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+        Method* m = read_method(file, thread);
+        mh = methodHandle(thread, m);
+      }
 
       for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
         OopRecord record;
@@ -2412,7 +2623,7 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         }
       }
 
-      nm->set_method(m);
+      nm->set_method(mh());
 
       PerMethod pm;
       r = fread(&pm, sizeof(pm), 1, file);
@@ -2436,6 +2647,13 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
       CodeCache::commit(nm);
 
       nm->print();
+
+      void* sym = dlsym(shared_lib, mh->external_name());
+      if (sym == NULL) {
+        tty->print_cr("XXX %s", dlerror());
+      }
+      assert(sym != NULL, "");
+
     } else if (cb->is_vtable_blob()) {
       MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
       MutexLocker ml(VtableStubs_lock, Mutex::_no_safepoint_check_flag);
@@ -2565,5 +2783,11 @@ Symbol* CodeCache::read_symbol(FILE* file) {
 
 void CodeCache::write_klass(FILE* file, Klass* klass) {
   write_symbol(file, klass->name());
+}
+
+void CodeCache::push_array(GrowableArray<char> &array, const char* string) {
+  for (size_t i = 0; i <= strlen(string); i++) {
+    array.push(string[i]);
+  }
 }
 //---<  END  >--- CodeHeap State Analytics.

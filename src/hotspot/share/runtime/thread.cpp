@@ -2883,7 +2883,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 
-  if (RestoreCodeFromDisk) {
+  if (RestoreCodeFromDisk && 0) {
     ResourceMark rm;
     HandleMark hm(THREAD);
     FILE* file = fopen("/home/roland/tmp/dump", "r");
@@ -2904,6 +2904,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
       Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
                                                    Handle(), true, THREAD);
       assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+//      if (k == NULL || THREAD->has_pending_exception()) {
+//        THREAD->clear_pending_exception();
+//        tty->print_cr("Warning: failed to resolve: %s", klass_name);
+//      }
     }
     CodeCache::restore_from_disk(file, THREAD);
   }
