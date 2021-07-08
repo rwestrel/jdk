@@ -1979,13 +1979,23 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             }
           }
         } else if (iter.type() == relocInfo::internal_word_type) {
-          internal_word_Relocation* iw = iter.internal_word_reloc();
-          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
-          assert(iw->_target != NULL, "");
+//          internal_word_Relocation* iw = iter.internal_word_reloc();
+//          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
+//          assert(iw->_target != NULL, "");
 //          address target = iw->target();
 //          intptr_t offset = target - (address)cb;
 //          tty->print_cr("ZZZ %ld", offset);
 //          iw_copy->set_value((address)offset);
+        } else if (iter.type() == relocInfo::section_word_type) {
+//          section_word_Relocation* iw = iter.section_word_reloc();
+//          section_word_Relocation* iw_copy = iter_copy.section_word_reloc();
+//          assert(iw->_target != NULL, "");
+//          address target = iw->target();
+//          intptr_t offset = target - (address)cb;
+//          tty->print_cr("ZZZ %p %ld", target, offset);
+//          assert(offset >= 0 && offset < cb->size(), "");
+//          iw_copy->set_value((address)offset);
+//          iw_copy->_target = (address)offset;
 //        } else if (iter.type() == relocInfo::external_word_type) {
 //          external_word_Relocation* ew = iter.external_word_reloc();
 //          ShouldNotReachHere();
@@ -2034,18 +2044,36 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           OopRecord record = CLASSLOADER_RECORD;
           w = fwrite(&record, sizeof(record), 1, file);
           assert(w == 1, "fwrite failed");
+        } else if (o == Universe::null_ptr_exception_instance()) {
+          OopRecord record = NPE_RECORD;
+          w = fwrite(&record, sizeof(record), 1, file);
+          assert(w == 1, "fwrite failed");
+        } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
+          OopRecord record = ASE_RECORD;
+          w = fwrite(&record, sizeof(record), 1, file);
+          assert(w == 1, "fwrite failed");
+        } else if (o == Universe::arithmetic_exception_instance()) {
+          OopRecord record = AE_RECORD;
+          w = fwrite(&record, sizeof(record), 1, file);
+          assert(w == 1, "fwrite failed");
+        } else if (o->is_a(vmClasses::ClassCastException_klass())) {
+          OopRecord record = CCE_RECORD;
+          w = fwrite(&record, sizeof(record), 1, file);
+          assert(w == 1, "fwrite failed");
         } else {
+          o->print();
           ShouldNotReachHere();
         }
       }
 
       {
-        RelocIterator iter(nm, nm->oops_reloc_begin());
+        RelocIterator iter(nm);
         while (iter.next()) {
           switch (iter.type()) {
             case relocInfo::metadata_type: {
               metadata_Relocation* r = iter.metadata_reloc();
               Metadata* md = r->metadata_value();
+              assert(!nm->consts_contains(iter.addr()) || *(Metadata**)iter.addr() == md, "");
               if (md != NULL) {
                 if (md->is_klass()) {
                   MetadataRecord rec = KLASS_RECORD;
@@ -2066,6 +2094,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             case relocInfo::oop_type: {
               oop_Relocation* r = iter.oop_reloc();
               oop o = r->oop_value();
+              assert(!nm->consts_contains(iter.addr()) || *(oop*)iter.addr() == o, "");
               if (o->is_a(vmClasses::String_klass())) {
                 write_string_object(file, thread, o);
               } else if (o->is_a(vmClasses::Class_klass())) {
@@ -2502,6 +2531,15 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         address target = iw->target();
 //        address new_target = target + (address)cb;
         iw->set_value(target);
+//        iw->set_value(new_target);
+      } else if (iter.type() == relocInfo::section_word_type) {
+        section_word_Relocation* iw = iter.section_word_reloc();
+        address target = iw->target();
+//        address new_target = target + (address)cb;
+//        tty->print_cr("ZZZ %p %ld", target, new_target);
+
+        iw->set_value(target);
+//        iw->set_value(new_target);
       } else if (iter.type() == relocInfo::card_mark_word_type) {
         card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
         BarrierSet* bs = BarrierSet::barrier_set();
@@ -2546,12 +2584,20 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
           tty->print_cr("### class record %s", k->external_name());
         } else if (record == CLASSLOADER_RECORD) {
           *ptr = SystemDictionary::java_system_loader();
+        } else if (record == NPE_RECORD) {
+          *ptr = Universe::null_ptr_exception_instance();
+        } else if (record == AE_RECORD) {
+          *ptr = Universe::arithmetic_exception_instance();
+        } else if (record == ASE_RECORD) {
+          *ptr = ase();
+        } else if (record == CCE_RECORD) {
+          *ptr = cce();
         } else {
           ShouldNotReachHere();
         }
       }
 
-      RelocIterator iter(nm, nm->oops_reloc_begin());
+      RelocIterator iter(nm);
       while (iter.next()) {
         if (iter.type() == relocInfo::metadata_type) {
           metadata_Relocation* r = iter.metadata_reloc();
@@ -2560,14 +2606,17 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
             MetadataRecord rec;
             int read = fread(&rec, sizeof(rec), 1, file);
             assert(read == 1, "fwrite failed");
+            Metadata* md;
             if (rec == KLASS_RECORD) {
-              Klass* k = read_klass(file, thread);
-              *r->metadata_addr() = k;
+              md = read_klass(file, thread);
             } else if (rec == METHOD_RECORD) {
-              Method* m = read_method(file, thread);
-              *r->metadata_addr() = m;
+              md = read_method(file, thread);
             } else {
               ShouldNotReachHere();
+            }
+            *r->metadata_addr() = md;
+            if (nm->consts_contains(iter.addr())) {
+              *((Metadata**)iter.addr()) = md;
             }
           }
         } else if (iter.type() == relocInfo::virtual_call_type) {
@@ -2587,25 +2636,30 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
           OopRecord record;
           r = fread(&record, sizeof(record), 1, file);
           assert(r == 1, "fread failed");
+          oop o;
           if (record == STRING_RECORD) {
             Handle value = read_string_object(file, thread);
-            *reloc->oop_addr() = value();
+            o = value();
             tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
           } else if (record == CLASS_RECORD) {
             Klass* k = read_klass(file, thread);
             assert(k->java_mirror() != NULL, "");
-            *reloc->oop_addr() = k->java_mirror();
+            o = k->java_mirror();
             tty->print_cr("### class record %s", k->external_name());
           } else if (record == NPE_RECORD) {
-            *reloc->oop_addr() = Universe::null_ptr_exception_instance();
+            o = Universe::null_ptr_exception_instance();
           } else if (record == AE_RECORD) {
-            *reloc->oop_addr() = Universe::arithmetic_exception_instance();
+            o = Universe::arithmetic_exception_instance();
           } else if (record == ASE_RECORD) {
-            *reloc->oop_addr() = ase();
+            o = ase();
           } else if (record == CCE_RECORD) {
-            *reloc->oop_addr() = cce();
+            o = cce();
           } else {
             ShouldNotReachHere();
+          }
+          *reloc->oop_addr() = o;
+          if (nm->consts_contains(iter.addr())) {
+            *((oop*)iter.addr()) = o;
           }
         }
       }

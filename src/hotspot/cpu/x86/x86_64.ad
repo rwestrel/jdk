@@ -797,7 +797,7 @@ void emit_fp_min_max(MacroAssembler& _masm, XMMRegister dst,
 }
 
 //=============================================================================
-const RegMask& MachConstantBaseNode::_out_RegMask = RegMask::Empty;
+const RegMask& MachConstantBaseNode::_out_RegMask = RegMask::Empty;//ANY_REG_mask();
 
 int ConstantTable::calculate_table_base_offset() const {
   return 0;  // absolute addressing, no offset
@@ -809,11 +809,23 @@ void MachConstantBaseNode::postalloc_expand(GrowableArray <Node *> *nodes, Phase
 }
 
 void MachConstantBaseNode::emit(CodeBuffer& cbuf, PhaseRegAlloc* ra_) const {
-  // Empty encoding
+  /* Compile* C = ra_->C; */
+  /* ConstantTable& constant_table = C->output()->constant_table(); */
+  /* C2_MacroAssembler _masm(&cbuf); */
+
+  /* Register r = as_Register(ra_->get_encode(this)); */
+  /* CodeSection* consts_section = __ code()->consts(); */
+  /* int consts_size = consts_section->align_at_start(consts_section->size()); */
+  /* assert(C->output()->in_scratch_emit_size() || constant_table.size() == consts_size, "must be: %d == %d", constant_table.size(), consts_size); */
+
+  /* // Materialize the constant table base. */
+  /* address baseaddr = consts_section->start() + -(constant_table.table_base_offset()); */
+  /* __ lea(r, InternalAddress(baseaddr)); */
 }
 
 uint MachConstantBaseNode::size(PhaseRegAlloc* ra_) const {
   return 0;
+  /* return MachNode::size(ra_); */
 }
 
 #ifndef PRODUCT
@@ -3045,12 +3057,24 @@ operand immI_64()
 // Pointer Immediate
 operand immP()
 %{
+  predicate(!(n->bottom_type()->isa_oopptr() || n->bottom_type()->isa_klassptr()));
   match(ConP);
 
   op_cost(10);
   format %{ %}
   interface(CONST_INTER);
 %}
+
+operand immPTable()
+%{
+  predicate(n->bottom_type()->isa_oopptr() || n->bottom_type()->isa_klassptr());
+  match(ConP);
+
+  op_cost(10);
+  format %{ %}
+  interface(CONST_INTER);
+%}
+
 
 // NULL Pointer Immediate
 operand immP0()
@@ -5774,6 +5798,16 @@ instruct loadConP(rRegP dst, immP con) %{
   format %{ "movq    $dst, $con\t# ptr" %}
   ins_encode %{
     __ mov64($dst$$Register, $con$$constant, $con->constant_reloc(), RELOC_IMM64);
+  %}
+  ins_pipe(ialu_reg_fat); // XXX
+%}
+
+instruct loadConPTable(rRegP dst, immPTable con) %{
+  match(Set dst con);
+
+  format %{ "movq    $dst, $con\t# ptr" %}
+  ins_encode %{
+    __ movptr($dst$$Register, $constantaddress($con));
   %}
   ins_pipe(ialu_reg_fat); // XXX
 %}
