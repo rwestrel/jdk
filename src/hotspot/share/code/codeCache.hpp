@@ -25,6 +25,7 @@
 #ifndef SHARE_CODE_CODECACHE_HPP
 #define SHARE_CODE_CODECACHE_HPP
 
+#include <libelf.h>
 #include "code/codeBlob.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/gcBehaviours.hpp"
@@ -322,7 +323,6 @@ public:
 
   static Handle read_string_object(FILE* file, JavaThread* thread);
 
-  static void push_array(GrowableArray<char> &array, const char* string);
 };
 
 

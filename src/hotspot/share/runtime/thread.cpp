@@ -2883,7 +2883,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Notify JVMTI agents that VM has started (JNI is up) - nop if no agents.
   JvmtiExport::post_early_vm_start();
 
-  if (RestoreCodeFromDisk && 1) {
+  if (RestoreCodeFromDisk && UseNewCode) {
     ResourceMark rm;
     HandleMark hm(THREAD);
     FILE* file = fopen("/home/roland/tmp/dump", "r");

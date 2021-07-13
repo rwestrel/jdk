@@ -62,7 +62,7 @@ class FailedSpeculation;
 class JVMCINMethodData;
 #endif
 
-class nmethod : public CompiledMethod {
+class JNIEXPORT nmethod : public CompiledMethod {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class NMethodSweeper;

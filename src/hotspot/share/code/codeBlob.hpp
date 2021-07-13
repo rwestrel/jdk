@@ -386,7 +386,7 @@ class WhiteBox;
 //----------------------------------------------------------------------------------------------------
 // BufferBlob: used to hold non-relocatable machine code such as the interpreter, stubroutines, etc.
 
-class BufferBlob: public RuntimeBlob {
+class JNIEXPORT BufferBlob : public RuntimeBlob  {
   friend class VMStructs;
   friend class AdapterBlob;
   friend class VtableBlob;
@@ -430,7 +430,7 @@ class BufferBlob: public RuntimeBlob {
 //----------------------------------------------------------------------------------------------------
 // AdapterBlob: used to hold C2I/I2C adapters
 
-class AdapterBlob: public BufferBlob {
+class JNIEXPORT AdapterBlob: public BufferBlob {
   friend class CodeCache;
 private:
   AdapterBlob(int size, CodeBuffer* cb);
@@ -445,7 +445,7 @@ public:
 };
 
 //---------------------------------------------------------------------------------------------------
-class VtableBlob: public BufferBlob {
+class JNIEXPORT VtableBlob: public BufferBlob {
   friend class CodeCache;
 private:
   VtableBlob(const char*, int);
@@ -464,7 +464,7 @@ public:
 //----------------------------------------------------------------------------------------------------
 // MethodHandlesAdapterBlob: used to hold MethodHandles adapters
 
-class MethodHandlesAdapterBlob: public BufferBlob {
+class JNIEXPORT MethodHandlesAdapterBlob: public BufferBlob {
   friend class CodeCache;
 private:
   MethodHandlesAdapterBlob(int size)                 : BufferBlob("MethodHandles adapters", size) {}
@@ -482,7 +482,7 @@ public:
 //----------------------------------------------------------------------------------------------------
 // RuntimeStub: describes stubs used by compiled code to call a (static) C++ runtime routine
 
-class RuntimeStub: public RuntimeBlob {
+class JNIEXPORT RuntimeStub: public RuntimeBlob {
   friend class VMStructs;
   friend class CodeCache;
  private:
@@ -572,7 +572,7 @@ class SingletonBlob: public RuntimeBlob {
 //----------------------------------------------------------------------------------------------------
 // DeoptimizationBlob
 
-class DeoptimizationBlob: public SingletonBlob {
+class JNIEXPORT DeoptimizationBlob: public SingletonBlob {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class CodeCache;
@@ -659,7 +659,7 @@ public:
 
 #ifdef COMPILER2
 
-class UncommonTrapBlob: public SingletonBlob {
+class JNIEXPORT UncommonTrapBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
  private:
@@ -691,7 +691,7 @@ class UncommonTrapBlob: public SingletonBlob {
 //----------------------------------------------------------------------------------------------------
 // ExceptionBlob: used for exception unwinding in compiled code (currently only used by Compiler 2)
 
-class ExceptionBlob: public SingletonBlob {
+class JNIEXPORT ExceptionBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
  private:
@@ -725,7 +725,7 @@ class ExceptionBlob: public SingletonBlob {
 //----------------------------------------------------------------------------------------------------
 // SafepointBlob: handles illegal_instruction exceptions during a safepoint
 
-class SafepointBlob: public SingletonBlob {
+class JNIEXPORT SafepointBlob: public SingletonBlob {
   friend class VMStructs;
   friend class CodeCache;
  private:

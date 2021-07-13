@@ -3649,7 +3649,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
     if (ReplayCompiles) ciReplay::replay(thread);
 #endif
 
-    if (RestoreCodeFromDisk && 0) {
+    if (RestoreCodeFromDisk && !UseNewCode) {
       ResourceMark rm;
       HandleMark hm(thread);
       FILE* file = fopen("/home/roland/tmp/dump", "r");

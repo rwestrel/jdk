@@ -106,6 +106,7 @@ class Symbol : public MetaspaceObj {
   friend class SymbolTable;
   friend class vmSymbols;
   friend class JVMCIVMStructs;
+  friend class CodeCache;
 
  private:
 

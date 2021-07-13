@@ -207,3 +207,5 @@ JVM_AddReadsModule
 JVM_DefineArchivedModules
 JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
+
+_ZTV10BufferBlob
