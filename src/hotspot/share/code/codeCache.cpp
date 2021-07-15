@@ -1844,17 +1844,19 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   GrowableArray<char> shstrings;
   GrowableArray<char> strings;
   GrowableArray<Elf64_Sym> symbols;
-  GrowableArray<Elf64_Rela> relocs;
+  GrowableArray<Elf64_Rela> codeblobs_relocs;
+  GrowableArray<Elf64_Rela> text_relocs;
 
   Elf_Scn* text_section = elf_newscn(elf);
   assert(text_section != NULL, "");
   Elf64_Shdr* text_hdr = elf64_getshdr(text_section);
   assert(text_hdr != NULL, "");
 
+  push_array(shstrings, "");
   text_hdr->sh_name = shstrings.length();
   push_array(shstrings, ".text");
   text_hdr->sh_type = SHT_PROGBITS;
-  text_hdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+  text_hdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR | SHF_WRITE;
   text_hdr->sh_addr = 0;
   text_hdr->sh_offset = 0;
   text_hdr->sh_entsize = 0;
@@ -2450,18 +2452,37 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       ShouldNotReachHere();
     }
 
+    if (cb == CodeCache::first_blob(heap)) {
+      Elf_Data* text_data = elf_newdata(text_section);
+      text_data->d_buf = cb;
+      text_data->d_type = ELF_T_BYTE;
+      text_data->d_size = cb->code_begin() - (address)cb;
+      text_data->d_off = text_hdr->sh_size;
+      text_data->d_align = 1;;
+      text_data->d_version = EV_CURRENT;
+      text_hdr->sh_size += text_data->d_size;
+
+      Elf64_Sym sym;
+      sym.st_name = strings.length();
+      push_array(strings, "padding");
+      sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_NOTYPE);
+      sym.st_other = 0;
+      sym.st_shndx = elf_ndxscn(text_section);
+      sym.st_value = text_data->d_off;
+      sym.st_size = text_data->d_size;
+      symbols.push(sym);
+    }
+
     Elf_Data* text_data = elf_newdata(text_section);
     text_data->d_buf = cb->code_begin();
     text_data->d_type = ELF_T_BYTE;
     CodeBlob* next_cb = next_blob(heap, cb);
-    text_data->d_size = next_cb == NULL ? cb->code_size() : (address)next_cb - (address)cb;
-//    text_data->d_off = (text_hdr->sh_size + CodeEntryAlignment - 1) & ~(CodeEntryAlignment - 1); //cb->code_begin() - first_blob(heap)->code_begin();
+    text_data->d_size = next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin();
     text_data->d_off = text_hdr->sh_size;
-    text_data->d_align = 1; //CodeEntryAlignment;
+    text_data->d_align = 1;;
     text_data->d_version = EV_CURRENT;
-//    text_hdr->sh_size = text_data->d_off + cb->code_size();
-//    text_hdr->sh_size += cb->code_size();
     text_hdr->sh_size += text_data->d_size;
+
     {
       Elf64_Sym sym;
       sym.st_name = strings.length();
@@ -2484,7 +2505,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       Elf_Data* codeblobs_data = elf_newdata(codeblobs_section);
       codeblobs_data->d_buf = cb;
       codeblobs_data->d_type = ELF_T_BYTE;
-      codeblobs_data->d_size = cb->size();
+      codeblobs_data->d_size = next_cb == NULL ? cb->size() : (address)next_cb - (address)cb;
       codeblobs_data->d_off = codeblobs_hdr->sh_size;
       codeblobs_data->d_align = 8;
       codeblobs_data->d_version = EV_CURRENT;
@@ -2514,7 +2535,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
         reloc.r_offset = codeblobs_data->d_off;
         reloc.r_addend = vt_offset;
         reloc.r_info = ELF64_R_INFO(vtbl_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
 
       Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
@@ -2532,50 +2553,136 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _name);
         reloc.r_addend = codeblobsro_data->d_off;
         reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _code_begin);
         reloc.r_addend = text_data->d_off;
         reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _code_end);
         reloc.r_addend = text_data->d_off + cb->code_size();
         reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _content_begin);
         reloc.r_addend = codeblobs_data->d_off + (cb->_content_begin - (address)cb);
         reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _data_end);
         reloc.r_addend = codeblobs_data->d_off + (cb->_data_end - (address)cb);
         reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _relocation_begin);
         reloc.r_addend = codeblobs_data->d_off + (cb->_relocation_begin - (address)cb);
         reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
       {
         Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _relocation_end);
         reloc.r_addend = codeblobs_data->d_off + (cb->_relocation_end - (address)cb);
         reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-        relocs.push(reloc);
+        codeblobs_relocs.push(reloc);
       }
+      {
+        RelocIterator iter(cb);
+        address base_addr = NULL;
+        while (iter.next()) {
+          if (iter.type() == relocInfo::runtime_call_type) {
+//            runtime_call_Relocation* rt = iter.runtime_call_reloc();
+//            address dest = rt->destination();
+//            if (dest != (address) -1) {
+//              runtime_call_Relocation* rt_copy = iter_copy.runtime_call_reloc();
+//              if (heap->contains(dest)) {
+//                NativeInstruction* ni = nativeInstruction_at(rt->addr());
+//                if (ni->is_mov_literal64()) {
+//                  RuntimeCallLib lib = CODECACHE;
+//                  intptr_t offset = dest - (address)cb->code_begin();
+//                  intptr_t new_dest = ((intptr_t) offset) << 32 | lib;
+//
+//                  rt_copy->set_destination((address) new_dest);
+//                }
+//              } else {
+//                char lib_name[256];
+//                int lib_offset;
+//                char func_name[256];
+//                int func_offset;
+//                bool success = os::dll_address_to_library_name(dest, lib_name, sizeof(lib_name), &lib_offset);
+//                assert(success, "");
+//                success = os::dll_address_to_function_name(dest, func_name, sizeof(func_name), &func_offset, false);
+//                assert(success, "");
+//
+//                tty->print_cr("YYY %s %d", func_name, func_offset);
+//
+////              Elf64_Sym sym;
+////              sym.st_name = strings.length();
+////              push_array(strings, func_name);
+////              sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
+////              sym.st_other = 0;
+////              sym.st_shndx = elf_ndxscn(text_section);
+////              sym.st_value = 0;
+////              sym.st_size = 0;
+////              symbols.push(sym);
+//
+//
+//                RuntimeCallLib lib = LIBJVM;
+//                int l = strlen(lib_name);
+//                const char* libjvm = "libjvm.so";
+//                int libjvm_l = strlen(libjvm);
+//                const char* libjava = "libjava.so";
+//                int libjava_l = strlen(libjava);
+//
+//                if (l >= libjvm_l && !strcmp(&lib_name[l - libjvm_l], libjvm)) {
+//                  // ok
+//                } else if (l >= libjava_l && !strcmp(&lib_name[l - libjava_l], libjava)) {
+//                  lib = LIBJAVA;
+//                } else {
+//                  ShouldNotReachHere();
+//                }
+//
+//                intptr_t new_dest = ((intptr_t) lib_offset) << 32 | lib;
+//
+//                rt_copy->set_destination((address) new_dest);
+//              }
+//            }
+          } else if (iter.type() == relocInfo::internal_word_type) {
+//          internal_word_Relocation* iw = iter.internal_word_reloc();
+//          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
+//          assert(iw->_target != NULL, "");
+//          address target = iw->target();
+//          intptr_t offset = target - (address)cb;
+//          tty->print_cr("ZZZ %ld", offset);
+//          iw_copy->set_value((address)offset);
+          } else if (iter.type() == relocInfo::section_word_type) {
+            section_word_Relocation* r = iter.section_word_reloc();
+            Elf64_Rela reloc;
+            reloc.r_offset = (address)r->pd_address_in_code() - (address)CodeCache::first_blob(heap);
+            reloc.r_addend = r->target() - (address)CodeCache::first_blob(heap);
+            reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
+            text_relocs.push(reloc);
+          } else if (iter.type() == relocInfo::card_mark_word_type) {
+//            card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
+//            BarrierSet* bs = BarrierSet::barrier_set();
+//            CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+//            CardTable* ct = ctbs->card_table();
+//            assert(cm->value() == ct->byte_map_base(), "");
+          }
+        }
+      }
+
       if (cb->is_nmethod()) {
         nmethod* nm = cb->as_nmethod();
         {
@@ -2583,28 +2690,28 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           reloc.r_offset = codeblobs_data->d_off + offset_of(nmethod, _scopes_data_begin);
           reloc.r_addend = codeblobs_data->d_off + (nm->_scopes_data_begin - (address)cb);
           reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
         {
           Elf64_Rela reloc;
           reloc.r_offset = codeblobs_data->d_off + offset_of(nmethod, _entry_point);
           reloc.r_addend = text_data->d_off + (nm->_entry_point - nm->_code_begin);
           reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
         {
           Elf64_Rela reloc;
           reloc.r_offset = codeblobs_data->d_off + offset_of(nmethod, _verified_entry_point);
           reloc.r_addend = text_data->d_off + (nm->_verified_entry_point - nm->_code_begin);
           reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
         {
           Elf64_Rela reloc;
           reloc.r_offset = codeblobs_data->d_off + offset_of(nmethod, _osr_entry_point);
           reloc.r_addend = text_data->d_off + (nm->_osr_entry_point - nm->_code_begin);
           reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
         {
           Method* m = nm->method();
@@ -2615,7 +2722,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           reloc.r_offset = codeblobs_data->d_off + offset_of(nmethod, _method);
           reloc.r_addend = off;
           reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
 
         }
         for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
@@ -2645,7 +2752,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           reloc.r_offset = codeblobs_data->d_off + ((address)ptr - (address)nm);
           reloc.r_addend = off;
           reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
 
         {
@@ -2673,7 +2780,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
                   reloc.r_offset = codeblobs_data->d_off + ((address)r->metadata_addr() - (address)nm);
                   reloc.r_addend = off;
                   reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-                  relocs.push(reloc);
+                  codeblobs_relocs.push(reloc);
                 }
                 break;
               }
@@ -2705,7 +2812,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
                 reloc.r_offset = codeblobs_data->d_off + ((address)r->oop_addr() - (address)nm);
                 reloc.r_addend = off;
                 reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-                relocs.push(reloc);
+                codeblobs_relocs.push(reloc);
                 break;
               }
               case relocInfo::runtime_call_w_cp_type:
@@ -2747,7 +2854,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           reloc.r_offset = codeblobs_data->d_off + ((address)p - (address)nm);
           reloc.r_addend = off;
           reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
-          relocs.push(reloc);
+          codeblobs_relocs.push(reloc);
         }
       }
     }
@@ -2807,30 +2914,55 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   symbol_hdr->sh_link = elf_ndxscn(string_section);
   symbol_hdr->sh_info = 4;
 
-  Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
-  assert(codeblobs_rela_section != NULL, "");
-  Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
-  assert(codeblobs_rela_hdr != NULL, "");
+   Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
+   assert(codeblobs_rela_section != NULL, "");
+   Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
+   assert(codeblobs_rela_hdr != NULL, "");
 
-  codeblobs_rela_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".rela.codeblobs");
-  codeblobs_rela_hdr->sh_type = SHT_RELA;
-  codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
-  codeblobs_rela_hdr->sh_addr = 0;
-  codeblobs_rela_hdr->sh_offset = 0;
-  codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-  codeblobs_rela_hdr->sh_addralign = 8;
-  codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-  codeblobs_rela_hdr->sh_info = elf_ndxscn(codeblobs_section);
-  codeblobs_rela_hdr->sh_size = relocs.length();
+   codeblobs_rela_hdr->sh_name = shstrings.length();
+   push_array(shstrings, ".rela.codeblobs");
+   codeblobs_rela_hdr->sh_type = SHT_RELA;
+   codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
+   codeblobs_rela_hdr->sh_addr = 0;
+   codeblobs_rela_hdr->sh_offset = 0;
+   codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+   codeblobs_rela_hdr->sh_addralign = 8;
+   codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+   codeblobs_rela_hdr->sh_info = elf_ndxscn(codeblobs_section);
+   codeblobs_rela_hdr->sh_size = codeblobs_relocs.length();
 
-  Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
-  codeblobs_rela_data->d_buf = relocs.adr_at(0);
-  codeblobs_rela_data->d_type = ELF_T_RELA;
-  codeblobs_rela_data->d_size = relocs.length() * sizeof(Elf64_Rela);
-  codeblobs_rela_data->d_off = 0;
-  codeblobs_rela_data->d_align = 8;
-  codeblobs_rela_data->d_version = EV_CURRENT;
+   Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
+   codeblobs_rela_data->d_buf = codeblobs_relocs.adr_at(0);
+   codeblobs_rela_data->d_type = ELF_T_RELA;
+   codeblobs_rela_data->d_size = codeblobs_relocs.length() * sizeof(Elf64_Rela);
+   codeblobs_rela_data->d_off = 0;
+   codeblobs_rela_data->d_align = 8;
+   codeblobs_rela_data->d_version = EV_CURRENT;
+
+//  Elf_Scn* text_rela_section = elf_newscn(elf);
+//  assert(text_rela_section != NULL, "");
+//  Elf64_Shdr* text_rela_hdr = elf64_getshdr(text_rela_section);
+//  assert(text_rela_hdr != NULL, "");
+//
+//  text_rela_hdr->sh_name = shstrings.length();
+//  push_array(shstrings, ".rela.text");
+//  text_rela_hdr->sh_type = SHT_RELA;
+//  text_rela_hdr->sh_flags = SHF_INFO_LINK;
+//  text_rela_hdr->sh_addr = 0;
+//  text_rela_hdr->sh_offset = 0;
+//  text_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+//  text_rela_hdr->sh_addralign = 8;
+//  text_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+//  text_rela_hdr->sh_info = elf_ndxscn(text_section);
+//  text_rela_hdr->sh_size = text_relocs.length();
+//
+//  Elf_Data* text_rela_data = elf_newdata(text_rela_section);
+//  text_rela_data->d_buf = text_relocs.adr_at(0);
+//  text_rela_data->d_type = ELF_T_RELA;
+//  text_rela_data->d_size = text_relocs.length() * sizeof(Elf64_Rela);
+//  text_rela_data->d_off = 0;
+//  text_rela_data->d_align = 8;
+//  text_rela_data->d_version = EV_CURRENT;
 
   Elf_Scn* shstring_section = elf_newscn(elf);
   assert(shstring_section != NULL, "");
