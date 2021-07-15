@@ -1677,14 +1677,16 @@ enum RuntimeCallLib {
 };
 
 enum OopRecord {
-  STRING_RECORD = 1,
-  CLASS_RECORD = 2,
-  CLASSLOADER_RECORD = 3,
-  NPE_RECORD = 4,
-  ASE_RECORD = 5,
-  AE_RECORD = 6,
-  CCE_RECORD = 7,
+  STRING_RECORD = 0,
+  CLASS_RECORD = 1,
+  CLASSLOADER_RECORD = 2,
+  NPE_RECORD = 3,
+  ASE_RECORD = 4,
+  AE_RECORD = 5,
+  CCE_RECORD = 6,
 };
+
+static char oop_record_values[] { STRING_RECORD, CLASS_RECORD, CLASSLOADER_RECORD, NPE_RECORD, ASE_RECORD, AE_RECORD, CCE_RECORD };
 
 #include "code/scopeDesc.hpp"
 #include <libelf.h>
@@ -1727,9 +1729,21 @@ int64_t record_metadata_type(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobs
   return codeblobsro_data->d_off;
 }
 
-int64_t record_klass(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const Klass* k) {
+int64_t record_oop_type(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, OopRecord record) {
   Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
-  const char* str = k->name()->as_C_string();
+  codeblobsro_data->d_buf = &oop_record_values[record];
+  assert(oop_record_values[record] == record, "");
+  codeblobsro_data->d_type = ELF_T_BYTE;
+  codeblobsro_data->d_size = 1;
+  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+  codeblobsro_data->d_align = 1;
+  codeblobsro_data->d_version = EV_CURRENT;
+  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+  return codeblobsro_data->d_off;
+}
+
+int64_t record_string(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const char* str) {
+  Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
   codeblobsro_data->d_buf = (void*) str;
   codeblobsro_data->d_type = ELF_T_BYTE;
   codeblobsro_data->d_size = strlen(str) + 1;
@@ -1740,31 +1754,32 @@ int64_t record_klass(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, 
   return codeblobsro_data->d_off;
 }
 
+int64_t record_klass(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const Klass* k) {
+  const char* str = k->name()->as_C_string();
+  return record_string(codeblobsro_section, codeblobsro_hdr, str);
+}
+
 int64_t record_method(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, const Method* m) {
   int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, m->method_holder());
 
-  Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
   const char* str = m->name()->as_quoted_ascii();
-  codeblobsro_data->d_buf = (void*)str;
-  codeblobsro_data->d_type = ELF_T_BYTE;
-  codeblobsro_data->d_size = strlen(str)+1;
-  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
-  codeblobsro_data->d_align = 1;
-  codeblobsro_data->d_version = EV_CURRENT;
-  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
-
-  codeblobsro_data = elf_newdata(codeblobsro_section);
+  record_string(codeblobsro_section, codeblobsro_hdr, str);
   str = m->signature()->as_quoted_ascii();
-  codeblobsro_data->d_buf = (void*)str;
-  codeblobsro_data->d_type = ELF_T_BYTE;
-  codeblobsro_data->d_size = strlen(str)+1;
-  codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
-  codeblobsro_data->d_align = 1;
-  codeblobsro_data->d_version = EV_CURRENT;
-  codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+  record_string(codeblobsro_section, codeblobsro_hdr, str);
 
   return off;
 }
+
+int64_t record_class_object(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, oop o) {
+  Klass* k = java_lang_Class::as_Klass(o);
+  return record_klass(codeblobsro_section, codeblobsro_hdr, k);
+}
+
+int64_t record_string_object(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobsro_hdr, oop o) {
+  const char* str = java_lang_String::as_utf8_string(o);
+  return record_string(codeblobsro_section, codeblobsro_hdr, str);
+}
+
 
 Klass* restore_klass(const char* ptr, JavaThread* thread) {
   const char* klass_name = ptr;
@@ -1787,7 +1802,6 @@ Method* restore_method(const char* ptr, JavaThread* thread) {
   Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
   return m;
 }
-
 
 void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   if (elf_version(EV_CURRENT) == EV_NONE) {
@@ -2604,37 +2618,35 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           relocs.push(reloc);
 
         }
-//        for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
-//          oop o = *ptr;
-//          if (o->is_a(vmClasses::String_klass())) {
-//            write_string_object(file, thread, o);
-//          } else if (o->is_a(vmClasses::Class_klass())) {
-//            write_class_object(file, o);
-//          } else if (o == SystemDictionary::java_system_loader()) {
-//            OopRecord record = CLASSLOADER_RECORD;
-//            w = fwrite(&record, sizeof(record), 1, file);
-//            assert(w == 1, "fwrite failed");
-//          } else if (o == Universe::null_ptr_exception_instance()) {
-//            OopRecord record = NPE_RECORD;
-//            w = fwrite(&record, sizeof(record), 1, file);
-//            assert(w == 1, "fwrite failed");
-//          } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
-//            OopRecord record = ASE_RECORD;
-//            w = fwrite(&record, sizeof(record), 1, file);
-//            assert(w == 1, "fwrite failed");
-//          } else if (o == Universe::arithmetic_exception_instance()) {
-//            OopRecord record = AE_RECORD;
-//            w = fwrite(&record, sizeof(record), 1, file);
-//            assert(w == 1, "fwrite failed");
-//          } else if (o->is_a(vmClasses::ClassCastException_klass())) {
-//            OopRecord record = CCE_RECORD;
-//            w = fwrite(&record, sizeof(record), 1, file);
-//            assert(w == 1, "fwrite failed");
-//          } else {
-//            o->print();
-//            ShouldNotReachHere();
-//          }
-//        }
+        for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
+          oop o = *ptr;
+          int64_t off;
+          if (o->is_a(vmClasses::String_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, STRING_RECORD);
+            record_string_object(codeblobsro_section, codeblobsro_hdr, o);
+          } else if (o->is_a(vmClasses::Class_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASS_RECORD);
+            record_class_object(codeblobsro_section, codeblobsro_hdr, o);
+          } else if (o == SystemDictionary::java_system_loader()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASSLOADER_RECORD);
+          } else if (o == Universe::null_ptr_exception_instance()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, NPE_RECORD);
+          } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, ASE_RECORD);
+          } else if (o == Universe::arithmetic_exception_instance()) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, AE_RECORD);
+          } else if (o->is_a(vmClasses::ClassCastException_klass())) {
+            off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CCE_RECORD);
+          } else {
+            o->print();
+            ShouldNotReachHere();
+          }
+          Elf64_Rela reloc;
+          reloc.r_offset = codeblobs_data->d_off + ((address)ptr - (address)nm);
+          reloc.r_addend = off;
+          reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
+          relocs.push(reloc);
+        }
 
         {
           RelocIterator iter(nm);
@@ -2658,42 +2670,44 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
                   }
 
                   Elf64_Rela reloc;
-                  reloc.r_offset = codeblobs_data->d_off + (iter.addr() - (address)nm);
+                  reloc.r_offset = codeblobs_data->d_off + ((address)r->metadata_addr() - (address)nm);
                   reloc.r_addend = off;
                   reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
                   relocs.push(reloc);
                 }
                 break;
               }
-//              case relocInfo::oop_type: {
-//                oop_Relocation* r = iter.oop_reloc();
-//                oop o = r->oop_value();
-//                assert(!nm->consts_contains(iter.addr()) || *(oop*)iter.addr() == o, "");
-//                if (o->is_a(vmClasses::String_klass())) {
-//                  write_string_object(file, thread, o);
-//                } else if (o->is_a(vmClasses::Class_klass())) {
-//                  write_class_object(file, o);
-//                } else if (o == Universe::null_ptr_exception_instance()) {
-//                  OopRecord record = NPE_RECORD;
-//                  w = fwrite(&record, sizeof(record), 1, file);
-//                  assert(w == 1, "fwrite failed");
-//                } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
-//                  OopRecord record = ASE_RECORD;
-//                  w = fwrite(&record, sizeof(record), 1, file);
-//                  assert(w == 1, "fwrite failed");
-//                } else if (o == Universe::arithmetic_exception_instance()) {
-//                  OopRecord record = AE_RECORD;
-//                  w = fwrite(&record, sizeof(record), 1, file);
-//                  assert(w == 1, "fwrite failed");
-//                } else if (o->is_a(vmClasses::ClassCastException_klass())) {
-//                  OopRecord record = CCE_RECORD;
-//                  w = fwrite(&record, sizeof(record), 1, file);
-//                  assert(w == 1, "fwrite failed");
-//                } else {
-//                  ShouldNotReachHere();
-//                }
-//                break;
-//              }
+              case relocInfo::oop_type: {
+                oop_Relocation* r = iter.oop_reloc();
+                oop o = r->oop_value();
+                int64_t off;
+                if (o->is_a(vmClasses::String_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, STRING_RECORD);
+                  record_string_object(codeblobsro_section, codeblobsro_hdr, o);
+                } else if (o->is_a(vmClasses::Class_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASS_RECORD);
+                  record_class_object(codeblobsro_section, codeblobsro_hdr, o);
+                } else if (o == SystemDictionary::java_system_loader()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CLASSLOADER_RECORD);
+                } else if (o == Universe::null_ptr_exception_instance()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, NPE_RECORD);
+                } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, ASE_RECORD);
+                } else if (o == Universe::arithmetic_exception_instance()) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, AE_RECORD);
+                } else if (o->is_a(vmClasses::ClassCastException_klass())) {
+                  off = record_oop_type(codeblobsro_section, codeblobsro_hdr, CCE_RECORD);
+                } else {
+                  o->print();
+                  ShouldNotReachHere();
+                }
+                Elf64_Rela reloc;
+                reloc.r_offset = codeblobs_data->d_off + ((address)r->oop_addr() - (address)nm);
+                reloc.r_addend = off;
+                reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
+                relocs.push(reloc);
+                break;
+              }
               case relocInfo::runtime_call_w_cp_type:
                 ShouldNotReachHere();
 //              case relocInfo::virtual_call_type: {
@@ -3224,42 +3238,13 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         assert(m != NULL, "method not found");
         nm->set_method(m);
 
-//        for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
-//          OopRecord record;
-//          r = fread(&record, sizeof(record), 1, file);
-//          assert(r == 1, "fread failed");
-//          if (record == STRING_RECORD) {
-//            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-//            Handle value = read_string_object(file, thread);
-//            *ptr = value();
-//            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-//          } else if (record == CLASS_RECORD) {
-//            Klass* k = read_klass(file, thread);
-//            assert(k->java_mirror() != NULL, "");
-//            *ptr = k->java_mirror();
-//            tty->print_cr("### class record %s", k->external_name());
-//          } else if (record == CLASSLOADER_RECORD) {
-//            *ptr = SystemDictionary::java_system_loader();
-//          } else if (record == NPE_RECORD) {
-//            *ptr = Universe::null_ptr_exception_instance();
-//          } else if (record == AE_RECORD) {
-//            *ptr = Universe::arithmetic_exception_instance();
-//          } else if (record == ASE_RECORD) {
-//            *ptr = ase();
-//          } else if (record == CCE_RECORD) {
-//            *ptr = cce();
-//          } else {
-//            ShouldNotReachHere();
-//          }
-//        }
-
         RelocIterator iter(nm);
         while (iter.next()) {
           if (iter.type() == relocInfo::metadata_type) {
             metadata_Relocation* r = iter.metadata_reloc();
             Metadata* md = r->metadata_value();
             if (md != NULL) {
-              MetadataRecord rec = *(MetadataRecord*) md;
+              MetadataRecord rec = (MetadataRecord)*(char*)md;
               if (rec == KLASS_RECORD) {
                 md = restore_klass((const char*) (((address) md) + 1), thread);
               } else if (rec == METHOD_RECORD) {
@@ -3267,7 +3252,9 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
               } else {
                 ShouldNotReachHere();
               }
-              *r->metadata_addr() = md;
+              if (!nm->metadata_contains(r->metadata_addr())) {
+                *r->metadata_addr() = md;
+              }
               if (nm->consts_contains(iter.addr())) {
                 *((Metadata**) iter.addr()) = md;
               }
@@ -3284,52 +3271,86 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
 //              ic->set_data((intptr_t)holder);
 //            }
           } else if (iter.type() == relocInfo::oop_type) {
-//            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-//            oop_Relocation* reloc = iter.oop_reloc();
-//            OopRecord record;
-//            r = fread(&record, sizeof(record), 1, file);
-//            assert(r == 1, "fread failed");
-//            oop o;
-//            if (record == STRING_RECORD) {
-//              Handle value = read_string_object(file, thread);
-//              o = value();
-//              tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-//            } else if (record == CLASS_RECORD) {
-//              Klass* k = read_klass(file, thread);
-//              assert(k->java_mirror() != NULL, "");
-//              o = k->java_mirror();
-//              tty->print_cr("### class record %s", k->external_name());
-//            } else if (record == NPE_RECORD) {
-//              o = Universe::null_ptr_exception_instance();
-//            } else if (record == AE_RECORD) {
-//              o = Universe::arithmetic_exception_instance();
-//            } else if (record == ASE_RECORD) {
-//              o = ase();
-//            } else if (record == CCE_RECORD) {
-//              o = cce();
-//            } else {
-//              ShouldNotReachHere();
-//            }
-//            *reloc->oop_addr() = o;
-//            if (nm->consts_contains(iter.addr())) {
-//              *((oop*)iter.addr()) = o;
-//            }
-//          }
-          }
-          for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-            if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-            const char* ptr = (const char*)p;
-            MetadataRecord rec = (MetadataRecord)*ptr;
-            Metadata* md;
-            if (rec == KLASS_RECORD) {
-              md = restore_klass(ptr + 1, thread);
-            } else if (rec == METHOD_RECORD) {
-              md = restore_method(ptr +1, thread);
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            oop_Relocation* r = iter.oop_reloc();
+            char* ptr = *(char**)r->oop_addr();
+            oop o;
+            OopRecord record = (OopRecord)*ptr;
+            if (record == STRING_RECORD) {
+              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+              Handle value = java_lang_String::create_from_str(ptr+1, thread);
+              assert(!thread->has_pending_exception() && !value.is_null(), "");
+              o = value();
+              tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+            } else if (record == CLASS_RECORD) {
+              Klass* k = restore_klass(ptr+1, thread);
+              assert(k->java_mirror() != NULL, "");
+              o = k->java_mirror();
+              tty->print_cr("### class record %s", k->external_name());
+            } else if (record == CLASSLOADER_RECORD) {
+              o = SystemDictionary::java_system_loader();
+            } else if (record == NPE_RECORD) {
+              o = Universe::null_ptr_exception_instance();
+            } else if (record == AE_RECORD) {
+              o = Universe::arithmetic_exception_instance();
+            } else if (record == ASE_RECORD) {
+              o = ase();
+            } else if (record == CCE_RECORD) {
+              o = cce();
             } else {
               ShouldNotReachHere();
             }
-            *p = md;
+            if (!nm->oops_contains(r->oop_addr())) {
+              *r->oop_addr() = o;
+            }
+            if (nm->consts_contains(iter.addr())) {
+              *((oop*)iter.addr()) = o;
+            }
           }
+        }
+        for (oop* p = nm->oops_begin(); p < nm->oops_end(); p++) {
+          const char* ptr = *(const char**)p;
+          OopRecord record = (OopRecord)*ptr;
+          if (record == STRING_RECORD) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            Handle value = java_lang_String::create_from_str(ptr+1, thread);
+            assert(!thread->has_pending_exception() && !value.is_null(), "");
+            *p = value();
+            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+          } else if (record == CLASS_RECORD) {
+            Klass* k = restore_klass(ptr+1, thread);
+            assert(k->java_mirror() != NULL, "");
+            *p = k->java_mirror();
+            tty->print_cr("### class record %s", k->external_name());
+          } else if (record == CLASSLOADER_RECORD) {
+            *p = SystemDictionary::java_system_loader();
+          } else if (record == NPE_RECORD) {
+            *p = Universe::null_ptr_exception_instance();
+          } else if (record == AE_RECORD) {
+            *p = Universe::arithmetic_exception_instance();
+          } else if (record == ASE_RECORD) {
+            *p = ase();
+          } else if (record == CCE_RECORD) {
+            *p = cce();
+          } else {
+            ShouldNotReachHere();
+          }
+        }
+
+
+        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+          const char* ptr = *(const char**)p;
+          MetadataRecord rec = (MetadataRecord)*ptr;
+          Metadata* md;
+          if (rec == KLASS_RECORD) {
+            md = restore_klass(ptr + 1, thread);
+          } else if (rec == METHOD_RECORD) {
+            md = restore_method(ptr +1, thread);
+          } else {
+            ShouldNotReachHere();
+          }
+          *p = md;
         }
       }
 
