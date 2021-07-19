@@ -362,7 +362,7 @@ class Thread: public ThreadShadow {
   virtual const char* type_name() const { return "Thread"; }
 
   // Returns the current thread (ASSERTS if NULL)
-  static inline Thread* current();
+  static inline JNIEXPORT Thread* current();
   // Returns the current thread, or NULL if not attached
   static inline Thread* current_or_null();
   // Returns the current thread, or NULL if not attached, and is

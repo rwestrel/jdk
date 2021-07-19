@@ -396,7 +396,7 @@ int CodeCache::code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs) {
 }
 
 void CodeCache::add_heap(CodeHeap* heap) {
-  assert(!Universe::is_fully_initialized(), "late heap addition?");
+//  assert(!Universe::is_fully_initialized(), "late heap addition?");
 
   _heaps->insert_sorted<code_heap_compare>(heap);
 
@@ -480,7 +480,7 @@ CodeBlob* CodeCache::first_blob(int code_blob_type) {
 CodeBlob* CodeCache::next_blob(CodeHeap* heap, CodeBlob* cb) {
   assert_locked_or_safepoint(CodeCache_lock);
   assert(heap != NULL, "heap is null");
-  return (CodeBlob*)heap->next(cb);
+  return (CodeBlob*)heap->next(cb->code_begin());
 }
 
 /**
@@ -1803,7 +1803,83 @@ Method* restore_method(const char* ptr, JavaThread* thread) {
   return m;
 }
 
+JNIEXPORT uint8_t* card_table_base;
+
 void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
+  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+
+  bool has_compiledicholders = false;
+  bool has_oopmaps = false;
+  FOR_ALL_BLOBS(cb, heap) {
+    if (cb->is_nmethod()) {
+      RelocIterator iter(cb);
+      nmethod* nm = cb->as_nmethod();
+      while (iter.next()) {
+        if (iter.type() == relocInfo::virtual_call_type) {
+          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          virtual_call_Relocation* call = iter.virtual_call_reloc();
+          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
+          methodHandle caller(thread, sd->method());
+          Bytecode_invoke invoke(caller, sd->bci());
+          Method* method = call->method_value();
+          Klass* defc = method->method_holder();
+          Symbol* name = method->name();
+          Symbol* type = method->signature();
+          LinkInfo link_info(defc, name, type);
+          if (invoke.is_invokevirtual()) {
+            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+            int vtable_index = Method::invalid_vtable_index;
+            if (resolved_method->method_holder()->is_interface()) {
+              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+            } else {
+              vtable_index = resolved_method->vtable_index();
+            }
+            CompiledICLocker ml(nm);
+            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+            address entry = VtableStubs::find_vtable_stub(vtable_index);
+            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+          } else {
+            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
+            if (resolved_method->has_vtable_index()) {
+              int vtable_index = resolved_method->vtable_index();
+              CompiledICLocker ml(nm);
+              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+              address entry = VtableStubs::find_vtable_stub(vtable_index);
+              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+            } else if (resolved_method->has_itable_index()) {
+              int itable_index = resolved_method->itable_index();
+              {
+                ResourceMark rm;
+                stringStream ss;
+                resolved_method->print_short_name(&ss);
+                tty->print_cr("XXX itable index for %s %d", ss.as_string(), itable_index);
+                resolved_method->method_holder()->print_on(tty);
+                if (!strcmp(ss.as_string(), " java.util.function.Function::apply")) {
+                  tty->print_cr("Here! Here! %p", resolved_method->method_holder()->methods()->adr_at(0));
+                }
+              }
+              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
+                                                              link_info.resolved_klass(), false);
+              has_compiledicholders = true;
+
+              CompiledICLocker ml(nm);
+              address entry = VtableStubs::find_itable_stub(itable_index);
+              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
+            } else {
+              int index = resolved_method->vtable_index();
+//              ShouldNotReachHere();
+            }
+          }
+        }
+      }
+    }
+    if (cb->oop_maps() != NULL) {
+      has_oopmaps = true;
+    }
+  }
+
   if (elf_version(EV_CURRENT) == EV_NONE) {
     ShouldNotReachHere();
   }
@@ -1845,7 +1921,10 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   GrowableArray<char> strings;
   GrowableArray<Elf64_Sym> symbols;
   GrowableArray<Elf64_Rela> codeblobs_relocs;
+  GrowableArray<Elf64_Rela> codeblobsro_relocs;
   GrowableArray<Elf64_Rela> text_relocs;
+  GrowableArray<Elf64_Rela> codecache_relocs;
+  GrowableArray<Elf64_Rela> compiledicholders_relocs;
 
   Elf_Scn* text_section = elf_newscn(elf);
   assert(text_section != NULL, "");
@@ -1856,11 +1935,11 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   text_hdr->sh_name = shstrings.length();
   push_array(shstrings, ".text");
   text_hdr->sh_type = SHT_PROGBITS;
-  text_hdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR | SHF_WRITE;
+  text_hdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
   text_hdr->sh_addr = 0;
   text_hdr->sh_offset = 0;
   text_hdr->sh_entsize = 0;
-  text_hdr->sh_addralign = 1; //CodeEntryAlignment;
+  text_hdr->sh_addralign = os::vm_page_size();
 
   Elf64_Sym sym;
   sym.st_name = strings.length();
@@ -1885,7 +1964,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   codeblobs_hdr->sh_offset = 0;
   codeblobs_hdr->sh_entsize = 0;
   codeblobs_hdr->sh_addralign = 8;
-
+  
   Elf_Scn* codeblobsro_section = elf_newscn(elf);
   assert(codeblobsro_section != NULL, "");
   Elf64_Shdr* codeblobsro_hdr = elf64_getshdr(codeblobsro_section);
@@ -1899,6 +1978,20 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   codeblobsro_hdr->sh_offset = 0;
   codeblobsro_hdr->sh_entsize = 0;
   codeblobsro_hdr->sh_addralign = 8;
+
+  Elf_Scn* codecache_section = elf_newscn(elf);
+  assert(codecache_section != NULL, "");
+  Elf64_Shdr* codecache_hdr = elf64_getshdr(codecache_section);
+  assert(codecache_hdr != NULL, "");
+
+  codecache_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".codecache");
+  codecache_hdr->sh_type = SHT_PROGBITS;
+  codecache_hdr->sh_flags = SHF_ALLOC | SHF_WRITE;
+  codecache_hdr->sh_addr = 0;
+  codecache_hdr->sh_offset = 0;
+  codecache_hdr->sh_entsize = 0;
+  codecache_hdr->sh_addralign = 8;
 
   int codeblobsro_sym;
   {
@@ -1939,6 +2032,88 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     sym.st_value = 0;
     sym.st_size = 0;
     text_sym = symbols.length();
+    symbols.push(sym);
+  }
+
+  int codecache_sym;
+  {
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, ".codecache");
+    sym.st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(codecache_section);
+    sym.st_value = 0;
+    sym.st_size = 0;
+    codecache_sym = symbols.length();
+    symbols.push(sym);
+  }
+
+  Elf_Scn* compiledicholders_section = NULL;
+  Elf64_Shdr* compiledicholders_hdr = NULL;
+
+  if (has_compiledicholders) {
+    compiledicholders_section = elf_newscn(elf);
+    assert(compiledicholders_section != NULL, "");
+    compiledicholders_hdr = elf64_getshdr(compiledicholders_section);
+    assert(compiledicholders_hdr != NULL, "");
+
+    compiledicholders_hdr->sh_name = shstrings.length();
+    push_array(shstrings, ".compiledicholders");
+    compiledicholders_hdr->sh_type = SHT_PROGBITS;
+    compiledicholders_hdr->sh_flags = SHF_ALLOC | SHF_WRITE;
+    compiledicholders_hdr->sh_addr = 0;
+    compiledicholders_hdr->sh_offset = 0;
+    compiledicholders_hdr->sh_entsize = 0;
+    compiledicholders_hdr->sh_addralign = 8;
+
+  }
+
+  Elf_Scn* oopmaps_section = NULL;
+  Elf64_Shdr* oopmaps_hdr = NULL;
+
+  int oopmaps_sym;
+
+  if (has_oopmaps) {
+    oopmaps_section = elf_newscn(elf);
+    assert(oopmaps_section != NULL, "");
+    oopmaps_hdr = elf64_getshdr(oopmaps_section);
+    assert(oopmaps_hdr != NULL, "");
+
+    oopmaps_hdr->sh_name = shstrings.length();
+    push_array(shstrings, ".oopmaps");
+    oopmaps_hdr->sh_type = SHT_PROGBITS;
+    oopmaps_hdr->sh_flags = SHF_ALLOC | SHF_WRITE;
+    oopmaps_hdr->sh_addr = 0;
+    oopmaps_hdr->sh_offset = 0;
+    oopmaps_hdr->sh_entsize = 0;
+    oopmaps_hdr->sh_addralign = 8;
+
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, ".oopmaps");
+    sym.st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(oopmaps_section);
+    sym.st_value = 0;
+    sym.st_size = 0;
+    oopmaps_sym = symbols.length();
+    symbols.push(sym);
+  }
+
+  int local_sym = symbols.length();
+
+  int card_table_base_sym;
+  {
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, "card_table_base");
+    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
+    sym.st_other = 0;
+    sym.st_shndx = SHN_UNDEF;
+    sym.st_value = 0;
+    sym.st_size = 0;
+    card_table_base_sym = symbols.length();
     symbols.push(sym);
   }
 
@@ -2009,79 +2184,6 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     vt_syms.vtableblob = add_external_symbol((address)vts.vtableblob, strings, symbols, offset);
     assert(offset == vt_offset, "");
   }
-  int w = fwrite(&vts, sizeof(vts), 1, file);
-  assert(w == 1, "fwrite failed");
-
-
-  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
-
-  FOR_ALL_BLOBS(cb, heap) {
-    if (cb->is_nmethod()) {
-      RelocIterator iter(cb);
-      nmethod* nm = cb->as_nmethod();
-      while (iter.next()) {
-        if (iter.type() == relocInfo::virtual_call_type) {
-          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          virtual_call_Relocation* call = iter.virtual_call_reloc();
-          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
-          methodHandle caller(thread, sd->method());
-          Bytecode_invoke invoke(caller, sd->bci());
-          Method* method = call->method_value();
-          Klass* defc = method->method_holder();
-          Symbol* name = method->name();
-          Symbol* type = method->signature();
-          LinkInfo link_info(defc, name, type);
-          if (invoke.is_invokevirtual()) {
-            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
-            int vtable_index = Method::invalid_vtable_index;
-            if (resolved_method->method_holder()->is_interface()) {
-              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
-            } else {
-              vtable_index = resolved_method->vtable_index();
-            }
-            CompiledICLocker ml(nm);
-            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-            address entry = VtableStubs::find_vtable_stub(vtable_index);
-            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-          } else {
-            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
-            if (resolved_method->has_vtable_index()) {
-              int vtable_index = resolved_method->vtable_index();
-              CompiledICLocker ml(nm);
-              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-              address entry = VtableStubs::find_vtable_stub(vtable_index);
-              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-            } else if (resolved_method->has_itable_index()) {
-              int itable_index = resolved_method->itable_index();
-              {
-                ResourceMark rm;
-                stringStream ss;
-                resolved_method->print_short_name(&ss);
-                tty->print_cr("XXX itable index for %s %d", ss.as_string(), itable_index);
-                resolved_method->method_holder()->print_on(tty);
-                if (!strcmp(ss.as_string(), " java.util.function.Function::apply")) {
-                  tty->print_cr("Here! Here! %p", resolved_method->method_holder()->methods()->adr_at(0));
-                }
-              }
-              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
-                                                              link_info.resolved_klass(), false);
-
-              CompiledICLocker ml(nm);
-              address entry = VtableStubs::find_itable_stub(itable_index);
-              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
-            } else {
-              int index = resolved_method->vtable_index();
-//              ShouldNotReachHere();
-            }
-          }
-        }
-      }
-    }
-  }
-
-  int vtbl_offset;
 
 
   bool success = true;
@@ -2101,18 +2203,6 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             ) {
       ShouldNotReachHere();
     }
-
-    int cb_size = cb->size();
-//    tty->print_cr(">>> %d", cb_size);
-    w = fwrite(&cb_size, sizeof(cb_size), 1, file);
-    assert(w == 1, "fwrite failed");
-
-    CodeBlob* next = next_blob(heap, cb);
-    int offset = next != NULL ? (address) next - (address) cb : 0;
-    tty->print_cr("XXX %s:%ld - %d %d - %p %p", cb->name(), (uintptr_t) cb - (uintptr_t) heap->low(), cb_size, offset,
-                  cb, next);
-    w = fwrite(&offset, sizeof(offset), 1, file);
-    assert(w == 1, "fwrite failed");
 
     if (cb->is_nmethod()) {
       RelocIterator iter(cb);
@@ -2143,289 +2233,14 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     }
     assert(success, "");
 
-    CodeBlob* cb_copy = (CodeBlob*) NEW_RESOURCE_ARRAY(char, cb_size);;
-    memcpy((void*) cb_copy, cb, cb_size);
-
-    cb_copy->_code_begin = (address) cb_copy + (cb->_code_begin - (address) cb);
-    cb_copy->_code_end = (address) cb_copy + (cb->_code_end - (address) cb);
-    cb_copy->_content_begin = (address) cb_copy + (cb->_content_begin - (address) cb);
-    cb_copy->_data_end = (address) cb_copy + (cb->_data_end - (address) cb);
-    cb_copy->_relocation_begin = (address) cb_copy + (cb->_relocation_begin - (address) cb);
-    cb_copy->_relocation_end = (address) cb_copy + (cb->_relocation_end - (address) cb);
-
-    {
-      RelocIterator iter(cb);
-      RelocIterator iter_copy(cb_copy);
-      address base_addr = NULL;
-      while (iter.next()) {
-        bool success = iter_copy.next();
-        assert(success, "");
-        if (iter.type() == relocInfo::runtime_call_type) {
-          runtime_call_Relocation* rt = iter.runtime_call_reloc();
-          address dest = rt->destination();
-          if (dest != (address) -1) {
-            runtime_call_Relocation* rt_copy = iter_copy.runtime_call_reloc();
-            if (heap->contains(dest)) {
-              NativeInstruction* ni = nativeInstruction_at(rt->addr());
-              if (ni->is_mov_literal64()) {
-                RuntimeCallLib lib = CODECACHE;
-                intptr_t offset = dest - (address)cb->code_begin();
-                intptr_t new_dest = ((intptr_t) offset) << 32 | lib;
-
-                rt_copy->set_destination((address) new_dest);
-              }
-            } else {
-              char lib_name[256];
-              int lib_offset;
-              char func_name[256];
-              int func_offset;
-              bool success = os::dll_address_to_library_name(dest, lib_name, sizeof(lib_name), &lib_offset);
-              assert(success, "");
-              success = os::dll_address_to_function_name(dest, func_name, sizeof(func_name), &func_offset, false);
-              assert(success, "");
-
-              tty->print_cr("YYY %s %d", func_name, func_offset);
-
-//              Elf64_Sym sym;
-//              sym.st_name = strings.length();
-//              push_array(strings, func_name);
-//              sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
-//              sym.st_other = 0;
-//              sym.st_shndx = elf_ndxscn(text_section);
-//              sym.st_value = 0;
-//              sym.st_size = 0;
-//              symbols.push(sym);
-
-
-              RuntimeCallLib lib = LIBJVM;
-              int l = strlen(lib_name);
-              const char* libjvm = "libjvm.so";
-              int libjvm_l = strlen(libjvm);
-              const char* libjava = "libjava.so";
-              int libjava_l = strlen(libjava);
-
-              if (l >= libjvm_l && !strcmp(&lib_name[l - libjvm_l], libjvm)) {
-                // ok
-              } else if (l >= libjava_l && !strcmp(&lib_name[l - libjava_l], libjava)) {
-                lib = LIBJAVA;
-              } else {
-                ShouldNotReachHere();
-              }
-
-              intptr_t new_dest = ((intptr_t) lib_offset) << 32 | lib;
-
-              rt_copy->set_destination((address) new_dest);
-            }
-          }
-        } else if (iter.type() == relocInfo::internal_word_type) {
-//          internal_word_Relocation* iw = iter.internal_word_reloc();
-//          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
-//          assert(iw->_target != NULL, "");
-//          address target = iw->target();
-//          intptr_t offset = target - (address)cb;
-//          tty->print_cr("ZZZ %ld", offset);
-//          iw_copy->set_value((address)offset);
-        } else if (iter.type() == relocInfo::section_word_type) {
-//          section_word_Relocation* iw = iter.section_word_reloc();
-//          section_word_Relocation* iw_copy = iter_copy.section_word_reloc();
-//          assert(iw->_target != NULL, "");
-//          address target = iw->target();
-//          intptr_t offset = target - (address)cb;
-//          tty->print_cr("ZZZ %p %ld", target, offset);
-//          assert(offset >= 0 && offset < cb->size(), "");
-//          iw_copy->set_value((address)offset);
-//          iw_copy->_target = (address)offset;
-//        } else if (iter.type() == relocInfo::external_word_type) {
-//          external_word_Relocation* ew = iter.external_word_reloc();
-//          ShouldNotReachHere();
-        } else if (iter.type() == relocInfo::card_mark_word_type) {
-          card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
-          BarrierSet* bs = BarrierSet::barrier_set();
-          CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
-          CardTable* ct = ctbs->card_table();
-          assert(cm->value() == ct->byte_map_base(), "");
-        }
-      }
-      assert(!iter_copy.next(), "");
-    }
-
-    cb_copy->_code_begin = (address) (cb->_code_begin - (address) cb);
-    cb_copy->_code_end = (address) (cb->_code_end - (address) cb);
-    cb_copy->_content_begin = (address) (cb->_content_begin - (address) cb);
-    cb_copy->_data_end = (address) (cb->_data_end - (address) cb);
-    cb_copy->_relocation_begin = (address) (cb->_relocation_begin - (address) cb);
-    cb_copy->_relocation_end = (address) (cb->_relocation_end - (address) cb);
-
-    if (cb->is_nmethod()) {
-      nmethod* nm = cb->as_nmethod();
-      nmethod* nm_copy = (nmethod*) cb_copy;
-
-      nm_copy->_scopes_data_begin = (address) (nm->_scopes_data_begin - (address) nm);
-      nm_copy->_deopt_handler_begin = (address) (nm->_deopt_handler_begin - (address) nm);
-      nm_copy->_deopt_mh_handler_begin = (address) (nm->_deopt_mh_handler_begin - (address) nm);
-      nm_copy->_entry_point = (address) (nm->_entry_point - (address) nm);
-      nm_copy->_verified_entry_point = (address) (nm->_verified_entry_point - (address) nm);
-      nm_copy->_osr_entry_point = (address) (nm->_osr_entry_point - (address) nm);
-
-      w = fwrite(nm_copy, cb_size, 1, file);
-      assert(w == 1, "fwrite failed");
-
-      Method* m = nm->method();
-      write_method(file, m);
-
-      for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
-        oop o = *ptr;
-        if (o->is_a(vmClasses::String_klass())) {
-          write_string_object(file, thread, o);
-        } else if (o->is_a(vmClasses::Class_klass())) {
-          write_class_object(file, o);
-        } else if (o == SystemDictionary::java_system_loader()) {
-          OopRecord record = CLASSLOADER_RECORD;
-          w = fwrite(&record, sizeof(record), 1, file);
-          assert(w == 1, "fwrite failed");
-        } else if (o == Universe::null_ptr_exception_instance()) {
-          OopRecord record = NPE_RECORD;
-          w = fwrite(&record, sizeof(record), 1, file);
-          assert(w == 1, "fwrite failed");
-        } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
-          OopRecord record = ASE_RECORD;
-          w = fwrite(&record, sizeof(record), 1, file);
-          assert(w == 1, "fwrite failed");
-        } else if (o == Universe::arithmetic_exception_instance()) {
-          OopRecord record = AE_RECORD;
-          w = fwrite(&record, sizeof(record), 1, file);
-          assert(w == 1, "fwrite failed");
-        } else if (o->is_a(vmClasses::ClassCastException_klass())) {
-          OopRecord record = CCE_RECORD;
-          w = fwrite(&record, sizeof(record), 1, file);
-          assert(w == 1, "fwrite failed");
-        } else {
-          o->print();
-          ShouldNotReachHere();
-        }
-      }
-
-      {
-        RelocIterator iter(nm);
-        while (iter.next()) {
-          switch (iter.type()) {
-            case relocInfo::metadata_type: {
-              metadata_Relocation* r = iter.metadata_reloc();
-              Metadata* md = r->metadata_value();
-              assert(!nm->consts_contains(iter.addr()) || *(Metadata**)iter.addr() == md, "");
-              if (md != NULL) {
-                if (md->is_klass()) {
-                  MetadataRecord rec = KLASS_RECORD;
-                  w = fwrite(&rec, sizeof(rec), 1, file);
-                  assert(w == 1, "fwrite failed");
-                  write_klass(file, (Klass*) md);
-                } else if (md->is_method()) {
-                    MetadataRecord rec = METHOD_RECORD;
-                    w = fwrite(&rec, sizeof(rec), 1, file);
-                    assert(w == 1, "fwrite failed");
-                    write_method(file, (Method*) md);
-                } else {
-                  ShouldNotReachHere();
-                }
-              }
-              break;
-            }
-            case relocInfo::oop_type: {
-              oop_Relocation* r = iter.oop_reloc();
-              oop o = r->oop_value();
-              assert(!nm->consts_contains(iter.addr()) || *(oop*)iter.addr() == o, "");
-              if (o->is_a(vmClasses::String_klass())) {
-                write_string_object(file, thread, o);
-              } else if (o->is_a(vmClasses::Class_klass())) {
-                write_class_object(file, o);
-              } else if (o == Universe::null_ptr_exception_instance()) {
-                OopRecord record = NPE_RECORD;
-                w = fwrite(&record, sizeof(record), 1, file);
-                assert(w == 1, "fwrite failed");
-              } else if (o->is_a(vmClasses::ArrayStoreException_klass())) {
-                OopRecord record = ASE_RECORD;
-                w = fwrite(&record, sizeof(record), 1, file);
-                assert(w == 1, "fwrite failed");
-              } else if (o == Universe::arithmetic_exception_instance()) {
-                OopRecord record = AE_RECORD;
-                w = fwrite(&record, sizeof(record), 1, file);
-                assert(w == 1, "fwrite failed");
-              } else if (o->is_a(vmClasses::ClassCastException_klass())) {
-                OopRecord record = CCE_RECORD;
-                w = fwrite(&record, sizeof(record), 1, file);
-                assert(w == 1, "fwrite failed");
-              } else {
-                ShouldNotReachHere();
-              }
-              break;
-            }
-            case relocInfo::runtime_call_w_cp_type:
-              ShouldNotReachHere();
-            case relocInfo::virtual_call_type: {
-              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-              CompiledICLocker ml(nm);
-              CompiledIC* ic = CompiledIC_at(nm, iter.addr());
-              if (ic->is_icholder_call()) {
-                CompiledICHolder* holder = ic->cached_icholder();
-                assert(!holder->_is_metadata_method, "");
-                write_klass(file, holder->holder_klass());
-                assert(holder->holder_metadata()->is_klass(), "");
-                write_klass(file, (Klass*) holder->holder_metadata());
-              }
-              break;
-            }
-            default:
-              break;
-          }
-        }
-      }
-      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-        Metadata* md = *p;
-        if (md->is_method()) {
-          MetadataRecord rec = METHOD_RECORD;
-          w = fwrite(&rec, sizeof(rec), 1, file);
-          assert(w == 1, "fwrite failed");
-          write_method(file, (Method*) md);
-        } else if (md->is_klass()) {
-          MetadataRecord rec = KLASS_RECORD;
-          w = fwrite(&rec, sizeof(rec), 1, file);
-          assert(w == 1, "fwrite failed");
-          write_klass(file, (Klass*) md);
-        } else {
-          ShouldNotReachHere();
-        }
-      }
-      PerMethod pm;
-      assert(heap->contains(m->from_interpreted_entry()), "");
-      pm._from_interpreted_entry = (address) cb - m->from_interpreted_entry();
-      w = fwrite(&pm, sizeof(pm), 1, file);
-      assert(w == 1, "fwrite failed");
-      nm->print();
-    } else {
-      w = fwrite(cb_copy, cb_size, 1, file);
-      assert(w == 1, "fwrite failed");
-    }
-
-    const char* name = cb->name();
-    int name_len = strlen(name);
-    w = fwrite(&name_len, sizeof(name_len), 1, file);
-    assert(w == 1, "fwrite failed");
-    w = fwrite(name, 1, name_len, file);
-    assert(w == name_len, "fwrite failed");
-
-    ImmutableOopMapSet* oopmaps = cb->oop_maps();
-    int oopmaps_len = oopmaps == NULL ? 0 : oopmaps->nr_of_bytes();
-    w = fwrite(&oopmaps_len, sizeof(oopmaps_len), 1, file);
-    assert(w == 1, "fwrite failed");
-    if (oopmaps_len > 0) {
-      w = fwrite(oopmaps, oopmaps_len, 1, file);
-      assert(w == 1, "fwrite failed");
-    }
-
-//    if (!cb->is_nmethod()) {
-//      continue;
+//    int oopmaps_len = oopmaps == NULL ? 0 : oopmaps->nr_of_bytes();
+//    w = fwrite(&oopmaps_len, sizeof(oopmaps_len), 1, file);
+//    assert(w == 1, "fwrite failed");
+//    if (oopmaps_len > 0) {
+//      w = fwrite(oopmaps, oopmaps_len, 1, file);
+//      assert(w == 1, "fwrite failed");
 //    }
+
 
     int vtbl_sym;
     if (vtbl == vts.nmethod) {
@@ -2454,9 +2269,9 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
 
     if (cb == CodeCache::first_blob(heap)) {
       Elf_Data* text_data = elf_newdata(text_section);
-      text_data->d_buf = cb;
+      text_data->d_buf = heap->low();
       text_data->d_type = ELF_T_BYTE;
-      text_data->d_size = cb->code_begin() - (address)cb;
+      text_data->d_size = cb->code_begin() - (address)heap->low();
       text_data->d_off = text_hdr->sh_size;
       text_data->d_align = 1;;
       text_data->d_version = EV_CURRENT;
@@ -2510,7 +2325,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       codeblobs_data->d_align = 8;
       codeblobs_data->d_version = EV_CURRENT;
 
-      codeblobs_hdr->sh_size += cb->size();
+      codeblobs_hdr->sh_size += codeblobs_data->d_size;
 
       Elf64_Sym sym;
       sym.st_name = strings.length();
@@ -2537,6 +2352,21 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
         reloc.r_info = ELF64_R_INFO(vtbl_sym, R_X86_64_64);
         codeblobs_relocs.push(reloc);
       }
+      {
+        Elf64_Rela reloc;
+        reloc.r_offset = (address)cb - (address)heap->low();
+        reloc.r_addend = (address)cb - (address)CodeCache::first_blob(heap);
+        reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
+        text_relocs.push(reloc);
+      }
+
+//      {
+//        Elf64_Rela reloc;
+//        reloc.r_offset = offset_of(LeydenCodeHeap, _blobs) + codecache_relocs.length() * sizeof(address);
+//        reloc.r_addend = codeblobs_data->d_off;
+//        reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
+//        codecache_relocs.push(reloc);
+//      }
 
       Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
       codeblobsro_data->d_buf = (void*)cb->_name;
@@ -2602,62 +2432,44 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
         address base_addr = NULL;
         while (iter.next()) {
           if (iter.type() == relocInfo::runtime_call_type) {
-//            runtime_call_Relocation* rt = iter.runtime_call_reloc();
-//            address dest = rt->destination();
-//            if (dest != (address) -1) {
-//              runtime_call_Relocation* rt_copy = iter_copy.runtime_call_reloc();
-//              if (heap->contains(dest)) {
-//                NativeInstruction* ni = nativeInstruction_at(rt->addr());
-//                if (ni->is_mov_literal64()) {
-//                  RuntimeCallLib lib = CODECACHE;
-//                  intptr_t offset = dest - (address)cb->code_begin();
-//                  intptr_t new_dest = ((intptr_t) offset) << 32 | lib;
-//
-//                  rt_copy->set_destination((address) new_dest);
-//                }
-//              } else {
-//                char lib_name[256];
-//                int lib_offset;
-//                char func_name[256];
-//                int func_offset;
-//                bool success = os::dll_address_to_library_name(dest, lib_name, sizeof(lib_name), &lib_offset);
-//                assert(success, "");
-//                success = os::dll_address_to_function_name(dest, func_name, sizeof(func_name), &func_offset, false);
-//                assert(success, "");
-//
-//                tty->print_cr("YYY %s %d", func_name, func_offset);
-//
-////              Elf64_Sym sym;
-////              sym.st_name = strings.length();
-////              push_array(strings, func_name);
-////              sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
-////              sym.st_other = 0;
-////              sym.st_shndx = elf_ndxscn(text_section);
-////              sym.st_value = 0;
-////              sym.st_size = 0;
-////              symbols.push(sym);
-//
-//
-//                RuntimeCallLib lib = LIBJVM;
-//                int l = strlen(lib_name);
-//                const char* libjvm = "libjvm.so";
-//                int libjvm_l = strlen(libjvm);
-//                const char* libjava = "libjava.so";
-//                int libjava_l = strlen(libjava);
-//
-//                if (l >= libjvm_l && !strcmp(&lib_name[l - libjvm_l], libjvm)) {
-//                  // ok
-//                } else if (l >= libjava_l && !strcmp(&lib_name[l - libjava_l], libjava)) {
-//                  lib = LIBJAVA;
-//                } else {
-//                  ShouldNotReachHere();
-//                }
-//
-//                intptr_t new_dest = ((intptr_t) lib_offset) << 32 | lib;
-//
-//                rt_copy->set_destination((address) new_dest);
-//              }
-//            }
+            runtime_call_Relocation* r = iter.runtime_call_reloc();
+            address dest = r->destination();
+            if (dest != (address) -1) {
+              if (heap->contains(dest)) {
+              } else {
+                static address to_skip[] = {
+                        (address) SharedRuntime::handle_wrong_method,
+                        (address) SharedRuntime::fixup_callers_callsite,
+                        (address) SharedRuntime::handle_wrong_method_abstract,
+                        (address) SharedRuntime::handle_wrong_method_ic_miss,
+                        (address) SharedRuntime::resolve_opt_virtual_call_C,
+                        (address) SharedRuntime::resolve_virtual_call_C,
+                        (address)SharedRuntime::resolve_static_call_C,
+                        (address)Deoptimization::fetch_unroll_info,
+                        (address)Deoptimization::unpack_frames,
+                        (address)Deoptimization::uncommon_trap
+                };
+                bool skip = false;
+                for (uint i = 0; i < sizeof(to_skip) / sizeof(to_skip[0]); i++) {
+                  if (dest == to_skip[i]) {
+                    skip = true;
+                    break;
+                  }
+                }
+                if (!skip) {
+                  int offset;
+                  int sym = add_external_symbol(dest, strings, symbols, offset);
+                  assert(offset == 0, "");
+
+                  Elf64_Rela reloc;
+                  reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
+                  reloc.r_addend = offset;
+                  reloc.r_info = ELF64_R_INFO(sym, R_X86_64_64);
+                  text_relocs.push(reloc);
+                }
+
+              }
+            }
           } else if (iter.type() == relocInfo::internal_word_type) {
 //          internal_word_Relocation* iw = iter.internal_word_reloc();
 //          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
@@ -2669,20 +2481,39 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           } else if (iter.type() == relocInfo::section_word_type) {
             section_word_Relocation* r = iter.section_word_reloc();
             Elf64_Rela reloc;
-            reloc.r_offset = (address)r->pd_address_in_code() - (address)CodeCache::first_blob(heap);
+            reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
             reloc.r_addend = r->target() - (address)CodeCache::first_blob(heap);
             reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
             text_relocs.push(reloc);
           } else if (iter.type() == relocInfo::card_mark_word_type) {
-//            card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
-//            BarrierSet* bs = BarrierSet::barrier_set();
-//            CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
-//            CardTable* ct = ctbs->card_table();
-//            assert(cm->value() == ct->byte_map_base(), "");
+            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
+            Elf64_Rela reloc;
+            reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
+            reloc.r_addend = 0;
+            reloc.r_info = ELF64_R_INFO(card_table_base_sym, R_X86_64_64);
+            text_relocs.push(reloc);
           }
         }
       }
 
+      ImmutableOopMapSet* oopmaps = cb->oop_maps();
+      if (oopmaps != NULL) {
+        Elf_Data* oopmaps_data = elf_newdata(oopmaps_section);
+        oopmaps_data->d_buf = oopmaps;
+        oopmaps_data->d_type = ELF_T_BYTE;
+        oopmaps_data->d_size = oopmaps->nr_of_bytes();
+        oopmaps_data->d_off = oopmaps_hdr->sh_size;
+        oopmaps_data->d_align = 8;
+        oopmaps_data->d_version = EV_CURRENT;
+
+        oopmaps_hdr->sh_size += oopmaps_data->d_size;
+        Elf64_Rela reloc;
+        reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _oop_maps);
+        reloc.r_addend = oopmaps_data->d_off;
+        reloc.r_info = ELF64_R_INFO(oopmaps_sym, R_X86_64_64);
+        codeblobs_relocs.push(reloc);
+      }
+      
       if (cb->is_nmethod()) {
         nmethod* nm = cb->as_nmethod();
         {
@@ -2724,6 +2555,23 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
           reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
           codeblobs_relocs.push(reloc);
 
+        }
+        {
+          static intptr_t from_interpreted_entry;
+          Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
+          codeblobsro_data->d_buf = (void*) &from_interpreted_entry;
+          codeblobsro_data->d_type = ELF_T_BYTE;
+          codeblobsro_data->d_size = sizeof(from_interpreted_entry);
+          codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+          codeblobsro_data->d_align = 1;
+          codeblobsro_data->d_version = EV_CURRENT;
+          codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+
+          Elf64_Rela reloc;
+          reloc.r_offset = codeblobsro_data->d_off;
+          reloc.r_addend = nm->method()->_from_interpreted_entry - (address)heap->low();
+          reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
+          codeblobsro_relocs.push(reloc);
         }
         for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
           oop o = *ptr;
@@ -2817,19 +2665,46 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               }
               case relocInfo::runtime_call_w_cp_type:
                 ShouldNotReachHere();
-//              case relocInfo::virtual_call_type: {
-//                MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-//                CompiledICLocker ml(nm);
-//                CompiledIC* ic = CompiledIC_at(nm, iter.addr());
-//                if (ic->is_icholder_call()) {
-//                  CompiledICHolder* holder = ic->cached_icholder();
-//                  assert(!holder->_is_metadata_method, "");
-//                  write_klass(file, holder->holder_klass());
-//                  assert(holder->holder_metadata()->is_klass(), "");
-//                  write_klass(file, (Klass*) holder->holder_metadata());
-//                }
-//                break;
-//              }
+              case relocInfo::virtual_call_type: {
+                MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+                CompiledICLocker ml(nm);
+                CompiledIC* ic = CompiledIC_at(nm, iter.addr());
+                if (ic->is_icholder_call()) {
+                  CompiledICHolder* holder = ic->cached_icholder();
+
+                  Elf_Data* compiledicholders_data = elf_newdata(compiledicholders_section);
+                  compiledicholders_data->d_buf = holder;
+                  compiledicholders_data->d_type = ELF_T_BYTE;
+                  compiledicholders_data->d_size = sizeof(*holder);
+                  compiledicholders_data->d_off = compiledicholders_hdr->sh_size;
+                  compiledicholders_data->d_align = 8;
+                  compiledicholders_data->d_version = EV_CURRENT;
+
+                  compiledicholders_hdr->sh_size += compiledicholders_data->d_size;
+                  {
+                    assert(!holder->_is_metadata_method, "");
+                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
+
+                    Elf64_Rela reloc;
+                    reloc.r_offset = compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass);
+                    reloc.r_addend = off;
+                    reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
+                    compiledicholders_relocs.push(reloc);
+                  }
+
+                  {
+                    assert(holder->holder_metadata()->is_klass(), "");
+                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*) holder->holder_metadata());
+
+                    Elf64_Rela reloc;
+                    reloc.r_offset = compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_metadata);
+                    reloc.r_addend = off;
+                    reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
+                    compiledicholders_relocs.push(reloc);
+                  }
+                }
+                break;
+              }
               default:
                 break;
             }
@@ -2860,10 +2735,80 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     }
   }
 
-//  tty->print_cr("XXX %d %d %d", nb, heap->high() - heap->low(), heap->high_boundary() - heap->low_boundary());
-//  w = fwrite(heap->low(), 1, heap->high() - heap->low(), file);
-//  assert(w == heap->high() - heap->low(), "fwrite failed");
-  fclose(file);
+  {
+    Elf_Data* codecache_data = elf_newdata(codecache_section);
+    codecache_data->d_buf = heap;
+    codecache_data->d_type = ELF_T_BYTE;
+    codecache_data->d_size = sizeof(*heap);
+    codecache_data->d_off = codecache_hdr->sh_size;
+    codecache_data->d_align = 8;
+    codecache_data->d_version = EV_CURRENT;
+
+    codecache_hdr->sh_size += codecache_data->d_size;
+
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, "leydenCodeHeap");
+    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(codecache_section);
+    sym.st_value = 0;
+    sym.st_size = codecache_data->d_size;
+    symbols.push(sym);
+  }
+  {
+    Elf_Data* codecache_data = elf_newdata(codecache_section);
+    codecache_data->d_buf = heap->_segmap.low();
+    codecache_data->d_type = ELF_T_BYTE;
+    codecache_data->d_size = heap->_segmap.high() - heap->_segmap.low();
+    codecache_data->d_off = codecache_hdr->sh_size;
+    codecache_data->d_align = 8;
+    codecache_data->d_version = EV_CURRENT;
+
+    codecache_hdr->sh_size += codecache_data->d_size;
+
+    Elf64_Rela reloc;
+    reloc.r_offset = offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low);
+    reloc.r_addend = codecache_data->d_off;
+    reloc.r_info = ELF64_R_INFO(codecache_sym, R_X86_64_64);
+    codecache_relocs.push(reloc);
+  }
+  {
+    Elf64_Rela reloc;
+    reloc.r_offset = offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low);
+    reloc.r_addend = 0;
+    reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
+    codecache_relocs.push(reloc);
+  }
+  {
+    Elf64_Rela reloc;
+    reloc.r_offset = offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high);
+    reloc.r_addend = heap->high() - heap->low();
+    reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
+    codecache_relocs.push(reloc);
+  }
+
+  {
+    LeydenCodeHeap ch;
+
+    int sym = add_external_symbol(*(address*)&ch, strings, symbols, vt_offset);
+
+    Elf64_Rela reloc;
+    reloc.r_offset = 0;
+    reloc.r_addend = vt_offset;
+    reloc.r_info = ELF64_R_INFO(sym, R_X86_64_64);
+    codecache_relocs.push(reloc);
+  }
+
+//  codecache_data = elf_newdata(codecache_section);
+//  codecache_data->d_size = offset_of(LeydenCodeHeap, _blobs[0]) - sizeof(*heap) + codecache_relocs.length() * sizeof(CodeBlob*);
+//  codecache_data->d_buf = NEW_RESOURCE_ARRAY(char, codecache_data->d_size);
+//  codecache_data->d_type = ELF_T_BYTE;
+//  codecache_data->d_off = codecache_hdr->sh_size;
+//  codecache_data->d_align = 8;
+//  codecache_data->d_version = EV_CURRENT;
+//
+//  codecache_hdr->sh_size += codecache_data->d_size;
 
   Elf_Scn* string_section = elf_newscn(elf);
   assert(string_section != NULL, "");
@@ -2912,57 +2857,134 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   symbol_data->d_version = EV_CURRENT;
 
   symbol_hdr->sh_link = elf_ndxscn(string_section);
-  symbol_hdr->sh_info = 4;
+  symbol_hdr->sh_info = local_sym;
 
-   Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
-   assert(codeblobs_rela_section != NULL, "");
-   Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
-   assert(codeblobs_rela_hdr != NULL, "");
+  Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
+  assert(codeblobs_rela_section != NULL, "");
+  Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
+  assert(codeblobs_rela_hdr != NULL, "");
 
-   codeblobs_rela_hdr->sh_name = shstrings.length();
-   push_array(shstrings, ".rela.codeblobs");
-   codeblobs_rela_hdr->sh_type = SHT_RELA;
-   codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
-   codeblobs_rela_hdr->sh_addr = 0;
-   codeblobs_rela_hdr->sh_offset = 0;
-   codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-   codeblobs_rela_hdr->sh_addralign = 8;
-   codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-   codeblobs_rela_hdr->sh_info = elf_ndxscn(codeblobs_section);
-   codeblobs_rela_hdr->sh_size = codeblobs_relocs.length();
+  codeblobs_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".rela.codeblobs");
+  codeblobs_rela_hdr->sh_type = SHT_RELA;
+  codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
+  codeblobs_rela_hdr->sh_addr = 0;
+  codeblobs_rela_hdr->sh_offset = 0;
+  codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  codeblobs_rela_hdr->sh_addralign = 8;
+  codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  codeblobs_rela_hdr->sh_info = elf_ndxscn(codeblobs_section);
+  codeblobs_rela_hdr->sh_size = codeblobs_relocs.length();
 
-   Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
-   codeblobs_rela_data->d_buf = codeblobs_relocs.adr_at(0);
-   codeblobs_rela_data->d_type = ELF_T_RELA;
-   codeblobs_rela_data->d_size = codeblobs_relocs.length() * sizeof(Elf64_Rela);
-   codeblobs_rela_data->d_off = 0;
-   codeblobs_rela_data->d_align = 8;
-   codeblobs_rela_data->d_version = EV_CURRENT;
+  Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
+  codeblobs_rela_data->d_buf = codeblobs_relocs.adr_at(0);
+  codeblobs_rela_data->d_type = ELF_T_RELA;
+  codeblobs_rela_data->d_size = codeblobs_relocs.length() * sizeof(Elf64_Rela);
+  codeblobs_rela_data->d_off = 0;
+  codeblobs_rela_data->d_align = 8;
+  codeblobs_rela_data->d_version = EV_CURRENT;
 
-//  Elf_Scn* text_rela_section = elf_newscn(elf);
-//  assert(text_rela_section != NULL, "");
-//  Elf64_Shdr* text_rela_hdr = elf64_getshdr(text_rela_section);
-//  assert(text_rela_hdr != NULL, "");
-//
-//  text_rela_hdr->sh_name = shstrings.length();
-//  push_array(shstrings, ".rela.text");
-//  text_rela_hdr->sh_type = SHT_RELA;
-//  text_rela_hdr->sh_flags = SHF_INFO_LINK;
-//  text_rela_hdr->sh_addr = 0;
-//  text_rela_hdr->sh_offset = 0;
-//  text_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-//  text_rela_hdr->sh_addralign = 8;
-//  text_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-//  text_rela_hdr->sh_info = elf_ndxscn(text_section);
-//  text_rela_hdr->sh_size = text_relocs.length();
-//
-//  Elf_Data* text_rela_data = elf_newdata(text_rela_section);
-//  text_rela_data->d_buf = text_relocs.adr_at(0);
-//  text_rela_data->d_type = ELF_T_RELA;
-//  text_rela_data->d_size = text_relocs.length() * sizeof(Elf64_Rela);
-//  text_rela_data->d_off = 0;
-//  text_rela_data->d_align = 8;
-//  text_rela_data->d_version = EV_CURRENT;
+  Elf_Scn* codeblobsro_rela_section = elf_newscn(elf);
+  assert(codeblobsro_rela_section != NULL, "");
+  Elf64_Shdr* codeblobsro_rela_hdr = elf64_getshdr(codeblobsro_rela_section);
+  assert(codeblobsro_rela_hdr != NULL, "");
+
+  codeblobsro_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".rela.codeblobsro");
+  codeblobsro_rela_hdr->sh_type = SHT_RELA;
+  codeblobsro_rela_hdr->sh_flags = SHF_INFO_LINK;
+  codeblobsro_rela_hdr->sh_addr = 0;
+  codeblobsro_rela_hdr->sh_offset = 0;
+  codeblobsro_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  codeblobsro_rela_hdr->sh_addralign = 8;
+  codeblobsro_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  codeblobsro_rela_hdr->sh_info = elf_ndxscn(codeblobsro_section);
+  codeblobsro_rela_hdr->sh_size = codeblobsro_relocs.length();
+
+  Elf_Data* codeblobsro_rela_data = elf_newdata(codeblobsro_rela_section);
+  codeblobsro_rela_data->d_buf = codeblobsro_relocs.adr_at(0);
+  codeblobsro_rela_data->d_type = ELF_T_RELA;
+  codeblobsro_rela_data->d_size = codeblobsro_relocs.length() * sizeof(Elf64_Rela);
+  codeblobsro_rela_data->d_off = 0;
+  codeblobsro_rela_data->d_align = 8;
+  codeblobsro_rela_data->d_version = EV_CURRENT;
+
+  Elf_Scn* text_rela_section = elf_newscn(elf);
+  assert(text_rela_section != NULL, "");
+  Elf64_Shdr* text_rela_hdr = elf64_getshdr(text_rela_section);
+  assert(text_rela_hdr != NULL, "");
+
+  text_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".rela.text");
+  text_rela_hdr->sh_type = SHT_RELA;
+  text_rela_hdr->sh_flags = SHF_INFO_LINK;
+  text_rela_hdr->sh_addr = 0;
+  text_rela_hdr->sh_offset = 0;
+  text_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  text_rela_hdr->sh_addralign = 8;
+  text_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  text_rela_hdr->sh_info = elf_ndxscn(text_section);
+  text_rela_hdr->sh_size = text_relocs.length();
+
+  Elf_Data* text_rela_data = elf_newdata(text_rela_section);
+  text_rela_data->d_buf = text_relocs.adr_at(0);
+  text_rela_data->d_type = ELF_T_RELA;
+  text_rela_data->d_size = text_relocs.length() * sizeof(Elf64_Rela);
+  text_rela_data->d_off = 0;
+  text_rela_data->d_align = 8;
+  text_rela_data->d_version = EV_CURRENT;
+
+  Elf_Scn* codecache_rela_section = elf_newscn(elf);
+  assert(codecache_rela_section != NULL, "");
+  Elf64_Shdr* codecache_rela_hdr = elf64_getshdr(codecache_rela_section);
+  assert(codecache_rela_hdr != NULL, "");
+
+  codecache_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".rela.codecache");
+  codecache_rela_hdr->sh_type = SHT_RELA;
+  codecache_rela_hdr->sh_flags = SHF_INFO_LINK;
+  codecache_rela_hdr->sh_addr = 0;
+  codecache_rela_hdr->sh_offset = 0;
+  codecache_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  codecache_rela_hdr->sh_addralign = 8;
+  codecache_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  codecache_rela_hdr->sh_info = elf_ndxscn(codecache_section);
+  codecache_rela_hdr->sh_size = codecache_relocs.length();
+
+  Elf_Data* codecache_rela_data = elf_newdata(codecache_rela_section);
+  codecache_rela_data->d_buf = codecache_relocs.adr_at(0);
+  codecache_rela_data->d_type = ELF_T_RELA;
+  codecache_rela_data->d_size = codecache_relocs.length() * sizeof(Elf64_Rela);
+  codecache_rela_data->d_off = 0;
+  codecache_rela_data->d_align = 8;
+  codecache_rela_data->d_version = EV_CURRENT;
+
+  if (has_compiledicholders) {
+    Elf_Scn* compiledicholders_rela_section = elf_newscn(elf);
+    assert(compiledicholders_rela_section != NULL, "");
+    Elf64_Shdr* compiledicholders_rela_hdr = elf64_getshdr(compiledicholders_rela_section);
+    assert(compiledicholders_rela_hdr != NULL, "");
+
+    compiledicholders_rela_hdr->sh_name = shstrings.length();
+    push_array(shstrings, ".rela.compiledicholders");
+    compiledicholders_rela_hdr->sh_type = SHT_RELA;
+    compiledicholders_rela_hdr->sh_flags = SHF_INFO_LINK;
+    compiledicholders_rela_hdr->sh_addr = 0;
+    compiledicholders_rela_hdr->sh_offset = 0;
+    compiledicholders_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+    compiledicholders_rela_hdr->sh_addralign = 8;
+    compiledicholders_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+    compiledicholders_rela_hdr->sh_info = elf_ndxscn(compiledicholders_section);
+    compiledicholders_rela_hdr->sh_size = compiledicholders_relocs.length();
+
+    Elf_Data* compiledicholders_rela_data = elf_newdata(compiledicholders_rela_section);
+    compiledicholders_rela_data->d_buf = compiledicholders_relocs.adr_at(0);
+    compiledicholders_rela_data->d_type = ELF_T_RELA;
+    compiledicholders_rela_data->d_size = compiledicholders_relocs.length() * sizeof(Elf64_Rela);
+    compiledicholders_rela_data->d_off = 0;
+    compiledicholders_rela_data->d_align = 8;
+    compiledicholders_rela_data->d_version = EV_CURRENT;
+  }
 
   Elf_Scn* shstring_section = elf_newscn(elf);
   assert(shstring_section != NULL, "");
@@ -3048,8 +3070,17 @@ void CodeCache::write_symbol(FILE* file, const Symbol* sym) {
 #include "utilities/utf8.hpp"
 
 void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
+  if (UseSerialGC) {
+    BarrierSet* bs = BarrierSet::barrier_set();
+    CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+    CardTable* ct = ctbs->card_table();
+    card_table_base = ct->byte_map_base();
+  }
 
   void* shared_lib = dlopen("/home/roland/tmp/lib.so", RTLD_NOW);
+  if (shared_lib == NULL) {
+    tty->print_cr("XXX %s", dlerror());
+  }
   assert(shared_lib != NULL, "");
 
   Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
@@ -3057,6 +3088,166 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
   Handle cce = Handle(thread, InstanceKlass::cast(vmClasses::ClassCastException_klass())->allocate_instance(thread));
   assert(ase.not_null() && !thread->has_pending_exception(), "");
 
+  {
+    LeydenCodeHeap*  heap = (LeydenCodeHeap*) dlsym(shared_lib, "leydenCodeHeap");
+    assert(heap != NULL, "");
+    MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+    _heaps->push(heap);
+
+    FOR_ALL_BLOBS(cb, heap) {
+      if (cb->is_nmethod()) {
+        nmethod* nm = cb->as_nmethod();
+        const char* klass_name = (const char*) nm->_method;
+        Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
+        Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
+                                                     Handle(), true, thread);
+        assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
+        const char* method_name = klass_name + strlen(klass_name) + 1;
+        Symbol* method_sym = SymbolTable::new_symbol(method_name);
+        const char* signature = method_name + strlen(method_name) + 1;
+        Symbol* signature_sym = SymbolTable::new_symbol(signature);
+        address from_interpreted_entry = *(address*)(signature + strlen(signature) + 1);
+
+        Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
+        assert(m != NULL, "method not found");
+        nm->set_method(m);
+
+        RelocIterator iter(nm);
+        while (iter.next()) {
+          if (iter.type() == relocInfo::metadata_type) {
+            metadata_Relocation* r = iter.metadata_reloc();
+            Metadata* md = r->metadata_value();
+            if (md != NULL) {
+              MetadataRecord rec = (MetadataRecord) *(char*) md;
+              if (rec == KLASS_RECORD) {
+                md = restore_klass((const char*) (((address) md) + 1), thread);
+              } else if (rec == METHOD_RECORD) {
+                md = restore_method((const char*) (((address) md) + 1), thread);
+              } else {
+                ShouldNotReachHere();
+              }
+              if (!nm->metadata_contains(r->metadata_addr())) {
+                *r->metadata_addr() = md;
+              }
+              if (nm->consts_contains(iter.addr())) {
+                *((Metadata**) iter.addr()) = md;
+              }
+            }
+          } else if (iter.type() == relocInfo::virtual_call_type) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            CompiledICLocker ml(nm);
+            CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
+            if (ic->cached_value() != NULL) {
+              CompiledICHolder* holder = ic->cached_icholder();
+              Klass* k1 = restore_klass((const char*)holder->holder_klass(), thread);
+              Klass* k2 = restore_klass((const char*)holder->holder_metadata(), thread);
+              holder->_holder_klass = k1;
+              holder->_holder_metadata = k2;
+            }
+          } else if (iter.type() == relocInfo::oop_type) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            oop_Relocation* r = iter.oop_reloc();
+            char* ptr = *(char**) r->oop_addr();
+            oop o;
+            OopRecord record = (OopRecord) *ptr;
+            if (record == STRING_RECORD) {
+              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+              Handle value = java_lang_String::create_from_str(ptr + 1, thread);
+              assert(!thread->has_pending_exception() && !value.is_null(), "");
+              o = value();
+              tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+            } else if (record == CLASS_RECORD) {
+              Klass* k = restore_klass(ptr + 1, thread);
+              assert(k->java_mirror() != NULL, "");
+              o = k->java_mirror();
+              tty->print_cr("### class record %s", k->external_name());
+            } else if (record == CLASSLOADER_RECORD) {
+              o = SystemDictionary::java_system_loader();
+            } else if (record == NPE_RECORD) {
+              o = Universe::null_ptr_exception_instance();
+            } else if (record == AE_RECORD) {
+              o = Universe::arithmetic_exception_instance();
+            } else if (record == ASE_RECORD) {
+              o = ase();
+            } else if (record == CCE_RECORD) {
+              o = cce();
+            } else {
+              ShouldNotReachHere();
+            }
+            if (!nm->oops_contains(r->oop_addr())) {
+              *r->oop_addr() = o;
+            }
+            if (nm->consts_contains(iter.addr())) {
+              *((oop*) iter.addr()) = o;
+            }
+          }
+        }
+        for (oop* p = nm->oops_begin(); p < nm->oops_end(); p++) {
+          const char* ptr = *(const char**) p;
+          OopRecord record = (OopRecord) *ptr;
+          if (record == STRING_RECORD) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+            Handle value = java_lang_String::create_from_str(ptr + 1, thread);
+            assert(!thread->has_pending_exception() && !value.is_null(), "");
+            *p = value();
+            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
+          } else if (record == CLASS_RECORD) {
+            Klass* k = restore_klass(ptr + 1, thread);
+            assert(k->java_mirror() != NULL, "");
+            *p = k->java_mirror();
+            tty->print_cr("### class record %s", k->external_name());
+          } else if (record == CLASSLOADER_RECORD) {
+            *p = SystemDictionary::java_system_loader();
+          } else if (record == NPE_RECORD) {
+            *p = Universe::null_ptr_exception_instance();
+          } else if (record == AE_RECORD) {
+            *p = Universe::arithmetic_exception_instance();
+          } else if (record == ASE_RECORD) {
+            *p = ase();
+          } else if (record == CCE_RECORD) {
+            *p = cce();
+          } else {
+            ShouldNotReachHere();
+          }
+        }
+
+
+        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+          const char* ptr = *(const char**) p;
+          MetadataRecord rec = (MetadataRecord) *ptr;
+          Metadata* md;
+          if (rec == KLASS_RECORD) {
+            md = restore_klass(ptr + 1, thread);
+          } else if (rec == METHOD_RECORD) {
+            md = restore_method(ptr + 1, thread);
+          } else {
+            ShouldNotReachHere();
+          }
+          *p = md;
+        }
+
+        {
+          MutexLocker ml(CompiledMethod_lock, Mutex::_no_safepoint_check_flag);
+          m->_code = nm;
+          m->set_highest_comp_level(nm->comp_level());
+          OrderAccess::storestore();
+          m->_from_compiled_entry = nm->verified_entry_point();
+          OrderAccess::storestore();
+          // Instantly compiled code can execute.
+           if (!m->is_method_handle_intrinsic())
+             m->_from_interpreted_entry = from_interpreted_entry;
+          m->_i2i_entry = (address)-1;
+        }
+        nm->_gc_data = NULL;
+        
+        Universe::heap()->register_nmethod(nm);
+
+      }
+    }
+  }
+
+#if 0
   Vtables vts;
   int r = fread(&vts, sizeof(vts), 1, file);
   assert(r == 1, "fwrite failed");
@@ -3351,140 +3542,6 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         tty->print_cr("XXX %s", dlerror());
       }
       assert(sym != NULL, "");
-      {
-        stringStream ss;
-        ss.print("%s-obj", mh->external_name());
-        nmethod* nm = (nmethod*)dlsym(shared_lib, ss.as_string());
-        assert(nm != NULL, "");
-        const char* klass_name = (const char*)nm->_method;
-        Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
-        Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
-                                                     Handle(), true, thread);
-        assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
-        const char* method_name = klass_name + strlen(klass_name) + 1;
-        Symbol* method_sym = SymbolTable::new_symbol(method_name);
-        const char* signature = method_name + strlen(method_name) + 1;
-        Symbol* signature_sym = SymbolTable::new_symbol(signature);
-
-        Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
-        assert(m != NULL, "method not found");
-        nm->set_method(m);
-
-        RelocIterator iter(nm);
-        while (iter.next()) {
-          if (iter.type() == relocInfo::metadata_type) {
-            metadata_Relocation* r = iter.metadata_reloc();
-            Metadata* md = r->metadata_value();
-            if (md != NULL) {
-              MetadataRecord rec = (MetadataRecord)*(char*)md;
-              if (rec == KLASS_RECORD) {
-                md = restore_klass((const char*) (((address) md) + 1), thread);
-              } else if (rec == METHOD_RECORD) {
-                md = restore_method((const char*) (((address) md) + 1), thread);
-              } else {
-                ShouldNotReachHere();
-              }
-              if (!nm->metadata_contains(r->metadata_addr())) {
-                *r->metadata_addr() = md;
-              }
-              if (nm->consts_contains(iter.addr())) {
-                *((Metadata**) iter.addr()) = md;
-              }
-            }
-          } else if (iter.type() == relocInfo::virtual_call_type) {
-//            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-//            CompiledICLocker ml(nm);
-//            CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
-////          CompiledIC* ic = CompiledIC_at(nm, iter.addr());
-//            if (ic->cached_value() != NULL) {
-//              Klass* k1 = read_klass(file, thread);
-//              Klass* k2 = read_klass(file, thread);
-//              CompiledICHolder* holder = new CompiledICHolder(k2, k1, false);
-//              ic->set_data((intptr_t)holder);
-//            }
-          } else if (iter.type() == relocInfo::oop_type) {
-            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-            oop_Relocation* r = iter.oop_reloc();
-            char* ptr = *(char**)r->oop_addr();
-            oop o;
-            OopRecord record = (OopRecord)*ptr;
-            if (record == STRING_RECORD) {
-              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-              Handle value = java_lang_String::create_from_str(ptr+1, thread);
-              assert(!thread->has_pending_exception() && !value.is_null(), "");
-              o = value();
-              tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-            } else if (record == CLASS_RECORD) {
-              Klass* k = restore_klass(ptr+1, thread);
-              assert(k->java_mirror() != NULL, "");
-              o = k->java_mirror();
-              tty->print_cr("### class record %s", k->external_name());
-            } else if (record == CLASSLOADER_RECORD) {
-              o = SystemDictionary::java_system_loader();
-            } else if (record == NPE_RECORD) {
-              o = Universe::null_ptr_exception_instance();
-            } else if (record == AE_RECORD) {
-              o = Universe::arithmetic_exception_instance();
-            } else if (record == ASE_RECORD) {
-              o = ase();
-            } else if (record == CCE_RECORD) {
-              o = cce();
-            } else {
-              ShouldNotReachHere();
-            }
-            if (!nm->oops_contains(r->oop_addr())) {
-              *r->oop_addr() = o;
-            }
-            if (nm->consts_contains(iter.addr())) {
-              *((oop*)iter.addr()) = o;
-            }
-          }
-        }
-        for (oop* p = nm->oops_begin(); p < nm->oops_end(); p++) {
-          const char* ptr = *(const char**)p;
-          OopRecord record = (OopRecord)*ptr;
-          if (record == STRING_RECORD) {
-            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-            Handle value = java_lang_String::create_from_str(ptr+1, thread);
-            assert(!thread->has_pending_exception() && !value.is_null(), "");
-            *p = value();
-            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-          } else if (record == CLASS_RECORD) {
-            Klass* k = restore_klass(ptr+1, thread);
-            assert(k->java_mirror() != NULL, "");
-            *p = k->java_mirror();
-            tty->print_cr("### class record %s", k->external_name());
-          } else if (record == CLASSLOADER_RECORD) {
-            *p = SystemDictionary::java_system_loader();
-          } else if (record == NPE_RECORD) {
-            *p = Universe::null_ptr_exception_instance();
-          } else if (record == AE_RECORD) {
-            *p = Universe::arithmetic_exception_instance();
-          } else if (record == ASE_RECORD) {
-            *p = ase();
-          } else if (record == CCE_RECORD) {
-            *p = cce();
-          } else {
-            ShouldNotReachHere();
-          }
-        }
-
-
-        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-          const char* ptr = *(const char**)p;
-          MetadataRecord rec = (MetadataRecord)*ptr;
-          Metadata* md;
-          if (rec == KLASS_RECORD) {
-            md = restore_klass(ptr + 1, thread);
-          } else if (rec == METHOD_RECORD) {
-            md = restore_method(ptr +1, thread);
-          } else {
-            ShouldNotReachHere();
-          }
-          *p = md;
-        }
-      }
 
     } else if (cb->is_vtable_blob()) {
       MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
@@ -3517,6 +3574,7 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     prev = (address)cb;
     prev_offset = offset;
   }
+#endif
 
 //  FOR_ALL_BLOBS(cb, heap) {
 //    if (cb->is_nmethod()) {

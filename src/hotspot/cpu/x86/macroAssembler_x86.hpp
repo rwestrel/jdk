@@ -639,7 +639,7 @@ class MacroAssembler: public Assembler {
   void print_state();
 
   static void debug32(int rdi, int rsi, int rbp, int rsp, int rbx, int rdx, int rcx, int rax, int eip, char* msg);
-  static void debug64(char* msg, int64_t pc, int64_t regs[]);
+  static JNIEXPORT void debug64(char* msg, int64_t pc, int64_t regs[]);
   static void print_state32(int rdi, int rsi, int rbp, int rsp, int rbx, int rdx, int rcx, int rax, int eip);
   static void print_state64(int64_t pc, int64_t regs[]);
 

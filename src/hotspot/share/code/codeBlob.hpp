@@ -189,7 +189,8 @@ public:
   }
 
   // Containment
-  bool blob_contains(address addr) const         { return header_begin()       <= addr && addr < data_end();       }
+  bool blob_contains(address addr) const         { return (header_begin() <= addr && addr < data_end()) ||
+            code_contains(addr);       }
   bool code_contains(address addr) const         { return code_begin()         <= addr && addr < code_end();       }
   bool contains(address addr) const              { return content_begin()      <= addr && addr < content_end();    }
   bool is_frame_complete_at(address addr) const  { return _frame_complete_offset != CodeOffsets::frame_never_safe &&

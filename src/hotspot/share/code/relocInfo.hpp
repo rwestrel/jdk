@@ -1133,6 +1133,7 @@ class static_stub_Relocation : public Relocation {
 };
 
 class runtime_call_Relocation : public CallRelocation {
+  friend class CodeCache;
 
  public:
   static RelocationHolder spec() {
@@ -1262,6 +1263,7 @@ class external_word_Relocation : public DataRelocation {
 };
 
 class card_mark_word_Relocation : public DataRelocation {
+  friend class CodeCache;
 public:
   static RelocationHolder spec() {
     RelocationHolder rh = newHolder();

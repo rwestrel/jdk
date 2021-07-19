@@ -201,6 +201,7 @@ class JNIEXPORT nmethod : public CompiledMethod {
   int _unwind_handler_offset;
 
   int _consts_offset;
+  int _consts_end_offset;
   int _stub_offset;
   int _oops_offset;                       // offset to where embedded oop table begins (inside data)
   int _metadata_offset;                   // embedded meta data table
@@ -393,7 +394,7 @@ class JNIEXPORT nmethod : public CompiledMethod {
 
   // boundaries for different parts
   address consts_begin          () const          { return           header_begin() + _consts_offset        ; }
-  address consts_end            () const          { return           code_begin()                           ; }
+  address consts_end          () const          { return           header_begin() + _consts_end_offset      ; }
   address stub_begin            () const          { return           header_begin() + _stub_offset          ; }
   address stub_end              () const          { return           header_begin() + _oops_offset          ; }
   address exception_begin       () const          { return           header_begin() + _exception_offset     ; }

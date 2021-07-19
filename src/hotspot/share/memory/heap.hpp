@@ -230,4 +230,31 @@ public:
   void print()  PRODUCT_RETURN;
 };
 
+class JNIEXPORT LeydenCodeHeap : public CodeHeap {
+  friend class CodeCache;
+private:
+  LeydenCodeHeap() : CodeHeap(NULL, 0) {}
+public:
+  virtual void* first() const {
+    CodeBlob** cb = (CodeBlob**) CodeHeap::first();
+    if (cb == NULL) {
+      return NULL;
+    }
+    return *cb;
+  }
+
+  virtual void* next(void* p) const{
+
+    CodeBlob** cb = (CodeBlob**) CodeHeap::next(p);
+    if (cb == NULL) {
+      return NULL;
+    }
+    return *cb;
+  }
+
+  virtual CodeBlob* find_blob_unsafe(void* start) const;
+
+
+};
+
 #endif // SHARE_MEMORY_HEAP_HPP

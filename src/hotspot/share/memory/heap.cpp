@@ -488,6 +488,14 @@ CodeBlob* CodeHeap::find_blob_unsafe(void* start) const {
   return (result != NULL && result->blob_contains((address)start)) ? result : NULL;
 }
 
+CodeBlob* LeydenCodeHeap::find_blob_unsafe(void* start) const {
+  CodeBlob* result = (CodeBlob*)CodeHeap::find_start(start);
+  if (result != NULL) {
+    result = *(CodeBlob**)result;
+  }
+  return (result != NULL && result->blob_contains((address)start)) ? result : NULL;
+}
+
 size_t CodeHeap::alignment_unit() const {
   // this will be a power of two
   return _segment_size;

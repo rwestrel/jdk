@@ -623,6 +623,7 @@ nmethod::nmethod(
     _orig_pc_offset          = 0;
 
     _consts_offset           = data_offset();
+    _consts_end_offset       = data_offset();
     _stub_offset             = data_offset();
     _oops_offset             = data_offset();
     _metadata_offset         = _oops_offset         + align_up(code_buffer->total_oop_size(), oopSize);
@@ -756,6 +757,8 @@ nmethod::nmethod(
 
     // Section offsets
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
+    _consts_end_offset       = code_begin() - consts_begin() + content_offset();
+    assert(consts_end() == code_begin(), "");
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     set_ctable_begin(header_begin() + _consts_offset);
 

@@ -143,7 +143,7 @@ address* Relocation::pd_address_in_code() {
   // All embedded Intel addresses are stored in 32-bit words.
   // Since the addr points at the start of the instruction,
   // we must parse the instruction a bit to find the embedded word.
-  assert(is_data(), "must be a DataRelocation");
+//  assert(is_data(), "must be a DataRelocation");
   typedef Assembler::WhichOperand WhichOperand;
   WhichOperand which = (WhichOperand) format(); // that is, disp32 or imm/imm32
 #ifdef AMD64
