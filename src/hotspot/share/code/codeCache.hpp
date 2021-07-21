@@ -304,7 +304,6 @@ public:
   static void dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread);
 
   static void restore_from_disk(JavaThread* thread);
-
 };
 
 
