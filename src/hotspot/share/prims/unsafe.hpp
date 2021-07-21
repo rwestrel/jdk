@@ -29,7 +29,7 @@
 #include "jni.h"
 
 extern "C" {
-  void JNICALL JVM_RegisterJDKInternalMiscUnsafeMethods(JNIEnv *env, jclass unsafecls);
+  JNIEXPORT void JNICALL JVM_RegisterJDKInternalMiscUnsafeMethods(JNIEnv *env, jclass unsafecls);
 }
 
 jlong Unsafe_field_offset_to_byte_offset(jlong field_offset);

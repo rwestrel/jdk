@@ -1805,7 +1805,7 @@ Method* restore_method(const char* ptr, JavaThread* thread) {
 
 JNIEXPORT uint8_t* card_table_base;
 
-void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
+void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread) {
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
 
@@ -1886,36 +1886,16 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
   int fd = open("/home/roland/tmp/lib.o", O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
   assert(fd > 0, "");
 
-  ResourceMark rm;
-
   Elf* elf = elf_begin(fd, ELF_C_WRITE, (Elf *)0);
   assert(elf != NULL, "");
 
   Elf64_Ehdr* ehdr = elf64_newehdr(elf);
   assert(ehdr != NULL, "");
 
-
-//  ehdr->e_ident[EI_MAG0] = ELFMAG0;
-//  ehdr->e_ident[EI_MAG1] = ELFMAG1;
-//  ehdr->e_ident[EI_MAG2] = ELFMAG2;
-//  ehdr->e_ident[EI_MAG3] = ELFMAG3;
-//  ehdr->e_ident[EI_CLASS] = ELFCLASS64;
   ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-//  ehdr->e_ident[EI_VERSION] = EV_CURRENT;
-//  ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
   ehdr->e_type = ET_REL;
   ehdr->e_machine = EM_X86_64;
   ehdr->e_version = EV_CURRENT;
-//  ehdr->e_entry =
-//  ehdr->e_phoff =
-//  ehdr->e_shoff = // <-
-//  ehdr->e_flags =
-//  ehdr->e_ehsize = sizeof(Elf64_Ehdr);
-//  ehdr->e_phentsize =
-//  ehdr->e_phnum =
-//  ehdr->e_shentsize = sizeof(Elf64_Shdr);
-//  ehdr->e_shnum =// <-
-//  ehdr->e_shstrndx = // <-
 
   GrowableArray<char> shstrings;
   GrowableArray<char> strings;
@@ -2051,6 +2031,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
 
   Elf_Scn* compiledicholders_section = NULL;
   Elf64_Shdr* compiledicholders_hdr = NULL;
+  int compiledicholders_sym;
 
   if (has_compiledicholders) {
     compiledicholders_section = elf_newscn(elf);
@@ -2067,6 +2048,16 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     compiledicholders_hdr->sh_entsize = 0;
     compiledicholders_hdr->sh_addralign = 8;
 
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, ".compiledicholders");
+    sym.st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(compiledicholders_section);
+    sym.st_value = 0;
+    sym.st_size = 0;
+    compiledicholders_sym = symbols.length();
+    symbols.push(sym);
   }
 
   Elf_Scn* oopmaps_section = NULL;
@@ -2185,6 +2176,33 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
     assert(offset == vt_offset, "");
   }
 
+  int nb = loaded_klasses->length();
+  {
+    assert(nb >= 1, "");
+
+    Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
+    codeblobsro_data->d_buf = (void*)&nb;
+    codeblobsro_data->d_type = ELF_T_BYTE;
+    codeblobsro_data->d_size = sizeof(nb);
+    codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
+    codeblobsro_data->d_align = 1;
+    codeblobsro_data->d_version = EV_CURRENT;
+    codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+
+    Elf64_Sym sym;
+    sym.st_name = strings.length();
+    push_array(strings, "leydenLoadedKlasses");
+    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
+    sym.st_other = 0;
+    sym.st_shndx = elf_ndxscn(codeblobsro_section);
+    sym.st_value = codeblobsro_data->d_off;
+    sym.st_size = codeblobsro_data->d_size;
+    symbols.push(sym);
+
+    for (int i = 0; i < nb; i++) {
+      record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*)loaded_klasses->at(i));
+    }
+  }
 
   bool success = true;
   FOR_ALL_BLOBS(cb, heap) {
@@ -2232,15 +2250,6 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       }
     }
     assert(success, "");
-
-//    int oopmaps_len = oopmaps == NULL ? 0 : oopmaps->nr_of_bytes();
-//    w = fwrite(&oopmaps_len, sizeof(oopmaps_len), 1, file);
-//    assert(w == 1, "fwrite failed");
-//    if (oopmaps_len > 0) {
-//      w = fwrite(oopmaps, oopmaps_len, 1, file);
-//      assert(w == 1, "fwrite failed");
-//    }
-
 
     int vtbl_sym;
     if (vtbl == vts.nmethod) {
@@ -2401,6 +2410,20 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
       }
       {
         Elf64_Rela reloc;
+        reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _old_code_begin);
+        reloc.r_addend = codeblobs_data->d_off + (cb->_old_code_begin - (address)cb);
+        reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
+        codeblobs_relocs.push(reloc);
+      }
+      {
+        Elf64_Rela reloc;
+        reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _old_code_end);
+        reloc.r_addend = codeblobs_data->d_off + (cb->_old_code_end - (address)cb);
+        reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
+        codeblobs_relocs.push(reloc);
+      }
+      {
+        Elf64_Rela reloc;
         reloc.r_offset = codeblobs_data->d_off + offset_of(CodeBlob, _content_begin);
         reloc.r_addend = codeblobs_data->d_off + (cb->_content_begin - (address)cb);
         reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
@@ -2436,6 +2459,14 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
             address dest = r->destination();
             if (dest != (address) -1) {
               if (heap->contains(dest)) {
+                NativeInstruction* ni = nativeInstruction_at(r->addr());
+                if (ni->is_mov_literal64()) {
+                  Elf64_Rela reloc;
+                  reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
+                  reloc.r_addend = dest - (address)heap->low();
+                  reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
+                  text_relocs.push(reloc);
+                }
               } else {
                 static address to_skip[] = {
                         (address) SharedRuntime::handle_wrong_method,
@@ -2471,15 +2502,16 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               }
             }
           } else if (iter.type() == relocInfo::internal_word_type) {
-//          internal_word_Relocation* iw = iter.internal_word_reloc();
-//          internal_word_Relocation* iw_copy = iter_copy.internal_word_reloc();
-//          assert(iw->_target != NULL, "");
-//          address target = iw->target();
-//          intptr_t offset = target - (address)cb;
-//          tty->print_cr("ZZZ %ld", offset);
-//          iw_copy->set_value((address)offset);
+            internal_word_Relocation* r = iter.internal_word_reloc();
+            assert(cb->code_contains(r->target()), "");
+            Elf64_Rela reloc;
+            reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
+            reloc.r_addend = r->target() - (address)heap->low();
+            reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_64);
+            text_relocs.push(reloc);
           } else if (iter.type() == relocInfo::section_word_type) {
             section_word_Relocation* r = iter.section_word_reloc();
+            assert(!cb->code_contains(r->target()), "");
             Elf64_Rela reloc;
             reloc.r_offset = (address)r->pd_address_in_code() - (address)heap->low();
             reloc.r_addend = r->target() - (address)CodeCache::first_blob(heap);
@@ -2635,6 +2667,7 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               case relocInfo::oop_type: {
                 oop_Relocation* r = iter.oop_reloc();
                 oop o = r->oop_value();
+                assert(!nm->code_contains(iter.addr()), "");
                 int64_t off;
                 if (o->is_a(vmClasses::String_klass())) {
                   off = record_oop_type(codeblobsro_section, codeblobsro_hdr, STRING_RECORD);
@@ -2668,7 +2701,8 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
               case relocInfo::virtual_call_type: {
                 MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
                 CompiledICLocker ml(nm);
-                CompiledIC* ic = CompiledIC_at(nm, iter.addr());
+                address call = iter.addr();
+                CompiledIC* ic = CompiledIC_at(nm, call);
                 if (ic->is_icholder_call()) {
                   CompiledICHolder* holder = ic->cached_icholder();
 
@@ -2681,6 +2715,35 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
                   compiledicholders_data->d_version = EV_CURRENT;
 
                   compiledicholders_hdr->sh_size += compiledicholders_data->d_size;
+
+                  NativeCall* call = nativeCall_at(iter.addr());
+                  NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
+                  NativeMovConstReg* load = (NativeMovConstReg*)call_wrapper->get_load_instruction(iter.virtual_call_reloc());
+
+                  {
+                    Elf64_Rela reloc;
+                    reloc.r_offset = load->data_addr() - (address)heap->low();
+                    reloc.r_addend = compiledicholders_data->d_off;
+                    reloc.r_info = ELF64_R_INFO(compiledicholders_sym, R_X86_64_64);
+                    text_relocs.push(reloc);
+                  }
+                  {
+                    Elf64_Rela reloc;
+                    reloc.r_offset = codeblobs_data->d_off + (load->data_addr() - (address)nm);
+                    reloc.r_addend = compiledicholders_data->d_off;
+                    reloc.r_info = ELF64_R_INFO(compiledicholders_sym, R_X86_64_64);
+                    codeblobs_relocs.push(reloc);
+                  }
+                  {
+                    assert(!holder->_is_metadata_method, "");
+                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
+
+                    Elf64_Rela reloc;
+                    reloc.r_offset = compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass);
+                    reloc.r_addend = off;
+                    reloc.r_info = ELF64_R_INFO(codeblobsro_sym, R_X86_64_64);
+                    compiledicholders_relocs.push(reloc);
+                  }
                   {
                     assert(!holder->_is_metadata_method, "");
                     int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
@@ -3029,47 +3092,13 @@ void CodeCache::dump_to_disk(FILE* file, JavaThread* thread) {
 }
 
 
-void CodeCache::write_class_object(FILE* file, oop o) {
-  OopRecord record = CLASS_RECORD;
-  int w = fwrite(&record, sizeof(record), 1, file);
-  assert(w == 1, "fwrite failed");
-  Klass* k = java_lang_Class::as_Klass(o);
-  write_klass(file, k);
-  tty->print_cr("### class record %s", k->external_name());
-}
-
-void CodeCache::write_string_object(FILE* file, JavaThread* thread, oop o) {
-  OopRecord record = STRING_RECORD;
-  int w = fwrite(&record, sizeof(record), 1, file);
-  assert(w == 1, "fwrite failed");
-  int length;
-  jchar* str = java_lang_String::as_unicode_string(o, length, thread);
-  assert(str != NULL && !thread->has_pending_exception(), "");
-  w = fwrite(&length, sizeof(length), 1, file);
-  assert(w == 1, "fwrite failed");
-  w = fwrite(str, sizeof(jchar), length, file);
-  assert(w == length, "fwrite failed");
-  tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(o));
-}
-
-void CodeCache::write_method(FILE* file, const Method* m) {
-  write_symbol(file, m->klass_name());
-  write_symbol(file, m->name());
-  write_symbol(file, m->signature());
-}
-
-void CodeCache::write_symbol(FILE* file, const Symbol* sym) {
-  int l = sym->utf8_length();
-  int w = fwrite(&l, sizeof(l), 1, file);
-  assert(w == 1, "fwrite failed");
-  w = fwrite(sym->as_utf8(), 1, l, file);
-  assert(w == l, "fwrite failed");
-}
-
 #include "oops/klass.inline.hpp"
 #include "utilities/utf8.hpp"
 
-void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
+void CodeCache::restore_from_disk(JavaThread* thread) {
+  ResourceMark rm;
+  HandleMark hm(thread);
+
   if (UseSerialGC) {
     BarrierSet* bs = BarrierSet::barrier_set();
     CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
@@ -3082,6 +3111,17 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     tty->print_cr("XXX %s", dlerror());
   }
   assert(shared_lib != NULL, "");
+
+  char* klasses_ptr = (char*) dlsym(shared_lib, "leydenLoadedKlasses");
+  assert(klasses_ptr != NULL, "");
+  int nb_loaded_klasses = *(int*)klasses_ptr;
+  klasses_ptr += sizeof(int);
+
+  for (int i = 0; i < nb_loaded_klasses; i++) {
+    Klass* k = restore_klass(klasses_ptr, thread);
+    klasses_ptr += strlen(klasses_ptr) + 1;
+  }
+
 
   Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
   assert(ase.not_null() && !thread->has_pending_exception(), "");
@@ -3112,6 +3152,10 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
         assert(m != NULL, "method not found");
         nm->set_method(m);
 
+        if (!nm->is_native_method()) {
+          nm->_pc_desc_container.reset_to(nm->scopes_pcs_begin());
+        }
+
         RelocIterator iter(nm);
         while (iter.next()) {
           if (iter.type() == relocInfo::metadata_type) {
@@ -3136,9 +3180,19 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
           } else if (iter.type() == relocInfo::virtual_call_type) {
             MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
             CompiledICLocker ml(nm);
-            CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
-            if (ic->cached_value() != NULL) {
-              CompiledICHolder* holder = ic->cached_icholder();
+//            CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
+//            if (ic->cached_value() != NULL) {
+//              CompiledICHolder* holder = ic->cached_icholder();
+//              Klass* k1 = restore_klass((const char*)holder->holder_klass(), thread);
+//              Klass* k2 = restore_klass((const char*)holder->holder_metadata(), thread);
+//              holder->_holder_klass = k1;
+//              holder->_holder_metadata = k2;
+//            }
+            NativeCall* call = nativeCall_at(iter.addr());
+            NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
+            NativeInstruction* load = call_wrapper->get_load_instruction(iter.virtual_call_reloc());
+            CompiledICHolder* holder = (CompiledICHolder*)call_wrapper->get_data(load);
+            if (holder != Universe::non_oop_word()) {
               Klass* k1 = restore_klass((const char*)holder->holder_klass(), thread);
               Klass* k2 = restore_klass((const char*)holder->holder_metadata(), thread);
               holder->_holder_klass = k1;
@@ -3151,7 +3205,6 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
             oop o;
             OopRecord record = (OopRecord) *ptr;
             if (record == STRING_RECORD) {
-              MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
               Handle value = java_lang_String::create_from_str(ptr + 1, thread);
               assert(!thread->has_pending_exception() && !value.is_null(), "");
               o = value();
@@ -3590,8 +3643,6 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
 //    }
 //  }
 
-  fclose(file);
-
 #if 0
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
   FOR_ALL_BLOBS(cb, heap) {
@@ -3629,50 +3680,6 @@ void CodeCache::restore_from_disk(FILE* file, JavaThread* thread) {
     *(intptr_t*) cb = vtbl;
   }
 #endif
-}
-
-Handle CodeCache::read_string_object(FILE* file, JavaThread* thread) {
-  int length;
-  int r = fread(&length, sizeof(length), 1, file);
-  assert(r == 1, "fread failed");
-  jchar* str = NEW_RESOURCE_ARRAY(jchar, length);
-  r = fread(str, sizeof(jchar), length, file);
-  assert(r == length, "fread failed");
-  Handle value = java_lang_String::create_from_unicode(str, length, thread);
-  assert(!thread->has_pending_exception() && !value.is_null(), "");
-  return value;
-}
-
-Method* CodeCache::read_method(FILE* file, JavaThread* thread) {
-  Klass* k = read_klass(file, thread);
-  Symbol* method_sym = read_symbol(file);
-  Symbol* signature_sym = read_symbol(file);
-  Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
-  assert(m != NULL, "method not found");
-  return m;
-}
-
-Klass* CodeCache::read_klass(FILE* file, JavaThread* thread) {
-  Symbol* klass_sym = read_symbol(file);
-  Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
-                                               Handle(), true, thread);
-  assert(k != NULL && !thread->has_pending_exception(), "resolution failure");
-  return k;
-}
-
-Symbol* CodeCache::read_symbol(FILE* file) {
-  int l;
-  int r = fread(&l, sizeof(l), 1, file);
-  assert(r == 1, "fread failed");
-  char* name = NEW_RESOURCE_ARRAY(char, l + 1);
-  r = fread(name, 1, l, file);
-  assert(r == l, "fread failed");
-  name[l] = '\0';
-  return SymbolTable::new_symbol(name, l);
-}
-
-void CodeCache::write_klass(FILE* file, Klass* klass) {
-  write_symbol(file, klass->name());
 }
 
 //---<  END  >--- CodeHeap State Analytics.

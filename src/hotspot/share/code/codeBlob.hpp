@@ -101,6 +101,8 @@ protected:
 
   address    _code_begin;
   address    _code_end;
+  address    _old_code_begin;
+  address    _old_code_end;
   address    _content_begin;                     // address to where content region begins (this includes consts, insts, stubs)
                                                  // address    _content_end - not required, for all CodeBlobs _code_end == _content_end for now
   address    _data_end;
@@ -163,7 +165,7 @@ public:
   relocInfo* relocation_begin() const { return (relocInfo*) _relocation_begin; };
   relocInfo* relocation_end() const   { return (relocInfo*) _relocation_end; }
   address content_begin() const       { return _content_begin; }
-  address content_end() const         { return _code_end; } // _code_end == _content_end is true for all types of blobs for now, it is also checked in the constructor
+  address content_end() const         { return _old_code_end; } // _code_end == _content_end is true for all types of blobs for now, it is also checked in the constructor
   address code_begin() const          { return _code_begin;    }
   address code_end() const            { return _code_end; }
   address data_end() const            { return _data_end;      }
@@ -192,7 +194,8 @@ public:
   bool blob_contains(address addr) const         { return (header_begin() <= addr && addr < data_end()) ||
             code_contains(addr);       }
   bool code_contains(address addr) const         { return code_begin()         <= addr && addr < code_end();       }
-  bool contains(address addr) const              { return content_begin()      <= addr && addr < content_end();    }
+  bool contains(address addr) const              { return (content_begin() <= addr && addr < content_end()) ||
+            code_contains(addr);    }
   bool is_frame_complete_at(address addr) const  { return _frame_complete_offset != CodeOffsets::frame_never_safe &&
                                                           code_contains(addr) && addr >= code_begin() + _frame_complete_offset; }
   int frame_complete_offset() const              { return _frame_complete_offset; }

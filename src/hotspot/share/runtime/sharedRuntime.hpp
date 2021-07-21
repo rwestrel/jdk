@@ -282,7 +282,7 @@ class SharedRuntime: AllStatic {
 
 
   // used by native wrappers to reenable yellow if overflow happened in native code
-  static void reguard_yellow_pages();
+  static JNIEXPORT void reguard_yellow_pages();
 
   // Fill in the "X cannot be cast to a Y" message for ClassCastException
   //

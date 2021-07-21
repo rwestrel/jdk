@@ -622,8 +622,10 @@ nmethod::nmethod(
     _exception_offset        = 0;
     _orig_pc_offset          = 0;
 
-    _consts_offset           = data_offset();
-    _consts_end_offset       = data_offset();
+    _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
+    _consts_end_offset       = code_begin() - consts_begin() + content_offset();
+//    _consts_offset           = data_offset();
+//    _consts_end_offset       = data_offset();
     _stub_offset             = data_offset();
     _oops_offset             = data_offset();
     _metadata_offset         = _oops_offset         + align_up(code_buffer->total_oop_size(), oopSize);

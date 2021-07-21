@@ -2884,32 +2884,32 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   JvmtiExport::post_early_vm_start();
 
   if (RestoreCodeFromDisk && UseNewCode) {
-    ResourceMark rm;
-    HandleMark hm(THREAD);
-    FILE* file = fopen("/home/roland/tmp/dump", "r");
-    assert(file != NULL, "fopen failed");
-    int nb;
-    int r = fread(&nb, sizeof(nb), 1, file);
-    assert(r == 1, "fread failed");
-    for (int i = 0; i < nb; i++) {
-      int l;
-      r = fread(&l, sizeof(l), 1, file);
-      assert(r == 1, "fread failed");
-      char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
-      r = fread(klass_name, 1, l, file);
-      assert(r == l, "fread failed");
-      klass_name[l] = '\0';
-//        tty->print_cr("XXX %s", klass_name);
-      Symbol* sym = SymbolTable::new_symbol(klass_name, l);
-      Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
-                                                   Handle(), true, THREAD);
-      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
-//      if (k == NULL || THREAD->has_pending_exception()) {
-//        THREAD->clear_pending_exception();
-//        tty->print_cr("Warning: failed to resolve: %s", klass_name);
-//      }
-    }
-    CodeCache::restore_from_disk(file, THREAD);
+//    ResourceMark rm;
+//    HandleMark hm(THREAD);
+//    FILE* file = fopen("/home/roland/tmp/dump", "r");
+//    assert(file != NULL, "fopen failed");
+//    int nb;
+//    int r = fread(&nb, sizeof(nb), 1, file);
+//    assert(r == 1, "fread failed");
+//    for (int i = 0; i < nb; i++) {
+//      int l;
+//      r = fread(&l, sizeof(l), 1, file);
+//      assert(r == 1, "fread failed");
+//      char* klass_name = NEW_RESOURCE_ARRAY(char, l + 1);
+//      r = fread(klass_name, 1, l, file);
+//      assert(r == l, "fread failed");
+//      klass_name[l] = '\0';
+////        tty->print_cr("XXX %s", klass_name);
+//      Symbol* sym = SymbolTable::new_symbol(klass_name, l);
+//      Klass* k = SystemDictionary::resolve_or_fail(sym, Handle(THREAD, SystemDictionary::java_system_loader()),
+//                                                   Handle(), true, THREAD);
+//      assert(k != NULL && !THREAD->has_pending_exception(), "resolution failure");
+////      if (k == NULL || THREAD->has_pending_exception()) {
+////        THREAD->clear_pending_exception();
+////        tty->print_cr("Warning: failed to resolve: %s", klass_name);
+////      }
+//    }
+    CodeCache::restore_from_disk(THREAD);
   }
 
   initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
@@ -3454,10 +3454,9 @@ void Threads::destroy_vm() {
   }
 
   if (DumpCodeToDisk) {
+
     ResourceMark rm;
     HandleMark hm(thread);
-    FILE* file = fopen("/home/roland/tmp/dump", "w");
-    assert(file != NULL, "fopen failed");
 
     loaded_klasses = new GrowableArray<Klass*>();
     {
@@ -3465,19 +3464,20 @@ void Threads::destroy_vm() {
       ClassLoaderDataGraph::classes_do(collect_loaded_klasses);
     }
 
-    int nb = loaded_klasses->length();
-    assert(nb >= 1, "");
-    int w = fwrite(&nb, sizeof(nb), 1, file);
-    assert(w == 1, "fwrite failed");
-    for (int i = 0; i < nb; i++) {
-      Symbol* klass_name = loaded_klasses->at(i)->name();
-      int l = klass_name->utf8_length();
-      w = fwrite(&l, sizeof(l), 1, file);
-      assert(w == 1, "fwrite failed");
-      w = fwrite(klass_name->as_utf8(), 1, l, file);
-      assert(w == l, "fwrite failed");
-    }
-    CodeCache::dump_to_disk(file, thread);
+//    int nb = loaded_klasses->length();
+//    assert(nb >= 1, "");
+//    int w = fwrite(&nb, sizeof(nb), 1, file);
+//    assert(w == 1, "fwrite failed");
+//    for (int i = 0; i < nb; i++) {
+//      Symbol* klass_name = loaded_klasses->at(i)->name();
+//      int l = klass_name->utf8_length();
+//      w = fwrite(&l, sizeof(l), 1, file);
+//      assert(w == 1, "fwrite failed");
+//      w = fwrite(klass_name->as_utf8(), 1, l, file);
+//      assert(w == l, "fwrite failed");
+//    }
+
+    CodeCache::dump_to_disk(loaded_klasses, thread);
   }
 
   before_exit(thread);

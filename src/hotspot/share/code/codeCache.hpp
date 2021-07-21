@@ -301,27 +301,9 @@ class CodeCache : AllStatic {
   static void print_names(outputStream *out);
 
 public:
-  static void dump_to_disk(FILE* file, JavaThread* pThread);
+  static void dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread);
 
-  static void restore_from_disk(FILE* file, JavaThread* thread);
-
-  static void write_symbol(FILE* file, const Symbol* sym);
-
-  static void write_method(FILE* file, const Method* m);
-
-  static Symbol* read_symbol(FILE* file);
-
-  static Klass* read_klass(FILE* file, JavaThread* thread);
-
-  static Method* read_method(FILE* file, JavaThread* thread);
-
-  static void write_klass(FILE* file, Klass* klass);
-
-  static void write_string_object(FILE* file, JavaThread* thread, oop o);
-
-  static void write_class_object(FILE* file, oop o);
-
-  static Handle read_string_object(FILE* file, JavaThread* thread);
+  static void restore_from_disk(JavaThread* thread);
 
 };
 

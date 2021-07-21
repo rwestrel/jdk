@@ -2827,7 +2827,7 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_checkcast_copy(const char *name, address *entry,
                                   bool dest_uninitialized = false) {
-    int insts_size = 512;
+    int insts_size = 1024;
     int locs_size  = 64;
 
     CodeBuffer code(name, insts_size, locs_size);

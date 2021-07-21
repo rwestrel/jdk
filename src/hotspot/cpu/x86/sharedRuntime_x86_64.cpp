@@ -1992,13 +1992,14 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     if (method->is_static()) {
 
+      //  load oop into a register
       if (DumpCodeToDisk) {
-        __ mov_metadata(oop_handle_reg, method->method_holder());
-        const int mirror_offset = in_bytes(Klass::java_mirror_offset());
-        __ movptr(oop_handle_reg, Address(oop_handle_reg, mirror_offset));
-        __ resolve_oop_handle(oop_handle_reg, rbx);
+        jobject obj = JNIHandles::make_local(method->method_holder()->java_mirror());
+        int oop_index = __ oop_recorder()->find_index(obj);
+        __ lea(oop_handle_reg, InternalAddress(__ code()->consts()->start()));
+        address addr = __ address_constant((address) obj, oop_Relocation::spec(oop_index));
+        __ movptr(oop_handle_reg, Address(oop_handle_reg, addr - __ code()->consts()->start()));
       } else {
-        //  load oop into a register
         __ movoop(oop_handle_reg, JNIHandles::make_local(method->method_holder()->java_mirror()));
       }
 

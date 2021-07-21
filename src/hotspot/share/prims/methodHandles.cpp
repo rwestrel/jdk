@@ -1569,9 +1569,17 @@ static JNINativeMethod MH_methods[] = {
 /**
  * This one function is exported, used by NativeLookup.
  */
-JVM_ENTRY(void, JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass MHN_class)) {
+//JVM_ENTRY(void, JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass MHN_class)) {
+extern "C" {
+JNIEXPORT void JVM_RegisterMethodHandleMethods(JNIEnv* env, jclass MHN_class) {
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);;
+  ThreadInVMfromNative __tiv(thread);
+  VMNativeEntryWrapper __vew;
+  HandleMarkCleaner __hm(thread);
+  JavaThread* __the_thread__ = thread;
+  os::verify_stack_alignment();
   assert(!MethodHandles::enabled(), "must not be enabled");
-  assert(vmClasses::MethodHandle_klass() != NULL, "should be present");
+  assert(vmClasses::MethodHandle_klass() != NULL, "should be present"); {
 
   oop mirror = vmClasses::MethodHandle_klass()->java_mirror();
   jclass MH_class = (jclass) JNIHandles::make_local(THREAD, mirror);
