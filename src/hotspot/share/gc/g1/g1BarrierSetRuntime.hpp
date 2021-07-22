@@ -39,13 +39,13 @@ public:
   using CardValue = G1CardTable::CardValue;
 
   // Arraycopy stub generator
-  static void write_ref_array_pre_oop_entry(oop* dst, size_t length);
+  static JNIEXPORT void write_ref_array_pre_oop_entry(oop* dst, size_t length);
   static void write_ref_array_pre_narrow_oop_entry(narrowOop* dst, size_t length);
-  static void write_ref_array_post_entry(HeapWord* dst, size_t length);
+  static JNIEXPORT void write_ref_array_post_entry(HeapWord* dst, size_t length);
 
   // C2 slow-path runtime calls.
-  static void write_ref_field_pre_entry(oopDesc* orig, JavaThread *thread);
-  static void write_ref_field_post_entry(volatile CardValue* card_addr, JavaThread* thread);
+  static JNIEXPORT void write_ref_field_pre_entry(oopDesc* orig, JavaThread *thread);
+  static JNIEXPORT void write_ref_field_post_entry(volatile CardValue* card_addr, JavaThread* thread);
 };
 
 #endif // SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP

@@ -2552,7 +2552,7 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_disjoint_long_oop_copy(bool aligned, bool is_oop, address *entry,
                                           const char *name, bool dest_uninitialized = false) {
-    int insts_size = 512;
+    int insts_size = 512 * 2;
     int locs_size  = 64;
 
     CodeBuffer code(name, insts_size, locs_size);
@@ -2681,7 +2681,7 @@ class StubGenerator: public StubCodeGenerator {
   address generate_conjoint_long_oop_copy(bool aligned, bool is_oop,
                                           address nooverlap_target, address *entry,
                                           const char *name, bool dest_uninitialized = false) {
-    int insts_size = 512;
+    int insts_size = 512 * 2;
     int locs_size  = 64;
 
     CodeBuffer code(name, insts_size, locs_size);
@@ -2827,7 +2827,7 @@ class StubGenerator: public StubCodeGenerator {
   //
   address generate_checkcast_copy(const char *name, address *entry,
                                   bool dest_uninitialized = false) {
-    int insts_size = 1024;
+    int insts_size = 1024 * 2;
     int locs_size  = 64;
 
     CodeBuffer code(name, insts_size, locs_size);
