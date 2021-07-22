@@ -1979,8 +1979,6 @@ static void add_shstring_section(Elf* elf, Elf64_Ehdr* ehdr, GrowableArray<char>
 //JNIEXPORT uint8_t* card_table_base;
 
 void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread) {
-  assert(UseEpsilonGC, "");
-
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
 
@@ -2658,8 +2656,6 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 void CodeCache::restore_from_disk(JavaThread* thread) {
   ResourceMark rm;
   HandleMark hm(thread);
-
-  assert(UseEpsilonGC, "");
 
 //  if (UseSerialGC) {
 //    BarrierSet* bs = BarrierSet::barrier_set();

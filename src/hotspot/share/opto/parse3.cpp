@@ -94,7 +94,9 @@ void Parse::do_field_access(bool is_get, bool is_field) {
       (void) pop();  // pop receiver after putting
     }
   } else {
-    ensure_klass_initialization(field_holder);
+    if (DumpCodeToDisk) {
+      ensure_klass_initialization(field_holder);
+    }
     if (DumpCodeToDisk && 0) {
       obj = load_mirror_from_klass(makecon(TypeKlassPtr::make(field_holder)));
     } else {

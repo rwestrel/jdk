@@ -258,7 +258,9 @@ void Parse::do_new() {
     if (stopped())  return;
   }
 
-  ensure_klass_initialization(klass);
+  if (DumpCodeToDisk) {
+    ensure_klass_initialization(klass);
+  }
 
   Node* kls = makecon(TypeKlassPtr::make(klass));
   Node* obj = new_instance(kls);

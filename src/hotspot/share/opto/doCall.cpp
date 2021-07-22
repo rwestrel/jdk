@@ -522,7 +522,7 @@ void Parse::do_call() {
     return;
   }
 
-  if ((bc() == Bytecodes::_invokestatic)) {
+  if (DumpCodeToDisk && (bc() == Bytecodes::_invokestatic)) {
     ensure_klass_initialization(holder_klass);
   }
 

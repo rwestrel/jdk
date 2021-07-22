@@ -187,15 +187,16 @@ public:
     _size = (int)used;
     _data_offset = (int)used;
     _code_end = (address)this + used;
+    _old_code_end = (address)this + used;
     _data_end = (address)this + used;
   }
 
   // Containment
   bool blob_contains(address addr) const         { return (header_begin() <= addr && addr < data_end()) ||
-            code_contains(addr);       }
+            (RestoreCodeFromDisk && code_contains(addr));       }
   bool code_contains(address addr) const         { return code_begin()         <= addr && addr < code_end();       }
   bool contains(address addr) const              { return (content_begin() <= addr && addr < content_end()) ||
-            code_contains(addr);    }
+            (RestoreCodeFromDisk && code_contains(addr));    }
   bool is_frame_complete_at(address addr) const  { return _frame_complete_offset != CodeOffsets::frame_never_safe &&
                                                           code_contains(addr) && addr >= code_begin() + _frame_complete_offset; }
   int frame_complete_offset() const              { return _frame_complete_offset; }
