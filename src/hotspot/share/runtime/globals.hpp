@@ -2053,6 +2053,9 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, RestoreCodeFromDisk, false, DIAGNOSTIC,                     \
           "")                                                               \
                                                                             \
+  product(ccstr, CodeFileName, "leyden", DIAGNOSTIC,                    \
+          "")                                                               \
+                                                                            \
   product(bool, UpdateCompileList, false, DIAGNOSTIC,                       \
           "")                                                               \
                                                                             \

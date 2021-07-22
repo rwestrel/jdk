@@ -1845,6 +1845,19 @@ static void add_relocation(unsigned long offset, int64_t addend, int sym, Growab
   relocs.push(reloc);
 }
 
+static Elf_Data* new_data(Elf_Scn* section, void* buf, unsigned long size) {
+  Elf64_Shdr* hdr = elf64_getshdr(section);
+  Elf_Data* data = elf_newdata(section);
+  data->d_buf = buf;
+  data->d_type = ELF_T_BYTE;
+  data->d_size = size;
+  data->d_off = hdr->sh_size;
+  data->d_align = 1;
+  data->d_version = EV_CURRENT;
+  hdr->sh_size += data->d_size;
+  return data;
+}
+
 
 
 JNIEXPORT uint8_t* card_table_base;
@@ -1893,16 +1906,6 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
               inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
             } else if (resolved_method->has_itable_index()) {
               int itable_index = resolved_method->itable_index();
-              {
-                ResourceMark rm;
-                stringStream ss;
-                resolved_method->print_short_name(&ss);
-                tty->print_cr("XXX itable index for %s %d", ss.as_string(), itable_index);
-                resolved_method->method_holder()->print_on(tty);
-                if (!strcmp(ss.as_string(), " java.util.function.Function::apply")) {
-                  tty->print_cr("Here! Here! %p", resolved_method->method_holder()->methods()->adr_at(0));
-                }
-              }
               CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
                                                               link_info.resolved_klass(), false);
               has_compiledicholders = true;
@@ -1927,7 +1930,10 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   if (elf_version(EV_CURRENT) == EV_NONE) {
     ShouldNotReachHere();
   }
-  int fd = open("/home/roland/tmp/lib.o", O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  stringStream ss;
+  ss.print("%s.o", CodeFileName);
+
+  int fd = open(ss.as_string(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
   assert(fd > 0, "");
 
   Elf* elf = elf_begin(fd, ELF_C_WRITE, (Elf *)0);
@@ -2073,15 +2079,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   int nb = loaded_klasses->length();
   {
     assert(nb >= 1, "");
-
-    Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
-    codeblobsro_data->d_buf = (void*)&nb;
-    codeblobsro_data->d_type = ELF_T_BYTE;
-    codeblobsro_data->d_size = sizeof(nb);
-    codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
-    codeblobsro_data->d_align = 1;
-    codeblobsro_data->d_version = EV_CURRENT;
-    codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+    Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &nb, sizeof(nb));
 
     Elf64_Sym sym;
     sym.st_name = strings.length();
@@ -2171,14 +2169,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
 
     if (cb == CodeCache::first_blob(heap)) {
-      Elf_Data* text_data = elf_newdata(text_section);
-      text_data->d_buf = heap->low();
-      text_data->d_type = ELF_T_BYTE;
-      text_data->d_size = cb->code_begin() - (address)heap->low();
-      text_data->d_off = text_hdr->sh_size;
-      text_data->d_align = 1;;
-      text_data->d_version = EV_CURRENT;
-      text_hdr->sh_size += text_data->d_size;
+
+      Elf_Data* text_data = new_data(text_section, heap->low(), cb->code_begin() - (address) heap->low());
 
       Elf64_Sym sym;
       sym.st_name = strings.length();
@@ -2191,15 +2183,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       symbols.push(sym);
     }
 
-    Elf_Data* text_data = elf_newdata(text_section);
-    text_data->d_buf = cb->code_begin();
-    text_data->d_type = ELF_T_BYTE;
     CodeBlob* next_cb = next_blob(heap, cb);
-    text_data->d_size = next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin();
-    text_data->d_off = text_hdr->sh_size;
-    text_data->d_align = 1;;
-    text_data->d_version = EV_CURRENT;
-    text_hdr->sh_size += text_data->d_size;
+    Elf_Data* text_data = new_data(text_section, cb->code_begin(),
+                                   next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
 
     {
       Elf64_Sym sym;
@@ -2220,25 +2206,17 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
 
     {
-      Elf_Data* codeblobs_data = elf_newdata(codeblobs_section);
-      codeblobs_data->d_buf = cb;
-      codeblobs_data->d_type = ELF_T_BYTE;
-      codeblobs_data->d_size = next_cb == NULL ? cb->size() : (address)next_cb - (address)cb;
-      codeblobs_data->d_off = codeblobs_hdr->sh_size;
-      codeblobs_data->d_align = 8;
-      codeblobs_data->d_version = EV_CURRENT;
-
-      codeblobs_hdr->sh_size += codeblobs_data->d_size;
+      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
 
       Elf64_Sym sym;
       sym.st_name = strings.length();
       if (cb->is_nmethod()) {
         stringStream ss;
-        ss.print("%s-obj", cb->as_nmethod()->method()->external_name());
+        ss.print("%s-nmethod", cb->as_nmethod()->method()->external_name());
         push_array(strings, ss.as_string());
       } else {
         stringStream ss;
-        ss.print("%s:%p-obj", cb->name(), cb);
+        ss.print("%s:%p-nmethod", cb->name(), cb);
         push_array(strings, ss.as_string());
       }
       sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
@@ -2260,15 +2238,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 //        codecache_relocs.push(reloc);
 //      }
 
-      Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
-      codeblobsro_data->d_buf = (void*)cb->_name;
-      codeblobsro_data->d_type = ELF_T_BYTE;
-      codeblobsro_data->d_size = strlen(cb->_name) + 1;
-      codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
-      codeblobsro_data->d_align = 1;
-      codeblobsro_data->d_version = EV_CURRENT;
-
-      codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
+      Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*)cb->_name, strlen(cb->_name) + 1);
 
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _name), codeblobsro_data->d_off, codeblobsro_sym,
                      codeblobs_relocs);
@@ -2351,15 +2321,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
       ImmutableOopMapSet* oopmaps = cb->oop_maps();
       if (oopmaps != NULL) {
-        Elf_Data* oopmaps_data = elf_newdata(oopmaps_section);
-        oopmaps_data->d_buf = oopmaps;
-        oopmaps_data->d_type = ELF_T_BYTE;
-        oopmaps_data->d_size = oopmaps->nr_of_bytes();
-        oopmaps_data->d_off = oopmaps_hdr->sh_size;
-        oopmaps_data->d_align = 8;
-        oopmaps_data->d_version = EV_CURRENT;
-
-        oopmaps_hdr->sh_size += oopmaps_data->d_size;
+        Elf_Data* oopmaps_data = new_data(oopmaps_section, oopmaps, oopmaps->nr_of_bytes());
         add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _oop_maps), oopmaps_data->d_off, oopmaps_sym, codeblobs_relocs);
       }
       
@@ -2379,15 +2341,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         }
         {
           static intptr_t from_interpreted_entry;
-          Elf_Data* codeblobsro_data = elf_newdata(codeblobsro_section);
-          codeblobsro_data->d_buf = (void*) &from_interpreted_entry;
-          codeblobsro_data->d_type = ELF_T_BYTE;
-          codeblobsro_data->d_size = sizeof(from_interpreted_entry);
-          codeblobsro_data->d_off = codeblobsro_hdr->sh_size;
-          codeblobsro_data->d_align = 1;
-          codeblobsro_data->d_version = EV_CURRENT;
-          codeblobsro_hdr->sh_size += codeblobsro_data->d_size;
-
+          Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &from_interpreted_entry, sizeof(from_interpreted_entry));
           add_relocation(codeblobsro_data->d_off, nm->method()->_from_interpreted_entry - (address)heap->low(), text_sym, codeblobsro_relocs);
         }
         for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
@@ -2480,15 +2434,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                 if (ic->is_icholder_call()) {
                   CompiledICHolder* holder = ic->cached_icholder();
 
-                  Elf_Data* compiledicholders_data = elf_newdata(compiledicholders_section);
-                  compiledicholders_data->d_buf = holder;
-                  compiledicholders_data->d_type = ELF_T_BYTE;
-                  compiledicholders_data->d_size = sizeof(*holder);
-                  compiledicholders_data->d_off = compiledicholders_hdr->sh_size;
-                  compiledicholders_data->d_align = 8;
-                  compiledicholders_data->d_version = EV_CURRENT;
-
-                  compiledicholders_hdr->sh_size += compiledicholders_data->d_size;
+                  Elf_Data* compiledicholders_data = new_data(compiledicholders_section, holder, sizeof(*holder));
 
                   NativeCall* call = nativeCall_at(iter.addr());
                   NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
@@ -2548,15 +2494,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
 
   {
-    Elf_Data* codecache_data = elf_newdata(codecache_section);
-    codecache_data->d_buf = heap;
-    codecache_data->d_type = ELF_T_BYTE;
-    codecache_data->d_size = sizeof(*heap);
-    codecache_data->d_off = codecache_hdr->sh_size;
-    codecache_data->d_align = 8;
-    codecache_data->d_version = EV_CURRENT;
-
-    codecache_hdr->sh_size += codecache_data->d_size;
+    Elf_Data* codecache_data = new_data(codecache_section, heap, sizeof(*heap));
 
     Elf64_Sym sym;
     sym.st_name = strings.length();
@@ -2569,17 +2507,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     symbols.push(sym);
   }
   {
-    Elf_Data* codecache_data = elf_newdata(codecache_section);
-    codecache_data->d_buf = heap->_segmap.low();
-    codecache_data->d_type = ELF_T_BYTE;
-    codecache_data->d_size = heap->_segmap.high() - heap->_segmap.low();
-    codecache_data->d_off = codecache_hdr->sh_size;
-    codecache_data->d_align = 8;
-    codecache_data->d_version = EV_CURRENT;
-
-    codecache_hdr->sh_size += codecache_data->d_size;
-
-
+    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), heap->_segmap.high() - heap->_segmap.low());
     add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
   }
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
@@ -2619,13 +2547,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   string_hdr->sh_addralign = 1;
   string_hdr->sh_size = strings.length();
 
-  Elf_Data* string_data = elf_newdata(string_section);
-  string_data->d_buf = strings.adr_at(0);
-  string_data->d_type = ELF_T_BYTE;
-  string_data->d_size = strings.length();
-  string_data->d_off = 0;
-  string_data->d_align = 1;
-  string_data->d_version = EV_CURRENT;
+  Elf_Data* string_data = new_data(string_section, strings.adr_at(0), strings.length());
 
   Elf_Scn* symbol_section = elf_newscn(elf);
   assert(symbol_section != NULL, "");
@@ -2642,13 +2564,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   symbol_hdr->sh_addralign = 8;
   symbol_hdr->sh_size = symbols.length();
 
-  Elf_Data* symbol_data = elf_newdata(symbol_section);
-  symbol_data->d_buf = symbols.adr_at(0);
-  symbol_data->d_type = ELF_T_SYM;
-  symbol_data->d_size = symbols.length() * sizeof(Elf64_Sym);
-  symbol_data->d_off = 0;
-  symbol_data->d_align = 8;
-  symbol_data->d_version = EV_CURRENT;
+  Elf_Data* symbol_data = new_data(symbol_section, symbols.adr_at(0), symbols.length() * sizeof(Elf64_Sym));
 
   symbol_hdr->sh_link = elf_ndxscn(string_section);
   symbol_hdr->sh_info = local_sym;
@@ -2836,7 +2752,9 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
     card_table_base = ct->byte_map_base();
   }
 
-  void* shared_lib = dlopen("/home/roland/tmp/lib.so", RTLD_NOW);
+  stringStream ss;
+  ss.print("lib%s.so", CodeFileName);
+  void* shared_lib = dlopen(ss.as_string(), RTLD_NOW);
   if (shared_lib == NULL) {
     tty->print_cr("XXX %s", dlerror());
   }
