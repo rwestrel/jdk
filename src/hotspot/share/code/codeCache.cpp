@@ -1858,11 +1858,129 @@ static Elf_Data* new_data(Elf_Scn* section, void* buf, unsigned long size) {
   return data;
 }
 
+static void
+add_global_symbol(GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbols, Elf_Scn* section, const char* name,
+                  int kind, int64_t value, size_t size) {
+  Elf64_Sym sym;
+  sym.st_name = strings.length();
+  push_array(strings, name);
+  sym.st_info = ELF64_ST_INFO(STB_GLOBAL, kind);
+  sym.st_other = 0;
+  sym.st_shndx = elf_ndxscn(section);
+  sym.st_value = value;
+  sym.st_size = size;
+  symbols.push(sym);
+}
+
+static void add_relocation_section(Elf* elf, GrowableArray<char> &shstrings, const GrowableArray<Elf64_Rela> &relocs,
+                                   Elf_Scn* section, Elf_Scn* symbol_section, const char* name) {
+  Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
+  assert(codeblobs_rela_section != NULL, "");
+  Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
+  assert(codeblobs_rela_hdr != NULL, "");
+
+  codeblobs_rela_hdr->sh_name = shstrings.length();
+  push_array(shstrings, name);
+  codeblobs_rela_hdr->sh_type = SHT_RELA;
+  codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
+  codeblobs_rela_hdr->sh_addr = 0;
+  codeblobs_rela_hdr->sh_offset = 0;
+  codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
+  codeblobs_rela_hdr->sh_addralign = 8;
+  codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
+  codeblobs_rela_hdr->sh_info = elf_ndxscn(section);
+  codeblobs_rela_hdr->sh_size = relocs.length();
+
+  Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
+  codeblobs_rela_data->d_buf = relocs.adr_at(0);
+  codeblobs_rela_data->d_type = ELF_T_RELA;
+  codeblobs_rela_data->d_size = relocs.length() * sizeof(Elf64_Rela);
+  codeblobs_rela_data->d_off = 0;
+  codeblobs_rela_data->d_align = 8;
+  codeblobs_rela_data->d_version = EV_CURRENT;
+}
 
 
-JNIEXPORT uint8_t* card_table_base;
+static Elf_Scn* add_string_section(Elf* elf, const GrowableArray<char> &strings, GrowableArray<char> &shstrings) {
+  Elf_Scn* string_section = elf_newscn(elf);
+  assert(string_section != NULL, "");
+  Elf64_Shdr* string_hdr = elf64_getshdr(string_section);
+  assert(string_hdr != NULL, "");
+
+  string_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".strtab");
+  string_hdr->sh_type = SHT_STRTAB;
+  string_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  string_hdr->sh_addr = 0;
+  string_hdr->sh_offset = 0;
+  string_hdr->sh_entsize = 0;
+  string_hdr->sh_addralign = 1;
+  string_hdr->sh_size = strings.length();
+
+  Elf_Data* string_data = new_data(string_section, strings.adr_at(0), strings.length());
+
+  return string_section;
+}
+
+
+static Elf_Scn* add_symbol_section(Elf* elf, const GrowableArray<Elf64_Sym> &symbols, int local_sym, Elf_Scn* string_section,
+                                   GrowableArray<char> &shstrings) {
+  Elf_Scn* symbol_section = elf_newscn(elf);
+  assert(symbol_section != NULL, "");
+  Elf64_Shdr* symbol_hdr = elf64_getshdr(symbol_section);
+  assert(symbol_hdr != NULL, "");
+
+  symbol_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".symtab");
+  symbol_hdr->sh_type = SHT_SYMTAB;
+  symbol_hdr->sh_flags = 0;
+  symbol_hdr->sh_addr = 0;
+  symbol_hdr->sh_offset = 0;
+  symbol_hdr->sh_entsize = sizeof(Elf64_Sym);
+  symbol_hdr->sh_addralign = 8;
+  symbol_hdr->sh_size = symbols.length();
+
+  Elf_Data* symbol_data = new_data(symbol_section, symbols.adr_at(0), symbols.length() * sizeof(Elf64_Sym));
+
+  symbol_hdr->sh_link = elf_ndxscn(string_section);
+  symbol_hdr->sh_info = local_sym;
+  return symbol_section;
+}
+
+
+static void add_shstring_section(Elf* elf, Elf64_Ehdr* ehdr, GrowableArray<char> &shstrings) {
+  Elf_Scn* shstring_section = elf_newscn(elf);
+  assert(shstring_section != NULL, "");
+  Elf64_Shdr* shstring_hdr = elf64_getshdr(shstring_section);
+  assert(shstring_hdr != NULL, "");
+
+  shstring_hdr->sh_name = shstrings.length();
+  push_array(shstrings, ".shstrtab");
+  shstring_hdr->sh_type = SHT_STRTAB;
+  shstring_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
+  shstring_hdr->sh_addr = 0;
+  shstring_hdr->sh_offset = 0;
+  shstring_hdr->sh_entsize = 0;
+  shstring_hdr->sh_addralign = 1;
+  shstring_hdr->sh_size = shstrings.length();
+
+  Elf_Data* shstring_data = elf_newdata(shstring_section);
+  shstring_data->d_buf = shstrings.adr_at(0);
+  shstring_data->d_type = ELF_T_BYTE;
+  shstring_data->d_size = shstrings.length();
+  shstring_data->d_off = 0;
+  shstring_data->d_align = 1;
+  shstring_data->d_version = EV_CURRENT;
+
+  ehdr->e_shstrndx = elf_ndxscn(shstring_section);
+}
+
+
+//JNIEXPORT uint8_t* card_table_base;
 
 void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread) {
+  assert(UseEpsilonGC, "");
+
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
 
@@ -2007,19 +2125,19 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
   int local_sym = symbols.length();
 
-  int card_table_base_sym;
-  {
-    Elf64_Sym sym;
-    sym.st_name = strings.length();
-    push_array(strings, "card_table_base");
-    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
-    sym.st_other = 0;
-    sym.st_shndx = SHN_UNDEF;
-    sym.st_value = 0;
-    sym.st_size = 0;
-    card_table_base_sym = symbols.length();
-    symbols.push(sym);
-  }
+//  int card_table_base_sym;
+//  {
+//    Elf64_Sym sym;
+//    sym.st_name = strings.length();
+//    push_array(strings, "card_table_base");
+//    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
+//    sym.st_other = 0;
+//    sym.st_shndx = SHN_UNDEF;
+//    sym.st_value = 0;
+//    sym.st_size = 0;
+//    card_table_base_sym = symbols.length();
+//    symbols.push(sym);
+//  }
 
   Vtables vts;
   VtableSymbols vt_syms;
@@ -2081,15 +2199,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     assert(nb >= 1, "");
     Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &nb, sizeof(nb));
 
-    Elf64_Sym sym;
-    sym.st_name = strings.length();
-    push_array(strings, "leydenLoadedKlasses");
-    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
-    sym.st_other = 0;
-    sym.st_shndx = elf_ndxscn(codeblobsro_section);
-    sym.st_value = codeblobsro_data->d_off;
-    sym.st_size = codeblobsro_data->d_size;
-    symbols.push(sym);
+    add_global_symbol(strings, symbols, codeblobsro_section, "leydenLoadedKlasses", STT_OBJECT,
+                      codeblobsro_data->d_off, codeblobsro_data->d_size);
 
     for (int i = 0; i < nb; i++) {
       record_klass(codeblobsro_section, codeblobsro_hdr, (Klass*)loaded_klasses->at(i));
@@ -2172,15 +2283,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
       Elf_Data* text_data = new_data(text_section, heap->low(), cb->code_begin() - (address) heap->low());
 
-      Elf64_Sym sym;
-      sym.st_name = strings.length();
-      push_array(strings, "padding");
-      sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_NOTYPE);
-      sym.st_other = 0;
-      sym.st_shndx = elf_ndxscn(text_section);
-      sym.st_value = text_data->d_off;
-      sym.st_size = text_data->d_size;
-      symbols.push(sym);
+      add_global_symbol(strings, symbols, text_section, "padding", STT_NOTYPE, text_data->d_off, text_data->d_size);
     }
 
     CodeBlob* next_cb = next_blob(heap, cb);
@@ -2188,45 +2291,36 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                                    next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
 
     {
-      Elf64_Sym sym;
-      sym.st_name = strings.length();
+      const char* name;
       if (cb->is_nmethod()) {
-        push_array(strings, cb->as_nmethod()->method()->external_name());
+        name = cb->as_nmethod()->method()->external_name();
       } else {
         stringStream ss;
         ss.print("%s:%p", cb->name(), cb);
-        push_array(strings, ss.as_string());
+        name = ss.as_string();
       }
-      sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
-      sym.st_other = 0;
-      sym.st_shndx = elf_ndxscn(text_section);
-      sym.st_value = text_data->d_off;
-      sym.st_size = cb->code_size();
-      symbols.push(sym);
+
+      add_global_symbol(strings, symbols, text_section, name, STT_FUNC, text_data->d_off, cb->code_size());
     }
 
     {
       Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
 
-      Elf64_Sym sym;
-      sym.st_name = strings.length();
+      const char* name;
       if (cb->is_nmethod()) {
         stringStream ss;
         ss.print("%s-nmethod", cb->as_nmethod()->method()->external_name());
-        push_array(strings, ss.as_string());
+        name = ss.as_string();
       } else {
         stringStream ss;
         ss.print("%s:%p-nmethod", cb->name(), cb);
-        push_array(strings, ss.as_string());
+        name = ss.as_string();
       }
-      sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
-      sym.st_other = 0;
-      sym.st_shndx = elf_ndxscn(codeblobs_section);
-      sym.st_value = codeblobs_data->d_off;
-      sym.st_size = cb->size();
-      symbols.push(sym);
+
+      add_global_symbol(strings, symbols, codeblobs_section, name, STT_OBJECT, codeblobs_data->d_off, cb->size());
 
       add_relocation(codeblobs_data->d_off, vt_offset, vtbl_sym, codeblobs_relocs);
+      // pointer in text section to CodeBlobs object
       add_relocation((address) cb - (address) heap->low(), (address) cb - (address) CodeCache::first_blob(heap),
                      codeblobs_sym, text_relocs);
 
@@ -2313,8 +2407,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
                            r->target() - (address) CodeCache::first_blob(heap), codeblobs_sym, text_relocs);
           } else if (iter.type() == relocInfo::card_mark_word_type) {
-            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
-            add_relocation((address)r->pd_address_in_code() - (address)heap->low(), 0, card_table_base_sym, text_relocs);
+//            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
+//            add_relocation((address)r->pd_address_in_code() - (address)heap->low(), 0, card_table_base_sym, text_relocs);
           }
         }
       }
@@ -2496,15 +2590,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   {
     Elf_Data* codecache_data = new_data(codecache_section, heap, sizeof(*heap));
 
-    Elf64_Sym sym;
-    sym.st_name = strings.length();
-    push_array(strings, "leydenCodeHeap");
-    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
-    sym.st_other = 0;
-    sym.st_shndx = elf_ndxscn(codecache_section);
-    sym.st_value = 0;
-    sym.st_size = codecache_data->d_size;
-    symbols.push(sym);
+    add_global_symbol(strings, symbols, codecache_section, "leydenCodeHeap", STT_OBJECT, 0, codecache_data->d_size);
   }
   {
     Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), heap->_segmap.high() - heap->_segmap.low());
@@ -2531,195 +2617,23 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 //  codecache_data->d_version = EV_CURRENT;
 //
 //  codecache_hdr->sh_size += codecache_data->d_size;
+  Elf_Scn* string_section = add_string_section(elf, strings, shstrings);
+  Elf_Scn* symbol_section = add_symbol_section(elf, symbols, local_sym, string_section, shstrings);
 
-  Elf_Scn* string_section = elf_newscn(elf);
-  assert(string_section != NULL, "");
-  Elf64_Shdr* string_hdr = elf64_getshdr(string_section);
-  assert(string_hdr != NULL, "");
+  add_relocation_section(elf, shstrings, codeblobs_relocs, codeblobs_section, symbol_section, ".rela.codeblobs");
 
-  string_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".strtab");
-  string_hdr->sh_type = SHT_STRTAB;
-  string_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
-  string_hdr->sh_addr = 0;
-  string_hdr->sh_offset = 0;
-  string_hdr->sh_entsize = 0;
-  string_hdr->sh_addralign = 1;
-  string_hdr->sh_size = strings.length();
+  add_relocation_section(elf, shstrings, codeblobsro_relocs, codeblobsro_section, symbol_section, ".rela.codeblobsro");
 
-  Elf_Data* string_data = new_data(string_section, strings.adr_at(0), strings.length());
+  add_relocation_section(elf, shstrings, text_relocs, text_section, symbol_section, ".rela.text");
 
-  Elf_Scn* symbol_section = elf_newscn(elf);
-  assert(symbol_section != NULL, "");
-  Elf64_Shdr* symbol_hdr = elf64_getshdr(symbol_section);
-  assert(symbol_hdr != NULL, "");
+  add_relocation_section(elf, shstrings, codecache_relocs, codecache_section, symbol_section, ".rela.codecache");
 
-  symbol_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".symtab");
-  symbol_hdr->sh_type = SHT_SYMTAB;
-  symbol_hdr->sh_flags = 0;
-  symbol_hdr->sh_addr = 0;
-  symbol_hdr->sh_offset = 0;
-  symbol_hdr->sh_entsize = sizeof(Elf64_Sym);
-  symbol_hdr->sh_addralign = 8;
-  symbol_hdr->sh_size = symbols.length();
-
-  Elf_Data* symbol_data = new_data(symbol_section, symbols.adr_at(0), symbols.length() * sizeof(Elf64_Sym));
-
-  symbol_hdr->sh_link = elf_ndxscn(string_section);
-  symbol_hdr->sh_info = local_sym;
-
-  Elf_Scn* codeblobs_rela_section = elf_newscn(elf);
-  assert(codeblobs_rela_section != NULL, "");
-  Elf64_Shdr* codeblobs_rela_hdr = elf64_getshdr(codeblobs_rela_section);
-  assert(codeblobs_rela_hdr != NULL, "");
-
-  codeblobs_rela_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".rela.codeblobs");
-  codeblobs_rela_hdr->sh_type = SHT_RELA;
-  codeblobs_rela_hdr->sh_flags = SHF_INFO_LINK;
-  codeblobs_rela_hdr->sh_addr = 0;
-  codeblobs_rela_hdr->sh_offset = 0;
-  codeblobs_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-  codeblobs_rela_hdr->sh_addralign = 8;
-  codeblobs_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-  codeblobs_rela_hdr->sh_info = elf_ndxscn(codeblobs_section);
-  codeblobs_rela_hdr->sh_size = codeblobs_relocs.length();
-
-  Elf_Data* codeblobs_rela_data = elf_newdata(codeblobs_rela_section);
-  codeblobs_rela_data->d_buf = codeblobs_relocs.adr_at(0);
-  codeblobs_rela_data->d_type = ELF_T_RELA;
-  codeblobs_rela_data->d_size = codeblobs_relocs.length() * sizeof(Elf64_Rela);
-  codeblobs_rela_data->d_off = 0;
-  codeblobs_rela_data->d_align = 8;
-  codeblobs_rela_data->d_version = EV_CURRENT;
-
-  Elf_Scn* codeblobsro_rela_section = elf_newscn(elf);
-  assert(codeblobsro_rela_section != NULL, "");
-  Elf64_Shdr* codeblobsro_rela_hdr = elf64_getshdr(codeblobsro_rela_section);
-  assert(codeblobsro_rela_hdr != NULL, "");
-
-  codeblobsro_rela_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".rela.codeblobsro");
-  codeblobsro_rela_hdr->sh_type = SHT_RELA;
-  codeblobsro_rela_hdr->sh_flags = SHF_INFO_LINK;
-  codeblobsro_rela_hdr->sh_addr = 0;
-  codeblobsro_rela_hdr->sh_offset = 0;
-  codeblobsro_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-  codeblobsro_rela_hdr->sh_addralign = 8;
-  codeblobsro_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-  codeblobsro_rela_hdr->sh_info = elf_ndxscn(codeblobsro_section);
-  codeblobsro_rela_hdr->sh_size = codeblobsro_relocs.length();
-
-  Elf_Data* codeblobsro_rela_data = elf_newdata(codeblobsro_rela_section);
-  codeblobsro_rela_data->d_buf = codeblobsro_relocs.adr_at(0);
-  codeblobsro_rela_data->d_type = ELF_T_RELA;
-  codeblobsro_rela_data->d_size = codeblobsro_relocs.length() * sizeof(Elf64_Rela);
-  codeblobsro_rela_data->d_off = 0;
-  codeblobsro_rela_data->d_align = 8;
-  codeblobsro_rela_data->d_version = EV_CURRENT;
-
-  Elf_Scn* text_rela_section = elf_newscn(elf);
-  assert(text_rela_section != NULL, "");
-  Elf64_Shdr* text_rela_hdr = elf64_getshdr(text_rela_section);
-  assert(text_rela_hdr != NULL, "");
-
-  text_rela_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".rela.text");
-  text_rela_hdr->sh_type = SHT_RELA;
-  text_rela_hdr->sh_flags = SHF_INFO_LINK;
-  text_rela_hdr->sh_addr = 0;
-  text_rela_hdr->sh_offset = 0;
-  text_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-  text_rela_hdr->sh_addralign = 8;
-  text_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-  text_rela_hdr->sh_info = elf_ndxscn(text_section);
-  text_rela_hdr->sh_size = text_relocs.length();
-
-  Elf_Data* text_rela_data = elf_newdata(text_rela_section);
-  text_rela_data->d_buf = text_relocs.adr_at(0);
-  text_rela_data->d_type = ELF_T_RELA;
-  text_rela_data->d_size = text_relocs.length() * sizeof(Elf64_Rela);
-  text_rela_data->d_off = 0;
-  text_rela_data->d_align = 8;
-  text_rela_data->d_version = EV_CURRENT;
-
-  Elf_Scn* codecache_rela_section = elf_newscn(elf);
-  assert(codecache_rela_section != NULL, "");
-  Elf64_Shdr* codecache_rela_hdr = elf64_getshdr(codecache_rela_section);
-  assert(codecache_rela_hdr != NULL, "");
-
-  codecache_rela_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".rela.codecache");
-  codecache_rela_hdr->sh_type = SHT_RELA;
-  codecache_rela_hdr->sh_flags = SHF_INFO_LINK;
-  codecache_rela_hdr->sh_addr = 0;
-  codecache_rela_hdr->sh_offset = 0;
-  codecache_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-  codecache_rela_hdr->sh_addralign = 8;
-  codecache_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-  codecache_rela_hdr->sh_info = elf_ndxscn(codecache_section);
-  codecache_rela_hdr->sh_size = codecache_relocs.length();
-
-  Elf_Data* codecache_rela_data = elf_newdata(codecache_rela_section);
-  codecache_rela_data->d_buf = codecache_relocs.adr_at(0);
-  codecache_rela_data->d_type = ELF_T_RELA;
-  codecache_rela_data->d_size = codecache_relocs.length() * sizeof(Elf64_Rela);
-  codecache_rela_data->d_off = 0;
-  codecache_rela_data->d_align = 8;
-  codecache_rela_data->d_version = EV_CURRENT;
 
   if (has_compiledicholders) {
-    Elf_Scn* compiledicholders_rela_section = elf_newscn(elf);
-    assert(compiledicholders_rela_section != NULL, "");
-    Elf64_Shdr* compiledicholders_rela_hdr = elf64_getshdr(compiledicholders_rela_section);
-    assert(compiledicholders_rela_hdr != NULL, "");
-
-    compiledicholders_rela_hdr->sh_name = shstrings.length();
-    push_array(shstrings, ".rela.compiledicholders");
-    compiledicholders_rela_hdr->sh_type = SHT_RELA;
-    compiledicholders_rela_hdr->sh_flags = SHF_INFO_LINK;
-    compiledicholders_rela_hdr->sh_addr = 0;
-    compiledicholders_rela_hdr->sh_offset = 0;
-    compiledicholders_rela_hdr->sh_entsize = sizeof(Elf64_Rela);
-    compiledicholders_rela_hdr->sh_addralign = 8;
-    compiledicholders_rela_hdr->sh_link = elf_ndxscn(symbol_section);
-    compiledicholders_rela_hdr->sh_info = elf_ndxscn(compiledicholders_section);
-    compiledicholders_rela_hdr->sh_size = compiledicholders_relocs.length();
-
-    Elf_Data* compiledicholders_rela_data = elf_newdata(compiledicholders_rela_section);
-    compiledicholders_rela_data->d_buf = compiledicholders_relocs.adr_at(0);
-    compiledicholders_rela_data->d_type = ELF_T_RELA;
-    compiledicholders_rela_data->d_size = compiledicholders_relocs.length() * sizeof(Elf64_Rela);
-    compiledicholders_rela_data->d_off = 0;
-    compiledicholders_rela_data->d_align = 8;
-    compiledicholders_rela_data->d_version = EV_CURRENT;
+    add_relocation_section(elf, shstrings, compiledicholders_relocs, compiledicholders_section, symbol_section, ".rela.compiledicholders");
   }
 
-  Elf_Scn* shstring_section = elf_newscn(elf);
-  assert(shstring_section != NULL, "");
-  Elf64_Shdr* shstring_hdr = elf64_getshdr(shstring_section);
-  assert(shstring_hdr != NULL, "");
-
-  shstring_hdr->sh_name = shstrings.length();
-  push_array(shstrings, ".shstrtab");
-  shstring_hdr->sh_type = SHT_STRTAB;
-  shstring_hdr->sh_flags = SHF_STRINGS | SHF_ALLOC;
-  shstring_hdr->sh_addr = 0;
-  shstring_hdr->sh_offset = 0;
-  shstring_hdr->sh_entsize = 0;
-  shstring_hdr->sh_addralign = 1;
-  shstring_hdr->sh_size = shstrings.length();
-
-  Elf_Data* shstring_data = elf_newdata(shstring_section);
-  shstring_data->d_buf = shstrings.adr_at(0);
-  shstring_data->d_type = ELF_T_BYTE;
-  shstring_data->d_size = shstrings.length();
-  shstring_data->d_off = 0;
-  shstring_data->d_align = 1;
-  shstring_data->d_version = EV_CURRENT;
-
-  ehdr->e_shstrndx = elf_ndxscn(shstring_section);
+  add_shstring_section(elf, ehdr, shstrings);
 
 
   {
@@ -2745,12 +2659,14 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
   ResourceMark rm;
   HandleMark hm(thread);
 
-  if (UseSerialGC) {
-    BarrierSet* bs = BarrierSet::barrier_set();
-    CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
-    CardTable* ct = ctbs->card_table();
-    card_table_base = ct->byte_map_base();
-  }
+  assert(UseEpsilonGC, "");
+
+//  if (UseSerialGC) {
+//    BarrierSet* bs = BarrierSet::barrier_set();
+//    CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
+//    CardTable* ct = ctbs->card_table();
+//    card_table_base = ct->byte_map_base();
+//  }
 
   stringStream ss;
   ss.print("lib%s.so", CodeFileName);
