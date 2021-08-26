@@ -3713,7 +3713,7 @@ instruct ReplB_imm(vec dst, immI con) %{
   match(Set dst (ReplicateB con));
   format %{ "replicateB $dst,$con" %}
   ins_encode %{
-    uint vlen = vector_length(this);
+    uint vlen = Matcher::vector_length(this);
 //    InternalAddress const_addr = $constantaddress(replicate8_imm($con$$constant, 1));
     Address const_addr($constanttablebase, $constantoffset(replicate8_imm($con$$constant, 1)));
     if (vlen == 4) {
@@ -3796,7 +3796,7 @@ instruct ReplS_imm(vec dst, immI con) %{
   match(Set dst (ReplicateS con));
   format %{ "replicateS $dst,$con" %}
   ins_encode %{
-    uint vlen = vector_length(this);
+    uint vlen = Matcher::vector_length(this);
 //    InternalAddress const_addr = $constantaddress(replicate8_imm($con$$constant, 2));
     Address const_addr($constanttablebase, $constantoffset(replicate8_imm($con$$constant, 2)));
     if (vlen == 2) {
@@ -3879,7 +3879,7 @@ instruct ReplI_imm(vec dst, immI con) %{
   match(Set dst (ReplicateI con));
   format %{ "replicateI $dst,$con" %}
   ins_encode %{
-    uint vlen = vector_length(this);
+    uint vlen = Matcher::vector_length(this);
 //    InternalAddress const_addr = $constantaddress(replicate8_imm($con$$constant, 4));
     Address const_addr($constanttablebase, $constantoffset(replicate8_imm($con$$constant, 4)));
     if (vlen <= 4) {
@@ -4034,7 +4034,7 @@ instruct ReplL_imm(vec dst, immL con) %{
   match(Set dst (ReplicateL con));
   format %{ "replicateL $dst,$con" %}
   ins_encode %{
-    uint vlen = vector_length(this);
+    uint vlen = Matcher::vector_length(this);
 //    InternalAddress const_addr = $constantaddress($con);
     Address const_addr($constanttablebase, $constantoffset($con));
     if (vlen == 2) {
