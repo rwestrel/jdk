@@ -1858,9 +1858,8 @@ static Elf_Data* new_data(Elf_Scn* section, void* buf, unsigned long size) {
   return data;
 }
 
-static void
-add_global_symbol(GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbols, Elf_Scn* section, const char* name,
-                  int kind, int64_t value, size_t size) {
+static int add_global_symbol(GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbols, Elf_Scn* section,
+                             const char* name, int kind, int64_t value, size_t size) {
   Elf64_Sym sym;
   sym.st_name = strings.length();
   push_array(strings, name);
@@ -1869,7 +1868,9 @@ add_global_symbol(GrowableArray<char> &strings, GrowableArray<Elf64_Sym> &symbol
   sym.st_shndx = elf_ndxscn(section);
   sym.st_value = value;
   sym.st_size = size;
+  int sym_id = symbols.length();
   symbols.push(sym);
+  return sym_id;
 }
 
 static void add_relocation_section(Elf* elf, GrowableArray<char> &shstrings, const GrowableArray<Elf64_Rela> &relocs,
@@ -1975,12 +1976,76 @@ static void add_shstring_section(Elf* elf, Elf64_Ehdr* ehdr, GrowableArray<char>
   ehdr->e_shstrndx = elf_ndxscn(shstring_section);
 }
 
+class CodeBlobEntry : public HashtableEntry<CodeBlob*, mtLeyden> {
+  friend class CodeBlobHashtable;
+
+private:
+  int _symbol_index;
+
+public:
+
+  CodeBlobEntry* next() const {
+    return (CodeBlobEntry*)HashtableEntry<CodeBlob*, mtLeyden>::next();
+  }
+
+  int symbol_index() const {
+    return _symbol_index;
+  }
+
+};
+
+class CodeBlobHashtable : public Hashtable<CodeBlob*, mtLeyden> {
+private:
+  unsigned int compute_hash(CodeBlob* cb) {
+    uintptr_t hash = (uintptr_t)cb;
+    return hash ^ (hash >> 7); // code heap blocks are 128byte aligned
+  }
+
+  CodeBlobEntry* bucket(int i) const {
+    return (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::bucket(i);
+  }
+
+  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index) {
+    unsigned int hash = compute_hash(cb);
+    CodeBlobEntry* entry = (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::new_entry(hash, cb);
+    entry->_symbol_index = symbol_index;
+    return entry;
+  }
+
+public:
+  CodeBlobHashtable(int table_size) : Hashtable<CodeBlob*, mtLeyden>(table_size, sizeof(CodeBlobEntry)) {
+  }
+
+  bool add(CodeBlob* cb, int symbol_index) {
+    CodeBlobEntry* e = find(cb);
+    if (e == NULL) {
+      CodeBlobEntry* e = new_entry(cb, symbol_index);
+      int index = hash_to_index(e->hash());
+      add_entry(index, e);
+      return true;
+    }
+    return false;
+  }
+
+  CodeBlobEntry* find(CodeBlob* cb) {
+    int index = hash_to_index(compute_hash(cb));
+    for (CodeBlobEntry* e = bucket(index); e != NULL; e = e->next()) {
+      if (e->literal() == cb) {
+        return e;
+      }
+    }
+    return NULL;
+  }
+};
+
 
 //JNIEXPORT uint8_t* card_table_base;
 
 void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread) {
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
+
+  CodeBlobHashtable codeblobs(heap->blob_count() / 4 * 3);
 
   bool has_compiledicholders = false;
   bool has_oopmaps = false;
@@ -2298,7 +2363,10 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         name = ss.as_string();
       }
 
-      add_global_symbol(strings, symbols, text_section, name, STT_FUNC, text_data->d_off, cb->code_size());
+      int sym_id = add_global_symbol(strings, symbols, text_section, name, STT_FUNC, text_data->d_off, cb->code_size());
+      bool duplicate = codeblobs.add(cb, sym_id);
+      assert(!duplicate, "");
+      assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
     }
 
     {

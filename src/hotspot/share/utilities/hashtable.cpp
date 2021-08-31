@@ -281,6 +281,11 @@ template class BasicHashtable<mtTracing>;
 template class BasicHashtable<mtServiceability>;
 template class BasicHashtable<mtLogging>;
 
+template class Hashtable<CodeBlob*, mtLeyden>;
+template class HashtableEntry<CodeBlob*, mtLeyden>;
+template class BasicHashtableEntry<mtLeyden>;
+template class BasicHashtable<mtLeyden>;
+
 template void BasicHashtable<mtClass>::verify_table<DictionaryEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<ModuleEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<PackageEntry>(char const*);

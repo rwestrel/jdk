@@ -147,6 +147,7 @@ class AllocatedObj {
   f(mtMetaspace,      "Metaspace")                                                   \
   f(mtStringDedup,    "String Deduplication")                                        \
   f(mtNone,           "Unknown")                                                     \
+  f(mtLeyden,         "Leyden")                                                      \
   //end
 
 #define MEMORY_TYPE_DECLARE_ENUM(type, human_readable) \
