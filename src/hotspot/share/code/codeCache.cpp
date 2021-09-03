@@ -1980,7 +1980,8 @@ class CodeBlobEntry : public HashtableEntry<CodeBlob*, mtLeyden> {
   friend class CodeBlobHashtable;
 
 private:
-  int _symbol_index;
+  uint _symbol_index;
+  long _offset;
 
 public:
 
@@ -1988,8 +1989,12 @@ public:
     return (CodeBlobEntry*)HashtableEntry<CodeBlob*, mtLeyden>::next();
   }
 
-  int symbol_index() const {
+  uint symbol_index() const {
     return _symbol_index;
+  }
+
+  long offset() const {
+    return _offset;
   }
 
 };
@@ -2005,10 +2010,12 @@ private:
     return (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::bucket(i);
   }
 
-  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index) {
+  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index, long offset) {
+    assert(offset > 0, "");
     unsigned int hash = compute_hash(cb);
     CodeBlobEntry* entry = (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::new_entry(hash, cb);
     entry->_symbol_index = symbol_index;
+    entry->_offset = offset;
     return entry;
   }
 
@@ -2016,15 +2023,15 @@ public:
   CodeBlobHashtable(int table_size) : Hashtable<CodeBlob*, mtLeyden>(table_size, sizeof(CodeBlobEntry)) {
   }
 
-  bool add(CodeBlob* cb, int symbol_index) {
+  bool add(CodeBlob* cb, int symbol_index, long offset) {
     CodeBlobEntry* e = find(cb);
     if (e == NULL) {
-      CodeBlobEntry* e = new_entry(cb, symbol_index);
+      CodeBlobEntry* e = new_entry(cb, symbol_index, offset);
       int index = hash_to_index(e->hash());
       add_entry(index, e);
-      return true;
+      return false;
     }
-    return false;
+    return true;
   }
 
   CodeBlobEntry* find(CodeBlob* cb) {
@@ -2037,6 +2044,50 @@ public:
     return NULL;
   }
 };
+
+static const char* codeblob_code_symbol(CodeBlob* cb) {
+  const char* name;
+  if (cb->is_nmethod()) {
+    name = cb->as_nmethod()->method()->external_name();
+  } else {
+    stringStream ss;
+    ss.print("%s:%p", cb->name(), cb);
+    name = ss.as_string();
+  }
+  return name;
+}
+
+static const char* codeblob_obj_symbol(CodeBlob* cb) {
+  const char* name;
+  if (cb->is_nmethod()) {
+    stringStream ss;
+    ss.print("%s-nmethod", cb->as_nmethod()->method()->external_name());
+    name = ss.as_string();
+  } else {
+    stringStream ss;
+    ss.print("%s:%p-nmethod", cb->name(), cb);
+    name = ss.as_string();
+  }
+  return name;
+}
+
+static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<Elf64_Rela> &text_relocs, int text_sym,
+                                  CodeBlob* caller, const Method* method, CompiledMethod* callee, address call_addr) {
+  CodeBlobEntry* callee_data = codeblobs.find(callee);
+  assert(callee_data != NULL, "");
+  CodeBlobEntry* caller_data = codeblobs.find(caller);
+  assert(caller_data != NULL, "");
+  NativeInstruction* ni = nativeInstruction_at(call_addr);
+  assert(ni->is_call(), "");
+
+  Elf64_Rela reloc;
+  long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
+  assert(call_offset > 0, "outside the code cache?");
+  reloc.r_offset = call_offset + NativeCall::displacement_offset;
+  reloc.r_addend = callee_data->offset() + (method->from_compiled_entry() - callee->code_begin()) ;
+  reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_PC32);
+  text_relocs.push(reloc);
+}
 
 
 //JNIEXPORT uint8_t* card_table_base;
@@ -2288,35 +2339,6 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       ShouldNotReachHere();
     }
 
-    if (cb->is_nmethod()) {
-      RelocIterator iter(cb);
-      nmethod* nm = cb->as_nmethod();
-      while (iter.next()) {
-        if (iter.type() == relocInfo::static_call_type) {
-          static_call_Relocation* call = iter.static_call_reloc();
-          Method* method = call->method_value();
-          assert(method != NULL, "can't resolve the call");
-          if (!method->has_compiled_code()) {
-            method->print_short_name(); tty->cr();
-            success = false;
-          } else {
-            call->set_destination(method->from_compiled_entry());
-          }
-        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
-          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
-          Method* method = call->method_value();
-          assert(method != NULL, "can't resolve the call");
-          if (!method->has_compiled_code()) {
-            method->print_short_name(); tty->cr();
-            success = false;
-          } else {
-            call->set_destination(method->from_compiled_entry());
-          }
-        }
-      }
-    }
-    assert(success, "");
-
     int vtbl_sym;
     if (vtbl == vts.nmethod) {
       vtbl_sym = vt_syms.nmethod;
@@ -2354,17 +2376,10 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                                    next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
 
     {
-      const char* name;
-      if (cb->is_nmethod()) {
-        name = cb->as_nmethod()->method()->external_name();
-      } else {
-        stringStream ss;
-        ss.print("%s:%p", cb->name(), cb);
-        name = ss.as_string();
-      }
+      const char* name = codeblob_code_symbol(cb);
 
       int sym_id = add_global_symbol(strings, symbols, text_section, name, STT_FUNC, text_data->d_off, cb->code_size());
-      bool duplicate = codeblobs.add(cb, sym_id);
+      bool duplicate = codeblobs.add(cb, sym_id, cb->code_begin() - (address)heap->low());
       assert(!duplicate, "");
       assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
     }
@@ -2372,16 +2387,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     {
       Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
 
-      const char* name;
-      if (cb->is_nmethod()) {
-        stringStream ss;
-        ss.print("%s-nmethod", cb->as_nmethod()->method()->external_name());
-        name = ss.as_string();
-      } else {
-        stringStream ss;
-        ss.print("%s:%p-nmethod", cb->name(), cb);
-        name = ss.as_string();
-      }
+      const char* name = codeblob_obj_symbol(cb);
 
       add_global_symbol(strings, symbols, codeblobs_section, name, STT_OBJECT, codeblobs_data->d_off, cb->size());
 
@@ -2653,6 +2659,47 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
   }
 
+  FOR_ALL_BLOBS(cb, heap) {
+    if (cb->is_nmethod()) {
+      RelocIterator iter(cb);
+      nmethod* nm = cb->as_nmethod();
+      while (iter.next()) {
+        if (iter.type() == relocInfo::static_call_type) {
+          static_call_Relocation* call = iter.static_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code()) {
+            method->print_short_name();
+            tty->cr();
+            success = false;
+          } else {
+            CompiledMethod* cm = method->code();
+            address call_addr = call->addr();
+
+            add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, method, cm, call_addr);
+          }
+        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+          Method* method = call->method_value();
+          assert(method != NULL, "can't resolve the call");
+          if (!method->has_compiled_code()) {
+            method->print_short_name();
+            tty->cr();
+            success = false;
+          } else {
+            CompiledMethod* cm = method->code();
+            address call_addr = call->addr();
+
+            add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, method, cm, call_addr);
+          }
+        }
+      }
+    }
+    assert(success, "");
+  }
+
+
+
   {
     Elf_Data* codecache_data = new_data(codecache_section, heap, sizeof(*heap));
 
@@ -2718,6 +2765,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   close(fd);
 }
 
+
 #include "oops/klass.inline.hpp"
 #include "utilities/utf8.hpp"
 
@@ -2749,7 +2797,6 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
     Klass* k = restore_klass(klasses_ptr, thread);
     klasses_ptr += strlen(klasses_ptr) + 1;
   }
-
 
   Handle ase = Handle(thread, InstanceKlass::cast(vmClasses::ArrayStoreException_klass())->allocate_instance(thread));
   assert(ase.not_null() && !thread->has_pending_exception(), "");
