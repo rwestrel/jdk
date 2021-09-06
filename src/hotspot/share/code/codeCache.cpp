@@ -2072,19 +2072,25 @@ static const char* codeblob_obj_symbol(CodeBlob* cb) {
 }
 
 static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<Elf64_Rela> &text_relocs, int text_sym,
-                                  CodeBlob* caller, const Method* method, CompiledMethod* callee, address call_addr) {
+                                  CodeBlob* caller, CodeBlob* callee, address call_addr, address dest, long addend) {
   CodeBlobEntry* callee_data = codeblobs.find(callee);
   assert(callee_data != NULL, "");
   CodeBlobEntry* caller_data = codeblobs.find(caller);
   assert(caller_data != NULL, "");
   NativeInstruction* ni = nativeInstruction_at(call_addr);
   assert(ni->is_call(), "");
+  NativeCall* nc = nativeCall_at(call_addr);
+  Assembler::WhichOperand operand = Assembler::call32_operand;
 
   Elf64_Rela reloc;
+  long displacement_offset = Assembler::locate_operand(call_addr, operand) - call_addr;
+  long next_instruction_offset = Assembler::locate_next_instruction(call_addr) - call_addr;
   long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
   assert(call_offset > 0, "outside the code cache?");
-  reloc.r_offset = call_offset + NativeCall::displacement_offset;
-  reloc.r_addend = callee_data->offset() + (method->from_compiled_entry() - callee->code_begin()) ;
+  reloc.r_offset = call_offset + displacement_offset;
+  reloc.r_addend = callee_data->offset() + addend - nc->displacement() - (next_instruction_offset - displacement_offset);
+  assert(nc->displacement() == (nc->destination() - call_addr - next_instruction_offset), "");
+//  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
   reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_PC32);
   text_relocs.push(reloc);
 }
@@ -2434,10 +2440,15 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             address dest = r->destination();
             if (dest != (address) -1) {
               if (heap->contains(dest)) {
+                CodeBlob* callee = CodeCache::find_blob(dest);
                 NativeInstruction* ni = nativeInstruction_at(r->addr());
                 if (ni->is_mov_literal64()) {
-                  add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
-                                 dest - (address) heap->low(), text_sym, text_relocs);
+//                  add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
+//                                 dest - (address) heap->low(), text_sym, text_relocs);
+                } else if (ni->is_call()) {
+//                  add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(), dest - callee->code_begin());
+                } else {
+
                 }
               } else {
                 static address to_skip[] = {
@@ -2660,37 +2671,62 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
 
   FOR_ALL_BLOBS(cb, heap) {
-    if (cb->is_nmethod()) {
-      RelocIterator iter(cb);
-      nmethod* nm = cb->as_nmethod();
-      while (iter.next()) {
-        if (iter.type() == relocInfo::static_call_type) {
-          static_call_Relocation* call = iter.static_call_reloc();
-          Method* method = call->method_value();
-          assert(method != NULL, "can't resolve the call");
-          if (!method->has_compiled_code()) {
-            method->print_short_name();
-            tty->cr();
-            success = false;
-          } else {
-            CompiledMethod* cm = method->code();
-            address call_addr = call->addr();
+    RelocIterator iter(cb);
+    while (iter.next()) {
+      if (iter.type() == relocInfo::static_call_type) {
+        static_call_Relocation* call = iter.static_call_reloc();
+        Method* method = call->method_value();
+        assert(method != NULL, "can't resolve the call");
+        if (!method->has_compiled_code()) {
+          method->print_short_name();
+          tty->cr();
+          success = false;
+        } else {
+          CompiledMethod* cm = method->code();
+          address call_addr = call->addr();
 
-            add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, method, cm, call_addr);
-          }
-        } else if (iter.type() == relocInfo::opt_virtual_call_type) {
-          opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
-          Method* method = call->method_value();
-          assert(method != NULL, "can't resolve the call");
-          if (!method->has_compiled_code()) {
-            method->print_short_name();
-            tty->cr();
-            success = false;
-          } else {
-            CompiledMethod* cm = method->code();
-            address call_addr = call->addr();
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
+                                call->destination(), method->from_compiled_entry() - cb->code_begin()) ;
+        }
+      } else if (iter.type() == relocInfo::opt_virtual_call_type) {
+        opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
+        Method* method = call->method_value();
+        assert(method != NULL, "can't resolve the call");
+        if (!method->has_compiled_code()) {
+          method->print_short_name();
+          tty->cr();
+          success = false;
+        } else {
+          CompiledMethod* cm = method->code();
+          address call_addr = call->addr();
 
-            add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, method, cm, call_addr);
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
+                                call->destination(), method->from_compiled_entry() - cb->code_begin());
+        }
+      } else if (iter.type() == relocInfo::runtime_call_type) {
+        runtime_call_Relocation* r = iter.runtime_call_reloc();
+        address dest = r->destination();
+        if (dest != (address) -1) {
+          if (heap->contains(dest)) {
+            CodeBlob* callee = CodeCache::find_blob(dest);
+            NativeInstruction* ni = nativeInstruction_at(r->addr());
+            if (ni->is_mov_literal64()) {
+              CodeBlobEntry* callee_data = codeblobs.find(callee);
+              assert(callee_data != NULL, "");
+              CodeBlobEntry* caller_data = codeblobs.find(cb);
+              assert(caller_data != NULL, "");
+
+              long call_offset = caller_data->offset() + ((address) r->pd_address_in_code() - cb->code_begin());
+              long callee_offset = callee_data->offset() + (dest - callee->code_begin());
+              add_relocation(call_offset, callee_offset, text_sym, text_relocs);
+            } else if (ni->is_call()) {
+              add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
+                                    dest, 0);
+            } else if (ni->is_cond_jump() || ni->is_jump()) {
+
+            } else {
+              ShouldNotReachHere();
+            }
           }
         }
       }
