@@ -2078,19 +2078,15 @@ static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<El
   CodeBlobEntry* caller_data = codeblobs.find(caller);
   assert(caller_data != NULL, "");
   NativeInstruction* ni = nativeInstruction_at(call_addr);
-  assert(ni->is_call(), "");
-  NativeCall* nc = nativeCall_at(call_addr);
+  assert(ni->is_call() || ni->is_jump() || ni->is_cond_jump(), "");
   Assembler::WhichOperand operand = Assembler::call32_operand;
 
   Elf64_Rela reloc;
   long displacement_offset = Assembler::locate_operand(call_addr, operand) - call_addr;
-  long next_instruction_offset = Assembler::locate_next_instruction(call_addr) - call_addr;
   long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
   assert(call_offset > 0, "outside the code cache?");
   reloc.r_offset = call_offset + displacement_offset;
-  reloc.r_addend = callee_data->offset() + addend - nc->displacement() - (next_instruction_offset - displacement_offset);
-  assert(nc->displacement() == (nc->destination() - call_addr - next_instruction_offset), "");
-//  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
+  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
   reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_PC32);
   text_relocs.push(reloc);
 }
@@ -2113,52 +2109,63 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       while (iter.next()) {
         if (iter.type() == relocInfo::virtual_call_type) {
           MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          virtual_call_Relocation* call = iter.virtual_call_reloc();
-          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
-          methodHandle caller(thread, sd->method());
-          Bytecode_invoke invoke(caller, sd->bci());
-          Method* method = call->method_value();
-          Klass* defc = method->method_holder();
-          Symbol* name = method->name();
-          Symbol* type = method->signature();
-          LinkInfo link_info(defc, name, type);
-          if (invoke.is_invokevirtual()) {
-            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
-            int vtable_index = Method::invalid_vtable_index;
-            if (resolved_method->method_holder()->is_interface()) {
-              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
-            } else {
-              vtable_index = resolved_method->vtable_index();
-            }
-            CompiledICLocker ml(nm);
-            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-            address entry = VtableStubs::find_vtable_stub(vtable_index);
-            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-          } else {
-            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
-            if (resolved_method->has_vtable_index()) {
-              int vtable_index = resolved_method->vtable_index();
-              CompiledICLocker ml(nm);
-              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-              address entry = VtableStubs::find_vtable_stub(vtable_index);
-              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-            } else if (resolved_method->has_itable_index()) {
-              int itable_index = resolved_method->itable_index();
-              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
-                                                              link_info.resolved_klass(), false);
-              has_compiledicholders = true;
-
-              CompiledICLocker ml(nm);
-              address entry = VtableStubs::find_itable_stub(itable_index);
-              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
-            } else {
-              int index = resolved_method->vtable_index();
-//              ShouldNotReachHere();
-            }
+          address entry;
+          if (virtual_call_entry_and_holder(thread, iter, nm, entry, NULL)) {
+            has_compiledicholders |= VtableStubs::entry_point(entry)->is_itable_stub();
           }
         }
       }
+//       RelocIterator iter(cb);
+//      nmethod* nm = cb->as_nmethod();
+//      while (iter.next()) {
+//        if (iter.type() == relocInfo::virtual_call_type) {
+//          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+//          virtual_call_Relocation* call = iter.virtual_call_reloc();
+//          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
+//          methodHandle caller(thread, sd->method());
+//          Bytecode_invoke invoke(caller, sd->bci());
+//          Method* method = call->method_value();
+//          Klass* defc = method->method_holder();
+//          Symbol* name = method->name();
+//          Symbol* type = method->signature();
+//          LinkInfo link_info(defc, name, type);
+//          if (invoke.is_invokevirtual()) {
+//            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+//            int vtable_index = Method::invalid_vtable_index;
+//            if (resolved_method->method_holder()->is_interface()) {
+//              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+//            } else {
+//              vtable_index = resolved_method->vtable_index();
+//            }
+//            CompiledICLocker ml(nm);
+//            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+//            address entry = VtableStubs::find_vtable_stub(vtable_index);
+////            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+//          } else {
+//            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
+//            if (resolved_method->has_vtable_index()) {
+//              int vtable_index = resolved_method->vtable_index();
+//              CompiledICLocker ml(nm);
+//              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+//              address entry = VtableStubs::find_vtable_stub(vtable_index);
+////              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
+//            } else if (resolved_method->has_itable_index()) {
+//              int itable_index = resolved_method->itable_index();
+//              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
+//                                                              link_info.resolved_klass(), false);
+//              has_compiledicholders = true;
+//
+//              CompiledICLocker ml(nm);
+//              address entry = VtableStubs::find_itable_stub(itable_index);
+//              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
+////              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
+//            } else {
+//              int index = resolved_method->vtable_index();
+////              ShouldNotReachHere();
+//            }
+//          }
+//        }
+//      }
     }
     if (cb->oop_maps() != NULL) {
       has_oopmaps = true;
@@ -2605,12 +2612,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                 ShouldNotReachHere();
               case relocInfo::virtual_call_type: {
                 MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-                CompiledICLocker ml(nm);
-                address call = iter.addr();
-                CompiledIC* ic = CompiledIC_at(nm, call);
-                if (ic->is_icholder_call()) {
-                  CompiledICHolder* holder = ic->cached_icholder();
-
+                address entry;
+                CompiledICHolder* holder;
+                if (virtual_call_entry_and_holder(thread, iter, nm, entry, &holder) && holder != NULL) {
                   Elf_Data* compiledicholders_data = new_data(compiledicholders_section, holder, sizeof(*holder));
 
                   NativeCall* call = nativeCall_at(iter.addr());
@@ -2686,7 +2690,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           address call_addr = call->addr();
 
           add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
-                                call->destination(), method->from_compiled_entry() - cb->code_begin()) ;
+                                call->destination(), method->from_compiled_entry() - cm->code_begin()) ;
         }
       } else if (iter.type() == relocInfo::opt_virtual_call_type) {
         opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
@@ -2701,7 +2705,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           address call_addr = call->addr();
 
           add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
-                                call->destination(), method->from_compiled_entry() - cb->code_begin());
+                                call->destination(), method->from_compiled_entry() - cm->code_begin());
         }
       } else if (iter.type() == relocInfo::runtime_call_type) {
         runtime_call_Relocation* r = iter.runtime_call_reloc();
@@ -2719,15 +2723,24 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
               long call_offset = caller_data->offset() + ((address) r->pd_address_in_code() - cb->code_begin());
               long callee_offset = callee_data->offset() + (dest - callee->code_begin());
               add_relocation(call_offset, callee_offset, text_sym, text_relocs);
-            } else if (ni->is_call()) {
+            } else if (ni->is_call() || ni->is_jump() || ni->is_cond_jump()) {
               add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
-                                    dest, 0);
-            } else if (ni->is_cond_jump() || ni->is_jump()) {
-
+                                    dest, dest - callee->code_begin());
             } else {
               ShouldNotReachHere();
             }
           }
+        }
+      } else if (iter.type() == relocInfo::virtual_call_type) {
+        virtual_call_Relocation* r = iter.virtual_call_reloc();
+        MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+        address entry;
+        bool ignored;
+        if (virtual_call_entry_and_holder(thread, iter, cb->as_nmethod(), entry, NULL)) {
+          CodeBlob* callee = CodeCache::find_blob(entry);
+          address dest = r->destination();
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
+                                dest, entry - callee->code_begin());
         }
       }
     }
@@ -2799,6 +2812,55 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
   elf_end(elf);
   close(fd);
+}
+
+bool CodeCache::virtual_call_entry_and_holder(JavaThread* thread, RelocIterator &iter, nmethod* nm, address &entry,
+                                              CompiledICHolder** holder) {
+  virtual_call_Relocation* call = iter.virtual_call_reloc();
+  ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
+  methodHandle caller(thread, sd->method());
+  Bytecode_invoke invoke(caller, sd->bci());
+  Method* method = call->method_value();
+  Klass* defc = method->method_holder();
+  Symbol* name = method->name();
+  Symbol* type = method->signature();
+  LinkInfo link_info(defc, name, type);
+  if (invoke.is_invokevirtual()) {
+    Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
+    int vtable_index = Method::invalid_vtable_index;
+    if (resolved_method->method_holder()->is_interface()) {
+      vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
+    } else {
+      vtable_index = resolved_method->vtable_index();
+    }
+    if (holder != NULL) {
+      *holder = NULL;
+    }
+    entry = VtableStubs::find_vtable_stub(vtable_index);
+    return true;
+  } else {
+    Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
+    if (resolved_method->has_vtable_index()) {
+      int vtable_index = resolved_method->vtable_index();
+      if (holder != NULL) {
+        *holder = NULL;
+      }
+      entry = VtableStubs::find_vtable_stub(vtable_index);
+      return true;
+    } else if (resolved_method->has_itable_index()) {
+      int itable_index = resolved_method->itable_index();
+      if (holder != NULL) {
+        *holder = new CompiledICHolder(resolved_method->method_holder(),
+                                       link_info.resolved_klass(), false);
+      }
+      entry = VtableStubs::find_itable_stub(itable_index);
+      return true;
+    } else {
+      int index = resolved_method->vtable_index();
+//              ShouldNotReachHere();
+    }
+  }
+  return false;
 }
 
 

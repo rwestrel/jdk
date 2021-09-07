@@ -304,6 +304,9 @@ public:
   static void dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaThread* thread);
 
   static void restore_from_disk(JavaThread* thread);
+
+  static bool virtual_call_entry_and_holder(JavaThread* thread, RelocIterator &iter, nmethod* nm, address &entry,
+                                            CompiledICHolder** holder);
 };
 
 
