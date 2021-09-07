@@ -2334,6 +2334,11 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
   }
 
+  unsigned long segmap_size = heap->_segmap.high() - heap->_segmap.low();
+  char* segmap_clone = NEW_RESOURCE_ARRAY(char, segmap_size);
+//  memset(segmap_clone, CodeHeap::free_sentinel, segmap_size);
+  memcpy(segmap_clone, heap->_segmap.low(), segmap_size);
+
   bool success = true;
   FOR_ALL_BLOBS(cb, heap) {
     intptr_t vtbl = *(intptr_t*) cb;
@@ -2375,6 +2380,16 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       vtbl_sym = vt_syms.vtableblob;
     } else {
       ShouldNotReachHere();
+    }
+
+    {
+      int s = cb->size();
+      size_t segments = heap->size_to_segments(s);
+      size_t beg = heap->segment_for(cb);
+      assert(heap->_segmap.low()[beg] == 0, "");
+      for (size_t i = 1; i < segments; i++) {
+        assert(heap->_segmap.low()[beg + i] == (i % (CodeHeap::free_sentinel - 1)), "");
+      }
     }
 
     if (cb == CodeCache::first_blob(heap)) {
@@ -2747,15 +2762,14 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     assert(success, "");
   }
 
-
-
   {
     Elf_Data* codecache_data = new_data(codecache_section, heap, sizeof(*heap));
 
     add_global_symbol(strings, symbols, codecache_section, "leydenCodeHeap", STT_OBJECT, 0, codecache_data->d_size);
   }
   {
-    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), heap->_segmap.high() - heap->_segmap.low());
+//    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), segmap_size);
+    Elf_Data* codecache_data = new_data(codecache_section, segmap_clone, segmap_size);
     add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
   }
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
