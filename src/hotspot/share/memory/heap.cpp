@@ -489,10 +489,17 @@ CodeBlob* CodeHeap::find_blob_unsafe(void* start) const {
 }
 
 CodeBlob* LeydenCodeHeap::find_blob_unsafe(void* start) const {
-  CodeBlob* result = (CodeBlob*)CodeHeap::find_start(start);
-  if (result != NULL) {
-    result = *(CodeBlob**)result;
+  CodeBlob** cb = (CodeBlob**)find_block_for(start);
+  if (cb == NULL) {
+    return NULL;
   }
+  size_t seg_idx = segment_for(cb);
+  address seg_map = (address)_segmap.low();
+  assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
+  if (seg_map[seg_idx] == free_sentinel) {
+    return NULL;
+  }
+  CodeBlob* result = *cb;
   return (result != NULL && result->blob_contains((address)start)) ? result : NULL;
 }
 

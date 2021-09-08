@@ -1982,6 +1982,7 @@ class CodeBlobEntry : public HashtableEntry<CodeBlob*, mtLeyden> {
 private:
   uint _symbol_index;
   long _offset;
+  long _from_interpreted_entry_off;
 
 public:
 
@@ -1997,6 +1998,9 @@ public:
     return _offset;
   }
 
+  long from_interpreted_entry_off() const {
+    return  _from_interpreted_entry_off;
+  }
 };
 
 class CodeBlobHashtable : public Hashtable<CodeBlob*, mtLeyden> {
@@ -2010,12 +2014,13 @@ private:
     return (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::bucket(i);
   }
 
-  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index, long offset) {
+  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index, long offset, long from_interpreted_entry_off) {
     assert(offset > 0, "");
     unsigned int hash = compute_hash(cb);
     CodeBlobEntry* entry = (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::new_entry(hash, cb);
     entry->_symbol_index = symbol_index;
     entry->_offset = offset;
+    entry->_from_interpreted_entry_off = from_interpreted_entry_off;
     return entry;
   }
 
@@ -2023,10 +2028,10 @@ public:
   CodeBlobHashtable(int table_size) : Hashtable<CodeBlob*, mtLeyden>(table_size, sizeof(CodeBlobEntry)) {
   }
 
-  bool add(CodeBlob* cb, int symbol_index, long offset) {
+  bool add(CodeBlob* cb, int symbol_index, long offset, long from_interpreted_entry_off) {
     CodeBlobEntry* e = find(cb);
     if (e == NULL) {
-      CodeBlobEntry* e = new_entry(cb, symbol_index, offset);
+      CodeBlobEntry* e = new_entry(cb, symbol_index, offset, from_interpreted_entry_off);
       int index = hash_to_index(e->hash());
       add_entry(index, e);
       return false;
@@ -2382,34 +2387,50 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       ShouldNotReachHere();
     }
 
-    {
-      size_t beg = heap->segment_for(cb);
-      size_t end = heap->segment_for((address)cb + cb->size() - 1);
-      size_t segments = end - beg + 1;
-      segmap_clone.at_put_grow(beg, 0);
-      for (size_t i = 1; i < segments; i++) {
-        segmap_clone.at_put_grow(beg + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
-      }
+
+    int size = cb->code_size() + CodeEntryAlignment;
+    size_t segments = heap->size_to_segments(size);
+    size_t actual_size = heap->segments_to_size(segments);
+
+    segmap_clone.at_put_grow(current_segment, 0);
+    for (size_t i = 1; i < segments; i++) {
+      segmap_clone.at_put_grow(current_segment + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
     }
+    current_segment += segments;
 
-    if (cb == CodeCache::first_blob(heap)) {
 
-      Elf_Data* text_data = new_data(text_section, heap->low(), cb->code_begin() - (address) heap->low());
+//    {
+//      size_t beg = heap->segment_for(cb);
+//      size_t end = heap->segment_for((address)cb + cb->size() - 1);
+//      size_t segments = end - beg + 1;
+//      segmap_clone.at_put_grow(beg, 0);
+//      for (size_t i = 1; i < segments; i++) {
+//        segmap_clone.at_put_grow(beg + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
+//      }
+//    }
 
-      add_global_symbol(strings, symbols, text_section, "padding", STT_NOTYPE, text_data->d_off, text_data->d_size);
-    }
+//    if (cb == CodeCache::first_blob(heap)) {
+//
+//      Elf_Data* text_data = new_data(text_section, heap->low(), cb->code_begin() - (address) heap->low());
+//
+//      add_global_symbol(strings, symbols, text_section, "padding", STT_NOTYPE, text_data->d_off, text_data->d_size);
+//    }
+
+    Elf_Data* text_data = new_data(text_section, cb->code_begin() - CodeEntryAlignment, actual_size);
+
+    long code_offset = text_data->d_off + CodeEntryAlignment;
 
     CodeBlob* next_cb = next_blob(heap, cb);
-    Elf_Data* text_data = new_data(text_section, cb->code_begin(),
-                                   next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
+//    Elf_Data* text_data = new_data(text_section, cb->code_begin(),
+//                                   next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
+
+    int sym_id;
+    long from_interpreted_entry_off = -1;
 
     {
       const char* name = codeblob_code_symbol(cb);
 
-      int sym_id = add_global_symbol(strings, symbols, text_section, name, STT_FUNC, text_data->d_off, cb->code_size());
-      bool duplicate = codeblobs.add(cb, sym_id, cb->code_begin() - (address)heap->low());
-      assert(!duplicate, "");
-      assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
+      sym_id = add_global_symbol(strings, symbols, text_section, name, STT_FUNC, code_offset, cb->code_size());
     }
 
     {
@@ -2421,7 +2442,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
       add_relocation(codeblobs_data->d_off, vt_offset, vtbl_sym, codeblobs_relocs);
       // pointer in text section to CodeBlobs object
-      add_relocation((address) cb - (address) heap->low(), (address) cb - (address) CodeCache::first_blob(heap),
+      add_relocation(text_data->d_off, (address) cb - (address) CodeCache::first_blob(heap),
                      codeblobs_sym, text_relocs);
 
 //      {
@@ -2436,9 +2457,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _name), codeblobsro_data->d_off, codeblobsro_sym,
                      codeblobs_relocs);
-      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_begin), text_data->d_off, text_sym,
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_begin), code_offset, text_sym,
                      codeblobs_relocs);
-      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_end), text_data->d_off + cb->code_size(),
+      add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _code_end), code_offset + cb->code_size(),
                      text_sym, codeblobs_relocs);
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _old_code_begin),
                      codeblobs_data->d_off + (cb->_old_code_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
@@ -2497,19 +2518,19 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                   int sym = add_external_symbol(dest, strings, symbols, offset);
                   assert(offset == 0, "");
 
-                  add_relocation((address) r->pd_address_in_code() - (address) heap->low(), offset, sym, text_relocs);
+                  add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset, offset, sym, text_relocs);
                 }
               }
             }
           } else if (iter.type() == relocInfo::internal_word_type) {
             internal_word_Relocation* r = iter.internal_word_reloc();
             assert(cb->code_contains(r->target()), "");
-            add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
-                           r->target() - (address) heap->low(), text_sym, text_relocs);
+            add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset,
+                           (r->target() - cb->code_begin()) + code_offset, text_sym, text_relocs);
           } else if (iter.type() == relocInfo::section_word_type) {
             section_word_Relocation* r = iter.section_word_reloc();
             assert(!cb->code_contains(r->target()), "");
-            add_relocation((address) r->pd_address_in_code() - (address) heap->low(),
+            add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset,
                            r->target() - (address) CodeCache::first_blob(heap), codeblobs_sym, text_relocs);
           } else if (iter.type() == relocInfo::card_mark_word_type) {
 //            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
@@ -2523,13 +2544,12 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         Elf_Data* oopmaps_data = new_data(oopmaps_section, oopmaps, oopmaps->nr_of_bytes());
         add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _oop_maps), oopmaps_data->d_off, oopmaps_sym, codeblobs_relocs);
       }
-      
       if (cb->is_nmethod()) {
         nmethod* nm = cb->as_nmethod();
         add_relocation(codeblobs_data->d_off + offset_of(nmethod, _scopes_data_begin), codeblobs_data->d_off + (nm->_scopes_data_begin - (address)cb), codeblobs_sym, codeblobs_relocs);
-        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _entry_point), text_data->d_off + (nm->_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
-        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _verified_entry_point), text_data->d_off + (nm->_verified_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
-        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _osr_entry_point), text_data->d_off + (nm->_osr_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _entry_point), code_offset + (nm->_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _verified_entry_point), code_offset + (nm->_verified_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _osr_entry_point), code_offset + (nm->_osr_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
 
         {
           Method* m = nm->method();
@@ -2541,7 +2561,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         {
           static intptr_t from_interpreted_entry;
           Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*) &from_interpreted_entry, sizeof(from_interpreted_entry));
-          add_relocation(codeblobsro_data->d_off, nm->method()->_from_interpreted_entry - (address)heap->low(), text_sym, codeblobsro_relocs);
+          from_interpreted_entry_off = codeblobsro_data->d_off;
+//          add_relocation(codeblobsro_data->d_off, nm->method()->_from_interpreted_entry - (address)heap->low(), text_sym, codeblobsro_relocs);
         }
         for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
           oop o = *ptr;
@@ -2636,7 +2657,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                   NativeCallWrapper* call_wrapper = nm->call_wrapper_at((address) call);
                   NativeMovConstReg* load = (NativeMovConstReg*)call_wrapper->get_load_instruction(iter.virtual_call_reloc());
 
-                  add_relocation(load->data_addr() - (address)heap->low(), compiledicholders_data->d_off, compiledicholders_sym, text_relocs);
+                  add_relocation((load->data_addr() - nm->code_begin()) + code_offset, compiledicholders_data->d_off, compiledicholders_sym, text_relocs);
                   add_relocation(codeblobs_data->d_off + (load->data_addr() - (address)nm), compiledicholders_data->d_off, compiledicholders_sym, codeblobs_relocs);
                   {
                     assert(!holder->_is_metadata_method, "");
@@ -2687,6 +2708,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         }
       }
     }
+    bool duplicate = codeblobs.add(cb, sym_id, code_offset, from_interpreted_entry_off);
+    assert(!duplicate, "");
+    assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
   }
 
   FOR_ALL_BLOBS(cb, heap) {
@@ -2759,6 +2783,17 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         }
       }
     }
+    if (cb->is_nmethod()) {
+      nmethod* nm = cb->as_nmethod();
+      CodeBlobEntry* nm_data = codeblobs.find(nm);
+      assert(nm_data != NULL, "");
+      CodeBlob* adapter = CodeCache::find_blob(nm->method()->_from_interpreted_entry);
+      CodeBlobEntry* adapter_data = codeblobs.find(adapter);
+      assert(adapter_data != NULL, "");
+      assert(nm_data->from_interpreted_entry_off() != -1, "");
+      add_relocation(nm_data->from_interpreted_entry_off(), (nm->method()->_from_interpreted_entry - adapter->code_begin()) + adapter_data->offset(), text_sym, codeblobsro_relocs);
+    }
+
     assert(success, "");
   }
 

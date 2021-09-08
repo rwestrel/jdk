@@ -236,24 +236,32 @@ private:
   LeydenCodeHeap() : CodeHeap(NULL, 0) {}
 public:
   virtual void* first() const {
-    CodeBlob** cb = (CodeBlob**) CodeHeap::first();
-    if (cb == NULL) {
+    address seg_map = (address)_segmap.low();
+    size_t  seg_idx = 0;
+    assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
+    assert((seg_map[seg_idx] == 0) == (_next_segment > 0), "");
+    if (seg_map[seg_idx] == free_sentinel) {
       return NULL;
     }
+    CodeBlob** cb = (CodeBlob**)address_for(0);
     return *cb;
   }
 
-  virtual void* next(void* p) const{
+  virtual void* next(void* p) const {
+    CodeBlob** cb = (CodeBlob**)find_block_for(p);
+    size_t segments = size_to_segments((*cb)->code_size() + CodeEntryAlignment);
+    size_t  seg_idx = segment_for(p) + segments;
+    address seg_map = (address)_segmap.low();
+    assert(seg_map[seg_idx] == 0 || seg_map[seg_idx] == free_sentinel, "");
 
-    CodeBlob** cb = (CodeBlob**) CodeHeap::next(p);
-    if (cb == NULL) {
+    if (seg_map[seg_idx] == free_sentinel) {
       return NULL;
     }
-    return *cb;
+    CodeBlob** next = (CodeBlob**)address_for(seg_idx);
+    return *next;
   }
 
   virtual CodeBlob* find_blob_unsafe(void* start) const;
-
 
 };
 
