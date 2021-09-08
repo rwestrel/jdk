@@ -2098,7 +2098,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
 
-  CodeBlobHashtable codeblobs(heap->blob_count() / 4 * 3);
+  CodeBlobHashtable codeblobs(heap->blob_count() / 3 * 4);
 
   bool has_compiledicholders = false;
   bool has_oopmaps = false;
@@ -2335,10 +2335,10 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
 
   unsigned long segmap_size = heap->_segmap.high() - heap->_segmap.low();
-  char* segmap_clone = NEW_RESOURCE_ARRAY(char, segmap_size);
-//  memset(segmap_clone, CodeHeap::free_sentinel, segmap_size);
-  memcpy(segmap_clone, heap->_segmap.low(), segmap_size);
+  GrowableArray<char> segmap_clone(2, 0, CodeHeap::free_sentinel);
+//  memcpy(segmap_clone, heap->_segmap.low(), segmap_size);
 
+  size_t current_segment = 0;
   bool success = true;
   FOR_ALL_BLOBS(cb, heap) {
     intptr_t vtbl = *(intptr_t*) cb;
@@ -2383,12 +2383,12 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
 
     {
-      int s = cb->size();
-      size_t segments = heap->size_to_segments(s);
       size_t beg = heap->segment_for(cb);
-      assert(heap->_segmap.low()[beg] == 0, "");
+      size_t end = heap->segment_for((address)cb + cb->size() - 1);
+      size_t segments = end - beg + 1;
+      segmap_clone.at_put_grow(beg, 0);
       for (size_t i = 1; i < segments; i++) {
-        assert(heap->_segmap.low()[beg + i] == (i % (CodeHeap::free_sentinel - 1)), "");
+        segmap_clone.at_put_grow(beg + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
       }
     }
 
@@ -2769,7 +2769,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
   {
 //    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), segmap_size);
-    Elf_Data* codecache_data = new_data(codecache_section, segmap_clone, segmap_size);
+    Elf_Data* codecache_data = new_data(codecache_section, segmap_clone.adr_at(0), segmap_clone.length());
     add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
   }
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
