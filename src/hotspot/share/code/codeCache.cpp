@@ -2077,17 +2077,18 @@ static const char* codeblob_obj_symbol(CodeBlob* cb) {
 }
 
 static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<Elf64_Rela> &text_relocs, int text_sym,
-                                  CodeBlob* caller, CodeBlob* callee, address call_addr, address dest, long addend) {
+                                  CodeBlob* caller, CodeBlob* callee, address call_addr, address dest, long addend,
+                                  Assembler::WhichOperand format) {
   CodeBlobEntry* callee_data = codeblobs.find(callee);
   assert(callee_data != NULL, "");
   CodeBlobEntry* caller_data = codeblobs.find(caller);
   assert(caller_data != NULL, "");
-  NativeInstruction* ni = nativeInstruction_at(call_addr);
-  assert(ni->is_call() || ni->is_jump() || ni->is_cond_jump(), "");
-  Assembler::WhichOperand operand = Assembler::call32_operand;
+//  NativeInstruction* ni = nativeInstruction_at(call_addr);
+//  assert(ni->is_call() || ni->is_jump() || ni->is_cond_jump(), "");
+//  Assembler::WhichOperand operand = Assembler::call32_operand;
 
   Elf64_Rela reloc;
-  long displacement_offset = Assembler::locate_operand(call_addr, operand) - call_addr;
+  long displacement_offset = Assembler::locate_operand(call_addr, format) - call_addr;
   long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
   assert(call_offset > 0, "outside the code cache?");
   reloc.r_offset = call_offset + displacement_offset;
@@ -2729,7 +2730,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           address call_addr = call->addr();
 
           add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
-                                call->destination(), method->from_compiled_entry() - cm->code_begin()) ;
+                                call->destination(), method->from_compiled_entry() - cm->code_begin(), Assembler::call32_operand);
         }
       } else if (iter.type() == relocInfo::opt_virtual_call_type) {
         opt_virtual_call_Relocation* call = iter.opt_virtual_call_reloc();
@@ -2744,7 +2745,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           address call_addr = call->addr();
 
           add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, cm, call_addr,
-                                call->destination(), method->from_compiled_entry() - cm->code_begin());
+                                call->destination(), method->from_compiled_entry() - cm->code_begin(), Assembler::call32_operand);
         }
       } else if (iter.type() == relocInfo::runtime_call_type) {
         runtime_call_Relocation* r = iter.runtime_call_reloc();
@@ -2764,7 +2765,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
               add_relocation(call_offset, callee_offset, text_sym, text_relocs);
             } else if (ni->is_call() || ni->is_jump() || ni->is_cond_jump()) {
               add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
-                                    dest, dest - callee->code_begin());
+                                    dest, dest - callee->code_begin(), Assembler::call32_operand/*(Assembler::WhichOperand)iter.format()*/);
             } else {
               ShouldNotReachHere();
             }
@@ -2779,7 +2780,15 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           CodeBlob* callee = CodeCache::find_blob(entry);
           address dest = r->destination();
           add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, callee, r->addr(),
-                                dest, entry - callee->code_begin());
+                                dest, entry - callee->code_begin(), Assembler::call32_operand);
+        }
+      } else if (iter.type() == relocInfo::external_word_type) {
+        external_word_Relocation* r = iter.external_word_reloc();
+        if (CodeCache::contains(r->target())) {
+          address target = r->target();
+          CodeBlob* target_cb = CodeCache::find_blob(target);
+          add_pc_relative_reloc(codeblobs, text_relocs, text_sym, cb, target_cb, r->addr(),
+                                target, target - target_cb->code_begin(), (Assembler::WhichOperand)iter.format());
         }
       }
     }
@@ -2809,6 +2818,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
   }
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->high() - heap->low(), text_sym, codecache_relocs);
+//  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->segments_to_size(current_segment), text_sym, codecache_relocs);
 
   {
     LeydenCodeHeap ch;
