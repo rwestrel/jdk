@@ -671,7 +671,7 @@ public:
   ZMarkNMethodClosure(OopClosure* cl) :
       _cl(cl) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
     if (!nm->is_alive()) {
       return;

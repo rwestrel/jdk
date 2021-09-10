@@ -99,10 +99,10 @@ public:
 
   virtual void keep_alive(oop obj);
 
-  virtual void register_nmethod(nmethod* nm);
+  virtual void register_nmethod(CompiledMethod* nm);
   virtual void unregister_nmethod(nmethod* nm);
   virtual void flush_nmethod(nmethod* nm);
-  virtual void verify_nmethod(nmethod* nmethod);
+  virtual void verify_nmethod(CompiledMethod* nmethod);
 
   virtual WorkGang* safepoint_workers();
 

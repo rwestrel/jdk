@@ -713,7 +713,7 @@ public:
 
 class ShenandoahIsNMethodAliveClosure: public NMethodClosure {
 public:
-  void do_nmethod(nmethod* n) {
+  void do_nmethod(CompiledMethod* n) {
     n->is_unloading();
   }
 };
@@ -823,7 +823,7 @@ public:
     _cl() {
   }
 
-  void do_nmethod(nmethod* n) {
+  void do_nmethod(CompiledMethod* n) {
     ShenandoahNMethod* data = ShenandoahNMethod::gc_data(n);
     ShenandoahReentrantLocker locker(data->lock());
     // Setup EvacOOM scope below reentrant lock to avoid deadlock with

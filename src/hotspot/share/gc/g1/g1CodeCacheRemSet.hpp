@@ -56,7 +56,7 @@ class G1CodeRootSet {
 
   static size_t static_mem_size();
 
-  void add(nmethod* method);
+  void add(CompiledMethod* method);
 
   bool remove(nmethod* method);
 

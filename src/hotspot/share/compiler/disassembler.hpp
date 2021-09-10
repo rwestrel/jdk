@@ -102,7 +102,7 @@ class Disassembler : public AbstractDisassembler {
   // Directly disassemble code blob.
   static void decode(CodeBlob *cb,               outputStream* st = NULL);
   // Directly disassemble nmethod.
-  static void decode(nmethod* nm,                outputStream* st = NULL);
+  static void decode(CompiledMethod* nm, outputStream* st = NULL);
   // Disassemble an arbitrary memory range.
   static void decode(address start, address end, outputStream* st = NULL, const CodeStrings* = NULL);
 

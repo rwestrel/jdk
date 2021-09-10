@@ -110,7 +110,7 @@ void ShenandoahCodeRoots::initialize() {
   _nmethod_table = new ShenandoahNMethodTable();
 }
 
-void ShenandoahCodeRoots::register_nmethod(nmethod* nm) {
+void ShenandoahCodeRoots::register_nmethod(CompiledMethod* nm) {
   assert_locked_or_safepoint(CodeCache_lock);
   _nmethod_table->register_nmethod(nm);
 }
@@ -148,7 +148,7 @@ public:
     _bs(BarrierSet::barrier_set()->barrier_set_nmethod()) {
   }
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     _bs->disarm(nm);
   }
 };
@@ -219,7 +219,7 @@ public:
       _heap(ShenandoahHeap::heap()),
       _bs(ShenandoahBarrierSet::barrier_set()->barrier_set_nmethod()) {}
 
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     assert(_heap->is_concurrent_weak_root_in_progress(), "Only this phase");
     if (failed()) {
       return;
@@ -234,7 +234,7 @@ public:
 
     if (nm->is_unloading()) {
       ShenandoahReentrantLocker locker(nm_data->lock());
-      unlink(nm);
+      unlink((nmethod*)(nm));
       return;
     }
 
@@ -313,9 +313,9 @@ void ShenandoahCodeRoots::unlink(WorkGang* workers, bool unloading_occurred) {
 
 class ShenandoahNMethodPurgeClosure : public NMethodClosure {
 public:
-  virtual void do_nmethod(nmethod* nm) {
+  virtual void do_nmethod(CompiledMethod* nm) {
     if (nm->is_alive() && nm->is_unloading()) {
-      nm->make_unloaded();
+      ((nmethod*)nm)->make_unloaded();
     }
   }
 };

@@ -45,10 +45,10 @@ private:
   static ZNMethodTableEntry* create(size_t size);
   static void destroy(ZNMethodTableEntry* table);
 
-  static size_t first_index(const nmethod* nm, size_t size);
+  static size_t first_index(CompiledMethod* nm, size_t size);
   static size_t next_index(size_t prev_index, size_t size);
 
-  static bool register_entry(ZNMethodTableEntry* table, size_t size, nmethod* nm);
+  static bool register_entry(ZNMethodTableEntry* table, size_t size, CompiledMethod* nm);
   static void unregister_entry(ZNMethodTableEntry* table, size_t size, nmethod* nm);
 
   static void rebuild(size_t new_size);
@@ -58,7 +58,7 @@ public:
   static size_t registered_nmethods();
   static size_t unregistered_nmethods();
 
-  static void register_nmethod(nmethod* nm);
+  static void register_nmethod(CompiledMethod* nm);
   static void unregister_nmethod(nmethod* nm);
 
   static void wait_until_iteration_done();

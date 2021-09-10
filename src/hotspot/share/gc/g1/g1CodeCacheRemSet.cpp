@@ -43,9 +43,9 @@ size_t G1CodeRootSetTable::mem_size() {
   return sizeof(G1CodeRootSetTable) + (entry_size() * number_of_entries()) + (sizeof(HashtableBucket<mtGC>) * table_size());
 }
 
-G1CodeRootSetTable::Entry* G1CodeRootSetTable::new_entry(nmethod* nm) {
+G1CodeRootSetTable::Entry* G1CodeRootSetTable::new_entry(CompiledMethod* nm) {
   unsigned int hash = compute_hash(nm);
-  return (Entry*)Hashtable<nmethod*, mtGC>::new_entry(hash, nm);
+  return (Entry*)Hashtable<CompiledMethod*, mtGC>::new_entry(hash, nm);
 }
 
 void G1CodeRootSetTable::remove_entry(Entry* e, Entry* previous) {
@@ -72,7 +72,7 @@ G1CodeRootSetTable::~G1CodeRootSetTable() {
   assert(number_of_entries() == 0, "should have removed all entries");
 }
 
-bool G1CodeRootSetTable::add(nmethod* nm) {
+bool G1CodeRootSetTable::add(CompiledMethod* nm) {
   if (!contains(nm)) {
     Entry* e = new_entry(nm);
     int index = hash_to_index(e->hash());
@@ -82,7 +82,7 @@ bool G1CodeRootSetTable::add(nmethod* nm) {
   return false;
 }
 
-bool G1CodeRootSetTable::contains(nmethod* nm) {
+bool G1CodeRootSetTable::contains(CompiledMethod* nm) {
   int index = hash_to_index(compute_hash(nm));
   for (Entry* e = bucket(index); e != NULL; e = e->next()) {
     if (e->literal() == nm) {
@@ -192,7 +192,7 @@ size_t G1CodeRootSet::static_mem_size() {
   return G1CodeRootSetTable::static_mem_size();
 }
 
-void G1CodeRootSet::add(nmethod* method) {
+void G1CodeRootSet::add(CompiledMethod* method) {
   bool added = false;
   if (is_empty()) {
     allocate_small_table();
@@ -276,7 +276,7 @@ class CleanCallback : public StackObj {
  public:
   CleanCallback(HeapRegion* hr) : _detector(hr), _blobs(&_detector, !CodeBlobToOopClosure::FixRelocations) {}
 
-  bool operator() (nmethod* nm) {
+  bool operator() (CompiledMethod* nm) {
     _detector._points_into = false;
     _blobs.do_code_blob(nm);
     return !_detector._points_into;

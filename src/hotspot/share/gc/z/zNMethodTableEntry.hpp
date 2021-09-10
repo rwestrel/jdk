@@ -50,7 +50,7 @@ class ZNMethodTableEntry : public CHeapObj<mtGC> {
 private:
   typedef ZBitField<uint64_t, bool,     0,  1>    field_registered;
   typedef ZBitField<uint64_t, bool,     1,  1>    field_unregistered;
-  typedef ZBitField<uint64_t, nmethod*, 2, 62, 2> field_method;
+  typedef ZBitField<uint64_t, CompiledMethod*, 2, 62, 2> field_method;
 
   uint64_t _entry;
 
@@ -60,7 +60,7 @@ public:
              field_unregistered::encode(unregistered) |
              field_method::encode(NULL)) {}
 
-  explicit ZNMethodTableEntry(nmethod* method) :
+  explicit ZNMethodTableEntry(CompiledMethod* method) :
       _entry(field_registered::encode(true) |
              field_unregistered::encode(false) |
              field_method::encode(method)) {}
@@ -73,7 +73,7 @@ public:
     return field_unregistered::decode(_entry);
   }
 
-  nmethod* method() const {
+  CompiledMethod* method() const {
     return field_method::decode(_entry);
   }
 };

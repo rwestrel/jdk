@@ -631,7 +631,7 @@ bool CodeCache::contains(void *p) {
   return false;
 }
 
-bool CodeCache::contains(nmethod *nm) {
+bool CodeCache::contains(CompiledMethod *nm) {
   return contains((void *)nm);
 }
 
@@ -662,6 +662,12 @@ nmethod* CodeCache::find_nmethod(void* start) {
   CodeBlob* cb = find_blob(start);
   assert(cb->is_nmethod(), "did not find an nmethod");
   return (nmethod*)cb;
+}
+
+LeydenNMethod* CodeCache::find_leyden_nmethod(void* start) {
+  CodeBlob* cb = find_blob(start);
+  assert(cb->is_leyden_nmethod(), "did not find an nmethod");
+  return (LeydenNMethod*)cb;
 }
 
 void CodeCache::blobs_do(void f(CodeBlob* nm)) {
@@ -2890,8 +2896,8 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
     _heaps->push(heap);
 
     FOR_ALL_BLOBS(cb, heap) {
-      if (cb->is_nmethod()) {
-        nmethod* nm = cb->as_nmethod();
+      if (cb->is_leyden_nmethod()) {
+        LeydenNMethod* nm = cb->as_leyden_nmethod();
         const char* klass_name = (const char*) nm->_method;
         Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
         Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
@@ -3048,393 +3054,12 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
           m->_i2i_entry = (address)-1;
         }
         nm->_gc_data = NULL;
-        
+
         Universe::heap()->register_nmethod(nm);
 
       }
     }
   }
-
-#if 0
-  Vtables vts;
-  int r = fread(&vts, sizeof(vts), 1, file);
-  assert(r == 1, "fwrite failed");
-  MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-  ResourceMark rm;
-
-  long cur = ftell(file);
-  fseek(file, 0, SEEK_END);
-  long end = ftell(file);
-  fseek(file, cur, SEEK_SET);
-
-//  tty->print_cr("XXX %ld %ld", cur, end);
-  CodeHeap* heap = get_code_heap(CodeBlobType::All);
-  tty->print_cr("XXX %p", heap->_freelist);
-  heap->_freelist = NULL;
-
-  address prev = NULL;
-  int prev_offset = -1;
-  while(ftell(file) != end) {
-    int cb_size;
-    r = fread(&cb_size, sizeof(cb_size), 1, file);
-    assert(r == 1, "fread failed");
-    int offset;
-    r = fread(&offset, sizeof(offset), 1, file);
-    assert(r == 1, "fwrite failed");
-
-    tty->print_cr("XXX %d %d", cb_size, offset);
-
-//    tty->print_cr("<<< %d", cb_size);
-    CodeBlob* cb = (CodeBlob*) allocate(offset > 0 ? offset - CodeHeap::header_size() : cb_size, CodeBlobType::All);
-    assert(prev == NULL || prev_offset == (address)cb - prev, "offset = %d differs from %d", prev_offset, (int)((address)cb - prev));
-
-    r = fread(cb, cb_size, 1, file);
-    assert(r == 1, "fread failed");
-    intptr_t vtbl = *(intptr_t*)cb;
-
-    if (vtbl == vts.nmethod) {
-      nmethod nm;
-      vtbl = *(intptr_t*)&nm;
-    } else if (vtbl == vts.bufferblob) {
-      BufferBlob bb;
-      vtbl = *(intptr_t*)&bb;
-    } else if (vtbl == vts.runtimestub) {
-      RuntimeStub rs;
-      vtbl = *(intptr_t*)&rs;
-    } else if (vtbl == vts.adapterblob) {
-      AdapterBlob ab;
-      vtbl = *(intptr_t*)&ab;
-    } else if (vtbl == vts.exceptionblob) {
-      ExceptionBlob eb;
-      vtbl = *(intptr_t*)&eb;
-    } else if (vtbl == vts.methodhandlesadapterblob) {
-      MethodHandlesAdapterBlob mhab;
-      vtbl = *(intptr_t*)&mhab;
-    } else if (vtbl == vts.safepointblob) {
-      SafepointBlob sb;
-      vtbl = *(intptr_t*)&sb;
-    } else if (vtbl == vts.uncommontrapblob) {
-      UncommonTrapBlob utb;
-      vtbl = *(intptr_t*)&utb;
-    } else if (vtbl == vts.deoptimizationblob) {
-      DeoptimizationBlob db;
-      vtbl = *(intptr_t*)&db;
-    } else if (vtbl == vts.vtableblob) {
-      VtableBlob vb;
-      vtbl = *(intptr_t*)&vb;
-    } else {
-      ShouldNotReachHere();
-    }
-    *(intptr_t*)cb = vtbl;
-    cb->_code_begin = (address)cb + (intptr_t)cb->_code_begin;
-    cb->_code_end = (address)cb + (intptr_t)cb->_code_end;
-    cb->_content_begin = (address)cb + (intptr_t)cb->_content_begin;
-    cb->_data_end = (address)cb + (intptr_t)cb->_data_end;
-    cb->_relocation_begin = (address)cb + (intptr_t)cb->_relocation_begin;
-    cb->_relocation_end = (address)cb + (intptr_t)cb->_relocation_end;
-
-    RelocIterator iter(cb);
-    while(iter.next()) {
-      if (iter.type() == relocInfo::runtime_call_type) {
-        runtime_call_Relocation* rt = iter.runtime_call_reloc();
-        address dest = rt->destination();
-        int lib = (int) (intptr_t) dest;
-        if (lib == LIBJAVA || lib == LIBJVM || lib == CODECACHE) {
-          intptr_t dest_as_int = (intptr_t) dest;
-          if (lib == CODECACHE) {
-            address new_dest = (address)cb->code_begin() + (dest_as_int >> 32);
-            rt->set_destination(new_dest);
-            tty->print_cr("### code cache fix %p -> %p", iter.addr(), new_dest);
-          } else {
-            address func_address;
-            if (lib == LIBJVM) {
-              func_address = (address) CodeCache::restore_from_disk;
-            } else if (lib == LIBJAVA) {
-              func_address = (address)dlsym(NULL, "Java_java_lang_System_registerNatives");
-              assert(func_address != NULL, "");
-            } else {
-              ShouldNotReachHere();
-            }
-            char lib_name[256];
-            int lib_offset;
-            bool success = os::dll_address_to_library_name(func_address, lib_name, sizeof(lib_name), &lib_offset);
-            assert(success, "");
-            address base = func_address - lib_offset;
-            address new_dest = base + (dest_as_int >> 32);
-
-            char func_name[256];
-            int func_offset;
-            success = os::dll_address_to_function_name(new_dest, func_name, sizeof(func_name), &func_offset);
-            assert(success, "");
-            rt->set_destination(new_dest);
-          }
-        }
-      } else if (iter.type() == relocInfo::internal_word_type) {
-        internal_word_Relocation* iw = iter.internal_word_reloc();
-        address target = iw->target();
-//        address new_target = target + (address)cb;
-        iw->set_value(target);
-//        iw->set_value(new_target);
-      } else if (iter.type() == relocInfo::section_word_type) {
-        section_word_Relocation* iw = iter.section_word_reloc();
-        address target = iw->target();
-//        address new_target = target + (address)cb;
-//        tty->print_cr("ZZZ %p %ld", target, new_target);
-
-        iw->set_value(target);
-//        iw->set_value(new_target);
-      } else if (iter.type() == relocInfo::card_mark_word_type) {
-        card_mark_word_Relocation* cm = iter.card_mark_word_reloc();
-        BarrierSet* bs = BarrierSet::barrier_set();
-        CardTableBarrierSet* ctbs = barrier_set_cast<CardTableBarrierSet>(bs);
-        CardTable* ct = ctbs->card_table();
-        cm->set_value(ct->byte_map_base());
-      }
-    }
-
-    if (cb->is_nmethod()) {
-      nmethod* nm = cb->as_nmethod();
-
-      nm->_pc_desc_container.reset_to(nm->scopes_pcs_begin());
-
-      nm->_scopes_data_begin = (address)nm + (intptr_t)nm->_scopes_data_begin;
-      nm->_deopt_handler_begin = (address)nm + (intptr_t)nm->_deopt_handler_begin;
-      nm->_deopt_mh_handler_begin = (address)nm + (intptr_t)nm->_deopt_mh_handler_begin;
-      nm->_entry_point = (address)nm + (intptr_t)nm->_entry_point;
-      nm->_verified_entry_point = (address)nm + (intptr_t)nm->_verified_entry_point;
-      nm->_osr_entry_point = (address)nm + (intptr_t)nm->_osr_entry_point;
-
-      methodHandle mh;
-      {
-        MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-        Method* m = read_method(file, thread);
-        mh = methodHandle(thread, m);
-      }
-
-      for (oop* ptr = nm->oops_begin(); ptr < nm->oops_end(); ptr++) {
-        OopRecord record;
-        r = fread(&record, sizeof(record), 1, file);
-        assert(r == 1, "fread failed");
-        if (record == STRING_RECORD) {
-          MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          Handle value = read_string_object(file, thread);
-          *ptr = value();
-          tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-        } else if (record == CLASS_RECORD) {
-          Klass* k = read_klass(file, thread);
-          assert(k->java_mirror() != NULL, "");
-          *ptr = k->java_mirror();
-          tty->print_cr("### class record %s", k->external_name());
-        } else if (record == CLASSLOADER_RECORD) {
-          *ptr = SystemDictionary::java_system_loader();
-        } else if (record == NPE_RECORD) {
-          *ptr = Universe::null_ptr_exception_instance();
-        } else if (record == AE_RECORD) {
-          *ptr = Universe::arithmetic_exception_instance();
-        } else if (record == ASE_RECORD) {
-          *ptr = ase();
-        } else if (record == CCE_RECORD) {
-          *ptr = cce();
-        } else {
-          ShouldNotReachHere();
-        }
-      }
-
-      RelocIterator iter(nm);
-      while (iter.next()) {
-        if (iter.type() == relocInfo::metadata_type) {
-          metadata_Relocation* r = iter.metadata_reloc();
-          Metadata* md = r->metadata_value();
-          if (md != NULL) {
-            MetadataRecord rec;
-            int read = fread(&rec, sizeof(rec), 1, file);
-            assert(read == 1, "fwrite failed");
-            Metadata* md;
-            if (rec == KLASS_RECORD) {
-              md = read_klass(file, thread);
-            } else if (rec == METHOD_RECORD) {
-              md = read_method(file, thread);
-            } else {
-              ShouldNotReachHere();
-            }
-            *r->metadata_addr() = md;
-            if (nm->consts_contains(iter.addr())) {
-              *((Metadata**)iter.addr()) = md;
-            }
-          }
-        } else if (iter.type() == relocInfo::virtual_call_type) {
-          MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          CompiledICLocker ml(nm);
-          CompiledIC* ic = new CompiledIC(nm, nativeCall_at(iter.addr()));
-//          CompiledIC* ic = CompiledIC_at(nm, iter.addr());
-          if (ic->cached_value() != NULL) {
-            Klass* k1 = read_klass(file, thread);
-            Klass* k2 = read_klass(file, thread);
-            CompiledICHolder* holder = new CompiledICHolder(k2, k1, false);
-            ic->set_data((intptr_t)holder);
-          }
-        } else if (iter.type() == relocInfo::oop_type) {
-          MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-          oop_Relocation* reloc = iter.oop_reloc();
-          OopRecord record;
-          r = fread(&record, sizeof(record), 1, file);
-          assert(r == 1, "fread failed");
-          oop o;
-          if (record == STRING_RECORD) {
-            Handle value = read_string_object(file, thread);
-            o = value();
-            tty->print_cr("### string record %s", java_lang_String::as_quoted_ascii(value()));
-          } else if (record == CLASS_RECORD) {
-            Klass* k = read_klass(file, thread);
-            assert(k->java_mirror() != NULL, "");
-            o = k->java_mirror();
-            tty->print_cr("### class record %s", k->external_name());
-          } else if (record == NPE_RECORD) {
-            o = Universe::null_ptr_exception_instance();
-          } else if (record == AE_RECORD) {
-            o = Universe::arithmetic_exception_instance();
-          } else if (record == ASE_RECORD) {
-            o = ase();
-          } else if (record == CCE_RECORD) {
-            o = cce();
-          } else {
-            ShouldNotReachHere();
-          }
-          *reloc->oop_addr() = o;
-          if (nm->consts_contains(iter.addr())) {
-            *((oop*)iter.addr()) = o;
-          }
-        }
-      }
-      for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-        if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-        MetadataRecord rec;
-        r = fread(&rec, sizeof(rec), 1, file);
-        assert(r == 1, "fwrite failed");
-        if (rec == METHOD_RECORD) {
-          *p = read_method(file, thread);
-        } else if (rec == KLASS_RECORD) {
-          *p = read_klass(file, thread);
-        } else {
-          ShouldNotReachHere();
-        }
-      }
-
-      nm->set_method(mh());
-
-      PerMethod pm;
-      r = fread(&pm, sizeof(pm), 1, file);
-      assert(r == 1, "fread failed");
-
-      {
-        MutexLocker ml(CompiledMethod_lock, Mutex::_no_safepoint_check_flag);
-        mh->_code = nm;
-        mh->set_highest_comp_level(nm->comp_level());
-        OrderAccess::storestore();
-        mh->_from_compiled_entry = nm->verified_entry_point();
-        OrderAccess::storestore();
-        // Instantly compiled code can execute.
-        if (!mh->is_method_handle_intrinsic())
-          mh->_from_interpreted_entry = (address)cb - pm._from_interpreted_entry;
-        mh->_i2i_entry = (address)-1;
-      }
-      nm->_gc_data = NULL;
-
-      Universe::heap()->register_nmethod(nm);
-      CodeCache::commit(nm);
-
-      nm->print();
-
-      void* sym = dlsym(shared_lib, mh->external_name());
-      if (sym == NULL) {
-        tty->print_cr("XXX %s", dlerror());
-      }
-      assert(sym != NULL, "");
-
-    } else if (cb->is_vtable_blob()) {
-      MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-      MutexLocker ml(VtableStubs_lock, Mutex::_no_safepoint_check_flag);
-      VtableStub* stub = (VtableStub*)cb->content_begin();
-      VtableStubs::enter(stub->is_vtable_stub(), stub->index(), stub);
-    }
-    int name_len;
-    r = fread(&name_len, sizeof(name_len), 1, file);
-    assert(r == 1, "fread failed");
-    char* name = NEW_C_HEAP_ARRAY(char, name_len+1, mtCode);
-    r = fread(name, 1, name_len, file);
-    assert(r == name_len, "fread failed");
-    name[name_len] = '\0';
-    cb->_name = name;
-
-    int oopmaps_len;
-    r = fread(&oopmaps_len, sizeof(oopmaps_len), 1, file);
-    assert(r == 1, "fread failed");
-    if (oopmaps_len > 0) {
-      ImmutableOopMapSet* oopmaps = (ImmutableOopMapSet*)NEW_C_HEAP_ARRAY(char, oopmaps_len, mtCode);
-      r = fread(oopmaps, oopmaps_len, 1, file);
-      assert(r == 1, "fread failed");
-      cb->_oop_maps = oopmaps;
-    } else {
-      cb->_oop_maps = NULL;
-    }
-
-    tty->print_cr("XXX %s:%ld", cb->name(), (uintptr_t)cb - (uintptr_t)heap->low());
-    prev = (address)cb;
-    prev_offset = offset;
-  }
-#endif
-
-//  FOR_ALL_BLOBS(cb, heap) {
-//    if (cb->is_nmethod()) {
-//      nmethod* nm = cb->as_nmethod();
-//      RelocIterator iter(nm, nm->oops_reloc_begin());
-//      while(iter.next()) {
-//        Relocation* r = iter.reloc();
-//        if (r->is_call()) {
-//          CallRelocation* cr = (CallRelocation*)r;
-//          assert(heap->contains(cr->destination()), "");
-//        }
-//      }
-//    }
-//  }
-
-#if 0
-  CodeHeap* heap = get_code_heap(CodeBlobType::MethodNonProfiled);
-  FOR_ALL_BLOBS(cb, heap) {
-    intptr_t vtbl = *(intptr_t*) cb;
-    if (vtbl == vts.nmethod) {
-      nmethod nm;
-      vtbl = *(intptr_t*)&nm;
-    } else if (vtbl == vts.bufferblob) {
-      BufferBlob bb;
-      vtbl = *(intptr_t*)&bb;
-    } else if (vtbl == vts.runtimestub) {
-      RuntimeStub rs;
-      vtbl = *(intptr_t*)&rs;
-    } else if (vtbl == vts.adapterblob) {
-      AdapterBlob ab;
-      vtbl = *(intptr_t*)&ab;
-    } else if (vtbl == vts.exceptionblob) {
-      ExceptionBlob eb;
-      vtbl = *(intptr_t*)&eb;
-    } else if (vtbl == vts.methodhandlesadapterblob) {
-      MethodHandlesAdapterBlob mhab;
-      vtbl = *(intptr_t*)&mhab;
-    } else if (vtbl == vts.safepointblob) {
-      SafepointBlob sb;
-      vtbl = *(intptr_t*)&sb;
-    } else if (vtbl == vts.uncommontrapblob) {
-      UncommonTrapBlob utb;
-      vtbl = *(intptr_t*)&utb;
-    } else if (vtbl == vts.deoptimizationblob) {
-      DeoptimizationBlob db;
-      vtbl = *(intptr_t*)&db;
-    } else {
-      ShouldNotReachHere();
-    }
-    *(intptr_t*) cb = vtbl;
-  }
-#endif
 }
 
 //---<  END  >--- CodeHeap State Analytics.

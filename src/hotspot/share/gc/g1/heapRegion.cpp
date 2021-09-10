@@ -315,7 +315,7 @@ void HeapRegion::add_strong_code_root(nmethod* nm) {
   hrrs->add_strong_code_root(nm);
 }
 
-void HeapRegion::add_strong_code_root_locked(nmethod* nm) {
+void HeapRegion::add_strong_code_root_locked(CompiledMethod* nm) {
   assert_locked_or_safepoint(CodeCache_lock);
   HeapRegionRemSet* hrrs = rem_set();
   hrrs->add_strong_code_root_locked(nm);

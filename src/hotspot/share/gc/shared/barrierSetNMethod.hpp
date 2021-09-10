@@ -36,16 +36,16 @@ class BarrierSetNMethod: public CHeapObj<mtGC> {
   int disarmed_value() const;
 
 public:
-  bool supports_entry_barrier(nmethod* nm);
+  bool supports_entry_barrier(CompiledMethod* nm);
 
-  virtual bool nmethod_entry_barrier(nmethod* nm) = 0;
+  virtual bool nmethod_entry_barrier(CompiledMethod* nm) = 0;
   virtual ByteSize thread_disarmed_offset() const = 0;
   virtual int* disarmed_value_address() const = 0;
 
   static int nmethod_stub_entry_barrier(address* return_address_ptr);
   bool nmethod_osr_entry_barrier(nmethod* nm);
-  bool is_armed(nmethod* nm);
-  void disarm(nmethod* nm);
+  bool is_armed(CompiledMethod* nm);
+  void disarm(CompiledMethod* nm);
 };
 
 

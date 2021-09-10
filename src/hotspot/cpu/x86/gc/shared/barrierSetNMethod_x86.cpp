@@ -158,14 +158,14 @@ void BarrierSetNMethod::deoptimize(nmethod* nm, address* return_address_ptr) {
 // Note that this offset is invariant of PreserveFramePointer.
 static const int entry_barrier_offset = LP64_ONLY(-19) NOT_LP64(-18);
 
-static NativeNMethodCmpBarrier* native_nmethod_barrier(nmethod* nm) {
+static NativeNMethodCmpBarrier* native_nmethod_barrier(CompiledMethod* nm) {
   address barrier_address = nm->code_begin() + nm->frame_complete_offset() + entry_barrier_offset;
   NativeNMethodCmpBarrier* barrier = reinterpret_cast<NativeNMethodCmpBarrier*>(barrier_address);
   debug_only(barrier->verify());
   return barrier;
 }
 
-void BarrierSetNMethod::disarm(nmethod* nm) {
+void BarrierSetNMethod::disarm(CompiledMethod* nm) {
   if (!supports_entry_barrier(nm)) {
     return;
   }
@@ -174,7 +174,7 @@ void BarrierSetNMethod::disarm(nmethod* nm) {
   cmp->set_immediate(disarmed_value());
 }
 
-bool BarrierSetNMethod::is_armed(nmethod* nm) {
+bool BarrierSetNMethod::is_armed(CompiledMethod* nm) {
   if (!supports_entry_barrier(nm)) {
     return false;
   }

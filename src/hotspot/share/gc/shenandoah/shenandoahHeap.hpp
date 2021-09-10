@@ -498,10 +498,10 @@ public:
 // ---------- Code roots handling hooks
 //
 public:
-  void register_nmethod(nmethod* nm);
+  void register_nmethod(CompiledMethod* nm);
   void unregister_nmethod(nmethod* nm);
   void flush_nmethod(nmethod* nm);
-  void verify_nmethod(nmethod* nm) {}
+  void verify_nmethod(CompiledMethod* nm) {}
 
 // ---------- Pinning hooks
 //

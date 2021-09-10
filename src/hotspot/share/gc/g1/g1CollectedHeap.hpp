@@ -1339,7 +1339,7 @@ public:
   // Optimized nmethod scanning support routines
 
   // Register the given nmethod with the G1 heap.
-  virtual void register_nmethod(nmethod* nm);
+  virtual void register_nmethod(CompiledMethod* nm);
 
   // Unregister the given nmethod from the G1 heap.
   virtual void unregister_nmethod(nmethod* nm);
@@ -1348,7 +1348,7 @@ public:
   virtual void flush_nmethod(nmethod* nm) {}
 
   // No nmethod verification implemented.
-  virtual void verify_nmethod(nmethod* nm) {}
+  virtual void verify_nmethod(CompiledMethod* nm) {}
 
   // Recalculate amount of used memory after GC. Must be called after all allocation
   // has finished.

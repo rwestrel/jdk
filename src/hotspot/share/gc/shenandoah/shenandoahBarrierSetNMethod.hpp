@@ -29,6 +29,7 @@
 #include "memory/allocation.hpp"
 
 class nmethod;
+class CompiledMethod;
 class ShenandoahHeap;
 
 class ShenandoahBarrierSetNMethod : public BarrierSetNMethod {
@@ -37,7 +38,7 @@ private:
 
 protected:
   virtual int disarmed_value() const;
-  virtual bool nmethod_entry_barrier(nmethod* nm);
+  virtual bool nmethod_entry_barrier(CompiledMethod* nm);
 
 public:
   ShenandoahBarrierSetNMethod(ShenandoahHeap* heap) : _heap(heap) {

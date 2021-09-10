@@ -173,9 +173,9 @@ class ParallelScavengeHeap : public CollectedHeap {
   // collection.
   virtual bool is_maximal_no_gc() const;
 
-  virtual void register_nmethod(nmethod* nm);
+  virtual void register_nmethod(CompiledMethod* nm);
   virtual void unregister_nmethod(nmethod* nm);
-  virtual void verify_nmethod(nmethod* nm);
+  virtual void verify_nmethod(CompiledMethod* nm);
   virtual void flush_nmethod(nmethod* nm);
 
   void prune_scavengable_nmethods();

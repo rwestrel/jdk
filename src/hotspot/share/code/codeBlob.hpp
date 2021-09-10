@@ -135,6 +135,7 @@ public:
   // Typing
   virtual bool is_buffer_blob() const                 { return false; }
   virtual bool is_nmethod() const                     { return false; }
+  virtual bool is_leyden_nmethod() const              { return false; }
   virtual bool is_runtime_stub() const                { return false; }
   virtual bool is_deoptimization_stub() const         { return false; }
   virtual bool is_uncommon_trap_stub() const          { return false; }
@@ -155,6 +156,8 @@ public:
   // Casting
   nmethod* as_nmethod_or_null()                { return is_nmethod() ? (nmethod*) this : NULL; }
   nmethod* as_nmethod()                        { assert(is_nmethod(), "must be nmethod"); return (nmethod*) this; }
+  LeydenNMethod* as_leyden_nmethod_or_null()   { return is_leyden_nmethod() ? (LeydenNMethod*) this : NULL; }
+  LeydenNMethod* as_leyden_nmethod()           { assert(is_leyden_nmethod(), "must be nmethod"); return (LeydenNMethod*) this; }
   CompiledMethod* as_compiled_method_or_null() { return is_compiled() ? (CompiledMethod*) this : NULL; }
   CompiledMethod* as_compiled_method()         { assert(is_compiled(), "must be compiled"); return (CompiledMethod*) this; }
   CodeBlob* as_codeblob_or_null() const        { return (CodeBlob*) this; }
@@ -238,6 +241,7 @@ public:
   virtual void print() const;
   virtual void print_on(outputStream* st) const;
   virtual void print_value_on(outputStream* st) const;
+
   void dump_for_addr(address addr, outputStream* st, bool verbose) const;
   void print_code();
 

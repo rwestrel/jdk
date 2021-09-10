@@ -36,7 +36,7 @@ int BarrierSetNMethod::disarmed_value() const {
   return *disarmed_value_address();
 }
 
-bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
+bool BarrierSetNMethod::supports_entry_barrier(CompiledMethod* nm) {
   if (nm->method()->is_method_handle_intrinsic()) {
     return false;
   }

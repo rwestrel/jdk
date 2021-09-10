@@ -4235,10 +4235,10 @@ HeapRegion* G1CollectedHeap::alloc_highest_free_region() {
 
 class RegisterNMethodOopClosure: public OopClosure {
   G1CollectedHeap* _g1h;
-  nmethod* _nm;
+  CompiledMethod* _nm;
 
 public:
-  RegisterNMethodOopClosure(G1CollectedHeap* g1h, nmethod* nm) :
+  RegisterNMethodOopClosure(G1CollectedHeap* g1h, CompiledMethod* nm) :
     _g1h(g1h), _nm(nm) {}
 
   void do_oop(oop* p) {
@@ -4284,7 +4284,7 @@ public:
   void do_oop(narrowOop* p) { ShouldNotReachHere(); }
 };
 
-void G1CollectedHeap::register_nmethod(nmethod* nm) {
+void G1CollectedHeap::register_nmethod(CompiledMethod* nm) {
   guarantee(nm != NULL, "sanity");
   RegisterNMethodOopClosure reg_cl(this, nm);
   nm->oops_do(&reg_cl);

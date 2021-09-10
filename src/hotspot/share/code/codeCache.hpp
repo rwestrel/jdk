@@ -144,7 +144,7 @@ class CodeCache : AllStatic {
   static void free(CodeBlob* cb);                          // frees a CodeBlob
   static void free_unused_tail(CodeBlob* cb, size_t used); // frees the unused tail of a CodeBlob (only used by TemplateInterpreter::initialize())
   static bool contains(void *p);                           // returns whether p is included
-  static bool contains(nmethod* nm);                       // returns whether nm is included
+  static bool contains(CompiledMethod* nm);                       // returns whether nm is included
   static void blobs_do(void f(CodeBlob* cb));              // iterates over all CodeBlobs
   static void blobs_do(CodeBlobClosure* f);                // iterates over all CodeBlobs
   static void nmethods_do(void f(nmethod* nm));            // iterates over all nmethods
@@ -154,6 +154,7 @@ class CodeCache : AllStatic {
   static CodeBlob* find_blob(void* start);              // Returns the CodeBlob containing the given address
   static CodeBlob* find_blob_unsafe(void* start);       // Same as find_blob but does not fail if looking up a zombie method
   static nmethod*  find_nmethod(void* start);           // Returns the nmethod containing the given address
+  static LeydenNMethod*  find_leyden_nmethod(void* start);           // Returns the nmethod containing the given address
   static CompiledMethod* find_compiled(void* start);
 
   static int       blob_count();                        // Returns the total number of CodeBlobs in the cache

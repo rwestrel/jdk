@@ -119,10 +119,10 @@ public:
   virtual void gc_threads_do(ThreadClosure* tc) const {}
 
   // No nmethod handling
-  virtual void register_nmethod(nmethod* nm) {}
+  virtual void register_nmethod(CompiledMethod* nm) {}
   virtual void unregister_nmethod(nmethod* nm) {}
   virtual void flush_nmethod(nmethod* nm) {}
-  virtual void verify_nmethod(nmethod* nm) {}
+  virtual void verify_nmethod(CompiledMethod* nm) {}
 
   // No heap verification
   virtual void prepare_for_verify() {}

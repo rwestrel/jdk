@@ -256,6 +256,8 @@ template <class T> void BasicHashtable<F>::verify_table(const char* table_name) 
 // Explicitly instantiate these types
 template class Hashtable<nmethod*, mtGC>;
 template class HashtableEntry<nmethod*, mtGC>;
+template class Hashtable<CompiledMethod*, mtGC>;
+template class HashtableEntry<CompiledMethod*, mtGC>;
 template class BasicHashtable<mtGC>;
 template class Hashtable<ConstantPool*, mtClass>;
 template class Hashtable<Symbol*, mtSymbol>;

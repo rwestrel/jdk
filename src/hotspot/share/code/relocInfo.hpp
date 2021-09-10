@@ -29,6 +29,7 @@
 #include "utilities/macros.hpp"
 
 class nmethod;
+class LeydenNMethod;
 class CodeBlob;
 class CompiledMethod;
 class Metadata;
