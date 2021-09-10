@@ -399,11 +399,11 @@ class JNIEXPORT nmethod : public CompiledMethod {
   address stub_end              () const          { return           header_begin() + _oops_offset          ; }
   address exception_begin       () const          { return           header_begin() + _exception_offset     ; }
   address unwind_handler_begin  () const          { return _unwind_handler_offset != -1 ? (header_begin() + _unwind_handler_offset) : NULL; }
-  oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset)         ; }
-  oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset)     ; }
+  virtual oop*    oops_begin            () const          { return (oop*)   (header_begin() + _oops_offset)         ; }
+  virtual oop*    oops_end              () const          { return (oop*)   (header_begin() + _metadata_offset)     ; }
 
-  Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset)     ; }
-  Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
+  virtual Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset)     ; }
+  virtual Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
 
   address scopes_data_end       () const          { return           header_begin() + _scopes_pcs_offset    ; }
   PcDesc* scopes_pcs_begin      () const          { return (PcDesc*)(header_begin() + _scopes_pcs_offset   ); }
@@ -758,6 +758,25 @@ public:
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const;
 };
 
+class JNIEXPORT LeydenNMethod : public nmethod {
+  friend class CodeCache;
+private:
+  LeydenNMethod() : nmethod() {}
+public:
+
+  address scopes_data_end       () const          { return nmethod::scopes_data_end() - code_size(); }
+  PcDesc* scopes_pcs_begin      () const          { return (PcDesc*)((address)nmethod::scopes_pcs_begin() - code_size()); }
+  PcDesc* scopes_pcs_end        () const          { return (PcDesc*)((address)nmethod::scopes_pcs_end() - code_size()); }
+  address handler_table_begin   () const          { return nmethod::handler_table_begin() - code_size(); }
+  address handler_table_end     () const          { return nmethod::handler_table_end() - code_size(); }
+  address nul_chk_table_begin   () const          { return nmethod::nul_chk_table_begin() - code_size(); }
+  address nul_chk_table_end     () const          { return nmethod::nul_chk_table_end() - code_size(); }
+  oop*    oops_begin            () const          { return (oop*)((address)nmethod::oops_begin() - code_size()); }
+  oop*    oops_end              () const          { return (oop*)((address)nmethod::oops_end() - code_size()); }
+
+  Metadata** metadata_begin   () const            { return (Metadata**)((address)nmethod::metadata_begin() - code_size()); }
+
+};
 // Locks an nmethod so its code will not get removed and it will not
 // be made into a zombie, even if it is a not_entrant method. After the
 // nmethod becomes a zombie, if CompiledMethodUnload event processing

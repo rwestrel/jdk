@@ -1647,7 +1647,7 @@ struct Vtables {
 };
 
 struct VtableSymbols {
-  int nmethod;
+  int LeydenNMethod;
   int bufferblob;
   int runtimestub;
   int adapterblob;
@@ -2121,57 +2121,6 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
           }
         }
       }
-//       RelocIterator iter(cb);
-//      nmethod* nm = cb->as_nmethod();
-//      while (iter.next()) {
-//        if (iter.type() == relocInfo::virtual_call_type) {
-//          MutexUnlocker mul(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-//          virtual_call_Relocation* call = iter.virtual_call_reloc();
-//          ScopeDesc* sd = nm->scope_desc_at(Assembler::locate_next_instruction(call->addr()));
-//          methodHandle caller(thread, sd->method());
-//          Bytecode_invoke invoke(caller, sd->bci());
-//          Method* method = call->method_value();
-//          Klass* defc = method->method_holder();
-//          Symbol* name = method->name();
-//          Symbol* type = method->signature();
-//          LinkInfo link_info(defc, name, type);
-//          if (invoke.is_invokevirtual()) {
-//            Method* resolved_method = LinkResolver::linktime_resolve_virtual_method(link_info, thread);
-//            int vtable_index = Method::invalid_vtable_index;
-//            if (resolved_method->method_holder()->is_interface()) {
-//              vtable_index = LinkResolver::vtable_index_of_interface_method(link_info.resolved_klass(), methodHandle(thread, resolved_method));
-//            } else {
-//              vtable_index = resolved_method->vtable_index();
-//            }
-//            CompiledICLocker ml(nm);
-//            CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-//            address entry = VtableStubs::find_vtable_stub(vtable_index);
-////            inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-//          } else {
-//            Method* resolved_method = LinkResolver::linktime_resolve_interface_method(link_info, thread);
-//            if (resolved_method->has_vtable_index()) {
-//              int vtable_index = resolved_method->vtable_index();
-//              CompiledICLocker ml(nm);
-//              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-//              address entry = VtableStubs::find_vtable_stub(vtable_index);
-////              inline_cache->set_ic_destination_and_value(entry, (void*)NULL);
-//            } else if (resolved_method->has_itable_index()) {
-//              int itable_index = resolved_method->itable_index();
-//              CompiledICHolder* holder = new CompiledICHolder(resolved_method->method_holder(),
-//                                                              link_info.resolved_klass(), false);
-//              has_compiledicholders = true;
-//
-//              CompiledICLocker ml(nm);
-//              address entry = VtableStubs::find_itable_stub(itable_index);
-//              CompiledIC* inline_cache = CompiledIC_at(nm, iter.addr());
-////              inline_cache->set_ic_destination_and_value(entry, (void*)holder);
-//            } else {
-//              int index = resolved_method->vtable_index();
-////              ShouldNotReachHere();
-//            }
-//          }
-//        }
-//      }
     }
     if (cb->oop_maps() != NULL) {
       has_oopmaps = true;
@@ -2258,27 +2207,14 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
   int local_sym = symbols.length();
 
-//  int card_table_base_sym;
-//  {
-//    Elf64_Sym sym;
-//    sym.st_name = strings.length();
-//    push_array(strings, "card_table_base");
-//    sym.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_OBJECT);
-//    sym.st_other = 0;
-//    sym.st_shndx = SHN_UNDEF;
-//    sym.st_value = 0;
-//    sym.st_size = 0;
-//    card_table_base_sym = symbols.length();
-//    symbols.push(sym);
-//  }
-
   Vtables vts;
   VtableSymbols vt_syms;
   int vt_offset;
   {
     nmethod nm;
     vts.nmethod = *(intptr_t*)&nm;
-    vt_syms.nmethod = add_external_symbol((address)vts.nmethod, strings, symbols, vt_offset);
+    LeydenNMethod lnm;
+    vt_syms.LeydenNMethod = add_external_symbol((address)*(intptr_t*)&lnm, strings, symbols, vt_offset);
 
     int offset = -1;
     BufferBlob bb;
@@ -2340,9 +2276,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
   }
 
-  unsigned long segmap_size = heap->_segmap.high() - heap->_segmap.low();
   GrowableArray<char> segmap_clone(2, 0, CodeHeap::free_sentinel);
-//  memcpy(segmap_clone, heap->_segmap.low(), segmap_size);
 
   size_t current_segment = 0;
   bool success = true;
@@ -2365,7 +2299,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
 
     int vtbl_sym;
     if (vtbl == vts.nmethod) {
-      vtbl_sym = vt_syms.nmethod;
+      vtbl_sym = vt_syms.LeydenNMethod;
     } else if (vtbl == vts.bufferblob) {
       vtbl_sym = vt_syms.bufferblob;
     } else if (vtbl == vts.runtimestub) {
@@ -2388,6 +2322,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       ShouldNotReachHere();
     }
 
+    assert(cb->is_nmethod() || cb->data_end() == cb->code_end(), "");
 
     int size = cb->code_size() + CodeEntryAlignment;
     size_t segments = heap->size_to_segments(size);
@@ -2400,30 +2335,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     current_segment += segments;
 
 
-//    {
-//      size_t beg = heap->segment_for(cb);
-//      size_t end = heap->segment_for((address)cb + cb->size() - 1);
-//      size_t segments = end - beg + 1;
-//      segmap_clone.at_put_grow(beg, 0);
-//      for (size_t i = 1; i < segments; i++) {
-//        segmap_clone.at_put_grow(beg + i, ((i - 1) % (CodeHeap::free_sentinel - 1)) + 1);
-//      }
-//    }
-
-//    if (cb == CodeCache::first_blob(heap)) {
-//
-//      Elf_Data* text_data = new_data(text_section, heap->low(), cb->code_begin() - (address) heap->low());
-//
-//      add_global_symbol(strings, symbols, text_section, "padding", STT_NOTYPE, text_data->d_off, text_data->d_size);
-//    }
-
     Elf_Data* text_data = new_data(text_section, cb->code_begin() - CodeEntryAlignment, actual_size);
 
     long code_offset = text_data->d_off + CodeEntryAlignment;
-
-    CodeBlob* next_cb = next_blob(heap, cb);
-//    Elf_Data* text_data = new_data(text_section, cb->code_begin(),
-//                                   next_cb == NULL ? cb->code_size() : next_cb->code_begin() - cb->code_begin());
 
     int sym_id;
     long from_interpreted_entry_off = -1;
@@ -2435,24 +2349,24 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
 
     {
-      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
+//      CodeBlob* next_cb = next_blob(heap, cb);
+//      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, next_cb == NULL ? cb->size() : (address)next_cb - (address)cb);
+
+      int size = cb->code_begin() - (address)cb;
+      Elf_Data* codeblobs_data = new_data(codeblobs_section, cb, size);
+      if (cb->is_nmethod()) {
+        int extra_size = cb->data_end() - cb->code_end();
+        Elf_Data* codeblobs_data_end = new_data(codeblobs_section, cb->code_end(), extra_size);
+        size += extra_size;
+      }
 
       const char* name = codeblob_obj_symbol(cb);
 
-      add_global_symbol(strings, symbols, codeblobs_section, name, STT_OBJECT, codeblobs_data->d_off, cb->size());
+      add_global_symbol(strings, symbols, codeblobs_section, name, STT_OBJECT, codeblobs_data->d_off, size);
 
       add_relocation(codeblobs_data->d_off, vt_offset, vtbl_sym, codeblobs_relocs);
-      // pointer in text section to CodeBlobs object
-      add_relocation(text_data->d_off, (address) cb - (address) CodeCache::first_blob(heap),
-                     codeblobs_sym, text_relocs);
-
-//      {
-//        Elf64_Rela reloc;
-//        reloc.r_offset = offset_of(LeydenCodeHeap, _blobs) + codecache_relocs.length() * sizeof(address);
-//        reloc.r_addend = codeblobs_data->d_off;
-//        reloc.r_info = ELF64_R_INFO(codeblobs_sym, R_X86_64_64);
-//        codecache_relocs.push(reloc);
-//      }
+      // pointer in text section to CodeBlob object
+      add_relocation(text_data->d_off, codeblobs_data->d_off, codeblobs_sym, text_relocs);
 
       Elf_Data* codeblobsro_data = new_data(codeblobsro_section, (void*)cb->_name, strlen(cb->_name) + 1);
 
@@ -2469,7 +2383,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _content_begin),
                      codeblobs_data->d_off + (cb->_content_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _data_end),
-                     codeblobs_data->d_off + (cb->_data_end - (address) cb), codeblobs_sym, codeblobs_relocs);
+                     codeblobs_data->d_off + (cb->_data_end - (address) cb) - cb->code_size(), codeblobs_sym, codeblobs_relocs);
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _relocation_begin),
                      codeblobs_data->d_off + (cb->_relocation_begin - (address) cb), codeblobs_sym, codeblobs_relocs);
       add_relocation(codeblobs_data->d_off + offset_of(CodeBlob, _relocation_end),
@@ -2532,7 +2446,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             section_word_Relocation* r = iter.section_word_reloc();
             assert(!cb->code_contains(r->target()), "");
             add_relocation(((address)r->pd_address_in_code() - cb->code_begin()) + code_offset,
-                           r->target() - (address) CodeCache::first_blob(heap), codeblobs_sym, text_relocs);
+                           (r->target() - (address)cb) + codeblobs_data->d_off, codeblobs_sym, text_relocs);
           } else if (iter.type() == relocInfo::card_mark_word_type) {
 //            card_mark_word_Relocation* r = iter.card_mark_word_reloc();
 //            add_relocation((address)r->pd_address_in_code() - (address)heap->low(), 0, card_table_base_sym, text_relocs);
@@ -2547,7 +2461,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
       }
       if (cb->is_nmethod()) {
         nmethod* nm = cb->as_nmethod();
-        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _scopes_data_begin), codeblobs_data->d_off + (nm->_scopes_data_begin - (address)cb), codeblobs_sym, codeblobs_relocs);
+        assert((nm->_scopes_data_begin - (address)cb) - cb->code_size() > 0, "");
+        add_relocation(codeblobs_data->d_off + offset_of(nmethod, _scopes_data_begin), codeblobs_data->d_off + (nm->_scopes_data_begin - (address)cb) - cb->code_size(), codeblobs_sym, codeblobs_relocs);
         add_relocation(codeblobs_data->d_off + offset_of(nmethod, _entry_point), code_offset + (nm->_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
         add_relocation(codeblobs_data->d_off + offset_of(nmethod, _verified_entry_point), code_offset + (nm->_verified_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
         add_relocation(codeblobs_data->d_off + offset_of(nmethod, _osr_entry_point), code_offset + (nm->_osr_entry_point - nm->_code_begin), text_sym, codeblobs_relocs);
@@ -2589,7 +2504,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             ShouldNotReachHere();
           }
 
-          add_relocation(codeblobs_data->d_off + ((address)ptr - (address)nm), off, codeblobsro_sym, codeblobs_relocs);
+          assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+          add_relocation(codeblobs_data->d_off + ((address)ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
         }
 
         {
@@ -2613,7 +2529,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                     ShouldNotReachHere();
                   }
 
-                  add_relocation(codeblobs_data->d_off + ((address)r->metadata_addr() - (address)nm), off, codeblobsro_sym, codeblobs_relocs);
+                  Metadata** ptr = r->metadata_addr();
+                  assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+                  add_relocation(codeblobs_data->d_off + ((address) ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
                 }
                 break;
               }
@@ -2642,7 +2560,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                   o->print();
                   ShouldNotReachHere();
                 }
-                add_relocation(codeblobs_data->d_off + ((address)r->oop_addr() - (address)nm), off, codeblobsro_sym, codeblobs_relocs);
+                oop* ptr = r->oop_addr();
+                assert((address)ptr >= nm->code_end() && (address)ptr < nm->data_end(), "");
+                add_relocation(codeblobs_data->d_off + ((address) ptr - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
                 break;
               }
               case relocInfo::runtime_call_w_cp_type:
@@ -2659,20 +2579,21 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
                   NativeMovConstReg* load = (NativeMovConstReg*)call_wrapper->get_load_instruction(iter.virtual_call_reloc());
 
                   add_relocation((load->data_addr() - nm->code_begin()) + code_offset, compiledicholders_data->d_off, compiledicholders_sym, text_relocs);
-                  add_relocation(codeblobs_data->d_off + (load->data_addr() - (address)nm), compiledicholders_data->d_off, compiledicholders_sym, codeblobs_relocs);
+//                  address ptr = load->data_addr();
+//                  add_relocation(codeblobs_data->d_off + (ptr - (address)nm) , compiledicholders_data->d_off, compiledicholders_sym, codeblobs_relocs);
                   {
                     assert(!holder->_is_metadata_method, "");
                     int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
 
                     add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass), off, codeblobsro_sym, compiledicholders_relocs);
                   }
-                  {
-                    assert(!holder->_is_metadata_method, "");
-                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
-
-
-                    add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass), off, codeblobsro_sym, compiledicholders_relocs);
-                  }
+//                  {
+//                    assert(!holder->_is_metadata_method, "");
+//                    int64_t off = record_klass(codeblobsro_section, codeblobsro_hdr, holder->holder_klass());
+//
+//
+//                    add_relocation(compiledicholders_data->d_off + offset_of(CompiledICHolder, _holder_klass), off, codeblobsro_sym, compiledicholders_relocs);
+//                  }
 
                   {
                     assert(holder->holder_metadata()->is_klass(), "");
@@ -2705,7 +2626,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             ShouldNotReachHere();
           }
 
-          add_relocation(codeblobs_data->d_off + ((address)p - (address)nm), off, codeblobsro_sym, codeblobs_relocs);
+//          assert(((address) p >= (address) nm && (address) p < nm->code_begin()) || ((address) p >= nm->code_end() && (address) p < nm->data_end()), "");
+          assert((address) p >= nm->code_end() && (address) p < nm->data_end(), "");
+          add_relocation(codeblobs_data->d_off + ((address)p - (address)nm) - nm->code_size(), off, codeblobsro_sym, codeblobs_relocs);
         }
       }
     }
@@ -2817,8 +2740,8 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
   }
   add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _low), 0, text_sym, codecache_relocs);
-  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->high() - heap->low(), text_sym, codecache_relocs);
-//  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->segments_to_size(current_segment), text_sym, codecache_relocs);
+//  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->high() - heap->low(), text_sym, codecache_relocs);
+  add_relocation(offset_of(CodeHeap, _memory) + offset_of(VirtualSpace, _high), heap->segments_to_size(current_segment), text_sym, codecache_relocs);
 
   {
     LeydenCodeHeap ch;

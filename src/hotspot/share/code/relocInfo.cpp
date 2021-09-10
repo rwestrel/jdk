@@ -136,6 +136,11 @@ void RelocIterator::initialize(CodeBlob* cb, address begin, address limit) {
   _current = cb->relocation_begin() - 1;
   _end     = cb->relocation_end();
   _addr    = cb->content_begin();
+  assert(_addr <= cb->old_code_begin(), "");
+  if (_addr == cb->old_code_begin()) {
+    _addr = cb->code_begin();
+  }
+
 
   if (cb->is_compiled()) {
     CompiledMethod* cm = cb->as_compiled_method();
@@ -248,6 +253,42 @@ Relocation* RelocIterator::reloc() {
   #undef EACH_TYPE
   assert(t == relocInfo::none, "must be padding");
   return new(_rh) Relocation(t);
+}
+
+bool RelocIterator::next() {
+  _current++;
+  assert(_current <= _end, "must not overrun relocInfo");
+  if (_current == _end) {
+    set_has_current(false);
+    return false;
+  }
+  set_has_current(true);
+
+  if (_current->is_prefix()) {
+    advance_over_prefix();
+    assert(!current()->is_prefix(), "only one prefix at a time");
+  }
+
+  address next_addr = _addr + _current->addr_offset();
+  if (_code != NULL) {
+    if (_addr < _code->old_code_begin() && next_addr >= _code->old_code_begin() && next_addr < _code->old_code_end()) {
+      address fixed_next_addr = _code->code_begin() + (next_addr -_code->old_code_begin());
+      assert(RestoreCodeFromDisk || fixed_next_addr == next_addr, "");
+      next_addr = fixed_next_addr;
+    } else if (_addr >= _code->code_begin() && _addr < _code->code_end() && next_addr > _code->code_end()) {
+      address fixed_next_addr = (_code->old_code_begin() == _code->code_begin() ? _code->old_code_end() : _code->old_code_begin())+ (next_addr - _code->code_end());
+      assert(RestoreCodeFromDisk || fixed_next_addr == next_addr, "");
+      next_addr = fixed_next_addr;
+    }
+  }
+  _addr = next_addr;
+
+  if (_limit != NULL && _addr >= _limit) {
+    set_has_current(false);
+    return false;
+  }
+
+  return true;
 }
 
 

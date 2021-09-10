@@ -563,29 +563,7 @@ class RelocIterator : public StackObj {
   RelocIterator(CodeSection* cb, address begin = NULL, address limit = NULL);
 
   // get next reloc info, return !eos
-  bool next() {
-    _current++;
-    assert(_current <= _end, "must not overrun relocInfo");
-    if (_current == _end) {
-      set_has_current(false);
-      return false;
-    }
-    set_has_current(true);
-
-    if (_current->is_prefix()) {
-      advance_over_prefix();
-      assert(!current()->is_prefix(), "only one prefix at a time");
-    }
-
-    _addr += _current->addr_offset();
-
-    if (_limit != NULL && _addr >= _limit) {
-      set_has_current(false);
-      return false;
-    }
-
-    return true;
-  }
+  bool next();
 
   // accessors
   address      limit()        const { return _limit; }
