@@ -2634,7 +2634,7 @@ static IfNode* gen_subtype_check_compare(Node* ctrl, Node* in1, Node* in2, BoolT
   case T_ADDRESS: cmp = new CmpPNode(in1, in2); break;
   default: fatal("unexpected comparison type %s", type2name(bt));
   }
-  gvn.transform(cmp);
+  cmp = gvn.transform(cmp);
   Node* bol = gvn.transform(new BoolNode(cmp, test));
   IfNode* iff = new IfNode(ctrl, bol, p, COUNT_UNKNOWN);
   gvn.transform(iff);
@@ -2697,7 +2697,27 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
       ShouldNotReachHere();
     }
   }
+  // Gather the various success & failures here
+  RegionNode *r_ok_subtype = new RegionNode(4);
+  gvn.record_for_igvn(r_ok_subtype);
+  RegionNode *r_not_subtype = new RegionNode(3);
+  gvn.record_for_igvn(r_not_subtype);
 
+  Node* psc = gvn.transform(
+    new PartialSubtypeCheckNode(*ctrl, subklass, superklass));
+//
+//  Node* cmp5 = gvn.transform(new CmpPNode(psc, gvn.zerocon(T_OBJECT)));
+//  Node* bol5 = gvn.transform(new BoolNode(cmp5, BoolTest::ne));
+//  bol5 = gvn.transform(new Opaque4Node(C, bol5, gvn.intcon(0)));
+//  IfNode* iff5 = new IfNode(*ctrl, bol5, PROB_FAIR, COUNT_UNKNOWN);
+//  gvn.transform(iff5);
+//  if (!bol5->is_Con()) gvn.record_for_igvn(iff5);
+//  *ctrl = gvn.transform(new IfFalseNode (iff5));
+//  r_not_subtype ->init_req(3, gvn.transform(new IfTrueNode(iff5)));
+//  if ((*ctrl)->is_top()) {
+//    return gvn.transform(r_not_subtype);
+//  }
+  
   // %%% Possible further optimization:  Even if the superklass is not exact,
   // if the subklass is the unique subtype of the superklass, the check
   // will always succeed.  We could leave a dependency behind to ensure this.
@@ -2729,8 +2749,12 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
   //   incorrect/missed optimization of the following Load.
   // - it's a cache so, worse case, not reading the latest value
   //   wouldn't cause incorrect execution
-  if (might_be_cache && mem != NULL) {
-    kmem = mem->is_MergeMem() ? mem->as_MergeMem()->memory_at(C->get_alias_index(gvn.type(p2)->is_ptr())) : mem;
+  if (might_be_cache) {
+    assert((C->get_alias_index(TypeInstKlassPtr::OBJECT->add_offset(Type::OffsetBot)) ==
+            C->get_alias_index(gvn.type(p2)->is_ptr())), "");
+    if (mem != NULL) {
+      kmem = mem->is_MergeMem() ? mem->as_MergeMem()->memory_at(C->get_alias_index(gvn.type(p2)->is_ptr())) : mem;
+    }
   }
   Node *nkls = gvn.transform(LoadKlassNode::make(gvn, NULL, kmem, p2, gvn.type(p2)->is_ptr(), TypeInstKlassPtr::OBJECT_OR_NULL));
 
@@ -2750,16 +2774,10 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
   // subklass.  In this case we need exactly the 1 test above and we can
   // return those results immediately.
   if (!might_be_cache) {
-    Node* not_subtype_ctrl = *ctrl;
+    r_not_subtype->init_req(1, *ctrl);
     *ctrl = iftrue1; // We need exactly the 1 test above
-    return not_subtype_ctrl;
+    return gvn.transform(r_not_subtype);
   }
-
-  // Gather the various success & failures here
-  RegionNode *r_ok_subtype = new RegionNode(4);
-  gvn.record_for_igvn(r_ok_subtype);
-  RegionNode *r_not_subtype = new RegionNode(3);
-  gvn.record_for_igvn(r_not_subtype);
 
   r_ok_subtype->init_req(1, iftrue1);
 
@@ -2801,8 +2819,6 @@ Node* Phase::gen_subtype_check(Node* subklass, Node* superklass, Node** ctrl, No
   // out of line, and it can only improve I-cache density.
   // The decision to inline or out-of-line this final check is platform
   // dependent, and is found in the AD file definition of PartialSubtypeCheck.
-  Node* psc = gvn.transform(
-    new PartialSubtypeCheckNode(*ctrl, subklass, superklass));
 
   IfNode *iff4 = gen_subtype_check_compare(*ctrl, psc, gvn.zerocon(T_OBJECT), BoolTest::ne, PROB_FAIR, gvn, T_ADDRESS);
   r_not_subtype->init_req(2, gvn.transform(new IfTrueNode (iff4)));

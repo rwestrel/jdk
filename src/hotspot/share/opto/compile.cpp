@@ -1427,12 +1427,15 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if (to->speculative() != NULL) {
       tj = to = to->remove_speculative();
     }
+
     // Canonicalize the holder of this field
     if (offset >= 0 && offset < instanceOopDesc::base_offset_in_bytes()) {
       // First handle header references such as a LoadKlassNode, even if the
       // object's klass is unloaded at compile time (4965979).
       if (!is_known_inst) { // Do it only for non-instance types
-        tj = to = TypeInstPtr::make(TypePtr::BotPTR, env()->Object_klass(), false, NULL, offset);
+        ciKlass* k = env()->Object_klass();
+        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+        tj = to = TypeInstPtr::make(TypePtr::BotPTR, k, interfaces,false, NULL, offset);
       }
     } else if (offset < 0 || offset >= ik->layout_helper_size_in_bytes()) {
       // Static fields are in the space above the normal instance
@@ -1446,10 +1449,12 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       ciInstanceKlass *canonical_holder = ik->get_canonical_holder(offset);
       assert(offset < canonical_holder->layout_helper_size_in_bytes(), "");
       if (!ik->equals(canonical_holder) || tj->offset() != offset) {
+        ciKlass* k = canonical_holder;
+        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
         if( is_known_inst ) {
-          tj = to = TypeInstPtr::make(to->ptr(), canonical_holder, true, NULL, offset, to->instance_id());
+          tj = to = TypeInstPtr::make(to->ptr(), k, interfaces, true, NULL, offset, to->instance_id());
         } else {
-          tj = to = TypeInstPtr::make(to->ptr(), canonical_holder, false, NULL, offset);
+          tj = to = TypeInstPtr::make(to->ptr(), k, interfaces, false, NULL, offset);
         }
       }
     }
@@ -1463,15 +1468,20 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     // inexact types must flatten to the same alias class so
     // use NotNull as the PTR.
     if ( offset == Type::OffsetBot || (offset >= 0 && (size_t)offset < sizeof(Klass)) ) {
+      ciKlass* k = env()->Object_klass();
+      const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
       tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull,
-                                       env()->Object_klass(),
+                                       k,
+                                       interfaces,
                                        offset);
     }
 
     if (tk->isa_aryklassptr() && tk->is_aryklassptr()->elem()->isa_klassptr()) {
       ciKlass* k = ciObjArrayKlass::make(env()->Object_klass());
       if (!k || !k->is_loaded()) {                  // Only fails for some -Xcomp runs
-        tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull, env()->Object_klass(), offset);
+        k = env()->Object_klass();
+        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+        tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull, k, interfaces, offset);
       } else {
         tj = tk = TypeAryKlassPtr::make(TypePtr::NotNull, tk->is_aryklassptr()->elem(), k, offset);
       }

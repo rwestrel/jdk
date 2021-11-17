@@ -2188,6 +2188,7 @@ const TypeOopPtr* LibraryCallKit::sharpen_unsafe_type(Compile::AliasType* alias_
   if (result == NULL && sharpened_klass != NULL && sharpened_klass->is_loaded()) {
     // Sharpen the value type.
     result = TypeOopPtr::make_from_klass(sharpened_klass);
+    result = result->cast_to_non_interface();
   }
   if (result != NULL) {
 #ifndef PRODUCT
@@ -6306,6 +6307,7 @@ Node* LibraryCallKit::load_field_from_object(Node* fromObj, const char* fieldNam
   const Type *type;
   if (bt == T_OBJECT) {
     type = TypeOopPtr::make_from_klass(field_klass->as_klass());
+    type = type->is_oopptr()->cast_to_non_interface();
   } else {
     type = Type::get_const_basic_type(bt);
   }

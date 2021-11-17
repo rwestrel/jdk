@@ -707,17 +707,18 @@ void G1BarrierSetC2::eliminate_gc_barrier(PhaseMacroExpand* macro, Node* node) c
       if (this_region->in(ind)->is_IfFalse() &&
           this_region->in(ind)->in(0)->Opcode() == Op_If) {
         Node* bol = this_region->in(ind)->in(0)->in(1);
-        assert(bol->is_Bool(), "");
-        cmpx = bol->in(1);
-        if (bol->as_Bool()->_test._test == BoolTest::ne &&
-            cmpx->is_Cmp() && cmpx->in(2) == macro->intcon(0) &&
-            cmpx->in(1)->is_Load()) {
-          Node* adr = cmpx->in(1)->as_Load()->in(MemNode::Address);
-          const int marking_offset = in_bytes(G1ThreadLocalData::satb_mark_queue_active_offset());
-          if (adr->is_AddP() && adr->in(AddPNode::Base) == macro->top() &&
-              adr->in(AddPNode::Address)->Opcode() == Op_ThreadLocal &&
-              adr->in(AddPNode::Offset) == macro->MakeConX(marking_offset)) {
-            macro->replace_node(cmpx, macro->makecon(TypeInt::CC_EQ));
+        if (bol->is_Bool()) {
+          cmpx = bol->in(1);
+          if (bol->as_Bool()->_test._test == BoolTest::ne &&
+              cmpx->is_Cmp() && cmpx->in(2) == macro->intcon(0) &&
+              cmpx->in(1)->is_Load()) {
+            Node* adr = cmpx->in(1)->as_Load()->in(MemNode::Address);
+            const int marking_offset = in_bytes(G1ThreadLocalData::satb_mark_queue_active_offset());
+            if (adr->is_AddP() && adr->in(AddPNode::Base) == macro->top() &&
+                adr->in(AddPNode::Address)->Opcode() == Op_ThreadLocal &&
+                adr->in(AddPNode::Offset) == macro->MakeConX(marking_offset)) {
+              macro->replace_node(cmpx, macro->makecon(TypeInt::CC_EQ));
+            }
           }
         }
       }

@@ -159,6 +159,8 @@ void Parse::do_get_xxx(Node* obj, ciField* field, bool is_field) {
       assert(type != NULL, "field singleton type must be consistent");
     } else {
       type = TypeOopPtr::make_from_klass(field_klass->as_klass());
+      // can't trust interfaces in signatures
+      type = type->is_oopptr()->cast_to_non_interface();
     }
   } else {
     type = Type::get_const_basic_type(bt);
