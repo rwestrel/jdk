@@ -5882,6 +5882,8 @@ bool TypeInstKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool
     return false;
   }
 
+  // FIXME
+  
   if (other->_klass->equals(ciEnv::current()->Object_klass())) {
     return true;
   }
