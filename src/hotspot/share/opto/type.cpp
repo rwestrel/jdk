@@ -5477,17 +5477,16 @@ const TypeKlassPtr* TypeAryPtr::as_klass_type(bool try_for_exact) const {
 }
 
 const TypeKlassPtr* TypeKlassPtr::make(ciKlass *klass) {
-  const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
     if (klass->is_instance_klass()) {
-    return TypeInstKlassPtr::make(klass, interfaces);
+    return TypeInstKlassPtr::make(klass);
   }
-  assert(interfaces.eq(*TypeAryKlassPtr::_array_interfaces), "");
-  return TypeAryKlassPtr::make(klass, interfaces);
+  return TypeAryKlassPtr::make(klass);
 }
 
 const TypeKlassPtr* TypeKlassPtr::make(PTR ptr, ciKlass* klass, int offset) {
   if (klass->is_instance_klass()) {
-    return TypeInstKlassPtr::make(ptr, klass, offset);
+    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, false);
+    return TypeInstKlassPtr::make(ptr, klass, interfaces, offset);
   }
   return TypeAryKlassPtr::make(ptr, klass, offset);
 }
@@ -5694,6 +5693,7 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
   assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
   // Element is an instance
   bool klass_is_exact = false;
+  TypePtr::InterfaceSet interfaces = _interfaces;
   if (k->is_loaded()) {
     // Try to set klass_is_exact.
     ciInstanceKlass* ik = k->as_instance_klass();
@@ -5705,11 +5705,11 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
         deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
         k = ik = sub;
         xk = sub->is_final();
+        interfaces = TypePtr::interfaces(k, true, false, false);
       }
     }
   }
-  // FIXME
-  return TypeInstPtr::make(TypePtr::BotPTR, k, _interfaces, xk, NULL, 0);
+  return TypeInstPtr::make(TypePtr::BotPTR, k, interfaces, xk, NULL, 0);
 }
 
 //------------------------------xmeet------------------------------------------
@@ -5807,6 +5807,7 @@ const Type    *TypeInstKlassPtr::xmeet( const Type *t ) const {
         assert(res_xk == (ptr == Constant), "");
         const Type* res = make(ptr, res_klass, interfaces, off);
         return res;
+      }
       default:
         ShouldNotReachHere();
     }

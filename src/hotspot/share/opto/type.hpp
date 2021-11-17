@@ -1271,7 +1271,7 @@ public:
 
   // Make a pointer to some value of type klass.
   static const TypeInstPtr *make(PTR ptr, ciKlass* klass) {
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, false, false);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, false);
     return make(ptr, klass, interfaces, false, NULL, 0, InstanceBot);
   }
 
@@ -1339,6 +1339,10 @@ public:
 //------------------------------TypeAryPtr-------------------------------------
 // Class of Java array pointers
 class TypeAryPtr : public TypeOopPtr {
+  friend class Type;
+  friend class TypeOopPtr;
+  friend class TypePtr;
+
   TypeAryPtr( PTR ptr, ciObject* o, const TypeAry *ary, ciKlass* k, bool xk,
               int offset, int instance_id, bool is_autobox_cache,
               const TypePtr* speculative, int inline_depth)
@@ -1632,6 +1636,8 @@ public:
 // Array klass pointer, mirrors TypeAryPtr
 class TypeAryKlassPtr : public TypeKlassPtr {
   friend class TypeInstKlassPtr;
+  friend class Type;
+
   const Type *_elem;
 
   static InterfaceSet* _array_interfaces;

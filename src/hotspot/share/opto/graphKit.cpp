@@ -4029,8 +4029,7 @@ Node* GraphKit::load_String_length(Node* str, bool set_ctrl) {
 
 Node* GraphKit::load_String_value(Node* str, bool set_ctrl) {
   int value_offset = java_lang_String::value_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
-                                                     false, NULL, 0);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass());
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
   const TypeAryPtr* value_type = TypeAryPtr::make(TypePtr::NotNull,
                                                   TypeAry::make(TypeInt::BYTE, TypeInt::POS),
@@ -4046,8 +4045,7 @@ Node* GraphKit::load_String_coder(Node* str, bool set_ctrl) {
     return intcon(java_lang_String::CODER_UTF16);
   }
   int coder_offset = java_lang_String::coder_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
-                                                     false, NULL, 0);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass());
   const TypePtr* coder_field_type = string_type->add_offset(coder_offset);
 
   Node* p = basic_plus_adr(str, str, coder_offset);
@@ -4058,8 +4056,7 @@ Node* GraphKit::load_String_coder(Node* str, bool set_ctrl) {
 
 void GraphKit::store_String_value(Node* str, Node* value) {
   int value_offset = java_lang_String::value_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
-                                                     false, NULL, 0);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass());
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
 
   access_store_at(str,  basic_plus_adr(str, value_offset), value_field_type,
@@ -4068,8 +4065,7 @@ void GraphKit::store_String_value(Node* str, Node* value) {
 
 void GraphKit::store_String_coder(Node* str, Node* value) {
   int coder_offset = java_lang_String::coder_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
-                                                     false, NULL, 0);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass());
   const TypePtr* coder_field_type = string_type->add_offset(coder_offset);
 
   access_store_at(str, basic_plus_adr(str, coder_offset), coder_field_type,
