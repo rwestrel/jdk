@@ -4356,15 +4356,11 @@ bool TypeInstPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_e
     return false;
   }
 
-  if (other->klass()->equals(ciEnv::current()->Object_klass())) {
+  if (other->klass()->equals(ciEnv::current()->Object_klass()) && other->_interfaces.empty()) {
     return true;
   }
 
-  if (!this_exact && klass()->is_interface()) {
-    return false;
-  }
-
-  return _klass->is_subtype_of(other->klass());
+  return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
 }
 
 bool TypeInstPtr::is_same_java_type_as(const TypeOopPtr* other) const {
@@ -4374,7 +4370,7 @@ bool TypeInstPtr::is_same_java_type_as(const TypeOopPtr* other) const {
   if (!other->isa_instptr()) {
     return false;
   }
-  return _klass->equals(other->_klass);
+  return _klass->equals(other->_klass) && _interfaces.eq(other->_interfaces);
 }
 
 bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
@@ -4383,11 +4379,7 @@ bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool thi
   }
 
   if (other->isa_aryptr()) {
-    return !this_exact && (_klass->equals(ciEnv::current()->Object_klass()) || _klass->is_interface());
-  }
-
-  if ((_klass->is_interface() && !this_exact) || (other->klass()->is_interface() /*&& !other_exact*/)) {
-    return true;
+    return !this_exact && _klass->equals(ciEnv::current()->Object_klass())  && _interfaces.intersection_with(other->_interfaces).eq(_interfaces);
   }
 
   assert(other->isa_instptr(), "unsupported");
@@ -4401,7 +4393,7 @@ bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool thi
   }
 
   if (this_exact) {
-    return _klass->is_subtype_of(other->_klass);
+    return _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
   }
 
   return true;
@@ -4693,7 +4685,7 @@ int TypeAryPtr::hash(void) const {
 }
 
 bool TypeAryPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass() && other_exact) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty() && other_exact) {
     return true;
   }
 
@@ -4701,7 +4693,7 @@ bool TypeAryPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_ex
     return false;
   }
   if (other->isa_instptr()) {
-    return _klass->is_subtype_of(other->_klass) && other_exact;
+    return _klass->is_subtype_of(other->_klass) && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces) && other_exact;
   }
   if (klass() == NULL) {
     return false;
@@ -4733,7 +4725,7 @@ bool TypeAryPtr::is_same_java_type_as(const TypeOopPtr* other) const {
 }
 
 bool TypeAryPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass()) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty() && other_exact) {
     return true;
   }
 
@@ -4741,7 +4733,7 @@ bool TypeAryPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this
     return true;
   }
   if (other->isa_instptr()) {
-    return (!other_exact && other->_klass->is_interface()) || _klass->is_subtype_of(other->_klass);
+    return other->_klass->equals(ciEnv::current()->Object_klass()) && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces);
   }
   assert(other->isa_aryptr(), "");
 
@@ -5882,17 +5874,11 @@ bool TypeInstKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool
     return false;
   }
 
-  // FIXME
-  
-  if (other->_klass->equals(ciEnv::current()->Object_klass())) {
+  if (other->klass()->equals(ciEnv::current()->Object_klass()) && other->_interfaces.empty()) {
     return true;
   }
 
-  if (!this_exact && klass()->is_interface()) {
-    return false;
-  }
-
-  return _klass->is_subtype_of(other->_klass);
+  return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
 }
 
 bool TypeInstKlassPtr::is_same_java_type_as(const TypeKlassPtr* other) const {
@@ -5902,7 +5888,7 @@ bool TypeInstKlassPtr::is_same_java_type_as(const TypeKlassPtr* other) const {
   if (!other->isa_instklassptr()) {
     return false;
   }
-  return _klass->equals(other->_klass);
+  return _klass->equals(other->_klass) && _interfaces.eq(other->_interfaces);
 }
 
 bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const {
@@ -5911,11 +5897,7 @@ bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, b
   }
 
   if (other->isa_aryklassptr()) {
-    return !this_exact && (_klass->equals(ciEnv::current()->Object_klass()) || _klass->is_interface());
-  }
-
-  if ((_klass->is_interface() && !this_exact) || (other->klass()->is_interface() /*&& !other_exact*/)) {
-    return true;
+    return !this_exact && _klass->equals(ciEnv::current()->Object_klass())  && _interfaces.intersection_with(other->_interfaces).eq(_interfaces);
   }
 
   assert(other->isa_instklassptr(), "unsupported");
@@ -5929,7 +5911,7 @@ bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, b
   }
 
   if (this_exact) {
-    return _klass->is_subtype_of(other->_klass);
+    return _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
   }
 
   return true;
@@ -6273,7 +6255,7 @@ const Type    *TypeAryKlassPtr::xmeet( const Type *t ) const {
 }
 
 bool TypeAryKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass() && other_exact) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty() && other_exact) {
     return true;
   }
 
@@ -6281,7 +6263,7 @@ bool TypeAryKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool 
     return false;
   }
   if (other->isa_instklassptr()) {
-    return _klass->is_subtype_of(other->_klass) && other_exact;
+    return _klass->is_subtype_of(other->_klass)  && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces) && other_exact;
   }
   if (klass() == NULL) {
     return false;
@@ -6313,14 +6295,14 @@ bool TypeAryKlassPtr::is_same_java_type_as(const TypeKlassPtr* other) const {
 }
 
 bool TypeAryKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const {
-  if (other->klass() == ciEnv::current()->Object_klass()) {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty() && other_exact) {
     return true;
   }
   if (!is_loaded() || !other->is_loaded() || klass() == NULL || other->klass() == NULL) {
     return true;
   }
   if (other->isa_instklassptr()) {
-    return (!other_exact && other->_klass->is_interface()) || _klass->is_subtype_of(other->_klass);
+    return other->_klass->equals(ciEnv::current()->Object_klass()) && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces);
   }
   assert(other->isa_aryklassptr(), "");
 
