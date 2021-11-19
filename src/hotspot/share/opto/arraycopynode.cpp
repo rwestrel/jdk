@@ -225,7 +225,6 @@ Node* ArrayCopyNode::try_clone_instance(PhaseGVN *phase, bool can_reshape, int c
       } else {
         ciKlass* field_klass = field->type()->as_klass();
         type = TypeOopPtr::make_from_klass(field_klass);
-        type = type->is_oopptr()->cast_to_non_interface();
       }
     } else {
       type = Type::get_const_basic_type(bt);

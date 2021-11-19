@@ -766,7 +766,6 @@ public:
   bool ary_must_be_exact() const;  // true if arrays of such are never generic
   virtual const TypeAry* remove_speculative() const;
   virtual const Type* cleanup_speculative() const;
-  const TypeAry* cast_to_non_interface() const;
 
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint, outputStream *st  ) const; // Specialized per-Type dumping
@@ -1118,7 +1117,7 @@ protected:
   // This is the node index of the allocation node creating this instance.
   int           _instance_id;
 
-  static const TypeOopPtr* make_from_klass_common(ciKlass* klass, const InterfaceSet& interfaces, bool klass_change, bool try_for_exact);
+  static const TypeOopPtr* make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact);
 
   int dual_instance_id() const;
   int meet_instance_id(int uid) const;
@@ -1148,20 +1147,17 @@ public:
   // Respects UseUniqueSubclasses.
   // If the klass is final, the resulting type will be exact.
   static const TypeOopPtr* make_from_klass(ciKlass* klass) {
-    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
-    return make_from_klass_common(klass, interfaces, true, false);
+    return make_from_klass_common(klass, true, false);
   }
   // Same as before, but will produce an exact type, even if
   // the klass is not final, as long as it has exactly one implementation.
   static const TypeOopPtr* make_from_klass_unique(ciKlass* klass) {
-    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
-    return make_from_klass_common(klass, interfaces, true, true);
+    return make_from_klass_common(klass, true, true);
   }
   // Same as before, but does not respects UseUniqueSubclasses.
   // Use this only for creating array element types.
   static const TypeOopPtr* make_from_klass_raw(ciKlass* klass) {
-    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
-    return make_from_klass_common(klass, interfaces, false, false);
+    return make_from_klass_common(klass, false, false);
   }
   // Creates a singleton type given an object.
   // If the object cannot be rendered as a constant,
@@ -1216,8 +1212,6 @@ public:
 
   virtual const TypePtr* with_instance_id(int instance_id) const;
 
-  virtual const TypeOopPtr* cast_to_non_interface() const { ShouldNotReachHere(); return this; }
-  
   virtual const Type *xdual() const;    // Compute dual right now.
   // the core of the computation of the meet for TypeOopPtr and for its subclasses
   virtual const Type *xmeet_helper(const Type *t) const;
@@ -1313,8 +1307,6 @@ public:
   virtual const TypeInstPtr* remove_speculative() const;
   virtual const TypePtr* with_inline_depth(int depth) const;
   virtual const TypePtr* with_instance_id(int instance_id) const;
-
-  virtual const TypeOopPtr* cast_to_non_interface() const;
 
   // the core of the computation of the meet of 2 types
   virtual const Type *xmeet_helper(const Type *t) const;
@@ -1428,8 +1420,6 @@ public:
   virtual const TypeAryPtr* remove_speculative() const;
   virtual const TypePtr* with_inline_depth(int depth) const;
   virtual const TypePtr* with_instance_id(int instance_id) const;
-
-  virtual const TypeOopPtr* cast_to_non_interface() const;
 
   // the core of the computation of the meet of 2 types
   virtual const Type *xmeet_helper(const Type *t) const;

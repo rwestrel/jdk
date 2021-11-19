@@ -2008,10 +2008,6 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
   case T_OBJECT:
   case T_ARRAY: {
     const Type* ret = get_const_type(return_type);
-    if (ret->isa_oopptr()) {
-      // can't trust interfaces in signatures
-      ret = ret->is_oopptr()->cast_to_non_interface();
-    }
     field_array[TypeFunc::Parms] = ret;
     break;
   }
@@ -2063,7 +2059,6 @@ const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig)
     case T_ARRAY: {
       const Type* arg = get_const_type(type);
       // can't trust interfaces in signatures
-      arg = arg->is_oopptr()->cast_to_non_interface();
       field_array[pos++] = arg;
       break;
     }
@@ -2287,17 +2282,6 @@ const TypeAry* TypeAry::remove_speculative() const {
 const Type* TypeAry::cleanup_speculative() const {
   return make(_elem->cleanup_speculative(), _size, _stable);
 }
-
-const TypeAry* TypeAry::cast_to_non_interface() const {
-  const Type* elem = _elem;
-  if (elem->isa_narrowoop()) {
-    elem = elem->make_oopptr()->cast_to_non_interface()->make_narrowoop();
-  } else {
-    elem = elem->is_oopptr()->cast_to_non_interface();
-  }
-  return make(elem, _size, _stable);
-}
-
 
 /**
  * Return same type but with a different inline depth (used for speculation)
@@ -3538,14 +3522,16 @@ const Type *TypeOopPtr::xdual() const {
 
 //--------------------------make_from_klass_common-----------------------------
 // Computes the element-type given a klass.
-const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass *klass, const InterfaceSet& interfaces, bool klass_change, bool try_for_exact) {
+const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact) {
   if (klass->is_instance_klass()) {
+    if (klass->is_loaded() && klass->is_interface()) {
+      klass = ciEnv::current()->Object_klass();
+    }
     Compile* C = Compile::current();
     Dependencies* deps = C->dependencies();
     assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
     // Element is an instance
     bool klass_is_exact = false;
-    InterfaceSet new_interfaces = interfaces;
     if (klass->is_loaded()) {
       // Try to set klass_is_exact.
       ciInstanceKlass* ik = klass->as_instance_klass();
@@ -3559,7 +3545,6 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass *klass, const Inter
           klass_is_exact = sub->is_final();
           ciKlass* k = klass;
           const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
-          new_interfaces = interfaces.union_with(interfaces);
         }
       }
       if (!klass_is_exact && try_for_exact && deps != NULL &&
@@ -3569,22 +3554,20 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass *klass, const Inter
         klass_is_exact = true;
       }
     }
-    return TypeInstPtr::make(TypePtr::BotPTR, klass, new_interfaces, klass_is_exact, NULL, 0);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
+    return TypeInstPtr::make(TypePtr::BotPTR, klass, interfaces, klass_is_exact, NULL, 0);
   } else if (klass->is_obj_array_klass()) {
-    assert(interfaces.eq(*TypeAryPtr::_array_interfaces), "unexpected array interfaces");
     // Element is an object array. Recursively call ourself.
     ciKlass* eklass = klass->as_obj_array_klass()->element_klass();
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(eklass, true, true, true);
-    const TypeOopPtr *etype = TypeOopPtr::make_from_klass_common(eklass, interfaces, false, try_for_exact);
+    const TypeOopPtr *etype = TypeOopPtr::make_from_klass_common(eklass, try_for_exact, false);
     bool xk = etype->klass_is_exact();
     const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
     // We used to pass NotNull in here, asserting that the sub-arrays
     // are all not-null.  This is not true in generally, as code can
     // slam NULLs down in the subarrays.
-    const TypeAryPtr* arr = TypeAryPtr::make(TypePtr::BotPTR, arr0, klass, xk, 0);
+    const TypeAryPtr* arr = TypeAryPtr::make(TypePtr::BotPTR, arr0, NULL, xk, 0);
     return arr;
   } else if (klass->is_type_array_klass()) {
-    assert(interfaces.eq(*TypeAryPtr::_array_interfaces), "unexpected array interfaces");
     // Element is an typeArray
     const Type* etype = get_const_basic_type(klass->as_type_array_klass()->element_type());
     const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
@@ -4486,15 +4469,6 @@ const TypePtr *TypeInstPtr::with_instance_id(int instance_id) const {
   return make(_ptr, klass(), _interfaces, klass_is_exact(), const_oop(), _offset, instance_id, _speculative, _inline_depth);
 }
 
-const TypeOopPtr *TypeInstPtr::cast_to_non_interface() const {
-  ciKlass* exact_klass = this->exact_klass_helper();
-  if (!exact_klass->is_loaded() || !exact_klass->is_interface()) {
-    return this;
-  }
-  assert(klass()->equals(ciEnv::current()->Object_klass()), "Must be an Object klass");
-  return make(_ptr, klass(), InterfaceSet(), klass_is_exact(), const_oop(), _offset, _instance_id, _speculative, _inline_depth);
-}
-
 const TypeKlassPtr* TypeInstPtr::as_klass_type(bool try_for_exact) const {
   bool xk = klass_is_exact();
   ciInstanceKlass* ik = klass()->as_instance_klass();
@@ -5103,14 +5077,6 @@ const TypePtr *TypeAryPtr::with_inline_depth(int depth) const {
 const TypePtr *TypeAryPtr::with_instance_id(int instance_id) const {
   assert(is_known_instance(), "should be known");
   return make(_ptr, _const_oop, _ary->remove_speculative()->is_ary(), _klass, _klass_is_exact, _offset, instance_id, _speculative, _inline_depth);
-}
-
-const TypeOopPtr *TypeAryPtr::cast_to_non_interface() const {
-  ciKlass* exact_klass = this->exact_klass_helper();
-  if (!exact_klass->is_loaded() || !exact_klass->is_obj_array_klass() || !exact_klass->as_obj_array_klass()->base_element_klass()->is_interface()) {
-    return this;
-  }
-  return make(_ptr, _const_oop, _ary->cast_to_non_interface(), NULL, _klass_is_exact, _offset, _instance_id, _speculative, _inline_depth);
 }
 
 //=============================================================================
