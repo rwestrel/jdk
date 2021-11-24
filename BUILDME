@@ -6,7 +6,8 @@ and then can be built with:
 
 make hotspot
 
-Only building of the JVM is supported. Only debug builds were tested.
+Only building of the JVM is supported. Only debug builds on x86_64
+were tested.
 
 As part of this experiment, required components are excluded from the
 build and not replaced. As a consequence, the resulting build can't be
