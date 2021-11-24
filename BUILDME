@@ -1,0 +1,13 @@
+This needs to be configured with 
+
+--with-jvm-variants=leyden
+
+and then can be built with:
+
+make hotspot
+
+Only building of the JVM is supported. Only debug builds were tested.
+
+As part of this experiment, required components are excluded from the
+build and not replaced. As a consequence, the resulting build can't be
+run.
