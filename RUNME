@@ -11,7 +11,12 @@ shared library that contains all the code needed to run
 the repo.
 
 One method in the build requires a lot of resources and can cause the
-JVM to run out of memory.
+JVM to run out of memory. The options:
+-XX:MaxNodeLimit=800000 -XX:NodeLimitFudgeFactor=16000
+are needed otherwise c2 bails out of its compilation.
+
+-XX:SuppressErrorAt=/graphKit.cpp:278 works around a bug that's
+ armless in the context of this experiment.
 
 The result of the command above is a leyden.o file in the current directory. Then:
 
