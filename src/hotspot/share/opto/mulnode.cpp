@@ -705,6 +705,56 @@ Node *AndLNode::Ideal(PhaseGVN *phase, bool can_reshape) {
     }
   }
 
+  if (op == Op_AddL) {
+    Node* add1 = in1->in(1);
+    Node* add2 = in1->in(2);
+    if (add1 != NULL && add2 != NULL) {
+      BasicType bt1 = T_LONG;
+      BasicType bt2 = T_LONG;
+      if (add1->Opcode() == Op_ConvI2L) {
+        add1 = add1->in(1);
+        bt1 = T_INT;
+      }
+      if (add2->Opcode() == Op_ConvI2L) {
+        add2 = add2->in(1);
+        bt2 = T_INT;
+      }
+      bool remove_add1 = false;
+      bool remove_add2 = false;
+      if (add1->Opcode() == Op_LShift(bt1)) {
+        Node* shift2 = add1->in(2);
+        if (shift2 != NULL) {
+          const Type* shift2_t = phase->type(shift2);
+          if (shift2_t->isa_int() && shift2_t->is_int()->is_con()) {
+            jint shift = shift2_t->is_int()->get_con();
+            if (is_power_of_2(mask + 1) && (1L << shift) > mask) {
+              remove_add1 = true;
+            }
+          }
+        }
+      }
+      if (add2->Opcode() == Op_LShift(bt2)) {
+        Node* shift2 = add2->in(2);
+        if (shift2 != NULL) {
+          const Type* shift2_t = phase->type(shift2);
+          if (shift2_t->isa_int() && shift2_t->is_int()->is_con()) {
+            jint shift = shift2_t->is_int()->get_con();
+            if (is_power_of_2(mask + 1) && (1L << shift) > mask) {
+              remove_add2 = true;
+            }
+          }
+        }
+      }
+      if (remove_add1) {
+        set_req_X(1, add2, phase);
+        return this;
+      } else if (remove_add2) {
+        set_req_X(1, add1, phase);
+        return this;
+      }
+    }
+  }
+
   return MulNode::Ideal(phase, can_reshape);
 }
 
