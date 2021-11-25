@@ -56,7 +56,9 @@ ifeq ($(call check-jvm-feature, compiler2), true)
 
   ADLC_CFLAGS += -D$(HOTSPOT_TARGET_CPU_DEFINE)
 
-  ADLC_CFLAGS += -I$(TOPDIR)/src/hotspot/share
+  ADLC_CFLAGS += -DINCLUDE_SUFFIX_COMPILER=_$(HOTSPOT_TOOLCHAIN_TYPE)
+
+ADLC_CFLAGS += -I$(TOPDIR)/src/hotspot/share
 
   $(eval $(call SetupNativeCompilation, BUILD_ADLC, \
       NAME := adlc, \
