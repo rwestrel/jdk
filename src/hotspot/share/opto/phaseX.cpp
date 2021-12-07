@@ -35,6 +35,7 @@
 #include "opto/loopnode.hpp"
 #include "opto/machnode.hpp"
 #include "opto/opcodes.hpp"
+#include "opto/opaquenode.hpp"
 #include "opto/phaseX.hpp"
 #include "opto/regalloc.hpp"
 #include "opto/rootnode.hpp"
@@ -804,6 +805,11 @@ PhaseIterGVN::PhaseIterGVN(PhaseIterGVN* igvn) : _delay_transform(igvn->_delay_t
 {
   _iterGVN = true;
   assert(&_worklist == &igvn->_worklist, "sanity");
+#ifndef PRODUCT
+  memcpy(_verify_window, igvn->_verify_window, sizeof(_verify_window));
+  _verify_counter = igvn->_verify_counter;
+  _verify_full_passes = igvn->_verify_full_passes;
+#endif
 }
 
 //------------------------------PhaseIterGVN-----------------------------------
@@ -1694,6 +1700,17 @@ void PhaseIterGVN::add_users_of_use_to_worklist(Node* n, Node* use, Unique_Node_
       Node* cmp = use->unique_out();
       worklist.push(cmp);
     }
+    if (use->is_Opaque1() && use->as_Opaque1()->original_loop_limit() == n) {
+      for (DUIterator_Fast i2max, i2 = use->fast_outs(i2max); i2 < i2max; i2++) {
+        Node* u = use->fast_out(i2);
+        if (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpL) {
+          Node* phi = u->as_Cmp()->countedloop_phi(use);
+          if (phi != nullptr) {
+            _worklist.push(phi);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -1884,6 +1901,7 @@ void PhaseCCP::push_more_uses(Unique_Node_List& worklist, Node* parent, const No
   push_and(worklist, parent, use);
   push_cast_ii(worklist, parent, use);
   push_opaque_zero_trip_guard(worklist, use);
+  push_opaque_orig_limit(worklist, parent, use);
 }
 
 
@@ -1931,10 +1949,10 @@ void PhaseCCP::push_cmpu(Unique_Node_List& worklist, const Node* use) const {
 
 // If n is used in a counted loop exit condition, then the type of the counted loop's Phi depends on the type of 'n'.
 // Seem PhiNode::Value().
-void PhaseCCP::push_counted_loop_phi(Unique_Node_List& worklist, Node* parent, const Node* use) {
+void PhaseCCP::push_counted_loop_phi(Unique_Node_List& worklist, const Node* parent, const Node* use) {
   uint use_op = use->Opcode();
   if (use_op == Op_CmpI || use_op == Op_CmpL) {
-    PhiNode* phi = countedloop_phi_from_cmp(use->as_Cmp(), parent);
+    PhiNode* phi = use->as_Cmp()->countedloop_phi(parent);
     if (phi != nullptr) {
       worklist.push(phi);
     }
@@ -2011,6 +2029,14 @@ void PhaseCCP::push_cast_ii(Unique_Node_List& worklist, const Node* parent, cons
 void PhaseCCP::push_opaque_zero_trip_guard(Unique_Node_List& worklist, const Node* use) const {
   if (use->Opcode() == Op_OpaqueZeroTripGuard) {
     push_if_not_bottom_type(worklist, use->unique_out());
+  }
+}
+
+void PhaseCCP::push_opaque_orig_limit(Unique_Node_List& worklist, const Node* parent, const Node* use) const {
+  if (use->is_Opaque1() && use->as_Opaque1()->original_loop_limit() == parent) {
+    for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
+      push_counted_loop_phi(worklist, use, use->fast_out(i));
+    }
   }
 }
 

@@ -395,8 +395,7 @@ void PhaseIdealLoop::get_assertion_predicates(Node* predicate, Unique_Node_List&
 // predicate again).
 IfProjNode* PhaseIdealLoop::clone_assertion_predicate_for_unswitched_loops(Node* iff, IfProjNode* predicate,
                                                                            Deoptimization::DeoptReason reason,
-                                                                           ParsePredicateSuccessProj* parse_predicate_proj) {
-  Node* bol = create_bool_from_template_assertion_predicate(iff, nullptr, nullptr, parse_predicate_proj);
+  Node* bol = create_bool_from_template_assertion_predicate(iff, nullptr, nullptr, parse_predicate_proj->in(0)->in(0));
   IfProjNode* if_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, iff->Opcode(), false);
   _igvn.replace_input_of(if_proj->in(0), 1, bol);
   _igvn.replace_input_of(parse_predicate_proj->in(0), 0, if_proj);
@@ -1183,7 +1182,7 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
   }
   BoolNode* bol = test->as_Bool();
   bool range_check_predicate = false;
-  if (invar.is_invariant(bol)) {
+  if (invar.is_invariant(bol) && is_dominator(get_ctrl(bol), parse_predicate_proj)) {
     C->print_method(PHASE_BEFORE_LOOP_PREDICATION_IC, 4, iff);
     // Invariant test
     new_predicate_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr,
@@ -1339,8 +1338,8 @@ IfProjNode* PhaseIdealLoop::add_template_assertion_predicate(IfNode* iff, IdealL
   max_value = new AddINode(opaque_init, max_value);
   register_new_node(max_value, new_proj);
   // init + (current stride - initial stride) is within the loop so narrow its type by leveraging the type of the iv Phi
-  max_value = new CastIINode(max_value, loop->_head->as_CountedLoop()->phi()->bottom_type());
-  register_new_node(max_value, parse_predicate_proj);
+  max_value = new CastIINode(new_proj, max_value, loop->_head->as_CountedLoop()->phi()->bottom_type());
+  register_new_node(max_value, new_proj);
 
   bol = rc_predicate(loop, new_proj, scale, offset, max_value, limit, stride, rng, (stride > 0) != (scale > 0),
                      overflow);
