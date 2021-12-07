@@ -1095,6 +1095,8 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
   if( phase->type_or_null(r) == Type::TOP )  // Dead code?
     return Type::TOP;
 
+  const Type* type = _type;
+
   // Check for trip-counted loop.  If so, be smarter.
   BaseCountedLoopNode* l = r->is_BaseCountedLoop() ? r->as_BaseCountedLoop() : NULL;
   if (l && ((const Node*)l->phi() == this)) { // Trip counted loop!
@@ -1104,7 +1106,11 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
       const Node* limit = l->limit();
       const Node* stride = l->stride();
       if (init != NULL && limit != NULL && stride != NULL) {
-        const TypeInteger* lo = phase->type(init)->isa_integer(l->bt());
+        const Type* init_t = phase->type(init, r->in(1));
+        if (init_t == Type::TOP) {
+          return Type::TOP;
+        }
+        const TypeInteger* lo = init_t->isa_integer(l->bt());
         const TypeInteger* hi = phase->type(limit)->isa_integer(l->bt());
         const TypeInteger* stride_t = phase->type(stride)->isa_integer(l->bt());
         if (lo != NULL && hi != NULL && stride_t != NULL) { // Dying loops might have TOP here
@@ -1168,14 +1174,14 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
       // before the special code for counted loop above has a chance
       // to run (that is as long as the type of the backedge's control
       // is top), we might end up with non monotonic types
-      return phase->type(in(LoopNode::EntryControl))->filter_speculative(_type);
+      type = phase->type(in(LoopNode::EntryControl))->filter_speculative(_type);
     }
   }
 
   // Until we have harmony between classes and interfaces in the type
   // lattice, we must tread carefully around phis which implicitly
   // convert the one to the other.
-  const TypePtr* ttp = _type->make_ptr();
+  const TypePtr* ttp = type->make_ptr();
   const TypeInstPtr* ttip = (ttp != NULL) ? ttp->isa_instptr() : NULL;
   const TypeInstKlassPtr* ttkp = (ttp != NULL) ? ttp->isa_instklassptr() : NULL;
   bool is_intf = false;
@@ -1193,7 +1199,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
   for (uint i = 1; i < req(); ++i) {// For all paths in
     // Reachable control path?
     if (r->in(i) && phase->type(r->in(i)) == Type::CONTROL) {
-      const Type* ti = phase->type(in(i));
+      const Type* ti = phase->type(in(i), r->in(i));
       // We assume that each input of an interface-valued Phi is a true
       // subtype of that interface.  This might not be true of the meet
       // of all the input types.  The lattice is not distributive in
@@ -1206,7 +1212,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
         if (tiip->is_interface())
           ti_is_intf = true;
         if (is_intf != ti_is_intf)
-          { t = _type; break; }
+          { t = type; break; }
       }
       t = t->meet_speculative(ti);
     }
@@ -1225,11 +1231,11 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
   //
   // It is not possible to see Type::BOTTOM values as phi inputs,
   // because the ciTypeFlow pre-pass produces verifier-quality types.
-  const Type* ft = t->filter_speculative(_type);  // Worst case type
+  const Type* ft = t->filter_speculative(type);  // Worst case type
 
 #ifdef ASSERT
   // The following logic has been moved into TypeOopPtr::filter.
-  const Type* jt = t->join_speculative(_type);
+  const Type* jt = t->join_speculative(type);
   if (jt->empty()) {           // Emptied out???
 
     // Check for evil case of 't' being a class and '_type' expecting an
@@ -1242,14 +1248,14 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
     // into a Phi which "knows" it's an Interface type we'll have to
     // uplift the type.
     if (!t->empty() && ttip && ttip->is_interface()) {
-      assert(ft == _type, ""); // Uplift to interface
+      assert(ft == type, ""); // Uplift to interface
     } else if (!t->empty() && ttkp && ttkp->is_interface()) {
-      assert(ft == _type, ""); // Uplift to interface
+      assert(ft == type, ""); // Uplift to interface
     } else {
       // We also have to handle 'evil cases' of interface- vs. class-arrays
-      Type::get_arrays_base_elements(jt, _type, NULL, &ttip);
+      Type::get_arrays_base_elements(jt, type, NULL, &ttip);
       if (!t->empty() && ttip != NULL && ttip->is_interface()) {
-          assert(ft == _type, "");   // Uplift to array of interface
+          assert(ft == type, "");   // Uplift to array of interface
       } else {
         // Otherwise it's something stupid like non-overlapping int ranges
         // found on dying counted loops.
@@ -1297,7 +1303,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
     }
     if (jt != ft) {
       tty->print("merge type:  "); t->dump(); tty->cr();
-      tty->print("kill type:   "); _type->dump(); tty->cr();
+      tty->print("kill type:   "); type->dump(); tty->cr();
       tty->print("join type:   "); jt->dump(); tty->cr();
       tty->print("filter type: "); ft->dump(); tty->cr();
     }
@@ -1306,7 +1312,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
 #endif //ASSERT
 
   // Deal with conversion problems found in data loops.
-  ft = phase->saturate(ft, phase->type_or_null(this), _type);
+  ft = phase->saturate(ft, phase->type_or_null(this), type);
 
   return ft;
 }

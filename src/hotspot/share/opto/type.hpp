@@ -552,7 +552,7 @@ public:
 
 class TypeInteger : public Type {
 protected:
-  TypeInteger(TYPES t) : Type(t) {}
+  TypeInteger(TYPES t, int w) : Type(t), _widen(w) {}
 
 public:
   virtual jlong hi_as_long() const = 0;
@@ -566,6 +566,7 @@ public:
   static const TypeInteger* zero(BasicType type);
   static const TypeInteger* one(BasicType type);
   static const TypeInteger* minus_1(BasicType type);
+  const short _widen;           // Limit on times we widen this sucker
 };
 
 
@@ -585,7 +586,6 @@ public:
   virtual bool singleton(void) const;    // TRUE if type is a singleton
   virtual bool empty(void) const;        // TRUE if type is vacuous
   const jint _lo, _hi;          // Lower bound, upper bound
-  const short _widen;           // Limit on times we widen this sucker
 
   static const TypeInt *make(jint lo);
   // must always specify w
@@ -653,7 +653,6 @@ public:
   virtual bool empty(void) const;        // TRUE if type is vacuous
 public:
   const jlong _lo, _hi;         // Lower bound, upper bound
-  const short _widen;           // Limit on times we widen this sucker
 
   static const TypeLong *make(jlong lo);
   // must always specify w

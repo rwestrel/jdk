@@ -448,6 +448,8 @@ public:
     return T_INT;
   }
 
+  virtual bool safe_for_optimizations() const;
+
 #ifndef PRODUCT
   virtual void dump_spec(outputStream *st) const;
 #endif
@@ -1737,6 +1739,8 @@ public:
                      Node_List*& split_bool_set, Node_List*& split_cex_set);
 
   void finish_clone_loop(Node_List* split_if_set, Node_List* split_bool_set, Node_List* split_cex_set);
+  void conditional_elimination(VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
+  void enqueue_uses(Unique_Node_List &wq, const Node* n) const;
 };
 
 

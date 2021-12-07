@@ -2268,6 +2268,7 @@ void PhaseIdealLoop::do_unroll(IdealLoopTree *loop, Node_List &old_new, bool adj
         if (loop_head->unrolled_count() > 1 &&
             limit->is_CMove() && limit->Opcode() == Op_CMoveI &&
             limit->in(CMoveNode::IfTrue) == adj_max &&
+            bol->is_Bool() &&
             bol->as_Bool()->_test._test == bt &&
             bol->in(1)->Opcode() == Op_CmpI &&
             bol->in(1)->in(2) == limit->in(CMoveNode::IfFalse)) {
@@ -3527,6 +3528,24 @@ bool IdealLoopTree::do_remove_empty_loop(PhaseIdealLoop *phase) {
     // If the loop we are removing is a pre-loop then the main and post loop
     // can be removed as well.
     remove_main_post_loops(cl, phase);
+  } else if (cl->is_main_loop()) {
+    IdealLoopTree* post = _next;
+    if (cl->is_strip_mined()) {
+      assert(_parent->_head->is_OuterStripMinedLoop(), "");
+      post = _parent->_next;
+    }
+    if (post != NULL) {
+      Node* post_head = post->_head;
+      if (post_head->is_CountedLoop()) {
+        CountedLoopNode* post_cl = post_head->as_CountedLoop();
+        if (post_cl->is_post_loop()) {
+          Node* opaq = post_cl->is_canonical_loop_entry();
+          if (opaq != NULL) {
+            phase->_igvn.replace_node(opaq, opaq->in(1));
+          }
+        }
+      }
+    }
   }
 
 #ifdef ASSERT
@@ -3534,7 +3553,7 @@ bool IdealLoopTree::do_remove_empty_loop(PhaseIdealLoop *phase) {
   Node* iv = NULL;
   for (DUIterator_Fast imax, i = cl->fast_outs(imax); i < imax; i++) {
     Node* n = cl->fast_out(i);
-    if (n->Opcode() == Op_Phi) {
+    if (n->Opcode() == Op_Phi && n->outcnt() > 0) {
       assert(iv == NULL, "Too many phis");
       iv = n;
     }
@@ -4280,3 +4299,4 @@ bool PhaseIdealLoop::intrinsify_fill(IdealLoopTree* lpt) {
 
   return true;
 }
+

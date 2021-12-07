@@ -1172,7 +1172,7 @@ static bool merge_point_safe(Node* region) {
 Node* PhaseIdealLoop::place_outside_loop(Node* useblock, IdealLoopTree* loop) const {
   Node* head = loop->_head;
   assert(!loop->is_member(get_loop(useblock)), "must be outside loop");
-  if (head->is_Loop() && head->as_Loop()->is_strip_mined()) {
+  if (head->is_Loop() && head->as_Loop()->is_strip_mined() && head->as_Loop()->is_valid_counted_loop(T_INT)) {
     loop = loop->_parent;
     assert(loop->_head->is_OuterStripMinedLoop(), "malformed strip mined loop");
   }
@@ -1398,7 +1398,7 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
       Node *dom = idom(prevdom);
       while (dom != cutoff) {
         if (dom->req() > 1 && dom->in(1) == bol && prevdom->in(0) == dom &&
-            safe_for_if_replacement(dom)) {
+            dom->as_If()->safe_for_optimizations()) {
           // It's invalid to move control dependent data nodes in the inner
           // strip-mined loop, because:
           //  1) break validation of LoopNode::verify_strip_mined()
@@ -1582,8 +1582,7 @@ void PhaseIdealLoop::try_sink_out_of_loop(Node* n) {
       !n->is_MergeMem() &&
       !n->is_CMove() &&
       !is_raw_to_oop_cast && // don't extend live ranges of raw oops
-      n->Opcode() != Op_Opaque4 &&
-      !n->is_Type()) {
+      n->Opcode() != Op_Opaque4) {
     Node *n_ctrl = get_ctrl(n);
     IdealLoopTree *n_loop = get_loop(n_ctrl);
 

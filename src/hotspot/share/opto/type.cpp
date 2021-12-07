@@ -1066,6 +1066,7 @@ bool Type::empty(void) const {
   case Bottom:
   case FloatBot:
   case DoubleBot:
+  case Control:
     return false;  // never a singleton, therefore never empty
 
   default:
@@ -1462,7 +1463,7 @@ const TypeInt *TypeInt::SYMINT; // symmetric range [-max_jint..max_jint]
 const TypeInt *TypeInt::TYPE_DOMAIN; // alias for TypeInt::INT
 
 //------------------------------TypeInt----------------------------------------
-TypeInt::TypeInt( jint lo, jint hi, int w ) : TypeInteger(Int), _lo(lo), _hi(hi), _widen(w) {
+TypeInt::TypeInt( jint lo, jint hi, int w ) : TypeInteger(Int, w), _lo(lo), _hi(hi) {
 }
 
 //------------------------------make-------------------------------------------
@@ -1724,7 +1725,7 @@ const TypeLong *TypeLong::UINT; // 32-bit unsigned subrange
 const TypeLong *TypeLong::TYPE_DOMAIN; // alias for TypeLong::LONG
 
 //------------------------------TypeLong---------------------------------------
-TypeLong::TypeLong(jlong lo, jlong hi, int w) : TypeInteger(Long), _lo(lo), _hi(hi), _widen(w) {
+TypeLong::TypeLong(jlong lo, jlong hi, int w) : TypeInteger(Long, w), _lo(lo), _hi(hi) {
 }
 
 //------------------------------make-------------------------------------------
@@ -2195,9 +2196,9 @@ bool TypeTuple::singleton(void) const {
 
 bool TypeTuple::empty(void) const {
   for( uint i=0; i<_cnt; i++ ) {
-    if (_fields[i]->empty())  return true;
+    if (!_fields[i]->empty())  return false;
   }
-  return false;
+  return true;
 }
 
 //=============================================================================

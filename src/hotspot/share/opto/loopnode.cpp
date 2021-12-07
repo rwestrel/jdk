@@ -2262,6 +2262,21 @@ BaseCountedLoopEndNode* BaseCountedLoopEndNode::make(Node* control, Node* test, 
   return new LongCountedLoopEndNode(control, test, prob, cnt);
 }
 
+bool CountedLoopEndNode::safe_for_optimizations() const {
+  CountedLoopNode* cl = loopnode();
+  if (cl == NULL) {
+    return true;
+  }
+  if (!cl->is_main_loop()) {
+    return true;
+  }
+  if (cl->is_canonical_loop_entry() == NULL) {
+    return true;
+  }
+  // Further unrolling is possible so loop exit condition might change
+  return false;
+}
+
 //=============================================================================
 //------------------------------Value-----------------------------------------
 const Type* LoopLimitNode::Value(PhaseGVN* phase) const {
@@ -2287,6 +2302,10 @@ const Type* LoopLimitNode::Value(PhaseGVN* phase) const {
     int final_int = (int)final_con;
     // The final value should be in integer range since the loop
     // is counted and the limit was checked for overflow.
+    if (final_con != (jlong) final_int) {
+      assert(phase->is_ConditionalPropagation(), "");
+      return bottom_type();
+    }
     assert(final_con == (jlong)final_int, "final value should be integer");
     return TypeInt::make(final_int);
   }
@@ -3048,10 +3067,10 @@ const TypeInt* PhaseIdealLoop::filtered_type_from_dominators( Node* val, Node *u
     while (if_cnt < if_limit) {
       if ((pred->Opcode() == Op_IfTrue || pred->Opcode() == Op_IfFalse)) {
         if_cnt++;
-        const TypeInt* if_t = IfNode::filtered_int_type(&_igvn, val, pred);
-        if (if_t != NULL) {
+        const Type* if_t = IfNode::filtered_int_type(&_igvn, val, pred, T_INT);
+        if (if_t != NULL && if_t->isa_int()) {
           if (rtn_t == NULL) {
-            rtn_t = if_t;
+            rtn_t = if_t->is_int();
           } else {
             rtn_t = rtn_t->join(if_t)->is_int();
           }
@@ -3792,6 +3811,33 @@ void IdealLoopTree::counted_loop( PhaseIdealLoop *phase ) {
 
     // Look for induction variables
     phase->replace_parallel_iv(this);
+    if (_head->as_CountedLoop()->is_post_loop()) {
+      IdealLoopTree* l = _parent->_child;
+      IdealLoopTree* main_loop = NULL;
+      while (l != loop) {
+        main_loop = l;
+        l = l->_next;
+      }
+      bool main_found = false;
+      if (main_loop != NULL) {
+        Node* main_head = main_loop->_head;
+        if (main_head->is_CountedLoop() && main_head->as_CountedLoop()->is_main_loop()) {
+          main_found = true;
+        } else if (main_head->is_OuterStripMinedLoop()) {
+          assert(main_loop->_child->_head->as_CountedLoop()->is_strip_mined(), "");
+          main_found = main_loop->_child->_head->as_CountedLoop()->is_main_loop();
+        }
+      }
+      if (!main_found) {
+        CountedLoopNode* post_cl = _head->as_CountedLoop();
+        if (post_cl->is_post_loop()) {
+          Node* opaq = post_cl->is_canonical_loop_entry();
+          if (opaq != NULL) {
+            phase->_igvn.replace_node(opaq, opaq->in(1));
+          }
+        }
+      }
+    }
   } else if (_head->is_LongCountedLoop() ||
              phase->is_counted_loop(_head, loop, T_LONG)) {
     remove_safepoints(phase, true);
@@ -4499,6 +4545,11 @@ void PhaseIdealLoop::build_and_optimize() {
 
   if (!C->major_progress() && do_expensive_nodes && process_expensive_nodes()) {
     C->set_major_progress();
+  }
+
+  if (!C->major_progress()) {
+    visited.clear();
+    conditional_elimination(visited, nstack, worklist);
   }
 
   // Perform loop predication before iteration splitting
@@ -5440,7 +5491,7 @@ Node* CountedLoopNode::is_canonical_loop_entry() {
   }
   Node* ctrl = skip_predicates();
 
-  if (ctrl == NULL || (!ctrl->is_IfTrue() && !ctrl->is_IfFalse())) {
+  if (ctrl == NULL || !ctrl->is_IfTrue()) {
     return NULL;
   }
   Node* iffm = ctrl->in(0);
