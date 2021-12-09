@@ -384,7 +384,7 @@ public abstract non-sealed class AbstractMemorySegmentImpl extends MemorySegment
 
     private void checkBounds(long offset, long length) {
         if (this != NativeMemorySegmentImpl.EVERYTHING) { // oob not possible for everything segment
-            if (length > 0) {
+            if (this.length < Long.MAX_VALUE) {
                 try {
                     Objects.checkIndex(offset, this.length - length + 1);
                 } catch (IndexOutOfBoundsException ex) {
