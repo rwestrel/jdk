@@ -390,7 +390,9 @@ public abstract non-sealed class AbstractMemorySegmentImpl extends MemorySegment
                 } catch (IndexOutOfBoundsException ex) {
                     throw outOfBoundException(offset, length);
                 }
-            } else if (offset < 0 || length < 0) {
+            } else if (length < 0 ||
+                    offset < 0 ||
+                    offset > this.length - length) { // careful of overflow
                 throw outOfBoundException(offset, length);
             }
         }
