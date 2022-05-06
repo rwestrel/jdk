@@ -196,7 +196,6 @@ public class IRNode {
     public static final String VECTOR_UCAST_S2X = START + "VectorUCastS2X" + MID + END;
     public static final String VECTOR_UCAST_I2X = START + "VectorUCastI2X" + MID + END;
     public static final String VECTOR_REINTERPRET = START + "VectorReinterpret" + MID + END;
-    public static final String IF = START + "If\\b" + MID + END;
     public static final String ADDI = START + "AddI" + MID + END;
     public static final String MULI = START + "MulI" + MID + END;
 
