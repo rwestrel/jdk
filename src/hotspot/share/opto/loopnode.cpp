@@ -1768,49 +1768,38 @@ bool PhaseIdealLoop::is_counted_loop(Node* x, IdealLoopTree*&loop, BasicType iv_
   }
 
   Node *init_control = x->in(LoopNode::EntryControl);
-
-  int sov = check_stride_overflow(stride_m, limit_t, iv_bt);
-  // If sov==0, limit's type always satisfies the condition, for
-  // example, when it is an array length.
-  if (sov != 0) {
-    if (sov < 0) {
-      return false;  // Bailout: integer overflow is certain.
+  Node* sfpt = NULL;
+  if (loop->_child == NULL) {
+    sfpt = find_safepoint(back_control, x, loop);
+  } else {
+    sfpt = iff->in(0);
+    if (sfpt->Opcode() != Op_SafePoint) {
+      sfpt = NULL;
     }
-    assert(!x->as_Loop()->is_loop_nest_inner_loop(), "loop was transformed");
-    // Generate loop's limit check.
-    // Loop limit check predicate should be near the loop.
-    ProjNode *limit_check_proj = find_predicate_insertion_point(init_control, Deoptimization::Reason_loop_limit_check);
-    if (!limit_check_proj) {
-      // The limit check predicate is not generated if this method trapped here before.
-#ifdef ASSERT
-      if (TraceLoopLimitCheck) {
-        tty->print("missing loop limit check:");
-        loop->dump_head();
-        x->dump(1);
-      }
-#endif
-      return false;
-    }
-
-    IfNode* check_iff = limit_check_proj->in(0)->as_If();
-
-    if (!is_dominator(get_ctrl(limit), check_iff->in(0))) {
-      return false;
-    }
-
-    Node* cmp_limit;
-    Node* bol;
-
-    if (stride_con > 0) {
-      cmp_limit = CmpNode::make(limit, _igvn.integercon(max_signed_integer(iv_bt) - stride_m, iv_bt), iv_bt);
-      bol = new BoolNode(cmp_limit, BoolTest::le);
-    } else {
-      cmp_limit = CmpNode::make(limit, _igvn.integercon(min_signed_integer(iv_bt) - stride_m, iv_bt), iv_bt);
-      bol = new BoolNode(cmp_limit, BoolTest::ge);
-    }
-
-    insert_loop_limit_check(limit_check_proj, cmp_limit, bol);
   }
+
+  if (x->in(LoopNode::LoopBackControl)->Opcode() == Op_SafePoint) {
+    Node* backedge_sfpt = x->in(LoopNode::LoopBackControl);
+    if (((iv_bt == T_INT && LoopStripMiningIter != 0) ||
+         iv_bt == T_LONG) &&
+        sfpt == NULL) {
+      // Leaving the safepoint on the backedge and creating a
+      // CountedLoop will confuse optimizations. We can't move the
+      // safepoint around because its jvm state wouldn't match a new
+      // location. Give up on that loop.
+      return false;
+    }
+  }
+
+#ifdef ASSERT
+  if (iv_bt == T_INT &&
+      !x->as_Loop()->is_loop_nest_inner_loop() &&
+      StressLongCountedLoop > 0 &&
+      trunc1 == NULL &&
+      convert_to_long_loop(cmp, phi, loop)) {
+    return false;
+  }
+#endif
 
   // Now we need to canonicalize loop condition.
   if (bt == BoolTest::ne) {
@@ -1864,27 +1853,55 @@ bool PhaseIdealLoop::is_counted_loop(Node* x, IdealLoopTree*&loop, BasicType iv_
     }
   }
 
-  Node* sfpt = NULL;
-  if (loop->_child == NULL) {
-    sfpt = find_safepoint(back_control, x, loop);
-  } else {
-    sfpt = iff->in(0);
-    if (sfpt->Opcode() != Op_SafePoint) {
-      sfpt = NULL;
+  int sov = check_stride_overflow(stride_m, limit_t, iv_bt);
+  // If sov==0, limit's type always satisfies the condition, for
+  // example, when it is an array length.
+  if (sov != 0) {
+    if (sov < 0) {
+      return false;  // Bailout: integer overflow is certain.
     }
+    assert(!x->as_Loop()->is_loop_nest_inner_loop(), "loop was transformed");
+    // Generate loop's limit check.
+    // Loop limit check predicate should be near the loop.
+    ProjNode *limit_check_proj = find_predicate_insertion_point(init_control, Deoptimization::Reason_loop_limit_check);
+    if (!limit_check_proj) {
+      // The limit check predicate is not generated if this method trapped here before.
+#ifdef ASSERT
+      if (TraceLoopLimitCheck) {
+        tty->print("missing loop limit check:");
+        loop->dump_head();
+        x->dump(1);
+      }
+#endif
+      return false;
+    }
+
+    IfNode* check_iff = limit_check_proj->in(0)->as_If();
+
+    if (!is_dominator(get_ctrl(limit), check_iff->in(0))) {
+      return false;
+    }
+
+    Node* cmp_limit;
+    Node* bol;
+
+    if (stride_con > 0) {
+      cmp_limit = CmpNode::make(limit, _igvn.integercon(max_signed_integer(iv_bt) - stride_m, iv_bt), iv_bt);
+      bol = new BoolNode(cmp_limit, BoolTest::le);
+    } else {
+      cmp_limit = CmpNode::make(limit, _igvn.integercon(min_signed_integer(iv_bt) - stride_m, iv_bt), iv_bt);
+      bol = new BoolNode(cmp_limit, BoolTest::ge);
+    }
+
+    insert_loop_limit_check(limit_check_proj, cmp_limit, bol);
   }
+
 
   if (x->in(LoopNode::LoopBackControl)->Opcode() == Op_SafePoint) {
     Node* backedge_sfpt = x->in(LoopNode::LoopBackControl);
-    if (((iv_bt == T_INT && LoopStripMiningIter != 0) ||
-         iv_bt == T_LONG) &&
-        sfpt == NULL) {
-      // Leaving the safepoint on the backedge and creating a
-      // CountedLoop will confuse optimizations. We can't move the
-      // safepoint around because its jvm state wouldn't match a new
-      // location. Give up on that loop.
-      return false;
-    }
+    assert(!(((iv_bt == T_INT && LoopStripMiningIter != 0) ||
+              iv_bt == T_LONG) &&
+             sfpt == NULL), "");
     if (is_deleteable_safept(backedge_sfpt)) {
       lazy_replace(backedge_sfpt, iftrue);
       if (loop->_safepts != NULL) {
@@ -1893,17 +1910,6 @@ bool PhaseIdealLoop::is_counted_loop(Node* x, IdealLoopTree*&loop, BasicType iv_
       loop->_tail = iftrue;
     }
   }
-
-
-#ifdef ASSERT
-  if (iv_bt == T_INT &&
-      !x->as_Loop()->is_loop_nest_inner_loop() &&
-      StressLongCountedLoop > 0 &&
-      trunc1 == NULL &&
-      convert_to_long_loop(cmp, phi, loop)) {
-    return false;
-  }
-#endif
 
   if (phi_incr != NULL) {
     // If compare points directly to the phi we need to adjust

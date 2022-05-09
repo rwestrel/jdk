@@ -861,6 +861,30 @@ Node *CmpINode::Ideal( PhaseGVN *phase, bool can_reshape ) {
       // This is handled (with more general cases) by Ideal_sub_algebra.
     }
   }
+  if (in(2) != NULL && in(2)->Opcode() == Op_Opaque1) {
+    for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+      Node* u = fast_out(i);
+      if (u->is_Bool()) {
+        for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
+          Node* uu = u->fast_out(j);
+          if (uu->is_CountedLoopEnd() && uu->as_CountedLoopEnd()->cmp_node() == this && uu->as_CountedLoopEnd()->phi() == NULL) {
+            Node* new_cmp = clone();
+            new_cmp->set_req(2, in(2)->in(1));
+            new_cmp = phase->transform(new_cmp);
+            Node* new_bool = new BoolNode(new_cmp, u->as_Bool()->_test._test);
+            new_bool->set_req(1, new_cmp);
+            new_bool = phase->transform(new_bool);
+            if (can_reshape) {
+              phase->is_IterGVN()->replace_input_of(uu, 1, new_bool);
+            } else {
+              uu->set_req(1, new_bool);
+            }
+            --j; --jmax;
+          }
+        }
+      }
+    }
+  }
   return NULL;                  // No change
 }
 
