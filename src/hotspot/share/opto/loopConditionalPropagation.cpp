@@ -661,6 +661,7 @@ public:
                 }
                 rehash_node_delayed(use);
                 int nb = use->replace_edge(node, con, this);
+                _worklist.push(use);
                 --i, imax -= nb;
 #ifdef ASSERT
                 if (PrintLoopConditionalPropagation) {
@@ -706,6 +707,7 @@ public:
           rehash_node_delayed(node);
           node->as_Type()->set_type(t);
           PhaseTransform::set_type(node, t);
+          add_users_to_worklist(node);
         }
       }
     }
