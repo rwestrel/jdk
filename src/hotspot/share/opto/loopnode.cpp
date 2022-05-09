@@ -5497,7 +5497,7 @@ Node* CountedLoopNode::is_canonical_loop_entry() {
   }
   Node* ctrl = skip_predicates();
 
-  if (ctrl == NULL || !ctrl->is_IfTrue()) {
+  if (ctrl == NULL || (!ctrl->is_IfTrue() && !ctrl->is_IfFalse())) {
     return NULL;
   }
   Node* iffm = ctrl->in(0);
