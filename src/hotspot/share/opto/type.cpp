@@ -2006,6 +2006,7 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
     field_array[TypeFunc::Parms+1] = Type::HALF;
     break;
   case T_OBJECT:
+  case T_ARRAY:
   case T_BOOLEAN:
   case T_CHAR:
   case T_FLOAT:
