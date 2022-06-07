@@ -2006,11 +2006,6 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
     field_array[TypeFunc::Parms+1] = Type::HALF;
     break;
   case T_OBJECT:
-  case T_ARRAY: {
-    const Type* ret = get_const_type(return_type);
-    field_array[TypeFunc::Parms] = ret;
-    break;
-  }
   case T_BOOLEAN:
   case T_CHAR:
   case T_FLOAT:
@@ -2056,12 +2051,7 @@ const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig)
       field_array[pos++] = Type::HALF;
       break;
     case T_OBJECT:
-    case T_ARRAY: {
-      const Type* arg = get_const_type(type);
-      // can't trust interfaces in signatures
-      field_array[pos++] = arg;
-      break;
-    }
+    case T_ARRAY:
     case T_FLOAT:
     case T_INT:
       field_array[pos++] = get_const_type(type);
@@ -3875,7 +3865,6 @@ const TypeInstPtr *TypeInstPtr::make(PTR ptr,
     if (xk && ik->is_interface())  xk = false;  // no exact interface
   }
 
-  
   // Now hash this baby
   TypeInstPtr *result =
     (TypeInstPtr*)(new TypeInstPtr(ptr, k, interfaces, xk, o ,offset, instance_id, speculative, inline_depth))->hashcons();
@@ -4173,6 +4162,7 @@ const Type *TypeInstPtr::xmeet_helper(const Type *t) const {
     }
 
     return res;
+
   } // End of case InstPtr
 
   } // End of switch
@@ -5435,7 +5425,7 @@ const TypeKlassPtr* TypeAryPtr::as_klass_type(bool try_for_exact) const {
 }
 
 const TypeKlassPtr* TypeKlassPtr::make(ciKlass *klass) {
-    if (klass->is_instance_klass()) {
+  if (klass->is_instance_klass()) {
     return TypeInstKlassPtr::make(klass);
   }
   return TypeAryKlassPtr::make(klass);
@@ -5448,6 +5438,7 @@ const TypeKlassPtr* TypeKlassPtr::make(PTR ptr, ciKlass* klass, int offset) {
   }
   return TypeAryKlassPtr::make(ptr, klass, offset);
 }
+
 
 //------------------------------TypeKlassPtr-----------------------------------
 TypeKlassPtr::TypeKlassPtr(TYPES t, PTR ptr, ciKlass* klass, const InterfaceSet& interfaces, int offset)

@@ -32,23 +32,6 @@
 #include "utilities/count_leading_zeros.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-const Type* PartialSubtypeCheckNode::Value(PhaseGVN* phase) const {
-  const Type* in1_t = phase->type(in(1));
-  const Type* in2_t = phase->type(in(2));
-  
-  if (in1_t == Type::TOP || in2_t == Type::TOP) {
-    return Type::TOP;
-  }
-
-  in2_t = in2_t->is_klassptr()->cast_to_exactness(false);
-  
-  if (in1_t->join_speculative(in2_t)->empty()) { // not subtype
-    return TypeRawPtr::NOTNULL;
-  }
-  
-  return bottom_type();
-}
-
 //=============================================================================
 // Do not match memory edge.
 uint StrIntrinsicNode::match_edge(uint idx) const {

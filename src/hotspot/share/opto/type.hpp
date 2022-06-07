@@ -1085,7 +1085,6 @@ class TypeOopPtr : public TypePtr {
   friend class TypePtr;
   friend class TypeInstPtr;
   friend class TypeAryPtr;
-
 protected:
  TypeOopPtr(TYPES t, PTR ptr, ciKlass* k, const InterfaceSet& interfaces, bool xk, ciObject* o, int offset, int instance_id,
              const TypePtr* speculative, int inline_depth);

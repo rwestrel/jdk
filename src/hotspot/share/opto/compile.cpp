@@ -1427,7 +1427,6 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     if (to->speculative() != NULL) {
       tj = to = to->remove_speculative();
     }
-
     // Canonicalize the holder of this field
     if (offset >= 0 && offset < instanceOopDesc::base_offset_in_bytes()) {
       // First handle header references such as a LoadKlassNode, even if the
