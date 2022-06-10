@@ -3515,9 +3515,9 @@ const Type *TypeOopPtr::xdual() const {
 // Computes the element-type given a klass.
 const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact) {
   if (klass->is_instance_klass()) {
-    if (klass->is_loaded() && klass->is_interface()) {
-      klass = ciEnv::current()->Object_klass();
-    }
+//    if (klass->is_loaded() && klass->is_interface()) {
+//      klass = ciEnv::current()->Object_klass();
+//    }
     Compile* C = Compile::current();
     Dependencies* deps = C->dependencies();
     assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
