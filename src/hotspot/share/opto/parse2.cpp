@@ -126,7 +126,7 @@ Node* Parse::array_addressing(BasicType type, int vals, const Type*& elemtype) {
       const TypeInstPtr* toop = el->is_instptr();
       if (toop->instance_klass()->unique_concrete_subklass()) {
         // If we load from "AbstractClass[]" we must see "ConcreteSubClass".
-        const Type* subklass = Type::get_const_type(toop->instance_klass());
+        const Type* subklass = Type::get_const_type(toop->instance_klass(), true);
         elemtype = subklass->join_speculative(el);
       }
     }

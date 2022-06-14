@@ -418,7 +418,7 @@ void ShenandoahBarrierSetC2::insert_pre_barrier(GraphKit* kit, Node* base_oop, N
       // Update graphKit memory and control from IdealKit.
       kit->sync_kit(ideal);
 
-      Node* ref_klass_con = kit->makecon(TypeKlassPtr::make(kit->env()->Reference_klass()));
+      Node* ref_klass_con = kit->makecon(TypeKlassPtr::make(kit->env()->Reference_klass(), false));
       Node* is_instof = kit->gen_instanceof(base_oop, ref_klass_con);
 
       // Update IdealKit memory and control from graphKit.

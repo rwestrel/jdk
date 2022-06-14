@@ -908,7 +908,7 @@ Node* LibraryCallKit::current_thread_helper(Node*& tls_output, ByteSize handle_o
                                             bool is_immutable) {
   ciKlass* thread_klass = env()->Thread_klass();
   const Type* thread_type
-    = TypeOopPtr::make_from_klass(thread_klass)->cast_to_ptr_type(TypePtr::NotNull);
+    = TypeOopPtr::make_from_klass(thread_klass, false)->cast_to_ptr_type(TypePtr::NotNull);
 
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(handle_offset));
@@ -1463,7 +1463,7 @@ bool LibraryCallKit::inline_string_toBytesU() {
     }
 
     Node* size = _gvn.transform(new LShiftINode(length, intcon(1)));
-    Node* klass_node = makecon(TypeKlassPtr::make(ciTypeArrayKlass::make(T_BYTE)));
+    Node* klass_node = makecon(TypeKlassPtr::make(ciTypeArrayKlass::make(T_BYTE), false));
     newcopy = new_array(klass_node, size, 0);  // no arguments to push
     AllocateArrayNode* alloc = tightly_coupled_allocation(newcopy);
     guarantee(alloc != NULL, "created above");
@@ -2187,7 +2187,7 @@ const TypeOopPtr* LibraryCallKit::sharpen_unsafe_type(Compile::AliasType* alias_
   // contraint in place.
   if (result == NULL && sharpened_klass != NULL && sharpened_klass->is_loaded()) {
     // Sharpen the value type.
-    result = TypeOopPtr::make_from_klass(sharpened_klass);
+    result = TypeOopPtr::make_from_klass(sharpened_klass, false);
   }
   if (result != NULL) {
 #ifndef PRODUCT
@@ -3114,7 +3114,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   ciKlass* klass_EventWriter = env()->find_system_klass(ciSymbol::make("jdk/jfr/internal/event/EventWriter"));
   assert(klass_EventWriter->is_loaded(), "invariant");
   ciInstanceKlass* const instklass_EventWriter = klass_EventWriter->as_instance_klass();
-  const TypeKlassPtr* const aklass = TypeKlassPtr::make(instklass_EventWriter);
+  const TypeKlassPtr* const aklass = TypeKlassPtr::make(instklass_EventWriter, false);
   const TypeOopPtr* const xtype = aklass->as_instance_type();
   Node* event_writer = access_load(jobj, xtype, T_OBJECT, IN_NATIVE | C2_CONTROL_DEPENDENT_LOAD);
 
@@ -3354,7 +3354,7 @@ bool LibraryCallKit::inline_native_setCurrentThread() {
 
 Node* LibraryCallKit::extentLocalCache_helper() {
   ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
-  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass());
+  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass(), false);
 
   bool xk = etype->klass_is_exact();
 
@@ -3367,7 +3367,7 @@ Node* LibraryCallKit::extentLocalCache_helper() {
 //------------------------inline_native_extentLocalCache------------------
 bool LibraryCallKit::inline_native_extentLocalCache() {
   ciKlass *objects_klass = ciObjArrayKlass::make(env()->Object_klass());
-  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass());
+  const TypeOopPtr *etype = TypeOopPtr::make_from_klass(env()->Object_klass(), false);
   const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
 
   // Because we create the extentLocal cache lazily we have to make the
@@ -3658,7 +3658,7 @@ bool LibraryCallKit::inline_Class_cast() {
       // Don't use intrinsic when class is not loaded.
       return false;
     } else {
-      int static_res = C->static_subtype_check(TypeKlassPtr::make(tm->as_klass()), tp->as_klass_type());
+      int static_res = C->static_subtype_check(TypeKlassPtr::make(tm->as_klass(), true), tp->as_klass_type());
       if (static_res == Compile::SSC_always_true) {
         // isInstance() is true - fold the code.
         set_result(obj);
@@ -4019,7 +4019,7 @@ bool LibraryCallKit::inline_array_copyOf(bool is_copyOfRange) {
     if (not_objArray != NULL) {
       // Improve the klass node's type from the new optimistic assumption:
       ciKlass* ak = ciArrayKlass::make(env()->Object_klass());
-      const Type* akls = TypeKlassPtr::make(TypePtr::NotNull, ak, 0/*offset*/);
+      const Type* akls = TypeKlassPtr::make(TypePtr::NotNull, ak, 0/*offset*/, false);
       Node* cast = new CastPPNode(klass_node, akls);
       cast->init_req(0, control());
       klass_node = _gvn.transform(cast);
@@ -5451,7 +5451,7 @@ bool LibraryCallKit::inline_multiplyToLen() {
     // Allocate the result array
     Node* zlen = _gvn.transform(new AddINode(xlen, ylen));
     ciKlass* klass = ciTypeArrayKlass::make(T_INT);
-    Node* klass_node = makecon(TypeKlassPtr::make(klass));
+    Node* klass_node = makecon(TypeKlassPtr::make(klass, false));
 
     IdealKit ideal(this);
 
@@ -5491,7 +5491,7 @@ bool LibraryCallKit::inline_multiplyToLen() {
      sync_kit(ideal);
      z = __ value(z_alloc);
      // Can't use TypeAryPtr::INTS which uses Bottom offset.
-     _gvn.set_type(z, TypeOopPtr::make_from_klass(klass));
+     _gvn.set_type(z, TypeOopPtr::make_from_klass(klass, false));
      // Final sync IdealKit and GraphKit.
      final_sync(ideal);
 #undef __
@@ -6305,7 +6305,7 @@ Node* LibraryCallKit::load_field_from_object(Node* fromObj, const char* fieldNam
   // Build the resultant type of the load
   const Type *type;
   if (bt == T_OBJECT) {
-    type = TypeOopPtr::make_from_klass(field_klass->as_klass());
+    type = TypeOopPtr::make_from_klass(field_klass->as_klass(), false);
   } else {
     type = Type::get_const_basic_type(bt);
   }
@@ -6474,7 +6474,7 @@ bool LibraryCallKit::inline_cipherBlockChaining_AESCrypt(vmIntrinsics::ID id) {
   assert(klass_AESCrypt->is_loaded(), "predicate checks that this class is loaded");
 
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt);
+  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt, false);
   const TypeOopPtr* xtype = aklass->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
   Node* aescrypt_object = new CheckCastPPNode(control(), embeddedCipherObj, xtype);
   aescrypt_object = _gvn.transform(aescrypt_object);
@@ -6562,7 +6562,7 @@ bool LibraryCallKit::inline_electronicCodeBook_AESCrypt(vmIntrinsics::ID id) {
   assert(klass_AESCrypt->is_loaded(), "predicate checks that this class is loaded");
 
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt);
+  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt, false);
   const TypeOopPtr* xtype = aklass->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
   Node* aescrypt_object = new CheckCastPPNode(control(), embeddedCipherObj, xtype);
   aescrypt_object = _gvn.transform(aescrypt_object);
@@ -6633,7 +6633,7 @@ bool LibraryCallKit::inline_counterMode_AESCrypt(vmIntrinsics::ID id) {
   ciKlass* klass_AESCrypt = tinst->instance_klass()->find_klass(ciSymbol::make("com/sun/crypto/provider/AESCrypt"));
   assert(klass_AESCrypt->is_loaded(), "predicate checks that this class is loaded");
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt);
+  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt, false);
   const TypeOopPtr* xtype = aklass->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
   Node* aescrypt_object = new CheckCastPPNode(control(), embeddedCipherObj, xtype);
   aescrypt_object = _gvn.transform(aescrypt_object);
@@ -6727,7 +6727,7 @@ Node* LibraryCallKit::inline_cipherBlockChaining_AESCrypt_predicate(bool decrypt
   // Resolve oops to stable for CmpP below.
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
 
-  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt)));
+  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt, false)));
   Node* cmp_instof  = _gvn.transform(new CmpINode(instof, intcon(1)));
   Node* bool_instof  = _gvn.transform(new BoolNode(cmp_instof, BoolTest::ne));
 
@@ -6785,7 +6785,7 @@ Node* LibraryCallKit::inline_electronicCodeBook_AESCrypt_predicate(bool decrypti
   }
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
 
-  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt)));
+  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt, false)));
   Node* cmp_instof = _gvn.transform(new CmpINode(instof, intcon(1)));
   Node* bool_instof = _gvn.transform(new BoolNode(cmp_instof, BoolTest::ne));
 
@@ -6845,7 +6845,7 @@ Node* LibraryCallKit::inline_counterMode_AESCrypt_predicate() {
   }
 
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt)));
+  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt, false)));
   Node* cmp_instof = _gvn.transform(new CmpINode(instof, intcon(1)));
   Node* bool_instof = _gvn.transform(new BoolNode(cmp_instof, BoolTest::ne));
   Node* instof_false = generate_guard(bool_instof, NULL, PROB_MIN);
@@ -7151,7 +7151,7 @@ bool LibraryCallKit::inline_digestBase_implCompressMB(int predicate) {
 bool LibraryCallKit::inline_digestBase_implCompressMB(Node* digestBase_obj, ciInstanceKlass* instklass_digestBase,
                                                       BasicType elem_type, address stubAddr, const char *stubName,
                                                       Node* src_start, Node* ofs, Node* limit) {
-  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_digestBase);
+  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_digestBase, false);
   const TypeOopPtr* xtype = aklass->as_instance_type()->cast_to_ptr_type(TypePtr::NotNull);
   Node* digest_obj = new CheckCastPPNode(control(), digestBase_obj, xtype);
   digest_obj = _gvn.transform(digest_obj);
@@ -7247,7 +7247,7 @@ bool LibraryCallKit::inline_galoisCounterMode_AESCrypt() {
   ciKlass* klass_AESCrypt = tinst->instance_klass()->find_klass(ciSymbol::make("com/sun/crypto/provider/AESCrypt"));
   assert(klass_AESCrypt->is_loaded(), "predicate checks that this class is loaded");
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt);
+  const TypeKlassPtr* aklass = TypeKlassPtr::make(instklass_AESCrypt, false);
   const TypeOopPtr* xtype = aklass->as_instance_type();
   Node* aescrypt_object = new CheckCastPPNode(control(), embeddedCipherObj, xtype);
   aescrypt_object = _gvn.transform(aescrypt_object);
@@ -7307,7 +7307,7 @@ Node* LibraryCallKit::inline_galoisCounterMode_AESCrypt_predicate() {
   }
 
   ciInstanceKlass* instklass_AESCrypt = klass_AESCrypt->as_instance_klass();
-  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt)));
+  Node* instof = gen_instanceof(embeddedCipherObj, makecon(TypeKlassPtr::make(instklass_AESCrypt, false)));
   Node* cmp_instof = _gvn.transform(new CmpINode(instof, intcon(1)));
   Node* bool_instof = _gvn.transform(new BoolNode(cmp_instof, BoolTest::ne));
   Node* instof_false = generate_guard(bool_instof, NULL, PROB_MIN);
@@ -7406,7 +7406,7 @@ Node* LibraryCallKit::inline_digestBase_implCompressMB_predicate(int predicate) 
   }
   ciInstanceKlass* instklass = klass->as_instance_klass();
 
-  Node* instof = gen_instanceof(digestBaseObj, makecon(TypeKlassPtr::make(instklass)));
+  Node* instof = gen_instanceof(digestBaseObj, makecon(TypeKlassPtr::make(instklass, false)));
   Node* cmp_instof = _gvn.transform(new CmpINode(instof, intcon(1)));
   Node* bool_instof = _gvn.transform(new BoolNode(cmp_instof, BoolTest::ne));
   Node* instof_false = generate_guard(bool_instof, NULL, PROB_MIN);

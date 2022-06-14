@@ -82,7 +82,7 @@ void Parse::do_field_access(bool is_get, bool is_field) {
     if (stopped())  return;
 
 #ifdef ASSERT
-    const TypeInstPtr *tjp = TypeInstPtr::make(TypePtr::NotNull, iter().get_declared_field_holder());
+    const TypeInstPtr *tjp = TypeInstPtr::make(TypePtr::NotNull, iter().get_declared_field_holder(), false);
     assert(_gvn.type(obj)->higher_equal(tjp), "cast_up is no longer needed");
 #endif
 
@@ -158,7 +158,7 @@ void Parse::do_get_xxx(Node* obj, ciField* field, bool is_field) {
       }
       assert(type != NULL, "field singleton type must be consistent");
     } else {
-      type = TypeOopPtr::make_from_klass(field_klass->as_klass());
+      type = TypeOopPtr::make_from_klass(field_klass->as_klass(), false);
     }
   } else {
     type = Type::get_const_basic_type(bt);
@@ -219,7 +219,7 @@ void Parse::do_put_xxx(Node* obj, ciField* field, bool is_field) {
     field_type = TypeInstPtr::BOTTOM;
   } else {
     if (is_obj) {
-      field_type = TypeOopPtr::make_from_klass(field->type()->as_klass());
+      field_type = TypeOopPtr::make_from_klass(field->type()->as_klass(), false);
     } else {
       field_type = Type::BOTTOM;
     }
@@ -277,7 +277,7 @@ void Parse::do_anewarray() {
 
   kill_dead_locals();
 
-  const TypeKlassPtr* array_klass_type = TypeKlassPtr::make(array_klass);
+  const TypeKlassPtr* array_klass_type = TypeKlassPtr::make(array_klass, true);
   Node* count_val = pop();
   Node* obj = new_array(makecon(array_klass_type), count_val, 1);
   push(obj);
@@ -288,7 +288,7 @@ void Parse::do_newarray(BasicType elem_type) {
   kill_dead_locals();
 
   Node*   count_val = pop();
-  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(elem_type));
+  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(elem_type), false);
   Node*   obj = new_array(makecon(array_klass), count_val, 1);
   // Push resultant oop onto stack
   push(obj);
@@ -299,7 +299,7 @@ void Parse::do_newarray(BasicType elem_type) {
 Node* Parse::expand_multianewarray(ciArrayKlass* array_klass, Node* *lengths, int ndimensions, int nargs) {
   Node* length = lengths[0];
   assert(length != NULL, "");
-  Node* array = new_array(makecon(TypeKlassPtr::make(array_klass)), length, nargs);
+  Node* array = new_array(makecon(TypeKlassPtr::make(array_klass, true)), length, nargs);
   if (ndimensions > 1) {
     jint length_con = find_int_con(length, -1);
     guarantee(length_con >= 0, "non-constant multianewarray");
@@ -385,7 +385,7 @@ void Parse::do_multianewarray() {
     c = make_runtime_call(RC_NO_LEAF | RC_NO_IO,
                           OptoRuntime::multianewarray_Type(ndimensions),
                           fun, NULL, TypeRawPtr::BOTTOM,
-                          makecon(TypeKlassPtr::make(array_klass)),
+                          makecon(TypeKlassPtr::make(array_klass, true)),
                           length[0], length[1], length[2],
                           (ndimensions > 2) ? length[3] : NULL,
                           (ndimensions > 3) ? length[4] : NULL);
@@ -394,7 +394,7 @@ void Parse::do_multianewarray() {
     Node* dims = NULL;
     { PreserveReexecuteState preexecs(this);
       inc_sp(ndimensions);
-      Node* dims_array_klass = makecon(TypeKlassPtr::make(ciArrayKlass::make(ciType::make(T_INT))));
+      Node* dims_array_klass = makecon(TypeKlassPtr::make(ciArrayKlass::make(ciType::make(T_INT)), false));
       dims = new_array(dims_array_klass, intcon(ndimensions), 0);
 
       // Fill-in it with values
@@ -407,14 +407,14 @@ void Parse::do_multianewarray() {
     c = make_runtime_call(RC_NO_LEAF | RC_NO_IO,
                           OptoRuntime::multianewarrayN_Type(),
                           OptoRuntime::multianewarrayN_Java(), NULL, TypeRawPtr::BOTTOM,
-                          makecon(TypeKlassPtr::make(array_klass)),
+                          makecon(TypeKlassPtr::make(array_klass, true)),
                           dims);
   }
   make_slow_call_ex(c, env()->Throwable_klass(), false);
 
   Node* res = _gvn.transform(new ProjNode(c, TypeFunc::Parms));
 
-  const Type* type = TypeOopPtr::make_from_klass_raw(array_klass);
+  const Type* type = TypeOopPtr::make_from_klass_raw(array_klass, true);
 
   // Improve the type:  We know it's not null, exact, and of a given length.
   type = type->is_ptr()->cast_to_ptr_type(TypePtr::NotNull);

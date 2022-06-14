@@ -1187,7 +1187,7 @@ Node* PhaseStringOpts::fetch_static_field(GraphKit& kit, ciField* field) {
       assert(type != NULL, "field singleton type must be consistent");
       return __ makecon(type);
     } else {
-      type = TypeOopPtr::make_from_klass(field_klass->as_klass());
+      type = TypeOopPtr::make_from_klass(field_klass->as_klass(), false);
     }
   } else {
     type = Type::get_const_basic_type(bt);
@@ -1722,7 +1722,7 @@ Node* PhaseStringOpts::allocate_byte_array(GraphKit& kit, IdealKit* ideal, Node*
     // reexecution.  If we deoptimize in the slow path the bytecode
     // will be reexecuted and the char[] allocation will be thrown away.
     kit.jvms()->set_should_reexecute(true);
-    byte_array = kit.new_array(__ makecon(TypeKlassPtr::make(ciTypeArrayKlass::make(T_BYTE))),
+    byte_array = kit.new_array(__ makecon(TypeKlassPtr::make(ciTypeArrayKlass::make(T_BYTE), false)),
                                length, 1);
   }
 
@@ -2046,7 +2046,7 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
       // StringBuffer so no stack adjustment is necessary for proper
       // reexecution.
       kit.jvms()->set_should_reexecute(true);
-      result = kit.new_instance(__ makecon(TypeKlassPtr::make(C->env()->String_klass())));
+      result = kit.new_instance(__ makecon(TypeKlassPtr::make(C->env()->String_klass(), false)));
     }
 
     // Initialize the string

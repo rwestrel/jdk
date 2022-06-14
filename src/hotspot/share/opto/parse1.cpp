@@ -1198,7 +1198,7 @@ void Parse::do_method_entry() {
   // Narrow receiver type when it is too broad for the method being parsed.
   if (!method()->is_static()) {
     ciInstanceKlass* callee_holder = method()->holder();
-    const Type* holder_type = TypeInstPtr::make(TypePtr::BotPTR, callee_holder);
+    const Type* holder_type = TypeInstPtr::make(TypePtr::BotPTR, callee_holder, true);
 
     Node* receiver_obj = local(0);
     const TypeInstPtr* receiver_type = _gvn.type(receiver_obj)->isa_instptr();
@@ -1211,7 +1211,7 @@ void Parse::do_method_entry() {
       assert(callee_holder->is_interface(), "missing subtype check");
 
       // Perform dynamic receiver subtype check against callee holder class w/ a halt on failure.
-      Node* holder_klass = _gvn.makecon(TypeKlassPtr::make(callee_holder));
+      Node* holder_klass = _gvn.makecon(TypeKlassPtr::make(callee_holder, true));
       Node* not_subtype_ctrl = gen_subtype_check(receiver_obj, holder_klass);
       assert(!stopped(), "not a subtype");
 
@@ -2131,7 +2131,7 @@ void Parse::clinit_deopt() {
 
   set_parse_bci(0);
 
-  Node* holder = makecon(TypeKlassPtr::make(method()->holder()));
+  Node* holder = makecon(TypeKlassPtr::make(method()->holder(), false));
   guard_klass_being_initialized(holder);
 }
 

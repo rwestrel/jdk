@@ -136,13 +136,13 @@ const Type *Type::RETURN_ADDRESS;
 const Type *Type::TOP;          // No values in set
 
 //------------------------------get_const_type---------------------------
-const Type* Type::get_const_type(ciType* type) {
+const Type* Type::get_const_type(ciType* type, bool preserve_interface) {
   if (type == NULL) {
     return NULL;
   } else if (type->is_primitive_type()) {
     return get_const_basic_type(type->basic_type());
   } else {
-    return TypeOopPtr::make_from_klass(type->as_klass());
+    return TypeOopPtr::make_from_klass(type->as_klass(), preserve_interface);
   }
 }
 
@@ -230,7 +230,7 @@ const Type* Type::get_typeflow_type(ciType* type) {
     assert(type != ciTypeFlow::StateVector::double2_type(), "");
     assert(!type->is_return_address(), "");
 
-    return Type::get_const_type(type);
+    return Type::get_const_type(type, false);
   }
 }
 
@@ -542,12 +542,12 @@ void Type::Initialize_shared(Compile* current) {
   fsc[1] = Type::MEMORY;
   TypeTuple::STORECONDITIONAL = TypeTuple::make(2, fsc);
 
-  TypeInstPtr::NOTNULL = TypeInstPtr::make(TypePtr::NotNull, current->env()->Object_klass());
-  TypeInstPtr::BOTTOM  = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass());
-  TypeInstPtr::MIRROR  = TypeInstPtr::make(TypePtr::NotNull, current->env()->Class_klass());
+  TypeInstPtr::NOTNULL = TypeInstPtr::make(TypePtr::NotNull, current->env()->Object_klass(), false);
+  TypeInstPtr::BOTTOM  = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass(), false);
+  TypeInstPtr::MIRROR  = TypeInstPtr::make(TypePtr::NotNull, current->env()->Class_klass(), false);
   {
     ciKlass* k = current->env()->Object_klass();
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
     TypeInstPtr::MARK    = TypeInstPtr::make(TypePtr::BotPTR,  k, interfaces,
                                              false, 0, oopDesc::mark_offset_in_bytes());
     TypeInstPtr::KLASS   = TypeInstPtr::make(TypePtr::BotPTR,  k, interfaces,
@@ -616,7 +616,7 @@ void Type::Initialize_shared(Compile* current) {
   
   {
     ciKlass* k = current->env()->Object_klass();
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
     TypeInstKlassPtr::OBJECT = TypeInstKlassPtr::make(TypePtr::NotNull, current->env()->Object_klass(), interfaces, 0);
     TypeInstKlassPtr::OBJECT_OR_NULL = TypeInstKlassPtr::make(TypePtr::BotPTR, current->env()->Object_klass(), interfaces, 0);
   }
@@ -1992,7 +1992,7 @@ const TypeTuple *TypeTuple::LONG_CC_PAIR;
 
 //------------------------------make-------------------------------------------
 // Make a TypeTuple from the range of a method signature
-const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
+const TypeTuple *TypeTuple::make_range(ciSignature* sig, bool preserve_interface) {
   ciType* return_type = sig->return_type();
   uint arg_cnt = return_type->size();
   const Type **field_array = fields(arg_cnt);
@@ -2013,7 +2013,7 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
   case T_BYTE:
   case T_SHORT:
   case T_INT:
-    field_array[TypeFunc::Parms] = get_const_type(return_type);
+    field_array[TypeFunc::Parms] = get_const_type(return_type, preserve_interface);
     break;
   case T_VOID:
     break;
@@ -2024,7 +2024,7 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig) {
 }
 
 // Make a TypeTuple from the domain of a method signature
-const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig) {
+const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig, bool preserve_interface) {
   uint arg_cnt = sig->size();
 
   uint pos = TypeFunc::Parms;
@@ -2033,7 +2033,7 @@ const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig)
     arg_cnt++;
     field_array = fields(arg_cnt);
     // Use get_const_type here because it respects UseUniqueSubclasses:
-    field_array[pos++] = get_const_type(recv)->join_speculative(TypePtr::NOTNULL);
+    field_array[pos++] = get_const_type(recv, preserve_interface)->join_speculative(TypePtr::NOTNULL);
   } else {
     field_array = fields(arg_cnt);
   }
@@ -2055,7 +2055,7 @@ const TypeTuple *TypeTuple::make_domain(ciInstanceKlass* recv, ciSignature* sig)
     case T_ARRAY:
     case T_FLOAT:
     case T_INT:
-      field_array[pos++] = get_const_type(type);
+      field_array[pos++] = get_const_type(type, preserve_interface);
       break;
     case T_BOOLEAN:
     case T_CHAR:
@@ -3291,7 +3291,7 @@ ciKlass* TypePtr::InterfaceSet::exact_klass() const {
   ciKlass* res = NULL;
   for (int i = 0; i < _list.length(); i++) {
     ciKlass* interface = _list.at(i);
-    if (eq(TypePtr::interfaces(interface, false, true, false))) {
+    if (eq(TypePtr::interfaces(interface, false, true, false, true))) {
       assert(res == NULL, "");
       res = _list.at(i);
     }
@@ -3513,11 +3513,11 @@ const Type *TypeOopPtr::xdual() const {
 
 //--------------------------make_from_klass_common-----------------------------
 // Computes the element-type given a klass.
-const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact) {
+const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact, bool preserve_interface) {
   if (klass->is_instance_klass()) {
-//    if (klass->is_loaded() && klass->is_interface()) {
-//      klass = ciEnv::current()->Object_klass();
-//    }
+    if (klass->is_loaded() && klass->is_interface() && !preserve_interface) {
+      klass = ciEnv::current()->Object_klass();
+    }
     Compile* C = Compile::current();
     Dependencies* deps = C->dependencies();
     assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
@@ -3535,7 +3535,7 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_
           klass = ik = sub;
           klass_is_exact = sub->is_final();
           ciKlass* k = klass;
-          const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+          const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, preserve_interface);
         }
       }
       if (!klass_is_exact && try_for_exact && deps != NULL &&
@@ -3545,12 +3545,12 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_
         klass_is_exact = true;
       }
     }
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true, preserve_interface);
     return TypeInstPtr::make(TypePtr::BotPTR, klass, interfaces, klass_is_exact, NULL, 0);
   } else if (klass->is_obj_array_klass()) {
     // Element is an object array. Recursively call ourself.
     ciKlass* eklass = klass->as_obj_array_klass()->element_klass();
-    const TypeOopPtr *etype = TypeOopPtr::make_from_klass_common(eklass, try_for_exact, false);
+    const TypeOopPtr *etype = TypeOopPtr::make_from_klass_common(eklass, try_for_exact, false, preserve_interface);
     bool xk = etype->klass_is_exact();
     const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
     // We used to pass NotNull in here, asserting that the sub-arrays
@@ -3585,13 +3585,13 @@ const TypeOopPtr* TypeOopPtr::make_from_constant(ciObject* o, bool require_const
     if (make_constant) {
       return TypeInstPtr::make(o);
     } else {
-      const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, false, false);
+      const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, false, false, false);
       return TypeInstPtr::make(TypePtr::NotNull, klass, interfaces, true, NULL, 0);
     }
   } else if (klass->is_obj_array_klass()) {
     // Element is an object array. Recursively call ourself.
     const TypeOopPtr *etype =
-      TypeOopPtr::make_from_klass_raw(klass->as_obj_array_klass()->element_klass());
+      TypeOopPtr::make_from_klass_raw(klass->as_obj_array_klass()->element_klass(), true);
     const TypeAry* arr0 = TypeAry::make(etype, TypeInt::make(o->as_array()->length()));
     // We used to pass NotNull in here, asserting that the sub-arrays
     // are all not-null.  This is not true in generally, as code can
@@ -3819,7 +3819,7 @@ ciKlass* TypeInstPtr::exact_klass_helper() const {
   }
   if (_klass != ciEnv::current()->Object_klass()) {
     ciKlass* k = _klass;
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
     if (_interfaces.eq(interfaces)) {
       return _klass;
     }
@@ -3873,7 +3873,7 @@ const TypeInstPtr *TypeInstPtr::make(PTR ptr,
   return result;
 }
 
-TypePtr::InterfaceSet TypePtr::interfaces(ciKlass*& k, bool klass, bool interface, bool array) {
+TypePtr::InterfaceSet TypePtr::interfaces(ciKlass*& k, bool klass, bool interface, bool array, bool preserve_interface) {
   InterfaceSet interfaces;
   if (k->is_instance_klass()) {
     if (k->is_loaded()) {
@@ -3883,7 +3883,9 @@ TypePtr::InterfaceSet TypePtr::interfaces(ciKlass*& k, bool klass, bool interfac
       }
       if (k->is_interface()) {
         assert(interface, "no interface expected");
-        interfaces.add(k);
+        if (preserve_interface) {
+          interfaces.add(k);
+        }
         k = ciEnv::current()->Object_klass();
       } else {
         assert(klass, "no instance klass expected");
@@ -3891,9 +3893,14 @@ TypePtr::InterfaceSet TypePtr::interfaces(ciKlass*& k, bool klass, bool interfac
     }
     return interfaces;
   }
-  
   assert(array, "no array expected");
   assert(k->is_array_klass(), "Not an array?");
+  ciType* e = k->as_array_klass()->base_element_type();
+  if (e->is_loaded() && e->is_instance_klass() && e->as_instance_klass()->is_interface()) {
+    if (!preserve_interface) {
+      k = ciObjArrayKlass::make(ciEnv::current()->Object_klass(), k->as_array_klass()->dimension());
+    }
+  }
   return *TypeAryPtr::_array_interfaces;
 }
 
@@ -5425,19 +5432,19 @@ const TypeKlassPtr* TypeAryPtr::as_klass_type(bool try_for_exact) const {
   return TypeAryKlassPtr::make(xk ? TypePtr::Constant : TypePtr::NotNull, elem, klass(), 0);
 }
 
-const TypeKlassPtr* TypeKlassPtr::make(ciKlass *klass) {
+const TypeKlassPtr* TypeKlassPtr::make(ciKlass *klass, bool preserve_interface) {
   if (klass->is_instance_klass()) {
-    return TypeInstKlassPtr::make(klass);
+    return TypeInstKlassPtr::make(klass, preserve_interface);
   }
-  return TypeAryKlassPtr::make(klass);
+  return TypeAryKlassPtr::make(klass, preserve_interface);
 }
 
-const TypeKlassPtr* TypeKlassPtr::make(PTR ptr, ciKlass* klass, int offset) {
+const TypeKlassPtr* TypeKlassPtr::make(PTR ptr, ciKlass* klass, int offset, bool preserve_interface) {
   if (klass->is_instance_klass()) {
-    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, false);
+    const InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, false, preserve_interface);
     return TypeInstKlassPtr::make(ptr, klass, interfaces, offset);
   }
-  return TypeAryKlassPtr::make(ptr, klass, offset);
+  return TypeAryKlassPtr::make(ptr, klass, offset, preserve_interface);
 }
 
 
@@ -5455,7 +5462,7 @@ ciKlass* TypeKlassPtr::exact_klass_helper() const {
   }
   if (_klass != ciEnv::current()->Object_klass()) {
     ciKlass* k = _klass;
-    if (_interfaces.eq(TypePtr::interfaces(k, true, false, true))) {
+    if (_interfaces.eq(TypePtr::interfaces(k, true, false, true, false))) {
       return _klass;
     }
     return NULL;
@@ -5655,7 +5662,7 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
         deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
         k = ik = sub;
         xk = sub->is_final();
-        interfaces = TypePtr::interfaces(k, true, false, false);
+        interfaces = TypePtr::interfaces(k, true, false, false, false);
       }
     }
   }
@@ -5879,11 +5886,11 @@ const TypeAryKlassPtr *TypeAryKlassPtr::make(PTR ptr, const Type* elem, ciKlass*
   return (TypeAryKlassPtr*)(new TypeAryKlassPtr(ptr, elem, k, offset))->hashcons();
 }
 
-const TypeAryKlassPtr *TypeAryKlassPtr::make(PTR ptr, ciKlass* klass, int offset) {
+const TypeAryKlassPtr *TypeAryKlassPtr::make(PTR ptr, ciKlass* klass, int offset, bool preserve_interface) {
   if (klass->is_obj_array_klass()) {
     // Element is an object array. Recursively call ourself.
     ciKlass* eklass = klass->as_obj_array_klass()->element_klass();
-    const TypeKlassPtr *etype = TypeKlassPtr::make(eklass)->cast_to_exactness(false);
+    const TypeKlassPtr *etype = TypeKlassPtr::make(eklass, preserve_interface)->cast_to_exactness(false);
     return TypeAryKlassPtr::make(ptr, etype, NULL, offset);
   } else if (klass->is_type_array_klass()) {
     // Element is an typeArray
@@ -5895,8 +5902,8 @@ const TypeAryKlassPtr *TypeAryKlassPtr::make(PTR ptr, ciKlass* klass, int offset
   }
 }
 
-const TypeAryKlassPtr* TypeAryKlassPtr::make(ciKlass* klass) {
-  return TypeAryKlassPtr::make(Constant, klass, 0);
+const TypeAryKlassPtr* TypeAryKlassPtr::make(ciKlass* klass, bool preserve_interface) {
+  return TypeAryKlassPtr::make(Constant, klass, 0, preserve_interface);
 }
 
 //------------------------------eq---------------------------------------------
@@ -6377,11 +6384,11 @@ const TypeFunc *TypeFunc::make(ciMethod* method) {
   if (tf != NULL)  return tf;  // The hit rate here is almost 50%.
   const TypeTuple *domain;
   if (method->is_static()) {
-    domain = TypeTuple::make_domain(NULL, method->signature());
+    domain = TypeTuple::make_domain(NULL, method->signature(), false);
   } else {
-    domain = TypeTuple::make_domain(method->holder(), method->signature());
+    domain = TypeTuple::make_domain(method->holder(), method->signature(), false);
   }
-  const TypeTuple *range  = TypeTuple::make_range(method->signature());
+  const TypeTuple *range  = TypeTuple::make_range(method->signature(), false);
   tf = TypeFunc::make(domain, range);
   C->set_last_tf(method, tf);  // fill cache
   return tf;
