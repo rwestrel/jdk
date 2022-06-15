@@ -1240,6 +1240,7 @@ public:
   // Instance klass, ignoring any interface
   ciInstanceKlass* instance_klass() const {
     if (klass()->is_loaded() && klass()->is_interface()) {
+      ShouldNotReachHere();
       return Compile::current()->env()->Object_klass();
     }
     return klass()->as_instance_klass();
@@ -1313,8 +1314,6 @@ public:
   virtual const Type *xdual() const;    // Compute dual right now.
 
   const TypeKlassPtr* as_klass_type(bool try_for_exact = false) const;
-
-  bool is_interface() const { return is_loaded() && klass()->is_interface(); }
 
   // Convenience common pre-built types.
   static const TypeInstPtr *NOTNULL;
@@ -1575,6 +1574,7 @@ public:
   // Instance klass ignoring any interface
   ciInstanceKlass* instance_klass() const {
     if (klass()->is_interface()) {
+      ShouldNotReachHere();
       return Compile::current()->env()->Object_klass();
     }
     return klass()->as_instance_klass();
@@ -1614,8 +1614,6 @@ public:
   virtual const Type    *xmeet( const Type *t ) const;
   virtual const Type    *xdual() const;
   virtual const TypeInstKlassPtr* with_offset(intptr_t offset) const;
-
-  bool is_interface() const { return klass()->is_interface(); }
 
   // Convenience common pre-built types.
   static const TypeInstKlassPtr* OBJECT; // Not-null object klass or below
