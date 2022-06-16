@@ -2131,7 +2131,7 @@ void Parse::clinit_deopt() {
 
   set_parse_bci(0);
 
-  Node* holder = makecon(TypeKlassPtr::make(method()->holder(), false));
+  Node* holder = makecon(TypeKlassPtr::make(method()->holder(), true));
   guard_klass_being_initialized(holder);
 }
 
