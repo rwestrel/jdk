@@ -753,7 +753,7 @@ bool PhaseMacroExpand::scalar_replacement(AllocateNode *alloc, GrowableArray <Sa
             field_type = TypeOopPtr::make_from_constant(con)->isa_oopptr();
             assert(field_type != NULL, "field singleton type must be consistent");
           } else {
-            field_type = TypeOopPtr::make_from_klass(elem_type->as_klass(), false);
+            field_type = TypeOopPtr::make_from_klass(elem_type->as_klass());
           }
           if (UseCompressedOops) {
             field_type = field_type->make_narrowoop();

@@ -609,7 +609,7 @@ void GraphKit::builtin_throw(Deoptimization::DeoptReason reason) {
       const TypePtr* adr_typ = ex_con->add_offset(offset);
 
       Node *adr = basic_plus_adr(ex_node, ex_node, offset);
-      const TypeOopPtr* val_type = TypeOopPtr::make_from_klass(env()->String_klass(), false);
+      const TypeOopPtr* val_type = TypeOopPtr::make_from_klass(env()->String_klass());
       Node *store = access_store_at(ex_node, adr, adr_typ, null(), val_type, T_OBJECT, IN_HEAP);
 
       if (!method()->has_exception_handlers()) {
@@ -2616,7 +2616,7 @@ void GraphKit::make_slow_call_ex(Node* call, ciInstanceKlass* ex_klass, bool sep
       } else {
         // Create an exception state also.
         // Use an exact type if the caller has a specific exception.
-        const Type* ex_type = TypeOopPtr::make_from_klass_unique(ex_klass, false)->cast_to_ptr_type(TypePtr::NotNull);
+        const Type* ex_type = TypeOopPtr::make_from_klass_unique(ex_klass)->cast_to_ptr_type(TypePtr::NotNull);
         Node*       ex_oop  = new CreateExNode(ex_type, control(), i_o);
         add_exception_state(make_exception_state(_gvn.transform(ex_oop)));
       }
@@ -2958,7 +2958,7 @@ void GraphKit::guard_init_thread(Node* klass) {
 void GraphKit::clinit_barrier(ciInstanceKlass* ik, ciMethod* context) {
   if (ik->is_being_initialized()) {
     if (C->needs_clinit_barrier(ik, context)) {
-      Node* klass = makecon(TypeKlassPtr::make(ik, false));
+      Node* klass = makecon(TypeKlassPtr::make(ik));
       guard_klass_being_initialized(klass);
       guard_init_thread(klass);
       insert_mem_bar(Op_MemBarCPUOrder);
@@ -4013,7 +4013,8 @@ Node* GraphKit::load_String_length(Node* str, bool set_ctrl) {
 
 Node* GraphKit::load_String_value(Node* str, bool set_ctrl) {
   int value_offset = java_lang_String::value_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(), false);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
+                                                     false, NULL, 0);
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
   const TypeAryPtr* value_type = TypeAryPtr::make(TypePtr::NotNull,
                                                   TypeAry::make(TypeInt::BYTE, TypeInt::POS),
@@ -4029,7 +4030,8 @@ Node* GraphKit::load_String_coder(Node* str, bool set_ctrl) {
     return intcon(java_lang_String::CODER_UTF16);
   }
   int coder_offset = java_lang_String::coder_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(), false);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
+                                                     false, NULL, 0);
   const TypePtr* coder_field_type = string_type->add_offset(coder_offset);
 
   Node* p = basic_plus_adr(str, str, coder_offset);
@@ -4040,7 +4042,8 @@ Node* GraphKit::load_String_coder(Node* str, bool set_ctrl) {
 
 void GraphKit::store_String_value(Node* str, Node* value) {
   int value_offset = java_lang_String::value_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(), false);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
+                                                     false, NULL, 0);
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
 
   access_store_at(str,  basic_plus_adr(str, value_offset), value_field_type,
@@ -4049,7 +4052,8 @@ void GraphKit::store_String_value(Node* str, Node* value) {
 
 void GraphKit::store_String_coder(Node* str, Node* value) {
   int coder_offset = java_lang_String::coder_offset();
-  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(), false);
+  const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
+                                                     false, NULL, 0);
   const TypePtr* coder_field_type = string_type->add_offset(coder_offset);
 
   access_store_at(str, basic_plus_adr(str, coder_offset), coder_field_type,

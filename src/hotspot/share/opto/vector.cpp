@@ -376,7 +376,7 @@ Node* PhaseVector::expand_vbox_alloc_node(VectorBoxAllocateNode* vbox_alloc,
   }
 
   // Generate array allocation for the field which holds the values.
-  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(bt), false);
+  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(bt));
   Node* arr = kit.new_array(kit.makecon(array_klass), kit.intcon(num_elem), 1);
 
   // Store the vector value into the array.
@@ -413,7 +413,7 @@ Node* PhaseVector::expand_vbox_alloc_node(VectorBoxAllocateNode* vbox_alloc,
                                                         vec_field,
                                                         vec_adr_type,
                                                         arr,
-                                                        TypeOopPtr::make_from_klass(field->type()->as_klass(), false),
+                                                        TypeOopPtr::make_from_klass(field->type()->as_klass()),
                                                         T_OBJECT,
                                                         IN_HEAP));
   kit.set_memory(field_store, vec_adr_type);
@@ -459,13 +459,13 @@ void PhaseVector::expand_vunbox_node(VectorUnboxNode* vec_unbox) {
       gvn.record_for_igvn(local_mem);
       BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
       C2OptAccess access(gvn, ctrl, local_mem, decorators, T_OBJECT, obj, addr);
-      const Type* type = TypeOopPtr::make_from_klass(field->type()->as_klass(), false);
+      const Type* type = TypeOopPtr::make_from_klass(field->type()->as_klass());
       vec_field_ld = bs->load_at(access, type);
     }
 
     // For proper aliasing, attach concrete payload type.
     ciKlass* payload_klass = ciTypeArrayKlass::make(bt);
-    const Type* payload_type = TypeAryPtr::make_from_klass(payload_klass, false)->cast_to_ptr_type(TypePtr::NotNull);
+    const Type* payload_type = TypeAryPtr::make_from_klass(payload_klass)->cast_to_ptr_type(TypePtr::NotNull);
     vec_field_ld = gvn.transform(new CastPPNode(vec_field_ld, payload_type));
 
     Node* adr = kit.array_element_address(vec_field_ld, gvn.intcon(0), bt);

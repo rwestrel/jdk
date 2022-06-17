@@ -82,7 +82,7 @@ void Parse::do_field_access(bool is_get, bool is_field) {
     if (stopped())  return;
 
 #ifdef ASSERT
-    const TypeInstPtr *tjp = TypeInstPtr::make(TypePtr::NotNull, iter().get_declared_field_holder(), false);
+    const TypeInstPtr *tjp = TypeInstPtr::make(TypePtr::NotNull, iter().get_declared_field_holder());
     assert(_gvn.type(obj)->higher_equal(tjp), "cast_up is no longer needed");
 #endif
 
@@ -158,7 +158,7 @@ void Parse::do_get_xxx(Node* obj, ciField* field, bool is_field) {
       }
       assert(type != NULL, "field singleton type must be consistent");
     } else {
-      type = TypeOopPtr::make_from_klass(field_klass->as_klass(), false);
+      type = TypeOopPtr::make_from_klass(field_klass->as_klass());
     }
   } else {
     type = Type::get_const_basic_type(bt);
@@ -219,7 +219,7 @@ void Parse::do_put_xxx(Node* obj, ciField* field, bool is_field) {
     field_type = TypeInstPtr::BOTTOM;
   } else {
     if (is_obj) {
-      field_type = TypeOopPtr::make_from_klass(field->type()->as_klass(), false);
+      field_type = TypeOopPtr::make_from_klass(field->type()->as_klass());
     } else {
       field_type = Type::BOTTOM;
     }
@@ -288,7 +288,7 @@ void Parse::do_newarray(BasicType elem_type) {
   kill_dead_locals();
 
   Node*   count_val = pop();
-  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(elem_type), false);
+  const TypeKlassPtr* array_klass = TypeKlassPtr::make(ciTypeArrayKlass::make(elem_type));
   Node*   obj = new_array(makecon(array_klass), count_val, 1);
   // Push resultant oop onto stack
   push(obj);
@@ -394,7 +394,7 @@ void Parse::do_multianewarray() {
     Node* dims = NULL;
     { PreserveReexecuteState preexecs(this);
       inc_sp(ndimensions);
-      Node* dims_array_klass = makecon(TypeKlassPtr::make(ciArrayKlass::make(ciType::make(T_INT)), false));
+      Node* dims_array_klass = makecon(TypeKlassPtr::make(ciArrayKlass::make(ciType::make(T_INT))));
       dims = new_array(dims_array_klass, intcon(ndimensions), 0);
 
       // Fill-in it with values

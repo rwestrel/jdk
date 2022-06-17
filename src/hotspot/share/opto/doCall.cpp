@@ -724,8 +724,8 @@ void Parse::do_call() {
         } else if (is_reference_type(rt)) {
           assert(is_reference_type(ct), "rt=%s, ct=%s", type2name(rt), type2name(ct));
           if (ctype->is_loaded()) {
-            const TypeOopPtr* arg_type = TypeOopPtr::make_from_klass(rtype->as_klass(), false);
-            const Type*       sig_type = TypeOopPtr::make_from_klass(ctype->as_klass(), false);
+            const TypeOopPtr* arg_type = TypeOopPtr::make_from_klass(rtype->as_klass());
+            const Type*       sig_type = TypeOopPtr::make_from_klass(ctype->as_klass());
             if (arg_type != NULL && !arg_type->higher_equal(sig_type)) {
               Node* retnode = pop();
               Node* cast_obj = _gvn.transform(new CheckCastPPNode(control(), retnode, sig_type));
@@ -810,7 +810,7 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
         saw_unloaded->append(h_bci);
       }
     }
-    const Type*         h_extype = TypeOopPtr::make_from_klass(h_klass, false);
+    const Type*         h_extype = TypeOopPtr::make_from_klass(h_klass);
     // (We use make_from_klass because it respects UseUniqueSubclasses.)
     h_extype = h_extype->join(TypeInstPtr::NOTNULL);
     assert(!h_extype->empty(), "sanity");
@@ -824,7 +824,7 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
 
   if (!default_handler) {
     bcis->append(-1);
-    extypes->append(TypeOopPtr::make_from_klass(env()->Throwable_klass(), false)->is_instptr());
+    extypes->append(TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr());
   }
 
   int len = bcis->length();
@@ -912,7 +912,7 @@ void Parse::catch_inline_exceptions(SafePointNode* ex_map) {
   const TypeInstPtr* ex_type = _gvn.type(ex_node)->isa_instptr();
   NOT_PRODUCT(if (ex_type==NULL) tty->print_cr("*** Exception not InstPtr"));
   if (ex_type == NULL)
-    ex_type = TypeOopPtr::make_from_klass(env()->Throwable_klass(), false)->is_instptr();
+    ex_type = TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr();
 
   // determine potential exception handlers
   ciExceptionHandlerStream handlers(method(), bci(),
@@ -999,12 +999,12 @@ void Parse::catch_inline_exceptions(SafePointNode* ex_map) {
       break;                    // bail out
 
     // Check the type of the exception against the catch type
-    const TypeKlassPtr *tk = TypeKlassPtr::make(klass, false);
+    const TypeKlassPtr *tk = TypeKlassPtr::make(klass);
     Node* con = _gvn.makecon(tk);
     Node* not_subtype_ctrl = gen_subtype_check(ex_klass_node, con);
     if (!stopped()) {
       PreserveJVMState pjvms(this);
-      const TypeInstPtr* tinst = TypeOopPtr::make_from_klass_unique(klass, false)->cast_to_ptr_type(TypePtr::NotNull)->is_instptr();
+      const TypeInstPtr* tinst = TypeOopPtr::make_from_klass_unique(klass)->cast_to_ptr_type(TypePtr::NotNull)->is_instptr();
       assert(klass->has_subklass() || tinst->klass_is_exact(), "lost exactness");
       Node* ex_oop = _gvn.transform(new CheckCastPPNode(control(), ex_node, tinst));
       push_ex_oop(ex_oop);      // Push exception oop for handler

@@ -723,7 +723,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
     CallGenerator* cg = NULL;
     if (is_osr_compilation()) {
       const TypeTuple *domain = StartOSRNode::osr_domain();
-      const TypeTuple *range = TypeTuple::make_range(method()->signature(), false);
+      const TypeTuple *range = TypeTuple::make_range(method()->signature());
       init_tf(TypeFunc::make(domain, range));
       StartNode* s = new StartOSRNode(root(), domain);
       initial_gvn()->set_type_bottom(s);
@@ -1432,9 +1432,7 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       // First handle header references such as a LoadKlassNode, even if the
       // object's klass is unloaded at compile time (4965979).
       if (!is_known_inst) { // Do it only for non-instance types
-        ciKlass* k = env()->Object_klass();
-        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
-        tj = to = TypeInstPtr::make(TypePtr::BotPTR, k, interfaces,false, NULL, offset);
+        tj = to = TypeInstPtr::make(TypePtr::BotPTR, env()->Object_klass(), false, NULL, offset);
       }
     } else if (offset < 0 || offset >= ik->layout_helper_size_in_bytes()) {
       // Static fields are in the space above the normal instance
@@ -1448,12 +1446,10 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       ciInstanceKlass *canonical_holder = ik->get_canonical_holder(offset);
       assert(offset < canonical_holder->layout_helper_size_in_bytes(), "");
       if (!ik->equals(canonical_holder) || tj->offset() != offset) {
-        ciKlass* k = canonical_holder;
-        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
         if( is_known_inst ) {
-          tj = to = TypeInstPtr::make(to->ptr(), k, interfaces, true, NULL, offset, to->instance_id());
+          tj = to = TypeInstPtr::make(to->ptr(), canonical_holder, true, NULL, offset, to->instance_id());
         } else {
-          tj = to = TypeInstPtr::make(to->ptr(), k, interfaces, false, NULL, offset);
+          tj = to = TypeInstPtr::make(to->ptr(), canonical_holder, false, NULL, offset);
         }
       }
     }
@@ -1467,20 +1463,15 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
     // inexact types must flatten to the same alias class so
     // use NotNull as the PTR.
     if ( offset == Type::OffsetBot || (offset >= 0 && (size_t)offset < sizeof(Klass)) ) {
-      ciKlass* k = env()->Object_klass();
-      const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
       tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull,
-                                       k,
-                                       interfaces,
+                                       env()->Object_klass(),
                                        offset);
     }
 
     if (tk->isa_aryklassptr() && tk->is_aryklassptr()->elem()->isa_klassptr()) {
       ciKlass* k = ciObjArrayKlass::make(env()->Object_klass());
       if (!k || !k->is_loaded()) {                  // Only fails for some -Xcomp runs
-        k = env()->Object_klass();
-        const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
-        tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull, k, interfaces, offset);
+        tj = tk = TypeInstKlassPtr::make(TypePtr::NotNull, env()->Object_klass(), offset);
       } else {
         tj = tk = TypeAryKlassPtr::make(TypePtr::NotNull, tk->is_aryklassptr()->elem(), k, offset);
       }
@@ -1768,7 +1759,7 @@ Compile::AliasType* Compile::alias_type(ciField* field) {
   if (field->is_static())
     t = TypeInstPtr::make(field->holder()->java_mirror());
   else
-    t = TypeOopPtr::make_from_klass_raw(field->holder(), false);
+    t = TypeOopPtr::make_from_klass_raw(field->holder());
   AliasType* atp = alias_type(t->add_offset(field->offset_in_bytes()), field);
   assert((field->is_final() || field->is_stable()) == !atp->is_rewritable(), "must get the rewritable bits correct");
   return atp;

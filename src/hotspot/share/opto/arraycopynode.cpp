@@ -223,8 +223,8 @@ Node* ArrayCopyNode::try_clone_instance(PhaseGVN *phase, bool can_reshape, int c
       if (!field->type()->is_loaded()) {
         type = TypeInstPtr::BOTTOM;
       } else {
-        ciKlass* field_klass = field->type()->as_klass();
-        type = TypeOopPtr::make_from_klass(field_klass, false);
+        ciType* field_klass = field->type();
+        type = TypeOopPtr::make_from_klass(field_klass->as_klass());
       }
     } else {
       type = Type::get_const_basic_type(bt);

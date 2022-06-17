@@ -262,7 +262,7 @@ void Parse::do_new() {
     if (stopped())  return;
   }
 
-  Node* kls = makecon(TypeKlassPtr::make(klass, false));
+  Node* kls = makecon(TypeKlassPtr::make(klass));
   Node* obj = new_instance(kls);
 
   // Push resultant oop onto stack
