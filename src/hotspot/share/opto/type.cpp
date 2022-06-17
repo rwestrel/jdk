@@ -542,17 +542,13 @@ void Type::Initialize_shared(Compile* current) {
   fsc[1] = Type::MEMORY;
   TypeTuple::STORECONDITIONAL = TypeTuple::make(2, fsc);
 
-  TypeInstPtr::NOTNULL = TypeInstPtr::make(TypePtr::NotNull, current->env()->Object_klass(), false);
-  TypeInstPtr::BOTTOM  = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass(), false);
-  TypeInstPtr::MIRROR  = TypeInstPtr::make(TypePtr::NotNull, current->env()->Class_klass(), false);
-  {
-    ciKlass* k = current->env()->Object_klass();
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
-    TypeInstPtr::MARK    = TypeInstPtr::make(TypePtr::BotPTR,  k, interfaces,
-                                             false, 0, oopDesc::mark_offset_in_bytes());
-    TypeInstPtr::KLASS   = TypeInstPtr::make(TypePtr::BotPTR,  k, interfaces,
-                                             false, 0, oopDesc::klass_offset_in_bytes());
-  }
+  TypeInstPtr::NOTNULL = TypeInstPtr::make(TypePtr::NotNull, current->env()->Object_klass());
+  TypeInstPtr::BOTTOM  = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass());
+  TypeInstPtr::MIRROR  = TypeInstPtr::make(TypePtr::NotNull, current->env()->Class_klass());
+  TypeInstPtr::MARK    = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass(),
+                                           false, 0, oopDesc::mark_offset_in_bytes());
+  TypeInstPtr::KLASS   = TypeInstPtr::make(TypePtr::BotPTR,  current->env()->Object_klass(),
+                                           false, 0, oopDesc::klass_offset_in_bytes());
   TypeOopPtr::BOTTOM  = TypeOopPtr::make(TypePtr::BotPTR, OffsetBot, TypeOopPtr::InstanceBot);
 
   TypeMetadataPtr::BOTTOM = TypeMetadataPtr::make(TypePtr::BotPTR, NULL, OffsetBot);
@@ -613,13 +609,9 @@ void Type::Initialize_shared(Compile* current) {
   TypeAryPtr::_array_body_type[T_LONG]    = TypeAryPtr::LONGS;
   TypeAryPtr::_array_body_type[T_FLOAT]   = TypeAryPtr::FLOATS;
   TypeAryPtr::_array_body_type[T_DOUBLE]  = TypeAryPtr::DOUBLES;
-  
-  {
-    ciKlass* k = current->env()->Object_klass();
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
-    TypeInstKlassPtr::OBJECT = TypeInstKlassPtr::make(TypePtr::NotNull, current->env()->Object_klass(), interfaces, 0);
-    TypeInstKlassPtr::OBJECT_OR_NULL = TypeInstKlassPtr::make(TypePtr::BotPTR, current->env()->Object_klass(), interfaces, 0);
-  }
+
+  TypeInstKlassPtr::OBJECT = TypeInstKlassPtr::make(TypePtr::NotNull, current->env()->Object_klass(), 0);
+  TypeInstKlassPtr::OBJECT_OR_NULL = TypeInstKlassPtr::make(TypePtr::BotPTR, current->env()->Object_klass(), 0);
 
   const Type **fi2c = TypeTuple::fields(2);
   fi2c[TypeFunc::Parms+0] = TypeInstPtr::BOTTOM; // Method*
@@ -3585,8 +3577,7 @@ const TypeOopPtr* TypeOopPtr::make_from_constant(ciObject* o, bool require_const
     if (make_constant) {
       return TypeInstPtr::make(o);
     } else {
-      const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, false, false, false);
-      return TypeInstPtr::make(TypePtr::NotNull, klass, interfaces, true, NULL, 0);
+      return TypeInstPtr::make(TypePtr::NotNull, klass, true, NULL, 0);
     }
   } else if (klass->is_obj_array_klass()) {
     // Element is an object array. Recursively call ourself.
