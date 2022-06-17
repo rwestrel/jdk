@@ -5653,7 +5653,7 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
         deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
         k = ik = sub;
         xk = sub->is_final();
-        interfaces = TypePtr::interfaces(k, true, false, false, false);
+        interfaces = TypePtr::interfaces(k, true, false, false, false).union_with(interfaces);
       }
     }
   }
