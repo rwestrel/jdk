@@ -230,7 +230,7 @@ const Type* Type::get_typeflow_type(ciType* type) {
     assert(type != ciTypeFlow::StateVector::double2_type(), "");
     assert(!type->is_return_address(), "");
 
-    return Type::get_const_type(type, false);
+    return Type::get_const_type(type);
   }
 }
 
@@ -3868,15 +3868,18 @@ TypePtr::InterfaceSet TypePtr::interfaces(ciKlass*& k, bool klass, bool interfac
   InterfaceSet interfaces;
   if (k->is_instance_klass()) {
     if (k->is_loaded()) {
-      GrowableArray<ciInstanceKlass*>* k_interfaces = k->as_instance_klass()->transitive_interfaces();
+      if (k->is_interface() && !trust_interface) {
+        assert(interface, "no interface expected");
+        k = ciEnv::current()->Object_klass();
+        return interfaces;
+      }
+      GrowableArray<ciInstanceKlass *> *k_interfaces = k->as_instance_klass()->transitive_interfaces();
       for (int i = 0; i < k_interfaces->length(); i++) {
         interfaces.add(k_interfaces->at(i));
       }
       if (k->is_interface()) {
         assert(interface, "no interface expected");
-        if (trust_interface) {
-          interfaces.add(k);
-        }
+        interfaces.add(k);
         k = ciEnv::current()->Object_klass();
       } else {
         assert(klass, "no instance klass expected");
