@@ -1599,17 +1599,6 @@ public:
     return make(ptr, k, interfaces, offset);
   }
 
-    // static const TypeInstKlassPtr *make_from_klass(ciKlass* k) {
-  //   const InterfaceSet interfaces = TypePtr::interfaces(k, true, true, false);
-  //   return make(TypePtr::Constant, k, interfaces, 0);
-  // }
-  // static const TypeInstKlassPtr *make(ciKlass* k, const InterfaceSet& interfaces) {
-  //   return make(TypePtr::Constant, k, interfaces, 0);
-  // }
-  // static const TypeInstKlassPtr *make(ciKlass* k, const InterfaceSet& interfaces, int offset) { return make(TypePtr::Constant, k, interfaces, offset); }
-  // static const TypeInstKlassPtr *make(PTR ptr, ciKlass* k, const InterfaceSet& interfaces, int offset);
-
-
   virtual const TypeInstKlassPtr* cast_to_ptr_type(PTR ptr) const;
 
   virtual const TypeKlassPtr *cast_to_exactness(bool klass_is_exact) const;

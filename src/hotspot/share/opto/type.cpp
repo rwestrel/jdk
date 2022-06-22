@@ -3507,9 +3507,6 @@ const Type *TypeOopPtr::xdual() const {
 // Computes the element-type given a klass.
 const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_change, bool try_for_exact, bool trust_interface) {
   if (klass->is_instance_klass()) {
-//    if (klass->is_loaded() && klass->is_interface() && !trust_interface) {
-//      klass = ciEnv::current()->Object_klass();
-//    }
     Compile* C = Compile::current();
     Dependencies* deps = C->dependencies();
     assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
@@ -3526,8 +3523,6 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_
           deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
           klass = ik = sub;
           klass_is_exact = sub->is_final();
-          ciKlass* k = klass;
-          const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, trust_interface);
         }
       }
       if (!klass_is_exact && try_for_exact && deps != NULL &&
@@ -3537,7 +3532,7 @@ const TypeOopPtr* TypeOopPtr::make_from_klass_common(ciKlass* klass, bool klass_
         klass_is_exact = true;
       }
     }
-    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, true, trust_interface);
+    const TypePtr::InterfaceSet interfaces = TypePtr::interfaces(klass, true, true, false, trust_interface);
     return TypeInstPtr::make(TypePtr::BotPTR, klass, interfaces, klass_is_exact, NULL, 0);
   } else if (klass->is_obj_array_klass()) {
     // Element is an object array. Recursively call ourself.
