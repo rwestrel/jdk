@@ -395,7 +395,7 @@ public:
   BasicType array_element_basic_type() const;
 
   // Create standard type for a ciType:
-  static const Type* get_const_type(ciType* type, bool trust_interface);
+  static const Type* get_const_type(ciType* type, bool trust_interface = false);
 
   // Create standard zero value:
   static const Type* get_zero_type(BasicType type) {
