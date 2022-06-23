@@ -4522,9 +4522,6 @@ const TypeAryPtr* TypeAryPtr::cast_to_ptr_type(PTR ptr) const {
 const TypeAryPtr* TypeAryPtr::cast_to_exactness(bool klass_is_exact) const {
   if( klass_is_exact == _klass_is_exact ) return this;
   if (_ary->ary_must_be_exact())  return this;  // cannot clear xk
-  if (elem() == Type::BOTTOM && klass_is_exact) {
-    return this;
-  }
   return make(ptr(), const_oop(), _ary, klass(), klass_is_exact, _offset, _instance_id, _speculative, _inline_depth);
 }
 
