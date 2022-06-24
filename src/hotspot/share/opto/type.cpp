@@ -4118,7 +4118,7 @@ const Type *TypeInstPtr::xmeet_helper(const Type *t) const {
                                    res_klass, res_xk);
     if (kind == UNLOADED) {
       // One of these classes has not been loaded
-      const TypeInstPtr *unloaded_meet = xmeet_unloaded(tinst, interfaces);
+      const TypeInstPtr* unloaded_meet = xmeet_unloaded(tinst, interfaces);
 #ifndef PRODUCT
       if (PrintOpto && Verbose) {
         tty->print("meet of unloaded classes resulted in: ");
