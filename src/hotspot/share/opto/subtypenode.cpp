@@ -119,8 +119,8 @@ const Type* SubTypeCheckNode::sub(const Type* sub_t, const Type* super_t) const 
     }
   }
 
-    if (subk != NULL) {
-      switch (Compile::current()->static_subtype_check(superk, subk)) {
+  if (subk != NULL) {
+    switch (Compile::current()->static_subtype_check(superk, subk)) {
       case Compile::SSC_always_false:
         assert(old == TypeInt::CC_GT || old == NULL, "");
         return TypeInt::CC_GT;
@@ -132,7 +132,6 @@ const Type* SubTypeCheckNode::sub(const Type* sub_t, const Type* super_t) const 
         break;
       default:
         ShouldNotReachHere();
-      }
     }
   }
 

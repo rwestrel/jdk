@@ -1436,9 +1436,8 @@ const TypePtr *Compile::flatten_alias_type( const TypePtr *tj ) const {
       tj = to = res;
     }
     if (to->speculative() != NULL) {
-      tj = to = to->remove_speculative();
+      const Type* res = tj = to = to->remove_speculative();
       assert(res == TypeInstPtr::make(to->ptr(),to->klass(),to->klass_is_exact(),to->const_oop(),to->offset(), to->instance_id()), "");
-      tj = to = res;
     }
     // Canonicalize the holder of this field
     if (offset >= 0 && offset < instanceOopDesc::base_offset_in_bytes()) {

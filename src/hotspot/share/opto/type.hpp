@@ -1060,6 +1060,7 @@ class TypeOopPtr : public TypePtr {
   friend class CmpPNode;
   friend class CallNode;
   friend class ConnectionGraph;
+  friend class LoadNode;
 
 protected:
   TypeOopPtr(TYPES t, PTR ptr, ciKlass* k, bool xk, ciObject* o, int offset, int instance_id,
@@ -1291,6 +1292,8 @@ public:
 //------------------------------TypeAryPtr-------------------------------------
 // Class of Java array pointers
 class TypeAryPtr : public TypeOopPtr {
+  friend class Compile;
+  friend class LoadNode;
   TypeAryPtr( PTR ptr, ciObject* o, const TypeAry *ary, ciKlass* k, bool xk,
               int offset, int instance_id, bool is_autobox_cache,
               const TypePtr* speculative, int inline_depth)
@@ -1576,6 +1579,7 @@ public:
 // Array klass pointer, mirrors TypeAryPtr
 class TypeAryKlassPtr : public TypeKlassPtr {
   friend class TypeInstKlassPtr;
+  friend class LoadNode;
   const Type *_elem;
 
   TypeAryKlassPtr(PTR ptr, const Type *elem, ciKlass* klass, int offset)
