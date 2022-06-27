@@ -4333,8 +4333,8 @@ Compile::TracePhase::~TracePhase() {
 // (1) subklass is already limited to a subtype of superklass => always ok
 // (2) subklass does not overlap with superklass => always fail
 // (3) superklass has NO subtypes and we can check with a simple compare.
-Compile::SubTypeCheckResult Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr* subk) {
-  int res = (superk->klass_is_exact() && !subk->klass_is_exact() && subk->klass() != NULL) ? static_subtype_check_old(superk, subk) : -1;
+Compile::SubTypeCheckResult Compile::static_subtype_check(const TypeKlassPtr* superk, const TypeKlassPtr* subk, bool verif) {
+  int res = verif ? static_subtype_check_old(superk, subk) : -1;
   if (StressReflectiveCode) {
     assert(res == -1 || res == SSC_full_test, "");
     return SSC_full_test;       // Let caller generate the general case.

@@ -86,7 +86,7 @@ const Type* SubTypeCheckNode::sub_old(const Type* sub_t, const Type* super_t) co
 
   if (super_t->singleton()) {
     sub_t = sub_t->isa_klassptr() ? sub_t->is_klassptr() : sub_t->is_oopptr()->as_klass_type();
-    switch (Compile::current()->static_subtype_check(super_t->is_klassptr(), sub_t->is_klassptr())) {
+    switch (Compile::current()->static_subtype_check_old(super_t->is_klassptr(), sub_t->is_klassptr())) {
       case Compile::SSC_always_false:
         return TypeInt::CC_GT;
       case Compile::SSC_always_true:
@@ -106,7 +106,7 @@ const Type* SubTypeCheckNode::sub(const Type* sub_t, const Type* super_t) const 
   const TypeKlassPtr* superk = super_t->isa_klassptr();
   const TypeKlassPtr* subk = sub_t->isa_klassptr() ? sub_t->is_klassptr() : sub_t->is_oopptr()->as_klass_type();
 
-  const Type* old = superk->klass_is_exact() ? sub_old(sub_t, super_t) : NULL;
+  const Type* old = sub_old(sub_t, super_t);
 
   // Oop can't be a subtype of abstract type that has no subclass.
   if (sub_t->isa_oopptr() && superk->isa_instklassptr() && superk->klass_is_exact()) {
@@ -120,7 +120,7 @@ const Type* SubTypeCheckNode::sub(const Type* sub_t, const Type* super_t) const 
   }
 
   if (subk != NULL) {
-    switch (Compile::current()->static_subtype_check(superk, subk)) {
+    switch (Compile::current()->static_subtype_check(superk, subk, false)) {
       case Compile::SSC_always_false:
         assert(old == TypeInt::CC_GT || old == NULL, "");
         return TypeInt::CC_GT;
@@ -253,7 +253,7 @@ bool SubTypeCheckNode::verify(PhaseGVN* phase) {
     }
 
     const Type* cached_t = Value(phase); // cache the type to validate consistency
-    switch (C->static_subtype_check(superk, subk)) {
+    switch (C->static_subtype_check(superk, subk, false)) {
       case Compile::SSC_easy_test: {
         return verify_helper(phase, subklass, cached_t);
       }

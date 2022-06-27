@@ -3654,7 +3654,7 @@ bool LibraryCallKit::inline_Class_cast() {
       // Don't use intrinsic when class is not loaded.
       return false;
     } else {
-      int static_res = C->static_subtype_check(TypeKlassPtr::make(tm->as_klass()), tp->as_klass_type());
+      int static_res = C->static_subtype_check(TypeKlassPtr::make(tm->as_klass()), tp->as_klass_type(), true);
       if (static_res == Compile::SSC_always_true) {
         // isInstance() is true - fold the code.
         set_result(obj);
@@ -4066,7 +4066,7 @@ bool LibraryCallKit::inline_array_copyOf(bool is_copyOfRange) {
         const TypeKlassPtr* subk = _gvn.type(load_object_klass(original))->is_klassptr();
         const TypeKlassPtr* superk = _gvn.type(klass_node)->is_klassptr();
 
-        int test = C->static_subtype_check(superk, subk);
+        int test = C->static_subtype_check(superk, subk, true);
         if (test != Compile::SSC_always_true && test != Compile::SSC_always_false) {
           const TypeOopPtr* t_original = _gvn.type(original)->is_oopptr();
           if (t_original->speculative_type() != NULL) {
