@@ -2872,14 +2872,14 @@ Node* GraphKit::type_check_receiver(Node* receiver, ciKlass* klass,
 Node* GraphKit::subtype_check_receiver(Node* receiver, ciKlass* klass,
                                        Node** casted_receiver) {
   const TypeKlassPtr* tklass = TypeKlassPtr::make(klass, true);
-  Node* want_klass = makecon(tklass);
+  const TypeOopPtr* recv_type = tklass->cast_to_exactness(false)->is_klassptr()->as_instance_type();
+  Node* want_klass = makecon(recv_type->as_klass_type());
 
   Node* slow_ctl = gen_subtype_check(receiver, want_klass);
 
   // Ignore interface type information until interface types are properly tracked.
   if (!stopped() && !klass->is_interface()) {
     const TypeOopPtr* receiver_type = _gvn.type(receiver)->isa_oopptr();
-    const TypeOopPtr* recv_type = tklass->cast_to_exactness(false)->is_klassptr()->as_instance_type();
     if (!receiver_type->higher_equal(recv_type)) { // ignore redundant casts
       Node* cast = new CheckCastPPNode(control(), receiver, recv_type);
       (*casted_receiver) = _gvn.transform(cast);
