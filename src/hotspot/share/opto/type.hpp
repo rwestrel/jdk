@@ -1559,6 +1559,8 @@ public:
 
   virtual const TypeKlassPtr* with_offset(intptr_t offset) const { ShouldNotReachHere(); return NULL; }
 
+  virtual const TypeKlassPtr* try_improve() const { return this; }
+
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
@@ -1612,6 +1614,8 @@ public:
   virtual const Type    *xmeet( const Type *t ) const;
   virtual const Type    *xdual() const;
   virtual const TypeInstKlassPtr* with_offset(intptr_t offset) const;
+
+  virtual const TypeKlassPtr* try_improve() const;
 
   // Convenience common pre-built types.
   static const TypeInstKlassPtr* OBJECT; // Not-null object klass or below

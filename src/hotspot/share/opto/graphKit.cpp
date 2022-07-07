@@ -2871,9 +2871,11 @@ Node* GraphKit::type_check_receiver(Node* receiver, ciKlass* klass,
 //------------------------------subtype_check_receiver-------------------------
 Node* GraphKit::subtype_check_receiver(Node* receiver, ciKlass* klass,
                                        Node** casted_receiver) {
-  const TypeKlassPtr* tklass = TypeKlassPtr::make(klass, true);
+  const TypeKlassPtr* tklass = TypeKlassPtr::make(klass, true)->try_improve();
   const TypeOopPtr* recv_type = tklass->cast_to_exactness(false)->is_klassptr()->as_instance_type();
-  Node* want_klass = makecon(recv_type->as_klass_type());
+  Node* want_klass = makecon(tklass);
+
+  assert(!tklass->isa_instklassptr() || tklass->is_instklassptr()->instance_klass() == recv_type->is_instptr()->instance_klass(), "");
 
   Node* slow_ctl = gen_subtype_check(receiver, want_klass);
 
@@ -3180,8 +3182,10 @@ Node* GraphKit::gen_instanceof(Node* obj, Node* superklass, bool safe_for_replac
 Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
                               Node* *failure_control) {
   kill_dead_locals();           // Benefit all the uncommon traps
-  const TypeKlassPtr *tk = _gvn.type(superklass)->is_klassptr();
+  const TypeKlassPtr *tk = _gvn.type(superklass)->is_klassptr()->try_improve();
   const TypeOopPtr *toop = tk->cast_to_exactness(false)->as_instance_type();
+
+  assert(!tk->isa_instklassptr() || tk->is_instklassptr()->instance_klass() == toop->is_instptr()->instance_klass(), "");
 
   // Fast cutout:  Check the case that the cast is vacuously true.
   // This detects the common cases where the test will short-circuit
@@ -3192,7 +3196,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
   if (tk->singleton()) {
     const TypeOopPtr* objtp = _gvn.type(obj)->isa_oopptr();
     if (objtp != NULL) {
-      switch (C->static_subtype_check(toop->as_klass_type(), objtp->as_klass_type())) {
+      switch (C->static_subtype_check(tk, objtp->as_klass_type())) {
       case Compile::SSC_always_true:
         // If we know the type check always succeed then we don't use
         // the profiling data at this bytecode. Don't lose it, feed it

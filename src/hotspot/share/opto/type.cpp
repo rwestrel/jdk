@@ -5868,6 +5868,31 @@ bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, b
   return true;
 }
 
+const TypeKlassPtr* TypeInstKlassPtr::try_improve() const {
+  ciKlass* k = klass();
+  Compile* C = Compile::current();
+  Dependencies* deps = C->dependencies();
+  assert((deps != NULL) == (C->method() != NULL && C->method()->code_size() > 0), "sanity");
+  TypePtr::InterfaceSet interfaces = _interfaces;
+  if (k->is_loaded()) {
+    ciInstanceKlass* ik = k->as_instance_klass();
+    bool klass_is_exact = ik->is_final();
+    if (!klass_is_exact &&
+        deps != NULL && UseUniqueSubclasses) {
+      ciInstanceKlass* sub = ik->unique_concrete_subklass();
+      if (sub != NULL) {
+        deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
+        k = ik = sub;
+        klass_is_exact= sub->is_final();
+        interfaces = TypePtr::interfaces(k, true, false, false, false).union_with(interfaces);
+        return TypeKlassPtr::make(klass_is_exact ? Constant : _ptr, k, _offset);
+      }
+    }
+  }
+  return this;
+}
+
+
 const TypeAryKlassPtr *TypeAryKlassPtr::make(PTR ptr, const Type* elem, ciKlass* k, int offset) {
   return (TypeAryKlassPtr*)(new TypeAryKlassPtr(ptr, elem, k, offset))->hashcons();
 }
