@@ -4459,11 +4459,15 @@ const TypePtr *TypeInstPtr::with_instance_id(int instance_id) const {
 const TypeKlassPtr* TypeInstPtr::as_klass_type(bool try_for_exact) const {
   bool xk = klass_is_exact();
   ciInstanceKlass* ik = klass()->as_instance_klass();
-  if (try_for_exact && !xk && !ik->has_subklass() && !ik->is_final() && !ik->is_interface()) {
-    Compile* C = Compile::current();
-    Dependencies* deps = C->dependencies();
-    deps->assert_leaf_type(ik);
-    xk = true;
+  if (try_for_exact && !xk && !ik->has_subklass() && !ik->is_final()) {
+    ciKlass* k = ik;
+    TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
+    if (interfaces.eq(_interfaces)) {
+      Compile *C = Compile::current();
+      Dependencies* deps = C->dependencies();
+      deps->assert_leaf_type(ik);
+      xk = true;
+    }
   }
   return TypeInstKlassPtr::make(xk ? TypePtr::Constant : TypePtr::NotNull, klass(), _interfaces, 0);
 }
@@ -5645,10 +5649,12 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
         && deps != NULL && UseUniqueSubclasses) {
       ciInstanceKlass* sub = ik->unique_concrete_subklass();
       if (sub != NULL) {
-        deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
-        k = ik = sub;
-        xk = sub->is_final();
-        interfaces = TypePtr::interfaces(k, true, false, false, false).union_with(interfaces);
+        TypePtr::InterfaceSet sub_interfaces = TypePtr::interfaces(k, true, false, false, false);
+        if (sub_interfaces.eq(_interfaces)) {
+          deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
+          k = ik = sub;
+          xk = sub->is_final();
+        }
       }
     }
   }
