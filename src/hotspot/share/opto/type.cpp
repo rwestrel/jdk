@@ -4462,6 +4462,7 @@ const TypeKlassPtr* TypeInstPtr::as_klass_type(bool try_for_exact) const {
   if (try_for_exact && !xk && !ik->has_subklass() && !ik->is_final()) {
     ciKlass* k = ik;
     TypePtr::InterfaceSet interfaces = TypePtr::interfaces(k, true, false, false, false);
+    assert(k == ik, "");
     if (interfaces.eq(_interfaces)) {
       Compile *C = Compile::current();
       Dependencies* deps = C->dependencies();
@@ -5649,7 +5650,9 @@ const TypeOopPtr* TypeInstKlassPtr::as_instance_type(bool klass_change) const {
         && deps != NULL && UseUniqueSubclasses) {
       ciInstanceKlass* sub = ik->unique_concrete_subklass();
       if (sub != NULL) {
-        TypePtr::InterfaceSet sub_interfaces = TypePtr::interfaces(k, true, false, false, false);
+        ciKlass* sub_k = sub;
+        TypePtr::InterfaceSet sub_interfaces = TypePtr::interfaces(sub_k, true, false, false, false);
+        assert(sub_k == sub, "");
         if (sub_interfaces.eq(_interfaces)) {
           deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
           k = ik = sub;
@@ -5887,11 +5890,15 @@ const TypeKlassPtr* TypeInstKlassPtr::try_improve() const {
         deps != NULL && UseUniqueSubclasses) {
       ciInstanceKlass* sub = ik->unique_concrete_subklass();
       if (sub != NULL) {
-        deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
-        k = ik = sub;
-        klass_is_exact= sub->is_final();
-        interfaces = TypePtr::interfaces(k, true, false, false, false).union_with(interfaces);
-        return TypeKlassPtr::make(klass_is_exact ? Constant : _ptr, k, _offset);
+        ciKlass *sub_k = sub;
+        TypePtr::InterfaceSet sub_interfaces = TypePtr::interfaces(sub_k, true, false, false, false);
+        assert(sub_k == sub, "");
+        if (sub_interfaces.eq(_interfaces)) {
+          deps->assert_abstract_with_unique_concrete_subtype(ik, sub);
+          k = ik = sub;
+          klass_is_exact = sub->is_final();
+          return TypeKlassPtr::make(klass_is_exact ? Constant : _ptr, k, _offset);
+        }
       }
     }
   }
