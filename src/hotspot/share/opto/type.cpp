@@ -4807,7 +4807,7 @@ const Type *TypeAryPtr::xmeet_helper(const Type *t) const {
     ciKlass* res_klass = NULL;
     bool res_xk = false;
     const Type* elem = tary->_elem;
-    if (meet_aryptr(ptr, elem, this->klass(), tap->klass(), this->klass_is_exact(), tap->klass_is_exact(), this->ptr(), tap->ptr(), res_klass, res_xk) == NOT_SUBTYPE) {
+    if (meet_aryptr(ptr, elem, this->klass(), tap->klass(), this->klass_is_exact(), tap->klass_is_exact(), this->ptr(), tap->ptr(), this, tap, res_klass, res_xk) == NOT_SUBTYPE) {
       instance_id = InstanceBot;
     }
 
@@ -4894,6 +4894,7 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem,
                                          ciKlass* this_klass, ciKlass* tap_klass,
                                          bool this_xk, bool tap_xk,
                                          PTR this_ptr, PTR tap_ptr,
+                                         const TypePtr* this_ary, const TypePtr* other_ary,
                                          ciKlass*& res_klass, bool& res_xk) {
   res_klass = NULL;
   MeetResult result = SUBTYPE;
@@ -4960,7 +4961,7 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem,
         res_xk = tap_xk;
       } else {
         res_xk = (tap_xk && this_xk) &&
-          (this_klass == tap_klass); // Only precise for identical arrays
+          (this_ary->is_same_java_type_as(other_ary)); // Only precise for identical arrays
       }
       return result;
     default:  {
@@ -6188,7 +6189,7 @@ const Type    *TypeAryKlassPtr::xmeet( const Type *t ) const {
     PTR ptr = meet_ptr(tap->ptr());
     ciKlass* res_klass = NULL;
     bool res_xk = false;
-    meet_aryptr(ptr, elem, this->klass(), tap->klass(), this->klass_is_exact(), tap->klass_is_exact(), this->ptr(), tap->ptr(), res_klass, res_xk);
+    meet_aryptr(ptr, elem, this->klass(), tap->klass(), this->klass_is_exact(), tap->klass_is_exact(), this->ptr(), tap->ptr(), this, tap, res_klass, res_xk);
     assert(res_xk == (ptr == Constant), "");
     return make(ptr, elem, res_klass, off);
   } // End of case KlassPtr

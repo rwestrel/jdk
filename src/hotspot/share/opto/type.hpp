@@ -975,6 +975,7 @@ protected:
               ciKlass* this_klass, ciKlass* tap_klass,
               bool this_xk, bool tap_xk,
               PTR this_ptr, PTR tap_ptr,
+              const TypePtr* this_ary, const TypePtr* other_ary,
               ciKlass*& res_klass, bool& res_xk);
 
 public:
