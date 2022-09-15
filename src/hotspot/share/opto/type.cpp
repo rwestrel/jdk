@@ -4333,7 +4333,7 @@ bool TypeInstPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_e
   return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
 }
 
-bool TypeInstPtr::is_same_java_type_as(const TypeOopPtr* other) const {
+bool TypeInstPtr::is_same_java_type_as_helper(const TypeOopPtr* other) const {
   if (!is_loaded() || !other->is_loaded()) {
     return false;
   }
@@ -4672,7 +4672,7 @@ bool TypeAryPtr::is_java_subtype_of_helper(const TypeOopPtr* other, bool this_ex
   return false;
 }
 
-bool TypeAryPtr::is_same_java_type_as(const TypeOopPtr* other) const {
+bool TypeAryPtr::is_same_java_type_as_helper(const TypeOopPtr* other) const {
   if (!other->isa_aryptr() ||
       !is_loaded() || !other->is_loaded() || klass() == NULL || other->klass() == NULL) {
     return false;
@@ -5841,7 +5841,7 @@ bool TypeInstKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool
   return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
 }
 
-bool TypeInstKlassPtr::is_same_java_type_as(const TypeKlassPtr* other) const {
+bool TypeInstKlassPtr::is_same_java_type_as_helper(const TypeKlassPtr* other) const {
   if (!is_loaded() || !other->is_loaded()) {
     return false;
   }
@@ -6268,7 +6268,7 @@ bool TypeAryKlassPtr::is_java_subtype_of_helper(const TypeKlassPtr* other, bool 
   return false;
 }
 
-bool TypeAryKlassPtr::is_same_java_type_as(const TypeKlassPtr* other) const {
+bool TypeAryKlassPtr::is_same_java_type_as_helper(const TypeKlassPtr* other) const {
   if (!other->isa_aryklassptr() ||
       !is_loaded() || !other->is_loaded() || klass() == NULL || other->klass() == NULL) {
     return false;

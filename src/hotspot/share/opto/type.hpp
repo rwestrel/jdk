@@ -1042,6 +1042,11 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st  ) const;
 #endif
+
+private:
+  virtual bool is_same_java_type_as(const TypePtr* other) const {
+    ShouldNotReachHere(); return false;
+  }
 };
 
 //------------------------------TypeRawPtr-------------------------------------
@@ -1133,7 +1138,15 @@ public:
   bool is_java_subtype_of(const TypeOopPtr* other) const {
     return is_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
-  virtual bool is_same_java_type_as(const TypeOopPtr* other) const { ShouldNotReachHere(); return false; }
+
+  bool is_same_java_type_as(const TypePtr* other) const {
+    return is_same_java_type_as_helper(other->is_oopptr());
+  }
+
+  virtual bool is_same_java_type_as_helper(const TypeOopPtr* other) const {
+    ShouldNotReachHere(); return false;
+  }
+
   bool maybe_java_subtype_of(const TypeOopPtr* other) const {
     return maybe_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
@@ -1245,7 +1258,7 @@ public:
     return klass()->as_instance_klass();
   }
 
-  bool is_same_java_type_as(const TypeOopPtr* other) const;
+  bool is_same_java_type_as_helper(const TypeOopPtr* other) const;
   bool is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
   bool maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
 
@@ -1376,7 +1389,7 @@ class TypeAryPtr : public TypeOopPtr {
 
 public:
 
-  bool is_same_java_type_as(const TypeOopPtr* other) const;
+  bool is_same_java_type_as_helper(const TypeOopPtr* other) const;
   bool is_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
   bool maybe_java_subtype_of_helper(const TypeOopPtr* other, bool this_exact, bool other_exact) const;
 
@@ -1527,10 +1540,14 @@ public:
   bool is_java_subtype_of(const TypeKlassPtr* other) const {
     return is_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
+  bool is_same_java_type_as(const TypePtr* other) const {
+    return is_same_java_type_as_helper(other->is_klassptr());
+  }
+
   bool maybe_java_subtype_of(const TypeKlassPtr* other) const {
     return maybe_java_subtype_of_helper(other, klass_is_exact(), other->klass_is_exact());
   }
-  virtual bool is_same_java_type_as(const TypeKlassPtr* other) const { ShouldNotReachHere(); return false; }
+  virtual bool is_same_java_type_as_helper(const TypeKlassPtr* other) const { ShouldNotReachHere(); return false; }
   virtual bool is_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
   virtual bool maybe_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const { ShouldNotReachHere(); return false; }
 
@@ -1586,7 +1603,7 @@ public:
     return klass()->as_instance_klass();
   }
 
-  bool is_same_java_type_as(const TypeKlassPtr* other) const;
+  bool is_same_java_type_as_helper(const TypeKlassPtr* other) const;
   bool is_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const;
   bool maybe_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const;
 
@@ -1647,7 +1664,7 @@ public:
 
   static const TypeAryKlassPtr *make(PTR ptr, ciKlass* k, int offset, bool trust_interface);
 
-  bool is_same_java_type_as(const TypeKlassPtr* other) const;
+  bool is_same_java_type_as_helper(const TypeKlassPtr* other) const;
   bool is_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const;
   bool maybe_java_subtype_of_helper(const TypeKlassPtr* other, bool this_exact, bool other_exact) const;
 
