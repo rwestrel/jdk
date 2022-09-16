@@ -3185,7 +3185,7 @@ Node* GraphKit::gen_checkcast(Node *obj, Node* superklass,
   const TypeKlassPtr *tk = _gvn.type(superklass)->is_klassptr()->try_improve();
   const TypeOopPtr *toop = tk->cast_to_exactness(false)->as_instance_type();
 
-  assert(!tk->isa_instklassptr() || tk->is_instklassptr()->instance_klass() == toop->is_instptr()->instance_klass() || tk->try_improve()->is_instklassptr()->instance_klass() == toop->is_instptr()->instance_klass(), "");
+  assert(!tk->isa_instklassptr() || !tk->is_loaded() || tk->is_instklassptr()->instance_klass() == toop->is_instptr()->instance_klass() || tk->try_improve()->is_instklassptr()->instance_klass() == toop->is_instptr()->instance_klass(), "");
 
   // Fast cutout:  Check the case that the cast is vacuously true.
   // This detects the common cases where the test will short-circuit

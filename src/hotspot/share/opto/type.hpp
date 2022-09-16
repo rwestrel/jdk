@@ -969,6 +969,7 @@ protected:
                PTR this_ptr, PTR tinst_ptr,
                InterfaceSet this_interfaces, InterfaceSet tinst_interfaces,
                InterfaceSet& interfaces,
+               const TypePtr* this_type, const TypePtr* tinst_type,
                ciKlass*&res_klass, bool &res_xk);
   static MeetResult
   meet_aryptr(PTR& ptr, const Type*& elem,
@@ -1047,6 +1048,22 @@ public:
 private:
   virtual bool is_same_java_type_as(const TypePtr* other) const {
     ShouldNotReachHere(); return false;
+  }
+
+  virtual bool is_meet_subtype_of(const TypePtr* other) const {
+    ShouldNotReachHere(); return false;
+  }
+
+  virtual ciKlass* klass() const {
+    ShouldNotReachHere(); return NULL;
+  }
+
+  virtual const InterfaceSet interfaces() const {
+    ShouldNotReachHere(); return InterfaceSet();
+  };
+
+  virtual bool is_meet_same_type_as(const TypePtr* other) const {
+    return is_same_java_type_as(other);
   }
 };
 
@@ -1233,6 +1250,18 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const;
 #endif
+private:
+  virtual bool is_meet_subtype_of(const TypePtr* other) const {
+    return is_meet_subtype_of_helper(other->is_oopptr(), klass_is_exact(), other->is_oopptr()->klass_is_exact());
+  }
+
+  virtual bool is_meet_subtype_of_helper(const TypeOopPtr* other, bool this_xk, bool other_xk) const {
+    ShouldNotReachHere(); return false;
+  }
+
+  virtual const InterfaceSet interfaces() const {
+    return _interfaces;
+  };
 };
 
 //------------------------------TypeInstPtr------------------------------------
@@ -1342,6 +1371,14 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+
+private:
+  virtual bool is_meet_subtype_of_helper(const TypeOopPtr* other, bool this_xk, bool other_xk) const;
+
+  virtual bool is_meet_same_type_as(const TypePtr* other) const {
+    return _klass->equals(other->is_instptr()->_klass) && _interfaces.eq(other->is_instptr()->_interfaces);
+  }
+
 };
 
 //------------------------------TypeAryPtr-------------------------------------
@@ -1470,6 +1507,8 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+private:
+  virtual bool is_meet_subtype_of_helper(const TypeOopPtr* other, bool this_xk, bool other_xk) const;
 };
 
 //------------------------------TypeMetadataPtr-------------------------------------
@@ -1582,6 +1621,18 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+private:
+  virtual bool is_meet_subtype_of(const TypePtr* other) const {
+    return is_meet_subtype_of_helper(other->is_klassptr(), klass_is_exact(), other->is_klassptr()->klass_is_exact());
+  }
+
+  virtual bool is_meet_subtype_of_helper(const TypeKlassPtr* other, bool this_xk, bool other_xk) const {
+    ShouldNotReachHere(); return false;
+  }
+
+  virtual const InterfaceSet interfaces() const {
+    return _interfaces;
+  };
 };
 
 // Instance klass pointer, mirrors TypeInstPtr
@@ -1638,6 +1689,12 @@ public:
   // Convenience common pre-built types.
   static const TypeInstKlassPtr* OBJECT; // Not-null object klass or below
   static const TypeInstKlassPtr* OBJECT_OR_NULL; // Maybe-null version of same
+private:
+  virtual bool is_meet_subtype_of_helper(const TypeKlassPtr* other, bool this_xk, bool other_xk) const;
+
+  virtual bool is_meet_same_type_as(const TypePtr* other) const {
+    return _klass->equals(other->is_instklassptr()->_klass) && _interfaces.eq(other->is_instklassptr()->_interfaces);
+  }
 };
 
 // Array klass pointer, mirrors TypeAryPtr
@@ -1699,6 +1756,8 @@ public:
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint depth, outputStream *st ) const; // Specialized per-Type dumping
 #endif
+private:
+  virtual bool is_meet_subtype_of_helper(const TypeKlassPtr* other, bool this_xk, bool other_xk) const;
 };
 
 class TypeNarrowPtr : public Type {

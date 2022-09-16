@@ -4115,6 +4115,7 @@ const Type *TypeInstPtr::xmeet_helper(const Type *t) const {
                                    this_xk, tinst_xk,
                                    this->_ptr, tinst->_ptr,
                                    this->_interfaces, tinst->_interfaces, interfaces,
+                                   this, tinst,
                                    res_klass, res_xk);
     if (kind == UNLOADED) {
       // One of these classes has not been loaded
@@ -4171,6 +4172,7 @@ TypePtr::MeetResult TypePtr::meet_instptr(PTR &ptr, ciKlass* this_klass, ciKlass
                                           PTR this_ptr, PTR tinst_ptr,
                                           InterfaceSet this_interfaces, InterfaceSet tinst_interfaces,
                                           InterfaceSet& interfaces,
+                                          const TypePtr* this_type, const TypePtr* tinst_type,
                                           ciKlass*&res_klass, bool &res_xk) {
   // Check for easy case; klasses are equal (and perhaps not loaded!)
   // If we have constants, then we created oops so classes are loaded
@@ -4212,51 +4214,51 @@ TypePtr::MeetResult TypePtr::meet_instptr(PTR &ptr, ciKlass* this_klass, ciKlass
   // centerline and or-ed above it.  (N.B. Constants are always exact.)
 
   // Check for subtyping:
-  ciKlass *subtype = NULL;
+  const TypePtr* subtype = NULL;
   bool subtype_exact = false;
   InterfaceSet subtype_interfaces;
 
-  if (this_klass->equals(tinst_klass) && this_interfaces.eq(tinst_interfaces)) {
-    subtype = this_klass;
+//  assert(this_type->is_meet_subtype_of(tinst_type) == (this_klass->is_subtype_of(tinst_klass) &&
+//             (!this_xk || this_interfaces.intersection_with(tinst_interfaces).eq(tinst_interfaces))), "");
+//
+// assert(tinst_type->is_meet_subtype_of(this_type) == (tinst_klass->is_subtype_of(this_klass) &&
+//             (!tinst_xk || tinst_interfaces.intersection_with(this_interfaces).eq(this_interfaces))), "");
+
+
+  if (this_type->is_meet_same_type_as(tinst_type)) {
+    subtype = this_type;
     subtype_exact = below_centerline(ptr) ? (this_xk && tinst_xk) : (this_xk || tinst_xk);
-    subtype_interfaces = this_interfaces;
-  } else if (!tinst_xk && this_klass->is_subtype_of(tinst_klass) &&
-             (!this_xk || this_interfaces.intersection_with(tinst_interfaces).eq(tinst_interfaces))) {
-    subtype = this_klass;     // Pick subtyping class
+  } else if (!tinst_xk && this_type->is_meet_subtype_of(tinst_type)) {
+    subtype = this_type;     // Pick subtyping class
     subtype_exact = this_xk;
-    subtype_interfaces = this_interfaces;
-  } else if(!this_xk && tinst_klass->is_subtype_of(this_klass) &&
-            (!tinst_xk || this_interfaces.intersection_with(tinst_interfaces).eq(this_interfaces))) {
-    subtype = tinst_klass;    // Pick subtyping class
+  } else if(!this_xk && tinst_type->is_meet_subtype_of(this_type)) {
+    subtype = tinst_type;    // Pick subtyping class
     subtype_exact = tinst_xk;
-    subtype_interfaces = tinst_interfaces;
   }
 
   if (subtype) {
     if (above_centerline(ptr)) { // both are up?
-      this_klass = tinst_klass = subtype;
+      this_type = tinst_type = subtype;
       this_xk = tinst_xk = subtype_exact;
-      this_interfaces = tinst_interfaces = subtype_interfaces;
     } else if (above_centerline(this_ptr) && !above_centerline(tinst_ptr)) {
-      this_klass = tinst_klass; // tinst is down; keep down man
+      this_type = tinst_type; // tinst is down; keep down man
       this_xk = tinst_xk;
-      this_interfaces = tinst_interfaces;
     } else if (above_centerline(tinst_ptr) && !above_centerline(this_ptr)) {
-      tinst_klass = this_klass; // this is down; keep down man
+      tinst_type = this_type; // this is down; keep down man
       tinst_xk = this_xk;
-      tinst_interfaces = this_interfaces;
     } else {
       this_xk = subtype_exact;  // either they are equal, or we'll do an LCA
     }
   }
 
   // Check for classes now being equal
-  if (tinst_klass->equals(this_klass) && tinst_interfaces.eq(this_interfaces)) {
+  if (this_type->is_meet_same_type_as(tinst_type)) {
     // If the klasses are equal, the constants may still differ.  Fall to
     // NotNull if they do (neither constant is NULL; that is a special case
     // handled elsewhere).
-    res_klass = this_klass;
+    res_klass = this_type->klass();
     res_xk = this_xk;
+//    interfaces = this_type->interfaces();
     return SUBTYPE;
   } // Else classes are not equal
 
@@ -4471,6 +4473,79 @@ const TypeKlassPtr* TypeInstPtr::as_klass_type(bool try_for_exact) const {
     }
   }
   return TypeInstKlassPtr::make(xk ? TypePtr::Constant : TypePtr::NotNull, klass(), _interfaces, 0);
+}
+
+bool TypeInstPtr::is_meet_subtype_of_helper(const TypeOopPtr *other, bool this_xk, bool other_xk) const {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty()) {
+    return true;
+  }
+
+  return klass()->is_subtype_of(other->klass()) &&
+         (!this_xk || _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces));
+}
+
+bool TypeAryPtr::is_meet_subtype_of_helper(const TypeOopPtr *other, bool this_xk, bool other_xk) const {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty()) {
+    return true;
+  }
+
+  if (other->isa_instptr()) {
+    return _klass->is_subtype_of(other->_klass) && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces);
+  }
+
+  if (klass() == NULL) {
+    return false;
+  }
+
+  const TypeAryPtr* other_ary = other->is_aryptr();
+  if (other_ary->elem()->make_oopptr() && elem()->make_oopptr()) {
+    return elem()->make_oopptr()->is_meet_subtype_of_helper(other_ary->elem()->make_oopptr(), this_xk, other_xk);
+  }
+
+  if (!other_ary->elem()->make_oopptr() && !elem()->make_oopptr()) {
+    return _klass->is_subtype_of(other->_klass);
+  }
+
+  return false;
+}
+
+bool TypeInstKlassPtr::is_meet_subtype_of_helper(const TypeKlassPtr *other, bool this_xk, bool other_xk) const {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty()) {
+    return true;
+  }
+
+  return klass()->is_subtype_of(other->klass()) &&
+         (!this_xk || _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces));
+}
+
+bool TypeAryKlassPtr::is_meet_subtype_of_helper(const TypeKlassPtr *other, bool this_xk, bool other_xk) const {
+  if (other->klass() == ciEnv::current()->Object_klass() && other->_interfaces.empty()) {
+    return true;
+  }
+
+  if (!is_loaded() || !other->is_loaded() || other->klass() == NULL || klass() == NULL) {
+    return false;
+  }
+
+  if (other->isa_instklassptr()) {
+    return _klass->is_subtype_of(other->_klass)  && other->_interfaces.intersection_with(_interfaces).eq(other->_interfaces);
+  }
+
+  if (klass() == NULL) {
+    return false;
+  }
+
+  assert(other->isa_aryklassptr(), "");
+  const TypeAryKlassPtr* other_ary = other->isa_aryklassptr();
+  if (other_ary->_elem->isa_klassptr() && _elem->isa_klassptr()) {
+    return _elem->is_klassptr()->is_meet_subtype_of_helper(other_ary->_elem->is_klassptr(), this_xk, other_xk);
+  }
+
+  if (!other_ary->_elem->isa_klassptr() && !_elem->isa_klassptr()) {
+    return _klass->is_subtype_of(other->_klass);
+  }
+
+  return false;
 }
 
 //=============================================================================
@@ -4915,15 +4990,15 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem,
   } else // Non integral arrays.
     // Must fall to bottom if exact klasses in upper lattice
     // are not equal or super klass is exact.
-    if ((above_centerline(ptr) || ptr == Constant) && this_klass != tap_klass &&
+    if ((above_centerline(ptr) || ptr == Constant) && !this_ary->is_meet_same_type_as(other_ary) &&
         // meet with top[] and bottom[] are processed further down:
         tap_klass != NULL  && this_klass != NULL   &&
         // both are exact and not equal:
         ((tap_xk && this_xk) ||
          // 'tap'  is exact and super or unrelated:
-         (tap_xk && !tap_klass->is_subtype_of(this_klass)) ||
+         (tap_xk && !other_ary->is_meet_subtype_of(this_ary)) ||
          // 'this' is exact and super or unrelated:
-         (this_xk && !this_klass->is_subtype_of(tap_klass)))) {
+         (this_xk && !this_ary->is_meet_subtype_of(other_ary)))) {
       if (above_centerline(ptr) || (elem->make_ptr() && above_centerline(elem->make_ptr()->_ptr))) {
         elem = Type::BOTTOM;
       }
@@ -4950,7 +5025,7 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem,
         res_xk = true;
       } else {
         // Only precise for identical arrays
-        res_xk = this_xk && (this_klass == tap_klass);
+        res_xk = this_xk && this_ary->is_meet_same_type_as(other_ary);
       }
       return result;
     }
@@ -4961,7 +5036,7 @@ TypePtr::MeetResult TypePtr::meet_aryptr(PTR& ptr, const Type*& elem,
         res_xk = tap_xk;
       } else {
         res_xk = (tap_xk && this_xk) &&
-          (this_ary->is_same_java_type_as(other_ary)); // Only precise for identical arrays
+          (this_ary->is_meet_same_type_as(other_ary)); // Only precise for identical arrays
       }
       return result;
     default:  {
@@ -5750,6 +5825,7 @@ const Type    *TypeInstKlassPtr::xmeet( const Type *t ) const {
                         this_xk, tkls_xk,
                         this->_ptr, tkls->_ptr,
                         this->_interfaces, tkls->_interfaces, interfaces,
+                        this, tkls,
                         res_klass, res_xk)) {
       case UNLOADED:
         ShouldNotReachHere();
