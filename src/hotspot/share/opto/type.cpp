@@ -4365,7 +4365,7 @@ bool TypeInstPtr::maybe_java_subtype_of_helper(const TypeOopPtr* other, bool thi
   }
 
   if (this_exact) {
-    return _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
+    return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
   }
 
   return true;
@@ -5948,7 +5948,7 @@ bool TypeInstKlassPtr::maybe_java_subtype_of_helper(const TypeKlassPtr* other, b
   }
 
   if (this_exact) {
-    return _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
+    return _klass->is_subtype_of(other->_klass) && _interfaces.intersection_with(other->_interfaces).eq(other->_interfaces);
   }
 
   return true;
