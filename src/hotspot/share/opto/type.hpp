@@ -963,21 +963,12 @@ protected:
     NOT_SUBTYPE,
     LCA
   };
+  static TypePtr::MeetResult
+  meet_instptr(PTR& ptr, InterfaceSet& interfaces, const TypePtr* this_type, const TypePtr* other_type,
+               ciKlass*& res_klass, bool& res_xk);
   static MeetResult
-  meet_instptr(PTR &ptr, ciKlass* this_klass, ciKlass* tinst_klass,
-               bool this_xk, bool tinst_xk,
-               PTR this_ptr, PTR tinst_ptr,
-               InterfaceSet this_interfaces, InterfaceSet tinst_interfaces,
-               InterfaceSet& interfaces,
-               const TypePtr* this_type, const TypePtr* tinst_type,
-               ciKlass*&res_klass, bool &res_xk);
-  static MeetResult
-  meet_aryptr(PTR& ptr, const Type*& elem,
-              ciKlass* this_klass, ciKlass* tap_klass,
-              bool this_xk, bool tap_xk,
-              PTR this_ptr, PTR tap_ptr,
-              const TypePtr* this_ary, const TypePtr* other_ary,
-              ciKlass*& res_klass, bool& res_xk);
+  meet_aryptr(PTR& ptr, const Type*& elem, const TypePtr* this_ary, const TypePtr* other_ary, ciKlass*& res_klass,
+              bool& res_xk);
 
 public:
   const int _offset;            // Offset into oop, with TOP & BOT
@@ -1064,6 +1055,10 @@ private:
 
   virtual bool is_meet_same_type_as(const TypePtr* other) const {
     return is_same_java_type_as(other);
+  }
+
+  virtual bool klass_is_exact() const {
+    ShouldNotReachHere();  return false;
   }
 };
 
@@ -1208,7 +1203,7 @@ public:
   virtual bool  is_loaded() const { return klass()->is_loaded() && _interfaces.is_loaded(); }
   
   bool implements_interfaces() const { return !_interfaces.empty(); }
-  bool klass_is_exact()    const { return _klass_is_exact; }
+  virtual bool klass_is_exact()    const { return _klass_is_exact; }
 
   // Returns true if this pointer points at memory which contains a
   // compressed oop references.
@@ -1594,7 +1589,7 @@ public:
   // Exact klass, possibly an interface or an array of interface
   ciKlass* exact_klass(bool maybe_null = false) const { assert(klass_is_exact(), ""); ciKlass* k = exact_klass_helper(); assert(k != NULL || maybe_null, ""); return k;  }
   bool implements_interfaces() const { return !_interfaces.empty(); }
-  bool klass_is_exact()    const { return _ptr == Constant; }
+  virtual bool klass_is_exact()    const { return _ptr == Constant; }
 
   static const TypeKlassPtr* make(ciKlass* klass, bool trust_interface = false);
   static const TypeKlassPtr *make(PTR ptr, ciKlass* klass, int offset, bool trust_interface = false);
