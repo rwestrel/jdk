@@ -643,6 +643,8 @@ public:
   static void print_statistics();
   void escape_state_statistics(GrowableArray<JavaObjectNode*>& java_objects_worklist);
 #endif
+
+  bool field_store_not_captured(FieldNode* field) const;
 };
 
 inline PointsToNode::PointsToNode(ConnectionGraph *CG, Node* n, EscapeState es, NodeType type):

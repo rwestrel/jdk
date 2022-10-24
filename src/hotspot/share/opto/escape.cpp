@@ -1525,12 +1525,15 @@ int ConnectionGraph::add_java_object_edges(JavaObjectNode* jobj, bool populate_w
       if (use->is_Arraycopy()) {
         continue;
       }
-      add_uses_to_worklist(use);
       if (use->is_Field() && use->as_Field()->is_oop()) {
+        if (field_store_not_captured(use->as_Field())) {
+          continue;
+        }
         // Put on worklist all field's uses (loads) and
         // related field nodes (same base and offset).
         add_field_uses_to_worklist(use->as_Field());
       }
+      add_uses_to_worklist(use);
     }
   }
   for (int l = 0; l < _worklist.length(); l++) {
@@ -1578,10 +1581,12 @@ int ConnectionGraph::add_java_object_edges(JavaObjectNode* jobj, bool populate_w
         }
       }
     } else {
-      // Added new edge to stored in field values.
-      // Put on worklist all field's uses (loads) and
-      // related field nodes (same base and offset).
-      add_field_uses_to_worklist(use->as_Field());
+      if (!field_store_not_captured(use->as_Field())) {
+        // Added new edge to stored in field values.
+        // Put on worklist all field's uses (loads) and
+        // related field nodes (same base and offset).
+        add_field_uses_to_worklist(use->as_Field());
+      }
     }
   }
   _worklist.clear();
