@@ -1594,6 +1594,39 @@ int ConnectionGraph::add_java_object_edges(JavaObjectNode* jobj, bool populate_w
   return new_edges;
 }
 
+bool ConnectionGraph::field_store_not_captured(FieldNode* field) const {
+  if (!UseNewCode2) {
+    return false;
+  }
+
+  int offset = field->offset();
+  if (offset == Type::OffsetBot) {
+    return true;
+  }
+  for (BaseIterator i(field); i.has_next(); i.next()) {
+    PointsToNode* base = i.get();
+
+    if (base->is_JavaObject()) {
+      Node* alloc = base->ideal_node();
+      if (alloc->is_Allocate()) {
+        InitializeNode* ini = alloc->as_Allocate()->initialization();
+        const Type* adr_type = field->ideal_node()->as_AddP()->bottom_type();
+        if (!adr_type->isa_rawptr() && ini != NULL) {
+          BasicType ft = UseCompressedOops ? T_NARROWOOP : T_ADDRESS;
+          Node* store = ini->find_captured_store(offset, type2aelembytes(ft, true), _igvn);
+          if (store != NULL && store->is_Store() &&
+              store->as_Store()->memory_type() == ft) {
+
+          } else {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Put on worklist all related field nodes.
 void ConnectionGraph::add_field_uses_to_worklist(FieldNode* field) {
   assert(field->is_oop(), "sanity");
