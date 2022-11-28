@@ -1436,6 +1436,38 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
   }
 }
 
+static void debug_dump(Node* n) {
+  tty->print("%d", n->_idx);
+  tty->print("  ");
+  tty->print("%s", NodeClassNames[n->Opcode()]);
+  tty->print("  === ");
+  for (uint i = 0; i < n->req(); i++) {    // For all required inputs
+    Node* d = n->in(i);
+    if (d == NULL) {
+      tty->print("_ ");
+    } else if (not_a_node(d)) {
+      tty->print("not_a_node ");  // uninitialized, sentinel, garbage, etc.
+    } else {
+      tty->print("%d", d->_idx);
+      tty->print(" ");
+    }
+  }
+  tty->print(" [[ ");
+  // Dump the output edges
+  for (uint i = 0; i < n->outcnt(); i++) {    // For all outputs
+    Node* u = n->raw_out(i);
+    if (u == NULL) {
+      tty->print("_ ");
+    } else if (not_a_node(u)) {
+      tty->print("not_a_node ");
+    } else {
+      tty->print("%d", u->_idx);
+      tty->print(" ");
+    }
+  }
+  tty->print("]] ");
+}
+
 // Transform:
 //
 // if (some_condition) {
@@ -1461,6 +1493,10 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
 // }
 bool PhaseIdealLoop::try_merge_identical_ifs(Node* n) {
   if (identical_backtoback_ifs(n) && can_split_if(n->in(0))) {
+    if (n->outcnt() != 2) {
+      debug_dump(n);
+      ShouldNotReachHere();
+    }
     Node *n_ctrl = n->in(0);
     IfNode* dom_if = idom(n_ctrl)->as_If();
     ProjNode* dom_proj_true = dom_if->proj_out(1);
