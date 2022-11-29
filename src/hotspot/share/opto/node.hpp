@@ -500,8 +500,8 @@ private:
   }
   // Delete an output edge
   void del_out( Node *n ) {
-    extern void roland_debug(Node* n, Node* m);
-    roland_debug(this, n);
+//    extern void roland_debug(Node* n);
+//    roland_debug(this);
     if (is_top())  return;
     Node** outp = &_out[_outcnt];
     // Find and remove n

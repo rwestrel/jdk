@@ -1225,6 +1225,14 @@ class Compile : public Phase {
 
   static Node* narrow_value(BasicType bt, Node* value, const Type* type, PhaseGVN* phase, bool transform_res);
   int _optimizing;
+#define ROLAND_NODE_MAX_INS 5
+  struct RolandNode {
+      const char* _name;
+      int _idx;
+      uint _req;
+      int _ins[ROLAND_NODE_MAX_INS];
+  };
+  GrowableArray<RolandNode> _roland_nodes;
 };
 
 #endif // SHARE_OPTO_COMPILE_HPP

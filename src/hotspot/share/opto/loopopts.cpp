@@ -1436,7 +1436,7 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
   }
 }
 
-void roland_debug(Node* n, Node* m) {
+void roland_debug(Node* n/*, Node* m*/) {
   if (!UseNewCode) {
     return;
   }
@@ -1462,8 +1462,11 @@ void roland_debug(Node* n, Node* m) {
   if (strcmp(ss.as_string(), " RacingCollections$Frobber::realRun")) {
     return;
   }
-  if (strcmp(n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(),
-             "java.util.concurrent.ConcurrentLinkedDeque")) {
+  if (strncmp(n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(),
+             "java.util.concurrent.ConcurrentLinkedDeque", sizeof("java.util.concurrent"))) {
+    return;
+  }
+  if (C->_optimizing == 0) {
     return;
   }
 //  n->dump(8);
@@ -1476,7 +1479,8 @@ void roland_debug(Node* n, Node* m) {
       bci = nn->jvms()->bci();
     }
   }
-  tty->print_cr("XXX [%d] %d %s %d %s:%d / %d %d", C->compile_id(), n->_idx, n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(), C->_optimizing, ss2.as_string(), bci, m->_idx, m->as_IfProj()->_con);
+  tty->print_cr("XXX [%d] %d %s %d %s:%d", C->compile_id(), n->_idx, n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(), C->_optimizing, ss2.as_string(), bci);
+//  tty->print_cr("XXX [%d] %d %s %d %s:%d / %d %d", C->compile_id(), n->_idx, n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(), C->_optimizing, ss2.as_string(), bci, m->_idx, m->as_IfProj()->_con);
 }
 
 

@@ -650,6 +650,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
 #ifndef PRODUCT
                   , _in_dump_cnt(0)
 #endif
+        , _roland_nodes(comp_arena(), 2, 0, RolandNode())
 {
   C = this;
   CompileWrapper cw(this);
@@ -922,7 +923,8 @@ Compile::Compile( ciEnv* ci_env,
 #ifndef PRODUCT
     _in_dump_cnt(0),
 #endif
-    _allowed_reasons(0) {
+    _allowed_reasons(0),
+    _roland_nodes(comp_arena(), 2, 0, RolandNode()) {
   C = this;
 
   TraceTime t1(NULL, &_t_totalCompilation, CITime, false);

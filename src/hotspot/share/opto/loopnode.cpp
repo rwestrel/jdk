@@ -5222,6 +5222,58 @@ int PhaseIdealLoop::build_loop_tree_impl( Node *n, int pre_order ) {
   return pre_order;
 }
 
+void roland_dump_graph(Compile* C) {
+  for (int i = 0; i < C->_roland_nodes.length(); ++i) {
+    tty->print("%d %s (%d)", C->_roland_nodes.at(i)._idx, C->_roland_nodes.at(i)._name, C->_roland_nodes.at(i)._req);
+    for (uint j = 0; j < MIN2(C->_roland_nodes.at(i)._req, (uint)ROLAND_NODE_MAX_INS) ; ++j) {
+      tty->print(" %d", C->_roland_nodes.at(i)._ins[j]);
+    }
+    tty->cr();
+  }
+}
+
+void roland_record_graph(Compile* C) {
+  {
+    ResourceMark rm;
+    stringStream ss;
+    C->method()->print_short_name(&ss);
+    if (strcmp(ss.as_string(), " RacingCollections$Frobber::realRun")) {
+      return;
+    }
+  }
+
+  C->_roland_nodes.trunc_to(0);
+  Unique_Node_List wq;
+  wq.push(C->root());
+  for (uint i = 0; i < wq.size(); ++i) {
+    Node* n = wq.at(i);
+
+    Compile::RolandNode node;
+    node._name = NodeClassNames[n->Opcode()];
+    node._idx = n->_idx;
+    node._req = n->req();
+    for (uint j = 0; j < MIN2(n->req(), (uint)ROLAND_NODE_MAX_INS) ; ++j) {
+      Node* in = n->in(j);
+      if (in == NULL) {
+        node._ins[j] = 0;
+      } else if (not_a_node(in)) {
+        node._ins[j] = -1;
+      } else {
+        node._ins[j] = in->_idx;
+      }
+    }
+    C->_roland_nodes.push(node);
+
+    for (uint j = 0; j < n->req(); ++j) {
+      Node* in = n->in(j);
+      if (in == NULL || not_a_node(in)) {
+        continue;
+      }
+      wq.push(in);
+    }
+  }
+}
+
 
 //------------------------------build_loop_early-------------------------------
 // Put Data nodes into some loop nest, by setting the _nodes[]->loop mapping.
@@ -5254,6 +5306,13 @@ void PhaseIdealLoop::build_loop_early( VectorSet &visited, Node_List &worklist, 
           }
 
           tty->print_cr("XXX [%d] %d %s:%d %d", C->compile_id(), n->_idx, ss2.as_string(), bci, C->_optimizing);
+          for (uint j = 0; j < n->outcnt(); ++j) {
+            Node* u = n->raw_out(j);
+            tty->print_cr("XXX %d", u->_idx);
+          }
+
+          roland_dump_graph(C);
+          ShouldNotReachHere();
         }
         if( has_node(n) &&            // Have either loop or control already?
             !has_ctrl(n) ) {          // Have loop picked out already?
@@ -5693,6 +5752,16 @@ void PhaseIdealLoop::init_dom_lca_tags() {
 // Put Data nodes into some loop nest, by setting the _nodes[]->loop mapping.
 // Second pass finds latest legal placement, and ideal loop placement.
 void PhaseIdealLoop::build_loop_late( VectorSet &visited, Node_List &worklist, Node_Stack &nstack ) {
+//  bool roland_dump = false;
+//  {
+//    ResourceMark rm;
+//    stringStream ss;
+//    C->method()->print_short_name(&ss);
+//    roland_dump = !strcmp(ss.as_string(), " RacingCollections$Frobber::realRun");
+//    if (roland_dump) {
+//      C->_roland_nodes.trunc_to(0);
+//    }
+//  }
   while (worklist.size() != 0) {
     Node *n = worklist.pop();
     // Only visit once
@@ -5728,6 +5797,23 @@ void PhaseIdealLoop::build_loop_late( VectorSet &visited, Node_List &worklist, N
         }
       } else {
         // All of n's children have been processed, complete post-processing.
+//        if (roland_dump) {
+//          Compile::RolandNode node;
+//          node._name = NodeClassNames[n->Opcode()];
+//          node._idx = n->_idx;
+//          node._req = n->req();
+//          for (uint j = 0; j < MIN2(n->req(), (uint)ROLAND_NODE_MAX_INS) ; ++j) {
+//            Node* in = n->in(j);
+//            if (in == NULL) {
+//              node._ins[j] = 0;
+//            } else if (not_a_node(in)) {
+//              node._ins[j] = -1;
+//            } else {
+//              node._ins[j] = in->_idx;
+//            }
+//          }
+//          C->_roland_nodes.push(node);
+//        }
         build_loop_late_post(n);
         if (nstack.is_empty()) {
           // Finished all nodes on stack.
