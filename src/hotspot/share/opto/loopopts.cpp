@@ -1436,6 +1436,50 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
   }
 }
 
+void roland_debug(Node* n, Node* m) {
+  if (!UseNewCode) {
+    return;
+  }
+  if (n->Opcode() != Op_If ||
+      n->outcnt() != 2 ||
+      n->in(1) == NULL ||
+      n->in(1)->Opcode() != Op_Bool ||
+      n->in(1)->in(1) == NULL ||
+      n->in(1)->in(1)->Opcode() != Op_CmpP ||
+      n->in(1)->in(1)->in(2) == NULL ||
+      n->in(1)->in(1)->in(2)->Opcode() != Op_ConP ||
+      !n->in(1)->in(1)->in(2)->bottom_type()->isa_instklassptr() /*||
+                                                                   (n->_idx != 1632 && n->_idx != 3216)*/) {
+    return;
+  }
+  Compile* C = Compile::current();
+  if (C->method() == NULL || C->is_osr_compilation()) {
+    return;
+  }
+  ResourceMark rm;
+  stringStream ss;
+  C->method()->print_short_name(&ss);
+  if (strcmp(ss.as_string(), " RacingCollections$Frobber::realRun")) {
+    return;
+  }
+  if (strcmp(n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(),
+             "java.util.concurrent.ConcurrentLinkedDeque")) {
+    return;
+  }
+//  n->dump(8);
+  Node_Notes* nn = C->node_notes_at(n->_idx);
+  stringStream ss2;
+  int bci = -1;
+  if (nn != NULL && !nn->is_clear()) {
+    if (nn->jvms() != NULL) {
+      nn->jvms()->method()->print_short_name(&ss2);
+      bci = nn->jvms()->bci();
+    }
+  }
+  tty->print_cr("XXX [%d] %d %s %d %s:%d / %d %d", C->compile_id(), n->_idx, n->in(1)->in(1)->in(2)->bottom_type()->is_instklassptr()->instance_klass()->external_name(), C->_optimizing, ss2.as_string(), bci, m->_idx, m->as_IfProj()->_con);
+}
+
+
 static void debug_dump(Node* n) {
   tty->print("%d", n->_idx);
   tty->print("  ");

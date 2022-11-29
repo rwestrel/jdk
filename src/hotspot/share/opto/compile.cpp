@@ -1076,6 +1076,7 @@ void Compile::Init(bool aliasing) {
   _phase_optimize_finished = false;
   _exception_backedge = false;
 #endif
+  _optimizing = 0;
 }
 
 //---------------------------init_start----------------------------------------
@@ -2147,6 +2148,7 @@ bool Compile::optimize_loops(PhaseIterGVN& igvn, LoopOptsMode mode) {
       _loop_opts_cnt--;
       if (failing())  return false;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP_ITERATIONS, 2);
+      C->_optimizing++;
     }
   }
   return true;
@@ -2279,6 +2281,7 @@ void Compile::Optimize() {
   // Now that all inlining is over and no PhaseRemoveUseless will run, cut edge from root to loop
   // safepoints
   remove_root_to_sfpts_edges(igvn);
+  C->_optimizing++;
 
   // Perform escape analysis
   if (do_escape_analysis() && ConnectionGraph::has_candidates(this)) {
@@ -2322,6 +2325,8 @@ void Compile::Optimize() {
     } while (progress);
   }
 
+    C->_optimizing++;
+
   // Loop transforms on the ideal graph.  Range Check Elimination,
   // peeling, unrolling, etc.
 
@@ -2334,6 +2339,7 @@ void Compile::Optimize() {
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP1, 2);
       if (failing())  return;
     }
+    C->_optimizing++;
     // Loop opts pass if partial peeling occurred in previous pass
     if(PartialPeelLoop && major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
@@ -2342,6 +2348,7 @@ void Compile::Optimize() {
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP2, 2);
       if (failing())  return;
     }
+    C->_optimizing++;
     // Loop opts pass for loop-unrolling before CCP
     if(major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
@@ -2353,6 +2360,7 @@ void Compile::Optimize() {
       // Verify that last round of loop opts produced a valid graph
       PhaseIdealLoop::verify(igvn);
     }
+    C->_optimizing++;
   }
   if (failing())  return;
 
@@ -2373,6 +2381,7 @@ void Compile::Optimize() {
     igvn = ccp;
     igvn.optimize();
   }
+    C->_optimizing++;
   print_method(PHASE_ITER_GVN2, 2);
 
   if (failing())  return;

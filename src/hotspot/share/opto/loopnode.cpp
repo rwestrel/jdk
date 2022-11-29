@@ -5240,6 +5240,21 @@ void PhaseIdealLoop::build_loop_early( VectorSet &visited, Node_List &worklist, 
       uint   i = nstack_top_i;
       uint cnt = n->req(); // Count of inputs
       if (i == 0) {        // Pre-process the node.
+        if (n->is_If() && n->outcnt() < 2) {
+          ResourceMark rm;
+          stringStream ss, ss2;
+          C->method()->print_short_name(&ss);
+          Node_Notes* nn = C->node_notes_at(n->_idx);
+          int bci = -1;
+          if (nn != NULL && !nn->is_clear()) {
+            if (nn->jvms() != NULL) {
+              nn->jvms()->method()->print_short_name(&ss2);
+              bci = nn->jvms()->bci();
+            }
+          }
+
+          tty->print_cr("XXX [%d] %d %s:%d %d", C->compile_id(), n->_idx, ss2.as_string(), bci, C->_optimizing);
+        }
         if( has_node(n) &&            // Have either loop or control already?
             !has_ctrl(n) ) {          // Have loop picked out already?
           // During "merge_many_backedges" we fold up several nested loops
