@@ -5228,11 +5228,25 @@ void roland_dump_graph(Compile* C) {
     for (uint j = 0; j < MIN2(C->_roland_nodes.at(i)._req, (uint)ROLAND_NODE_MAX_INS) ; ++j) {
       tty->print(" %d", C->_roland_nodes.at(i)._ins[j]);
     }
+    const Type* t = C->_roland_nodes.at(i)._type;
+    if (t->make_ptr() != NULL) {
+      t = t->make_ptr();
+      TypePtr::InterfaceSet interfaces;
+      if (t->isa_instklassptr()) {
+        tty->print(" %s (%s)", t->is_instklassptr()->instance_klass()->external_name(), t->is_instklassptr()->klass_is_exact() ? "exact" : "not exact");
+        interfaces = t->is_instklassptr()->_interfaces;
+      } else if (t->isa_instptr()){
+        tty->print(" %s (%s)", t->is_instptr()->instance_klass()->external_name(), t->is_instptr()->klass_is_exact() ? "exact" : "not exact");
+        interfaces = t->is_instptr()->_interfaces;
+      }
+      tty->print(" ");
+      interfaces.dump(tty);
+    }
     tty->cr();
   }
 }
 
-void roland_record_graph(Compile* C) {
+void roland_record_graph(Compile* C, PhaseGVN* phase) {
   {
     ResourceMark rm;
     stringStream ss;
@@ -5262,6 +5276,7 @@ void roland_record_graph(Compile* C) {
         node._ins[j] = in->_idx;
       }
     }
+    node._type = phase->type(n);
     C->_roland_nodes.push(node);
 
     for (uint j = 0; j < n->req(); ++j) {
@@ -5272,6 +5287,7 @@ void roland_record_graph(Compile* C) {
       wq.push(in);
     }
   }
+//  roland_dump_graph(C);
 }
 
 

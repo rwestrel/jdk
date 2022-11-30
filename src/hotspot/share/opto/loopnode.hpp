@@ -1162,8 +1162,8 @@ public:
 
     Compile* C = Compile::current();
     if (!C->failing()) {
-      extern void roland_record_graph(Compile* C);
-      roland_record_graph(C);
+      extern void roland_record_graph(Compile* C, PhaseGVN* phase);
+      roland_record_graph(C, &igvn);
       // Cleanup any modified bits
       igvn.optimize();
 

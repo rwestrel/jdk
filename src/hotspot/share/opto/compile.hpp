@@ -1231,6 +1231,7 @@ class Compile : public Phase {
       int _idx;
       uint _req;
       int _ins[ROLAND_NODE_MAX_INS];
+      const Type* _type;
   };
   GrowableArray<RolandNode> _roland_nodes;
 };

@@ -876,7 +876,7 @@ public:
 class TypePtr : public Type {
   friend class TypeNarrowPtr;
   friend class Type;
-protected:
+public:
   class InterfaceSet {
   private:
     GrowableArray<ciKlass*> _list;
@@ -1117,9 +1117,9 @@ protected:
   ciObject*     _const_oop;   // Constant oop
   // If _klass is NULL, then so is _sig.  This is an unloaded klass.
   ciKlass*      _klass;       // Klass object
-
+public:
   const InterfaceSet _interfaces;
-
+protected:
   // Does the type exclude subclasses of the klass?  (Inexact == polymorphic.)
   bool          _klass_is_exact;
   bool          _is_ptr_to_narrowoop;
@@ -1561,7 +1561,9 @@ public:
 protected:
 
   ciKlass* _klass;
+public:
   const InterfaceSet _interfaces;
+protected:
   InterfaceSet meet_interfaces(const TypeKlassPtr* other) const;
   virtual bool must_be_exact() const { ShouldNotReachHere(); return false; }
   virtual ciKlass* exact_klass_helper() const;
@@ -1621,7 +1623,7 @@ private:
     ShouldNotReachHere(); return false;
   }
 
-  virtual const InterfaceSet interfaces() const {
+  const InterfaceSet interfaces() const {
     return _interfaces;
   };
 
