@@ -234,7 +234,7 @@ public:
 class JNIEXPORT LeydenCodeHeap : public CodeHeap {
   friend class CodeCache;
 private:
-  LeydenCodeHeap() : CodeHeap(NULL, 0) {}
+  LeydenCodeHeap() : CodeHeap(NULL, CodeBlobType::MethodNonProfiled) {}
 public:
   virtual void* first() const {
     address seg_map = (address)_segmap.low();

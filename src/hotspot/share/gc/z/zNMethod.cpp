@@ -197,7 +197,7 @@ void ZNMethod::disarm(CompiledMethod* nm) {
   bs->disarm(nm);
 }
 
-void ZNMethod::set_guard_value(nmethod* nm, int value) {
+void ZNMethod::set_guard_value(CompiledMethod* nm, int value) {
   BarrierSetNMethod* const bs = BarrierSet::barrier_set()->barrier_set_nmethod();
   bs->set_guard_value(nm, value);
 }

@@ -1627,6 +1627,39 @@ void C2_MacroAssembler::load_vector(XMMRegister dst, AddressLiteral src, int vle
   }
 }
 
+void C2_MacroAssembler::load_constant_vector(BasicType bt, XMMRegister dst, Address src, int vlen) {
+  int vlen_enc = vector_length_encoding(vlen);
+  if (VM_Version::supports_avx()) {
+    if (bt == T_LONG) {
+      if (VM_Version::supports_avx2()) {
+        vpbroadcastq(dst, src, vlen_enc);
+      } else {
+        vmovddup(dst, src, vlen_enc);
+      }
+    } else if (bt == T_DOUBLE) {
+      if (vlen_enc != Assembler::AVX_128bit) {
+//        vbroadcastsd(dst, src, vlen_enc, noreg);
+        vbroadcastsd(dst, src, vlen_enc);
+      } else {
+        vmovddup(dst, src, vlen_enc);
+      }
+    } else {
+      if (VM_Version::supports_avx2() && is_integral_type(bt)) {
+        vpbroadcastd(dst, src, vlen_enc);
+      } else {
+        vbroadcastss(dst, src, vlen_enc);
+      }
+    }
+  } else if (VM_Version::supports_sse3()) {
+    movddup(dst, src);
+  } else {
+    movq(dst, src);
+    if (vlen == 16) {
+      punpcklqdq(dst, dst);
+    }
+  }
+}
+
 void C2_MacroAssembler::load_constant_vector(BasicType bt, XMMRegister dst, InternalAddress src, int vlen) {
   int vlen_enc = vector_length_encoding(vlen);
   if (VM_Version::supports_avx()) {

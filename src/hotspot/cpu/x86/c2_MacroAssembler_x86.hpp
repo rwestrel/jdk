@@ -154,6 +154,7 @@ public:
   void load_vector_mask(XMMRegister dst, XMMRegister src, int vlen_in_bytes, BasicType elem_bt, bool is_legacy);
   void load_vector_mask(KRegister   dst, XMMRegister src, XMMRegister xtmp, bool novlbwdq, int vlen_enc);
 
+  void load_constant_vector(BasicType bt, XMMRegister dst, Address src, int vlen);
   void load_constant_vector(BasicType bt, XMMRegister dst, InternalAddress src, int vlen);
   void load_iota_indices(XMMRegister dst, int vlen_in_bytes, BasicType bt);
 

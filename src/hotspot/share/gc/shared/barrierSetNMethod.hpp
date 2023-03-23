@@ -51,8 +51,8 @@ public:
   bool is_armed(CompiledMethod* nm);
   void disarm(CompiledMethod* nm);
 
-  int guard_value(nmethod* nm);
-  void set_guard_value(nmethod* nm, int value);
+  int guard_value(CompiledMethod* nm);
+  void set_guard_value(CompiledMethod* nm, int value);
 
   void arm_all_nmethods();
 };

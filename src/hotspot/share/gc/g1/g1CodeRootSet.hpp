@@ -43,7 +43,7 @@ class G1CodeRootSet {
   const static size_t Threshold = 24;
   const static size_t LargeSize = 512;
 
-  using Table = ResizeableResourceHashtable<nmethod*, nmethod*, AnyObj::C_HEAP, mtGC>;
+  using Table = ResizeableResourceHashtable<CompiledMethod*, CompiledMethod*, AnyObj::C_HEAP, mtGC>;
   Table* _table;
   DEBUG_ONLY(mutable bool _is_iterating;)
 
@@ -54,7 +54,7 @@ class G1CodeRootSet {
   void add(CompiledMethod* method);
 
   bool remove(nmethod* method);
-  bool contains(nmethod* method);
+  bool contains(CompiledMethod* method);
   void clear();
   void nmethods_do(CodeBlobClosure* blk) const;
 

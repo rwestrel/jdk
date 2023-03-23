@@ -30,7 +30,7 @@
 #include "gc/g1/heapRegion.hpp"
 #include "oops/oop.inline.hpp"
 
-void G1CodeRootSet::add(nmethod* nm) {
+void G1CodeRootSet::add(CompiledMethod* nm) {
   assert(_is_iterating == false, "should not mutate while iterating the table");
   bool added = false;
   if (_table == nullptr) {
@@ -60,7 +60,7 @@ bool G1CodeRootSet::remove(nmethod* method) {
   return removed;
 }
 
-bool G1CodeRootSet::contains(nmethod* method) {
+bool G1CodeRootSet::contains(CompiledMethod* method) {
   if (_table != nullptr) {
     return _table->contains(method);
   }
@@ -82,7 +82,7 @@ size_t G1CodeRootSet::mem_size() {
 void G1CodeRootSet::nmethods_do(CodeBlobClosure* blk) const {
   DEBUG_ONLY(_is_iterating = true;)
   if (_table != nullptr) {
-    _table->iterate_all([&](nmethod* nm, nmethod* _) {
+    _table->iterate_all([&](CompiledMethod* nm, CompiledMethod* _) {
       blk->do_code_blob(nm);
     });
   }
@@ -119,7 +119,7 @@ class CleanCallback : public StackObj {
  public:
   CleanCallback(HeapRegion* hr) : _detector(hr), _blobs(&_detector, !CodeBlobToOopClosure::FixRelocations) {}
 
-  bool do_entry(nmethod* nm, nmethod* _) {
+  bool do_entry(CompiledMethod* nm, CompiledMethod* _) {
     _detector._points_into = false;
     _blobs.do_code_blob(nm);
     return !_detector._points_into;

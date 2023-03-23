@@ -69,15 +69,15 @@ bool BarrierSetNMethod::supports_entry_barrier(CompiledMethod* nm) {
   return true;
 }
 
-void BarrierSetNMethod::disarm(nmethod* nm) {
+void BarrierSetNMethod::disarm(CompiledMethod* nm) {
   set_guard_value(nm, disarmed_guard_value());
 }
 
-bool BarrierSetNMethod::is_armed(nmethod* nm) {
+bool BarrierSetNMethod::is_armed(CompiledMethod* nm) {
   return guard_value(nm) != disarmed_guard_value();
 }
 
-bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
+bool BarrierSetNMethod::nmethod_entry_barrier(CompiledMethod* nm) {
   class OopKeepAliveClosure : public OopClosure {
   public:
     virtual void do_oop(oop* p) {
@@ -104,8 +104,10 @@ bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
   OopKeepAliveClosure cl;
   nm->oops_do(&cl);
 
-  // CodeCache unloading support
-  nm->mark_as_maybe_on_stack();
+  if (nm->is_nmethod()) {
+    // CodeCache unloading support
+    nm->as_nmethod()->mark_as_maybe_on_stack();
+  }
 
   disarm(nm);
 

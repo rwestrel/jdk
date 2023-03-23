@@ -1435,5 +1435,4 @@ JNIEXPORT void JVM_RegisterMethodHandleMethods(JNIEnv* env, jclass MHN_class) {
   log_debug(methodhandles, indy)("MethodHandle support loaded (using LambdaForms)");
 
   MethodHandles::set_enabled(true);
-}
 JVM_END

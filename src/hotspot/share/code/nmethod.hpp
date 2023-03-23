@@ -742,7 +742,7 @@ public:
   Metadata** metadata_begin   () const            { return (Metadata**)  (header_begin() + _metadata_offset - code_size())     ; }
 
 private:
-  int       _entry_bci;        // != InvocationEntryBci if this nmethod is an on-stack replacement method
+  uint64_t  _gc_epoch;
 
   nmethod*  _osr_link;         // from InstanceKlass::osr_nmethods_head
 
@@ -753,6 +753,10 @@ private:
   address _entry_point;                      // entry point with class check
   address _verified_entry_point;             // entry point without class check
   address _osr_entry_point;                  // entry point for on stack replacement
+
+  nmethod* _unlinked_next;
+
+    int _entry_bci;      // != InvocationEntryBci if this nmethod is an on-stack replacement method
 
   int  _exception_offset;
   int _unwind_handler_offset;
@@ -765,7 +769,6 @@ private:
   int _scopes_data_offset;
   int _scopes_pcs_offset;
   int _dependencies_offset;
-  int _native_invokers_offset;
   int _handler_table_offset;
   int _nul_chk_table_offset;
 #if INCLUDE_JVMCI
@@ -777,33 +780,24 @@ private:
   int _orig_pc_offset;
 
   int _compile_id;                           // which compilation made this nmethod
-  int _comp_level;                           // compilation level
-
-  bool _has_flushed_dependencies;            // Used for maintenance of dependencies (CodeCache_lock)
-
-  bool _unload_reported;
-  bool _load_reported;
-
-  volatile signed char _state;               // {not_installed, in_use, not_entrant, zombie, unloaded}
-
-#ifdef ASSERT
-  bool _oops_are_stale;  // indicates that it's no longer safe to access oops section
-#endif
-
 #if INCLUDE_RTM_OPT
   RTMState _rtm_state;
 #endif
 
-  volatile jint _lock_count;
+  ByteSize _native_receiver_sp_offset;
+  ByteSize _native_basic_lock_sp_offset;
 
-  volatile long _stack_traversal_mark;
-
-  int _hotness_counter;
+  CompLevel _comp_level;               // compilation level
 
   volatile uint8_t _is_unloading_state;
 
-  ByteSize _native_receiver_sp_offset;
-  ByteSize _native_basic_lock_sp_offset;
+  bool _has_flushed_dependencies;            // Used for maintenance of dependencies (CodeCache_lock)
+
+  bool _load_reported;
+
+  volatile signed char _state;               // {not_installed, in_use, not_entrant, zombie, unloaded}
+
+  int _skipped_instructions_size;
 
   friend class nmethodLocker;
 
@@ -827,6 +821,8 @@ public:
 
   Metadata** metadata_end     () const            { return (Metadata**)  _scopes_data_begin; }
 
+  int skipped_instructions_size () const          { return           _skipped_instructions_size             ; }
+
   // Sizes
   int oops_size         () const                  { return (address)  oops_end         () - (address)  oops_begin         (); }
   int metadata_size     () const                  { return (address)  metadata_end     () - (address)  metadata_begin     (); }
@@ -843,11 +839,9 @@ public:
   address verified_entry_point() const            { return _verified_entry_point;    } // if klass is correct
 
   // flag accessing and manipulation
+  bool  is_not_installed() const                  { return _state == not_installed; }
   bool  is_in_use() const                         { return _state <= in_use; }
-  bool  is_alive() const                          { return _state < unloaded; }
   bool  is_not_entrant() const                    { return _state == not_entrant; }
-  bool  is_zombie() const                         { return _state == zombie; }
-  bool  is_unloaded() const                       { return _state == unloaded; }
 
 //  void clear_unloading_state();
   virtual bool is_unloading() { ShouldNotReachHere(); return false; }
@@ -876,7 +870,6 @@ public:
   oop*  oop_addr_at(int index) const {  // for GC
     // relocation indexes are biased by 1 (because 0 is reserved)
     assert(index > 0 && index <= oops_count(), "must be a valid non-zero index");
-    assert(!_oops_are_stale, "oops are stale");
     return &oops_begin()[index - 1];
   }
 
@@ -899,8 +892,6 @@ protected:
   void flush() { ShouldNotReachHere(); }
 
 public:
-  bool is_locked_by_vm() const                    { return _lock_count >0; }
-
   bool can_convert_to_zombie()  { ShouldNotReachHere(); return false; }
 
   void set_method(Method* method) { _method = method; }
@@ -915,6 +906,8 @@ private:
   address* orig_pc_addr(const frame* fr) { ShouldNotReachHere(); return NULL; }
 
 public:
+
+  int orig_pc_offset() { return _orig_pc_offset; }
 
   address get_original_pc(const frame* fr) { return *orig_pc_addr(fr); }
   void    set_original_pc(const frame* fr, address pc) { *orig_pc_addr(fr) = pc; }
@@ -1033,5 +1026,7 @@ class nmethodLocker : public StackObj {
     lock(_nm, zombie_ok);
   }
 };
+
+STATIC_ASSERT(sizeof(nmethod) == sizeof(LeydenNMethod));
 
 #endif // SHARE_CODE_NMETHOD_HPP

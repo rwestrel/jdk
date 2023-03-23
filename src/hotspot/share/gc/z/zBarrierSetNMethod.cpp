@@ -60,7 +60,9 @@ bool ZBarrierSetNMethod::nmethod_entry_barrier(CompiledMethod* nm) {
 
 
   // CodeCache unloading support
-  nm->mark_as_maybe_on_stack();
+  if (nm->is_nmethod()) {
+    nm->as_nmethod()->mark_as_maybe_on_stack();
+  }
 
   // Disarm
   disarm(nm);

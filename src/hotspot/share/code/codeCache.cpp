@@ -2221,9 +2221,7 @@ static void add_shstring_section(Elf* elf, Elf64_Ehdr* ehdr, GrowableArray<char>
   ehdr->e_shstrndx = elf_ndxscn(shstring_section);
 }
 
-class CodeBlobEntry : public HashtableEntry<CodeBlob*, mtLeyden> {
-  friend class CodeBlobHashtable;
-
+class CodeBlobEntry {
 private:
   uint _symbol_index;
   long _offset;
@@ -2231,9 +2229,10 @@ private:
 
 public:
 
-  CodeBlobEntry* next() const {
-    return (CodeBlobEntry*)HashtableEntry<CodeBlob*, mtLeyden>::next();
-  }
+  CodeBlobEntry(uint symbol_index, long offset, long from_interpreted_entry_off)
+    : _symbol_index(symbol_index),
+      _offset(offset),
+      _from_interpreted_entry_off(from_interpreted_entry_off) {}
 
   uint symbol_index() const {
     return _symbol_index;
@@ -2246,53 +2245,12 @@ public:
   long from_interpreted_entry_off() const {
     return  _from_interpreted_entry_off;
   }
-};
 
-class CodeBlobHashtable : public Hashtable<CodeBlob*, mtLeyden> {
-private:
-  unsigned int compute_hash(CodeBlob* cb) {
+  static unsigned int hash(CodeBlob* const& cb) {
     uintptr_t hash = (uintptr_t)cb;
     return hash ^ (hash >> 7); // code heap blocks are 128byte aligned
   }
 
-  CodeBlobEntry* bucket(int i) const {
-    return (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::bucket(i);
-  }
-
-  CodeBlobEntry* new_entry(CodeBlob* cb, uint symbol_index, long offset, long from_interpreted_entry_off) {
-    assert(offset > 0, "");
-    unsigned int hash = compute_hash(cb);
-    CodeBlobEntry* entry = (CodeBlobEntry*)Hashtable<CodeBlob*, mtLeyden>::new_entry(hash, cb);
-    entry->_symbol_index = symbol_index;
-    entry->_offset = offset;
-    entry->_from_interpreted_entry_off = from_interpreted_entry_off;
-    return entry;
-  }
-
-public:
-  CodeBlobHashtable(int table_size) : Hashtable<CodeBlob*, mtLeyden>(table_size, sizeof(CodeBlobEntry)) {
-  }
-
-  bool add(CodeBlob* cb, int symbol_index, long offset, long from_interpreted_entry_off) {
-    CodeBlobEntry* e = find(cb);
-    if (e == NULL) {
-      CodeBlobEntry* e = new_entry(cb, symbol_index, offset, from_interpreted_entry_off);
-      int index = hash_to_index(e->hash());
-      add_entry(index, e);
-      return false;
-    }
-    return true;
-  }
-
-  CodeBlobEntry* find(CodeBlob* cb) {
-    int index = hash_to_index(compute_hash(cb));
-    for (CodeBlobEntry* e = bucket(index); e != NULL; e = e->next()) {
-      if (e->literal() == cb) {
-        return e;
-      }
-    }
-    return NULL;
-  }
 };
 
 static const char* codeblob_code_symbol(CodeBlob* cb) {
@@ -2321,12 +2279,14 @@ static const char* codeblob_obj_symbol(CodeBlob* cb) {
   return name;
 }
 
+using CodeBlobHashtable = ResizeableResourceHashtable<CodeBlob*, CodeBlobEntry, AnyObj::RESOURCE_AREA, mtInternal, CodeBlobEntry::hash>;
+
 static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<Elf64_Rela> &text_relocs, int text_sym,
                                   CodeBlob* caller, CodeBlob* callee, address call_addr, address dest, long addend,
                                   Assembler::WhichOperand format) {
-  CodeBlobEntry* callee_data = codeblobs.find(callee);
+  CodeBlobEntry* callee_data = codeblobs.get(callee);
   assert(callee_data != NULL, "");
-  CodeBlobEntry* caller_data = codeblobs.find(caller);
+  CodeBlobEntry* caller_data = codeblobs.get(caller);
   assert(caller_data != NULL, "");
 //  NativeInstruction* ni = nativeInstruction_at(call_addr);
 //  assert(ni->is_call() || ni->is_jump() || ni->is_cond_jump(), "");
@@ -2877,9 +2837,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         }
       }
     }
-    bool duplicate = codeblobs.add(cb, sym_id, code_offset, from_interpreted_entry_off);
+    bool duplicate = codeblobs.put(cb, CodeBlobEntry(sym_id, code_offset, from_interpreted_entry_off));
     assert(!duplicate, "");
-    assert(codeblobs.find(cb)->symbol_index() == sym_id, "");
+    assert(codeblobs.get(cb)->symbol_index() == (uint)sym_id, "");
   }
 
   FOR_ALL_BLOBS(cb, heap) {
@@ -2923,9 +2883,9 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
             CodeBlob* callee = CodeCache::find_blob(dest);
             NativeInstruction* ni = nativeInstruction_at(r->addr());
             if (ni->is_mov_literal64()) {
-              CodeBlobEntry* callee_data = codeblobs.find(callee);
+              CodeBlobEntry* callee_data = codeblobs.get(callee);
               assert(callee_data != NULL, "");
-              CodeBlobEntry* caller_data = codeblobs.find(cb);
+              CodeBlobEntry* caller_data = codeblobs.get(cb);
               assert(caller_data != NULL, "");
 
               long call_offset = caller_data->offset() + ((address) r->pd_address_in_code() - cb->code_begin());
@@ -2962,10 +2922,10 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     }
     if (cb->is_nmethod()) {
       nmethod* nm = cb->as_nmethod();
-      CodeBlobEntry* nm_data = codeblobs.find(nm);
+      CodeBlobEntry* nm_data = codeblobs.get(nm);
       assert(nm_data != NULL, "");
       CodeBlob* adapter = CodeCache::find_blob(nm->method()->_from_interpreted_entry);
-      CodeBlobEntry* adapter_data = codeblobs.find(adapter);
+      CodeBlobEntry* adapter_data = codeblobs.get(adapter);
       assert(adapter_data != NULL, "");
       assert(nm_data->from_interpreted_entry_off() != -1, "");
       add_relocation(nm_data->from_interpreted_entry_off(), (nm->method()->_from_interpreted_entry - adapter->code_begin()) + adapter_data->offset(), text_sym, codeblobsro_relocs);

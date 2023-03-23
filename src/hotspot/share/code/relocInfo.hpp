@@ -1325,14 +1325,13 @@ class card_mark_word_Relocation : public DataRelocation {
   friend class CodeCache;
 public:
   static RelocationHolder spec() {
-    RelocationHolder rh = newHolder();
-    new(rh) card_mark_word_Relocation();
-    return rh;
+    return RelocationHolder::construct<card_mark_word_Relocation>();
   }
 
+  void copy_into(RelocationHolder& holder) const override;
 private:
 
-  friend class RelocIterator;
+  friend class RelocationHolder;
   card_mark_word_Relocation() : DataRelocation(relocInfo::card_mark_word_type) { }
 
 public:

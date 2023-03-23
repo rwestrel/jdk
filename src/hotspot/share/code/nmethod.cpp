@@ -1989,9 +1989,6 @@ void nmethod::follow_nmethod(OopIterateClosure* cl) {
 }
 
 void LeydenNMethod::oops_do(OopClosure* f, bool allow_dead) {
-  // make sure the oops ready to receive visitors
-  assert(allow_dead || is_alive(), "should not call follow on dead nmethod");
-
   // Prevent extra code cache walk for platforms that don't have immediate oops.
   if (relocInfo::mustIterateImmediateOopsInCode()) {
     RelocIterator iter(this, oops_reloc_begin());
@@ -2547,7 +2544,7 @@ void LeydenNMethod::verify() {
   // Hmm. OSR methods can be deopted but not marked as zombie or not_entrant
   // seems odd.
 
-  if (is_zombie() || is_not_entrant() || is_unloaded())
+  if (is_not_entrant())
     return;
 
   // Make sure all the entry points are correctly aligned for patching.
