@@ -685,4 +685,21 @@ compileonexit  java.lang.String::<clinit>
 compileonexit  java.util.HashSet::iterator
 compileonexit  jdk.internal.util.Preconditions::<clinit>
 compileonexit  java.lang.String::<clinit>
-compileonexit  java.lang.String::<clinit>
+compileonexit  java.lang.ThreadGroup::<clinit>
+
+compileonexit  jdk.internal.misc.InternalLock::<clinit>
+compileonexit  java.util.concurrent.locks.AbstractQueuedSynchronizer::<clinit>
+compileonexit  java.io.PrintStream::<clinit>
+compileonexit  java.lang.Thread$State::<clinit>
+compileonexit  java.lang.Thread$ThreadIdentifiers::<clinit>
+compileonexit  java.lang.ref.NativeReferenceQueue::remove
+compileonexit  java.lang.reflect.ClassFileFormatVersion::<clinit>
+compileonexit  java.lang.ref.NativeReferenceQueue::await
+compileonexit  java.lang.reflect.AccessFlag::<clinit>
+compileonexit  jdk.internal.misc.Blocker::<clinit>
+compileonexit  java.lang.reflect.AccessFlag$Location::<clinit>
+compileonexit  java.lang.Enum::equals
+compileonexit  java.lang.module.ModuleDescriptor::equals
+compileonexit  java.lang.Module$EnableNativeAccess::<clinit>
+compileonexit  java.lang.ref.ReferenceQueue::poll
+compileonexit  sun.net.util.IPAddressUtil$MASKS::<clinit>
