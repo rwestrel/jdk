@@ -3117,8 +3117,15 @@ address StubGenerator::generate_squareToLen() {
 }
 
 address StubGenerator::generate_method_entry_barrier() {
+  int insts_size = 512;
+  int locs_size  = 64;
+
+  const char* name = "nmethod_entry_barrier";
+  CodeBuffer code(name, insts_size, locs_size);
+  MacroAssembler* masm = new MacroAssembler(&code);
+  MasmOverwrite mo(this, masm);
   __ align(CodeEntryAlignment);
-  StubCodeMark mark(this, "StubRoutines", "nmethod_entry_barrier");
+  StubCodeMark mark(this, "StubRoutines", name);
   address start = __ pc();
 
   Label deoptimize_label;
@@ -3189,7 +3196,13 @@ address StubGenerator::generate_method_entry_barrier() {
   __ movptr(rsp, Address(rsp, 0)); // new rsp was written in the barrier
   __ jmp(Address(rsp, -1 * wordSize)); // jmp target should be callers verified_entry_point
 
-  return start;
+  RuntimeStub* stub =
+    RuntimeStub::new_runtime_stub(name,
+                                  &code,
+                                  CodeOffsets::frame_never_safe,
+                                  (288 >> (LogBytesPerWord - LogBytesPerInt)), // fixme
+                                  new OopMapSet(), false);
+  return stub->entry_point();
 }
 
  /**

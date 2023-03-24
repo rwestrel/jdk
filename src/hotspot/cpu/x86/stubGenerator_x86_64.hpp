@@ -32,6 +32,7 @@
 // Stub Code definitions
 
 class StubGenerator: public StubCodeGenerator {
+  friend class MasmOverwrite;
  private:
 
   // Call stubs are used to call Java from C.
@@ -566,5 +567,23 @@ class StubGenerator: public StubCodeGenerator {
     }
   }
 };
+
+class MasmOverwrite {
+public:
+  MasmOverwrite(StubGenerator* sg, MacroAssembler* masm)
+          : _sg(sg) {
+    _saved_masm = sg->_masm;
+    sg->_masm = masm;
+  }
+
+  ~MasmOverwrite() {
+    _sg->_masm = _saved_masm;
+  }
+
+private:
+  MacroAssembler* _saved_masm;
+  StubGenerator* _sg;
+};
+
 
 #endif // CPU_X86_STUBGENERATOR_X86_64_HPP

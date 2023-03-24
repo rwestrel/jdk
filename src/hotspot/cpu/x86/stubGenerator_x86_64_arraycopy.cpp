@@ -79,6 +79,7 @@ static int& get_profile_ctr(int shift) {
 #endif // COMPILER2_OR_JVMCI
 #endif // !PRODUCT
 
+
 void StubGenerator::generate_arraycopy_stubs() {
   address entry;
   address entry_jbyte_arraycopy;
@@ -517,8 +518,7 @@ address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const 
   
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
   __ align(CodeEntryAlignment);
   StubCodeMark mark(this, "StubRoutines", name);
@@ -735,7 +735,6 @@ address StubGenerator::generate_disjoint_copy_avx3_masked(address* entry, const 
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
@@ -757,8 +756,7 @@ address StubGenerator::generate_conjoint_copy_avx3_masked(address* entry, const 
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
   __ align(CodeEntryAlignment);
   StubCodeMark mark(this, "StubRoutines", name);
@@ -931,7 +929,6 @@ address StubGenerator::generate_conjoint_copy_avx3_masked(address* entry, const 
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
@@ -1646,8 +1643,7 @@ address StubGenerator::generate_disjoint_int_oop_copy(bool aligned, bool is_oop,
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
@@ -1746,7 +1742,6 @@ __ BIND(L_exit);
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
@@ -1778,8 +1773,7 @@ address StubGenerator::generate_conjoint_int_oop_copy(bool aligned, bool is_oop,
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-    _masm = masm;
+  MasmOverwrite mo(this, masm);
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
   if ((!is_oop || bs->supports_avx3_masked_arraycopy()) && VM_Version::supports_avx512vlbw() && VM_Version::supports_bmi2() && MaxVectorSize  >= 32) {
@@ -1880,7 +1874,6 @@ __ BIND(L_exit);
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
@@ -1910,8 +1903,7 @@ address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
@@ -2018,7 +2010,6 @@ address StubGenerator::generate_disjoint_long_oop_copy(bool aligned, bool is_oop
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
-  _masm = saved_masm;
     return stub->entry_point();
 }
 
@@ -2042,8 +2033,7 @@ address StubGenerator::generate_conjoint_long_oop_copy(bool aligned, bool is_oop
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
   BarrierSetAssembler *bs = BarrierSet::barrier_set()->barrier_set_assembler();
 #if COMPILER2_OR_JVMCI
@@ -2138,7 +2128,6 @@ address StubGenerator::generate_conjoint_long_oop_copy(bool aligned, bool is_oop
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   if (entry != NULL) {
     *entry = stub->entry_point() + offset;
   }
@@ -2190,8 +2179,7 @@ address StubGenerator::generate_checkcast_copy(const char *name, address *entry,
 
   CodeBuffer code(name, insts_size, locs_size);
   MacroAssembler* masm = new MacroAssembler(&code);
-  MacroAssembler* saved_masm = _masm;
-  _masm = masm;
+  MasmOverwrite mo(this, masm);
 
  Label L_load_element, L_store_element, L_do_card_marks, L_done;
 
@@ -2387,7 +2375,6 @@ address StubGenerator::generate_checkcast_copy(const char *name, address *entry,
                                   CodeOffsets::frame_never_safe,
                                   (4 >> (LogBytesPerWord - LogBytesPerInt)),
                                   new OopMapSet(), false);
-  _masm = saved_masm;
   return stub->entry_point();
 }
 

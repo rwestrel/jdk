@@ -46,7 +46,7 @@ public:
 
   int disarmed_guard_value() const;
 
-  static int nmethod_stub_entry_barrier(address* return_address_ptr);
+  static JNIEXPORT int nmethod_stub_entry_barrier(address* return_address_ptr);
   bool nmethod_osr_entry_barrier(nmethod* nm);
   bool is_armed(CompiledMethod* nm);
   void disarm(CompiledMethod* nm);

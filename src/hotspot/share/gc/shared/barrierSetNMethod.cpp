@@ -66,6 +66,10 @@ bool BarrierSetNMethod::supports_entry_barrier(CompiledMethod* nm) {
     return false;
   }
 
+  if (nm->is_leyden_nmethod()) {
+    return false;
+  }
+
   return true;
 }
 
@@ -168,7 +172,7 @@ int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
   CodeBlob* cb = CodeCache::find_blob(return_address);
   assert(cb != nullptr, "invariant");
 
-  nmethod* nm = cb->as_nmethod();
+  CompiledMethod* nm = cb->as_compiled_method();
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
 
   if (!bs_nm->is_armed(nm)) {
@@ -190,7 +194,8 @@ int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
 
   if (!may_enter) {
     log_trace(nmethod, barrier)("Deoptimizing nmethod: " PTR_FORMAT, p2i(nm));
-    bs_nm->deoptimize(nm, return_address_ptr);
+    assert(nm->is_nmethod(), "");
+    bs_nm->deoptimize(nm->as_nmethod(), return_address_ptr);
   }
   return may_enter ? 0 : 1;
 }

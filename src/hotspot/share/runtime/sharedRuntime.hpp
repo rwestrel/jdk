@@ -207,7 +207,7 @@ class SharedRuntime: AllStatic {
   // implementing e.g. ReduceInitialCardMarks
   static void on_slowpath_allocation_exit(JavaThread* current);
 
-  static void enable_stack_reserved_zone(JavaThread* current);
+  static JNIEXPORT void enable_stack_reserved_zone(JavaThread* current);
   static frame look_for_reserved_stack_annotated_method(JavaThread* current, frame fr);
 
   // Shared stub locations
@@ -266,8 +266,8 @@ class SharedRuntime: AllStatic {
 
 #if INCLUDE_JVMTI
   // Functions for JVMTI notifications
-  static void notify_jvmti_mount(oopDesc* vt, jboolean hide, jboolean first_mount, JavaThread* current);
-  static void notify_jvmti_unmount(oopDesc* vt, jboolean hide, jboolean last_unmount, JavaThread* current);
+  static JNIEXPORT void notify_jvmti_mount(oopDesc* vt, jboolean hide, jboolean first_mount, JavaThread* current);
+  static JNIEXPORT void notify_jvmti_unmount(oopDesc* vt, jboolean hide, jboolean last_unmount, JavaThread* current);
 #endif
 
   // RedefineClasses() tracing support for obsolete method entry

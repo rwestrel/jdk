@@ -2028,6 +2028,9 @@ int64_t record_string_object(Elf_Scn* codeblobsro_section, Elf64_Shdr* codeblobs
 
 Klass* restore_klass(const char* ptr, JavaThread* thread) {
   const char* klass_name = ptr;
+  if (!strcmp(klass_name, "Ljdk/internal/vm/FillerArray;")) {
+    return Universe::fillerArrayKlassObj();
+  }
   Symbol* klass_sym = SymbolTable::new_symbol(klass_name);
   Klass* k = SystemDictionary::resolve_or_fail(klass_sym, Handle(thread, SystemDictionary::java_system_loader()),
                                                Handle(), true, thread);
@@ -2294,12 +2297,19 @@ static void add_pc_relative_reloc(CodeBlobHashtable &codeblobs, GrowableArray<El
 
   Elf64_Rela reloc;
   long displacement_offset = Assembler::locate_operand(call_addr, format) - call_addr;
+  long next_instruction_offset = Assembler::locate_next_instruction(call_addr) - call_addr;
+//  long current_dest_offset = callee->code_begin() + addend - call_addr - next_instruction_offset;
+//  assert(current_dest_offset == *(int*)(call_addr + displacement_offset), "");
   long call_offset = caller_data->offset() + (call_addr - caller->code_begin());
+  long new_dest_offset = callee_data->offset() + addend - call_offset - next_instruction_offset;
   assert(call_offset > 0, "outside the code cache?");
   reloc.r_offset = call_offset + displacement_offset;
-  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
+//  reloc.r_addend = callee_data->offset() + addend - (dest - call_addr) + displacement_offset;
+  reloc.r_addend = callee_data->offset() + addend - (next_instruction_offset - displacement_offset);
+//  reloc.r_addend = checked_cast<int>(new_dest_offset);
   reloc.r_info = ELF64_R_INFO(text_sym, R_X86_64_PC32);
   text_relocs.push(reloc);
+//  *(int*)(call_addr + displacement_offset) = 0;
 }
 
 
@@ -2837,7 +2847,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
         }
       }
     }
-    bool duplicate = codeblobs.put(cb, CodeBlobEntry(sym_id, code_offset, from_interpreted_entry_off));
+    bool duplicate = !codeblobs.put(cb, CodeBlobEntry(sym_id, code_offset, from_interpreted_entry_off));
     assert(!duplicate, "");
     assert(codeblobs.get(cb)->symbol_index() == (uint)sym_id, "");
   }
@@ -2940,6 +2950,7 @@ void CodeCache::dump_to_disk(GrowableArray<struct Klass*>* loaded_klasses, JavaT
     add_global_symbol(strings, symbols, codecache_section, "leydenCodeHeap", STT_OBJECT, 0, codecache_data->d_size);
   }
   {
+    segmap_clone.push(CodeHeap::free_sentinel);
 //    Elf_Data* codecache_data = new_data(codecache_section, heap->_segmap.low(), segmap_size);
     Elf_Data* codecache_data = new_data(codecache_section, segmap_clone.adr_at(0), segmap_clone.length());
     add_relocation(offset_of(CodeHeap, _segmap) + offset_of(VirtualSpace, _low), codecache_data->d_off, codecache_sym, codecache_relocs);
@@ -3108,6 +3119,8 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
         Symbol* signature_sym = SymbolTable::new_symbol(signature);
         address from_interpreted_entry = *(address*)(signature + strlen(signature) + 1);
 
+        tty->print("XXX %s %s %s %p", klass_name, method_name, signature, from_interpreted_entry);
+
         Method* m = InstanceKlass::cast(k)->find_method(method_sym, signature_sym);
         assert(m != NULL, "method not found");
         nm->set_method(m);
@@ -3119,6 +3132,7 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
         RelocIterator iter(nm);
         while (iter.next()) {
           if (iter.type() == relocInfo::metadata_type) {
+            MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
             metadata_Relocation* r = iter.metadata_reloc();
             Metadata* md = r->metadata_value();
             if (md != NULL) {
@@ -3224,20 +3238,22 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
           }
         }
 
-
-        for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
-          if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
-          const char* ptr = *(const char**) p;
-          MetadataRecord rec = (MetadataRecord) *ptr;
-          Metadata* md;
-          if (rec == KLASS_RECORD) {
-            md = restore_klass(ptr + 1, thread);
-          } else if (rec == METHOD_RECORD) {
-            md = restore_method(ptr + 1, thread);
-          } else {
-            ShouldNotReachHere();
+        {
+          MutexUnlocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+          for (Metadata** p = nm->metadata_begin(); p < nm->metadata_end(); p++) {
+            if (*p == Universe::non_oop_word() || *p == NULL) continue;  // skip non-oops
+            const char* ptr = *(const char**) p;
+            MetadataRecord rec = (MetadataRecord) *ptr;
+            Metadata* md;
+            if (rec == KLASS_RECORD) {
+              md = restore_klass(ptr + 1, thread);
+            } else if (rec == METHOD_RECORD) {
+              md = restore_method(ptr + 1, thread);
+            } else {
+              ShouldNotReachHere();
+            }
+            *p = md;
           }
-          *p = md;
         }
 
         {
@@ -3251,6 +3267,7 @@ void CodeCache::restore_from_disk(JavaThread* thread) {
            if (!m->is_method_handle_intrinsic())
              m->_from_interpreted_entry = from_interpreted_entry;
           m->_i2i_entry = (address)-1;
+          m->_adapter = (AdapterHandlerEntry*)-1;
         }
         nm->_gc_data = NULL;
 

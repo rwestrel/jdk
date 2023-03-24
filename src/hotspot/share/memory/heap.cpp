@@ -488,7 +488,7 @@ CodeBlob* CodeHeap::find_blob(void* start) const {
   return (result != nullptr && result->blob_contains((address)start)) ? result : nullptr;
 }
 
-CodeBlob* LeydenCodeHeap::find_blob_unsafe(void* start) const {
+CodeBlob* LeydenCodeHeap::find_blob(void* start) const {
   CodeBlob** cb = (CodeBlob**)find_block_for(start);
   if (cb == NULL) {
     return NULL;

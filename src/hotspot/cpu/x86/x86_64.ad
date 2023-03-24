@@ -831,8 +831,6 @@ void MachConstantBaseNode::emit(CodeBuffer& cbuf, PhaseRegAlloc* ra_) const {
 
   Register r = as_Register(ra_->get_encode(this));
   CodeSection* consts_section = __ code()->consts();
-  int consts_size = consts_section->align_at_start(consts_section->size());
-  assert(C->output()->in_scratch_emit_size() || constant_table.size() == consts_size, "must be: %d == %d", constant_table.size(), consts_size);
 
   // Materialize the constant table base.
   address baseaddr = consts_section->start() + -(constant_table.table_base_offset());
