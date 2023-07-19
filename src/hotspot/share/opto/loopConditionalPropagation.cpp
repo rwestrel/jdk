@@ -241,32 +241,40 @@ void PhaseConditionalPropagation::mark_if(IfNode* iff, Node* c) {
 
 // PhaseValues::_types is in sync with types at _current_ctl, we want to update it to be in sync with types at c
 void PhaseConditionalPropagation::sync(Node* c) {
+  TypeUpdate* updates_at_current_ctrl = updates_at(_current_ctrl);
+  TypeUpdate* updates_at_c = updates_at(c);
+
+  if (updates_at_current_ctrl == updates_at_c) {
+    _current_ctrl = c;
+    return;
+  }
+
+  tty->print_cr("XXX %p %p", updates_at_current_ctrl, updates_at_c);
+
   Node* lca = _phase->dom_lca_internal(_current_ctrl, c);
   // Update PhaseValues::_types to lca by undoing every update between _current_ctrl and lca
   TypeUpdate* lca_updates = updates_at(lca);
   {
-    TypeUpdate* updates = updates_at(_current_ctrl);
-    while (updates != lca_updates) {
-      assert(updates != nullptr, "");
-      assert(lca_updates == nullptr || !_phase->is_dominator(updates->control(), lca_updates->control()), "");
+    while (updates_at_current_ctrl != lca_updates) {
+      assert(updates_at_current_ctrl != nullptr, "");
+      assert(lca_updates == nullptr || !_phase->is_dominator(updates_at_current_ctrl->control(), lca_updates->control()), "");
 
-      for (int i = 0; i < updates->length(); ++i) {
-        Node* n = updates->node_at(i);
-        const Type* t = updates->prev_type_at(i);
+      for (int i = 0; i < updates_at_current_ctrl->length(); ++i) {
+        Node* n = updates_at_current_ctrl->node_at(i);
+        const Type* t = updates_at_current_ctrl->prev_type_at(i);
         PhaseValues::set_type(n, t);
       }
-      updates = updates->prev();
+      updates_at_current_ctrl = updates_at_current_ctrl->prev();
     }
   }
   // Update PhaseValues::_types to c by applying every update between lca and c
   {
-    TypeUpdate* updates = updates_at(c);
     assert(_stack.length() == 0, "");
-    while (updates != lca_updates) {
-      assert(updates != nullptr, "");
-      assert(lca_updates == nullptr || !_phase->is_dominator(updates->control(), lca_updates->control()), "");
-      _stack.push(updates);
-      updates = updates->prev();
+    while (updates_at_c != lca_updates) {
+      assert(updates_at_c != nullptr, "");
+      assert(lca_updates == nullptr || !_phase->is_dominator(updates_at_c->control(), lca_updates->control()), "");
+      _stack.push(updates_at_c);
+      updates_at_c = updates_at_c->prev();
     }
     while (_stack.length() > 0) {
       TypeUpdate* updates = _stack.pop();
@@ -852,7 +860,7 @@ void PhaseConditionalPropagation::do_transform() {
         continue;
       }
     } else {
-      assert(find_type_between(c, c, C->root()) != Type::TOP, "");
+//      assert(find_type_between(c, c, C->root()) != Type::TOP, "");
     }
 
     for (DUIterator i = c->outs(); c->has_out(i); i++) {
@@ -1207,7 +1215,13 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
 void PhaseIdealLoop::conditional_elimination(VectorSet& visited, Node_Stack& nstack, Node_List& rpo_list, int rounds) {
   TraceTime tt("loop conditional propagation", UseNewCode);
   PhaseConditionalPropagation pcp(this, visited, nstack, rpo_list);
-  pcp.analyze(rounds);
-  pcp.do_transform();
+  {
+    TraceTime tt("loop conditional propagation analyze", UseNewCode);
+    pcp.analyze(rounds);
+  }
+  {
+    TraceTime tt("loop conditional propagation transform", UseNewCode);
+    pcp.do_transform();
+  }
   _igvn.reset_from_igvn(&pcp);
 }
