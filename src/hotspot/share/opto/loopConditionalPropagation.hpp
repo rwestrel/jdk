@@ -178,6 +178,10 @@ private:
   bool _progress;
   int _iterations;
 
+  int _nb_ifs;
+  GrowableArray<int> _uses;
+  GrowableArray<int> _uses2;
+
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
 

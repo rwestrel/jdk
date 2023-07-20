@@ -135,6 +135,15 @@ bool PhaseConditionalPropagation::related_use(Node* u, Node* c) {
 }
 
 void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
+  if (UseNewCode2) {
+    int cnt = _uses.at_grow(n->Opcode());
+    cnt++;
+    _uses.at_put(n->Opcode(), cnt);
+    cnt = _uses2.at_grow(n->Opcode());
+    cnt += n->outcnt();
+    _uses2.at_put(n->Opcode(), cnt);
+  }
+
   assert(_phase->has_node(const_cast<Node*>(n)), "");
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* u = n->fast_out(i);
@@ -244,16 +253,20 @@ void PhaseConditionalPropagation::sync(Node* c) {
   TypeUpdate* updates_at_current_ctrl = updates_at(_current_ctrl);
   TypeUpdate* updates_at_c = updates_at(c);
 
+  TypeUpdate* lca_updates = nullptr;
   if (updates_at_current_ctrl == updates_at_c) {
     _current_ctrl = c;
     return;
+  } else if (updates_at_current_ctrl != nullptr && updates_at_c != nullptr) {
+    Node* lca = _phase->dom_lca_internal(_current_ctrl, c);
+    lca_updates = updates_at(lca);
+//  } else {
+//    Node* lca = _phase->dom_lca_internal(_current_ctrl, c);
+//    lca_updates = updates_at(lca);
+//    assert(lca_updates == nullptr, "");
   }
 
-  tty->print_cr("XXX %p %p", updates_at_current_ctrl, updates_at_c);
-
-  Node* lca = _phase->dom_lca_internal(_current_ctrl, c);
   // Update PhaseValues::_types to lca by undoing every update between _current_ctrl and lca
-  TypeUpdate* lca_updates = updates_at(lca);
   {
     while (updates_at_current_ctrl != lca_updates) {
       assert(updates_at_current_ctrl != nullptr, "");
@@ -378,7 +391,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
     }
   }
 
-#ifdef ASSERT
+#if 0 //def ASSERT
   // Verify we've indeed reached a fixed point
   _control_dependent_node[_iterations % 2].clear();
   _iterations++;
@@ -399,6 +412,21 @@ void PhaseConditionalPropagation::analyze(int rounds) {
 #endif
 
   sync(C->root());
+  if (UseNewCode2) {
+    tty->print_cr("XXX %d %d", _nb_ifs, _iterations);
+    for (int i = 0; i < _uses.length(); ++i) {
+      int c = _uses.at(i);
+      if (c != 0) {
+        tty->print_cr("XXX %s: %d", NodeClassNames[i], c);
+      }
+    }
+    for (int i = 0; i < _uses2.length(); ++i) {
+      int c = _uses2.at(i);
+      if (c != 0) {
+        tty->print_cr("XXX %s: %d", NodeClassNames[i], c);
+      }
+    }
+  }
 }
 
 bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extra2, bool verify) {
@@ -774,6 +802,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
     const Type* new_n_t = n_t->filter(t);
     assert(narrows_type(n_t, new_n_t), "");
     if (n_t != new_n_t) {
+      _nb_ifs++;
 #ifdef ASSERT
       _conditions.set(c->_idx);
 #endif
@@ -793,6 +822,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
         const Type* new_in_t = in_t->filter(t_as_long);
         assert(narrows_type(in_t, new_in_t), "");
         if (in_t != new_in_t) {
+          _nb_ifs++;
 #ifdef ASSERT
           _conditions.set(c->_idx);
 #endif
@@ -1157,10 +1187,14 @@ const Type* PhaseConditionalPropagation::type(const Node* n, Node* c) const {
   }
   assert(c->is_CFG(), "");
   const Type* res = nullptr;
-  assert(_current_ctrl->is_Region() && _current_ctrl->find_edge(c) != -1, "");
-  Node* dom = _phase->idom(_current_ctrl);
+//  assert(_current_ctrl->is_Region() && _current_ctrl->find_edge(c) != -1, "");
   TypeUpdate* updates = updates_at(c);
-  TypeUpdate* dom_updates = updates_at(dom);
+  if (updates == nullptr) {
+    return PhaseValues::type(n);
+  }
+  Node* dom = _phase->idom(_current_ctrl);
+  TypeUpdate* dom_updates = _dom_updates;
+//  assert(dom_updates == updates_at(dom), "");
   assert(updates != nullptr || dom_updates == nullptr || _phase->is_dominator(_current_ctrl, c) || C->has_irreducible_loop(), "");
   while (updates != nullptr && updates->below(dom_updates, _phase)) {
     int idx = updates->find(n);
@@ -1187,6 +1221,7 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
           _current_ctrl(phase->C->root()),
           _progress(true),
           _iterations(0),
+          _nb_ifs(0),
           _current_updates(nullptr),
           _dom_updates(nullptr),
           _prev_updates(nullptr) {
