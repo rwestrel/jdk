@@ -4808,10 +4808,13 @@ void PhaseIdealLoop::build_and_optimize() {
     C->set_major_progress();
   }
 
-  if (!C->major_progress() && UseLoopConditionalPropagation) {
+  if (!C->major_progress() && UseLoopConditionalPropagation && C->run_loop_conditional_propagation()) {
     visited.clear();
     int rounds = max_jint;
     conditional_elimination(visited, nstack, worklist, rounds);
+    if (!C->major_progress()) {
+      C->set_run_loop_conditional_propagation(false);
+    }
   }
 
   // Perform loop predication before iteration splitting

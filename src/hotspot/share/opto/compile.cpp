@@ -890,7 +890,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
   set_allowed_deopt_reasons();
 
   // Now generate code
-//  Code_Gen();
+  Code_Gen();
 }
 
 //------------------------------Compile----------------------------------------
@@ -1053,6 +1053,7 @@ void Compile::Init(bool aliasing) {
 #ifndef PRODUCT
   Copy::zero_to_bytes(_igv_phase_iter, sizeof(_igv_phase_iter));
 #endif
+  set_run_loop_conditional_propagation(true);
 
   set_do_freq_based_layout(_directive->BlockLayoutByFrequencyOption);
   _loop_opts_cnt = LoopOptsCount;
