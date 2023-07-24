@@ -150,6 +150,8 @@ private:
 
   using Updates = ResizeableResourceHashtable<Node*, TypeUpdate*, AnyObj::RESOURCE_AREA, mtInternal>;
   Updates* _updates;
+  using Control2Rpo = ResizeableResourceHashtable<Node*, uint, AnyObj::RESOURCE_AREA, mtInternal>;
+  Control2Rpo* _control2rpo;
 
   bool related_use(Node* u, Node* c);
 
@@ -253,6 +255,8 @@ public:
   void mark_if(IfNode* iff, Node* c);
 
   void mark_if_from_cmp(const Node* u, Node* c);
+
+  uint _rpo;
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP
