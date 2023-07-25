@@ -155,7 +155,22 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
   assert(_phase->has_node(const_cast<Node*>(n)), "");
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* u = n->fast_out(i);
-    if (related_use(u, c)) {
+//    if (u->outcnt() == 1 && (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpU ||
+//        u->Opcode() == Op_CmpL || u->Opcode() == Op_CmpUL)) {
+//      Node* bol = u->unique_out();
+//      if (bol->outcnt() == 1) {
+//        if (bol->unique_out()->is_If()) {
+//          continue;
+//        }
+//      }
+//    }
+    bool is_related = related_use(u, c);
+#ifdef ASSERT
+    if (UseNewCode3) {
+      tty->print(">>>> at %d %s", _phase->ctrl_or_self(u)->_idx, is_related ? "related" : "not related"); u->dump();
+    }
+#endif
+    if (is_related) {
       _wq.push(u);
       if (u->Opcode() == Op_AddI || u->Opcode() == Op_SubI) {
         for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
@@ -200,13 +215,15 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
         }
       }
 
-      // If this node feeds into a condition that feeds into an If, mark the if as needing work (for iterations > 1)
-      mark_if_from_cmp(u, c);
+      if (_iterations > 1) {
+        // If this node feeds into a condition that feeds into an If, mark the if as needing work (for iterations > 1)
+        mark_if_from_cmp(u, c);
 
-      if (u->Opcode() == Op_ConvL2I) {
-        for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
-          Node* u2 = u->fast_out(j);
-          mark_if_from_cmp(u2, c);
+        if (u->Opcode() == Op_ConvL2I) {
+          for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
+            Node* u2 = u->fast_out(j);
+            mark_if_from_cmp(u2, c);
+          }
         }
       }
 
@@ -817,6 +834,11 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
       _conditions.set(c->_idx);
 #endif
       if (record_update(c, n, n_t, new_n_t)) {
+#ifdef ASSERT
+        if (UseNewCode3) {
+          tty->print("[%d] narrowed at %d ", _iterations, c->_idx); n_t->dump(); tty->print(" -> "); new_n_t->dump(); n->dump();
+        }
+#endif
 //        if (new_n_t != Type::TOP) {
 //          tty->print("XXX"); c->dump();
 //          n_t->dump(); tty->print(" -> "); new_n_t->dump(); n->dump();
