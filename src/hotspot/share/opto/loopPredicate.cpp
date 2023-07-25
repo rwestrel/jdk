@@ -1521,7 +1521,7 @@ IfProjNode* PhaseIdealLoop::add_template_assertion_predicate(IfNode* iff, IdealL
 
   bol = rc_predicate(loop, new_proj, scale, offset, max_value, limit, stride, rng, (stride > 0) != (scale > 0),
                      overflow);
-  add_template_assertion_predicate_helper(predicate_proj, reason, new_proj, bol, overflow ? Op_If : iff->Opcode());
+  new_proj = add_template_assertion_predicate_helper(predicate_proj, reason, new_proj, bol, overflow ? Op_If : iff->Opcode());
   assert(max_value->outcnt() > 0, "should be used");
   assert(assertion_predicate_has_loop_opaque_node(new_proj->in(0)->as_If()), "unexpected");
 
