@@ -125,11 +125,11 @@ bool PhaseConditionalPropagation::related_use(Node* u, Node* c) {
 //  assert(_rpo == *_control2rpo->get(c), "");
 //  assert(!_phase->is_dominator(c, u_c) || _rpo <= rpo, "");
 //  assert(!_phase->is_dominator(u_c, c) || rpo <= _rpo, "");
-  if (!(/*_rpo <= rpo &&*/ _phase->is_dominator(c, u_c)) && (u->is_CFG() || !(/*rpo <= _rpo &&*/ _phase->is_dominator(u_c, c)))) {
+  if (!(/*_rpo <= rpo &&*/ is_dominator(c, u_c)) && (u->is_CFG() || !(/*rpo <= _rpo &&*/is_dominator(u_c, c)))) {
     return false;
   }
 //  rpo = *_control2rpo->get(known_updates(u->in(0)));
-  if (!u->is_CFG() && u->in(0) != nullptr && u->in(0)->is_CFG() && !_phase->is_dominator(u->in(0), c)) {
+  if (!u->is_CFG() && u->in(0) != nullptr && u->in(0)->is_CFG() && !is_dominator(u->in(0), c)) {
     // mark as needing processing either in the pass over the CFG (control not yet processed) or on the next one
     assert(!_visited.test(u->in(0)->_idx), "");
     _control_dependent_node[_iterations%2].set(u->in(0)->_idx);
@@ -263,7 +263,7 @@ void PhaseConditionalPropagation::mark_if_from_cmp(const Node* u, Node* c) {
 }
 
 void PhaseConditionalPropagation::mark_if(IfNode* iff, Node* c) {
-  if (_phase->is_dominator(c, iff)) {
+  if (is_dominator(c, iff)) {
     ProjNode* proj_false = iff->proj_out(0);
     ProjNode* proj_true = iff->proj_out(1);
     assert(!_visited.test(proj_false->_idx), "");
@@ -295,7 +295,7 @@ void PhaseConditionalPropagation::sync(Node* c) {
   {
     while (updates_at_current_ctrl != lca_updates) {
       assert(updates_at_current_ctrl != nullptr, "");
-      assert(lca_updates == nullptr || !_phase->is_dominator(updates_at_current_ctrl->control(), lca_updates->control()), "");
+      assert(lca_updates == nullptr || !is_dominator(updates_at_current_ctrl->control(), lca_updates->control()), "");
 
       for (int i = 0; i < updates_at_current_ctrl->length(); ++i) {
         Node* n = updates_at_current_ctrl->node_at(i);
@@ -310,7 +310,7 @@ void PhaseConditionalPropagation::sync(Node* c) {
     assert(_stack.length() == 0, "");
     while (updates_at_c != lca_updates) {
       assert(updates_at_c != nullptr, "");
-      assert(lca_updates == nullptr || !_phase->is_dominator(updates_at_c->control(), lca_updates->control()), "");
+      assert(lca_updates == nullptr || !is_dominator(updates_at_c->control(), lca_updates->control()), "");
       _stack.push(updates_at_c);
       updates_at_c = updates_at_c->prev();
     }
@@ -480,7 +480,7 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
     Node* in = c->in(in_idx);
     Node* ctrl = in;
     TypeUpdate* updates = updates_at(ctrl);
-    assert(updates != nullptr || _dom_updates == nullptr || _phase->is_dominator(c, in) || C->has_irreducible_loop(), "");
+    assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
     // now go over all type updates between this region input and the dominator
     while(updates != nullptr && updates->below(_dom_updates, _phase)) {
       for (int j = 0; j < updates->length(); ++j) {
@@ -557,7 +557,7 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
         }
       }
       updates = updates->prev();
-      assert(updates != nullptr || _dom_updates == nullptr || _phase->is_dominator(c, in) || C->has_irreducible_loop(), "");
+      assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
     }
   } else if (c->is_IfProj()) {
     Node* iff = c->in(0);
@@ -750,7 +750,7 @@ void PhaseConditionalPropagation::adjust_updates(Node* c, bool verify) {
           j++;
         }
       }
-      assert(_dom_updates == nullptr || !_phase->is_dominator(_current_updates->control(), _dom_updates->control()), "");
+      assert(_dom_updates == nullptr || !is_dominator(_current_updates->control(), _dom_updates->control()), "");
       _current_updates->set_prev(_dom_updates);
     }
   }
@@ -777,7 +777,7 @@ void PhaseConditionalPropagation::analyze_allocate_array(Node* c, const Allocate
 }
 
 const Type* PhaseConditionalPropagation::find_type_between(Node* n, Node* c, Node* dom) const {
-  assert(_phase->is_dominator(dom, c), "");
+  assert(is_dominator(dom, c), "");
   TypeUpdate* updates = updates_at(c);
   TypeUpdate* dom_updates = updates_at(dom);
   while(updates != nullptr && updates->below(dom_updates, _phase)) {
@@ -791,7 +791,7 @@ const Type* PhaseConditionalPropagation::find_type_between(Node* n, Node* c, Nod
 }
 
 const Type* PhaseConditionalPropagation::find_prev_type_between(Node* n, Node* c, Node* dom) const {
-  assert(_phase->is_dominator(dom, c), "");
+  assert(is_dominator(dom, c), "");
   TypeUpdate* updates = updates_at(c);
   TypeUpdate* dom_updates = updates_at(dom);
   const Type* res = nullptr;
@@ -962,12 +962,12 @@ bool PhaseConditionalPropagation::validate_control(Node* n, Node* c) {
         continue;
       }
       if (u->is_CFG()) {
-        if (_phase->is_dominator(u, c) || _phase->is_dominator(c, u)) {
+        if (is_dominator(u, c) || is_dominator(c, u)) {
           return true;
         }
       } else if (u->is_Phi()) {
         for (uint k = 1; k < u->req(); k++) {
-          if (u->in(k) == node && (_phase->is_dominator(u->in(0)->in(k), c) || _phase->is_dominator(c, u->in(0)->in(k)))) {
+          if (u->in(k) == node && (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
             return true;
           }
         }
@@ -1102,7 +1102,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           }
           int nb_deleted = 0;
           for (uint j = 1; j < use->req(); ++j) {
-            if (use->in(j) == node && _phase->is_dominator(c, r->in(j)) &&
+            if (use->in(j) == node && is_dominator(c, r->in(j)) &&
                 is_safe_for_replacement_at_phi(node, use, r, j)) {
               progress = true;
               if (con == NULL) {
@@ -1128,7 +1128,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
             --i;
             imax -= nb_deleted;
           }
-        } else if (_phase->is_dominator(c, _phase->ctrl_or_self(use)) && is_safe_for_replacement(c, node, use)) {
+        } else if (is_dominator(c, _phase->ctrl_or_self(use)) && is_safe_for_replacement(c, node, use)) {
           progress = true;
           if (con == nullptr) {
             con = makecon(t);
@@ -1239,7 +1239,7 @@ const Type* PhaseConditionalPropagation::type(const Node* n, Node* c) const {
   Node* dom = _phase->idom(_current_ctrl);
   TypeUpdate* dom_updates = _dom_updates;
 //  assert(dom_updates == updates_at(dom), "");
-  assert(updates != nullptr || dom_updates == nullptr || _phase->is_dominator(_current_ctrl, c) || C->has_irreducible_loop(), "");
+  assert(updates != nullptr || dom_updates == nullptr || is_dominator(_current_ctrl, c) || C->has_irreducible_loop(), "");
   while (updates != nullptr && updates->below(dom_updates, _phase)) {
     int idx = updates->find(n);
     if (idx != -1) {
@@ -1247,7 +1247,7 @@ const Type* PhaseConditionalPropagation::type(const Node* n, Node* c) const {
       break;
     }
     updates = updates->prev();
-    assert(updates != nullptr || dom_updates == nullptr || _phase->is_dominator(_current_ctrl, c) || C->has_irreducible_loop(), "");
+    assert(updates != nullptr || dom_updates == nullptr || is_dominator(_current_ctrl, c) || C->has_irreducible_loop(), "");
   }
   if (res == nullptr) {
     res = PhaseValues::type(n);
@@ -1255,11 +1255,105 @@ const Type* PhaseConditionalPropagation::type(const Node* n, Node* c) const {
   return res;
 }
 
+class DominatorTree : public ResourceObj {
+private:
+  class DomTreeNode {
+  public:
+    DomTreeNode* _child;
+    DomTreeNode* _sibling;
+    Node* _node;
+    uint _pre;
+    uint _post;
+
+    DomTreeNode() : _child(nullptr), _sibling(nullptr), _node(nullptr), _pre(0), _post(0) {
+    }
+  };
+  GrowableArray<DomTreeNode> _nodes;
+public:
+  DominatorTree(const Node_List& rpo_list, PhaseIdealLoop* phase) :
+          _nodes(phase->C->unique(), phase->C->unique(), DomTreeNode()) {
+    for (uint i = 0; i < rpo_list.size(); ++i) {
+      Node* n = rpo_list.at(i);
+      DomTreeNode* dt_n = _nodes.adr_at(n->_idx);
+      dt_n->_node = n;
+      if (n->is_Root()) {
+        continue;
+      }
+      Node* dom = phase->idom(n);
+      DomTreeNode* dt_dom = _nodes.adr_at(dom->_idx);
+      dt_n->_sibling = dt_dom->_child;
+      dt_dom->_child = dt_n;
+    }
+    {
+      ResourceMark rm;
+      GrowableArray<DomTreeNode*> stack;
+      stack.push(_nodes.adr_at(phase->C->root()->_idx));
+      uint i = 1;
+//      tty->print_cr("XXXXXXXXX");
+//      tty->print("XX"); phase->C->root()->dump();
+      while (stack.is_nonempty()) {
+        DomTreeNode* current = stack.top();
+        DomTreeNode* next = current->_child;
+        if (next != nullptr) {
+//          tty->print("XX"); next->_node->dump();
+          stack.push(next);
+          next->_pre = i;
+          i++;
+        } else {
+          do {
+            current = stack.pop();
+            current->_post = i;
+            i++;
+            next = current->_sibling;
+            if (next != nullptr) {
+//              tty->print("XX"); next->_node->dump();
+              stack.push(next);
+              next->_pre = i;
+              i++;
+              break;
+            }
+          } while (stack.is_nonempty());
+        }
+      }
+    }
+//    for (uint i = 0; i < rpo_list.size(); ++i) {
+//      Node* n = rpo_list.at(i);
+//      assert(_nodes.at(n->_idx)._pre != 0 || n->is_Root(), "");
+//      assert(_nodes.at(n->_idx)._post != 0, "");
+//      assert(_nodes.at(n->_idx)._post > _nodes.at(n->_idx)._pre, "");
+//      if (n->is_Root()) {
+//        continue;
+//      }
+//      Node* dom = phase->idom(n);
+//      assert(_nodes.at(dom->_idx)._pre < _nodes.at(n->_idx)._pre && _nodes.at(dom->_idx)._post > _nodes.at(n->_idx)._post, "");
+//    }
+//    for (uint i = 0; i < rpo_list.size(); ++i) {
+//      Node* n = rpo_list.at(i);
+//      for (uint j = 0; j < rpo_list.size(); ++j) {
+//        Node* m = rpo_list.at(j);
+//        assert(n == m || phase->is_dominator(n, m) == (_nodes.at(n->_idx)._pre < _nodes.at(m->_idx)._pre && _nodes.at(n->_idx)._post > _nodes.at(m->_idx)._post), "");
+//      }
+//    }
+//    ShouldNotReachHere();
+  }
+
+  bool is_dominator(Node* n, Node* m) const {
+    return _nodes.at(n->_idx)._pre < _nodes.at(m->_idx)._pre && _nodes.at(n->_idx)._post > _nodes.at(m->_idx)._post;
+  }
+};
+
+bool PhaseConditionalPropagation::is_dominator(Node* n, Node* d) const {
+//  assert(_phase->is_dominator(n, d) == (n == d || _dominator_tree->is_dominator(n, d)), "");
+//  return _phase->is_dominator(n, d);
+  return (n == d || _dominator_tree->is_dominator(n, d));
+}
+
+
 PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet& visited, Node_Stack& nstack,
                                                          Node_List& rpo_list)
         : PhaseIterGVN(&phase->igvn()),
           _updates(nullptr),
-          _control2rpo(nullptr),
+//          _control2rpo(nullptr),
           _phase(phase),
           _visited(visited),
           _rpo_list(rpo_list),
@@ -1267,12 +1361,15 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
           _progress(true),
           _iterations(0),
           _nb_ifs(0),
+          _dominator_tree(nullptr),
           _current_updates(nullptr),
           _dom_updates(nullptr),
           _prev_updates(nullptr) {
   assert(nstack.is_empty(), "");
   assert(_rpo_list.size() == 0, "");
   phase->rpo(C->root(), nstack, _visited, _rpo_list);
+  _dominator_tree = new DominatorTree(_rpo_list, phase);
+//  return;
   int shift = 0;
   for (uint i = 0; i < _rpo_list.size(); ++i) {
     Node* n = _rpo_list.at(i);
@@ -1287,14 +1384,20 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
     shift--;
     _rpo_list.pop();
   }
-//  Node* root = _rpo_list.pop();
-//  assert(root == C->root(), "");
-  _control2rpo = new Control2Rpo(8, _rpo_list.size());
+  uint max_id = 0;
   for (uint i = 0; i < _rpo_list.size(); ++i) {
     Node* n = _rpo_list.at(i);
-    _control2rpo->put(n, _rpo_list.size() - 1 - i);
-    _control2rpo->maybe_grow(load_factor);
+    max_id = MAX2(n->_idx, max_id);
   }
+
+//  Node* root = _rpo_list.pop();
+//  assert(root == C->root(), "");
+//  _control2rpo = new Control2Rpo(8, _rpo_list.size());
+//  for (uint i = 0; i < _rpo_list.size(); ++i) {
+//    Node* n = _rpo_list.at(i);
+//    _control2rpo->put(n, _rpo_list.size() - 1 - i);
+//    _control2rpo->maybe_grow(load_factor);
+//  }
   _updates = new Updates(8, _rpo_list.size());
 }
 

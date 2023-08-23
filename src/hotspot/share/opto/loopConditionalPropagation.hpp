@@ -28,6 +28,8 @@
 #include "opto/loopnode.hpp"
 #include "opto/rootnode.hpp"
 
+class DominatorTree;
+
 class PhaseConditionalPropagation : public PhaseIterGVN {
 private:
 
@@ -150,8 +152,8 @@ private:
 
   using Updates = ResizeableResourceHashtable<Node*, TypeUpdate*, AnyObj::RESOURCE_AREA, mtInternal>;
   Updates* _updates;
-  using Control2Rpo = ResizeableResourceHashtable<Node*, uint, AnyObj::RESOURCE_AREA, mtInternal>;
-  Control2Rpo* _control2rpo;
+//  using Control2Rpo = ResizeableResourceHashtable<Node*, uint, AnyObj::RESOURCE_AREA, mtInternal>;
+//  Control2Rpo* _control2rpo;
 
   bool related_use(Node* u, Node* c);
 
@@ -183,6 +185,8 @@ private:
   int _nb_ifs;
   GrowableArray<int> _uses;
   GrowableArray<int> _uses2;
+
+  const DominatorTree* _dominator_tree;
 
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
@@ -255,6 +259,8 @@ public:
   void mark_if(IfNode* iff, Node* c);
 
   void mark_if_from_cmp(const Node* u, Node* c);
+
+  bool is_dominator(Node* n, Node* m) const;
 
   uint _rpo;
 };
