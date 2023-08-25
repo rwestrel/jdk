@@ -101,42 +101,66 @@
 #include "opto/movenode.hpp"
 #include "opto/opaquenode.hpp"
 
-
-bool PhaseConditionalPropagation::related_use(Node* u, Node* c) {
-  if (!_phase->has_node(u)) {
-    return false;
+void PhaseConditionalPropagation::enqueue_for_delayed_processing(Node* n) {
+  if (_enqueued.test_set(n->_idx)) {
+    return;
   }
-  if (u->is_Phi()) {
-    if (u->in(0) ==  c) {
-      return true;
-    }
-    int iterations = _iterations;
-    if (_visited.test(u->in(0)->_idx)) {
-      _progress = true;
-      iterations = _iterations + 1;
-    }
-    // mark as needing processing either in the pass over the CFG (control not yet processed) or on the next one
-    _control_dependent_node[iterations%2].set(u->in(0)->_idx);
-    _control_dependent_node[iterations%2].set(u->_idx);
-    return false;
+  Node* c = _phase->ctrl_or_self(n);
+  if (_visited.test(c->_idx)) {
+    _progress = true;
+    assert(n->is_Phi(), "");
+  }
+  GrowableArray<Node*>** wq_ptr = _work_queues->get(c);
+  GrowableArray<Node*>* wq = nullptr;
+  if (wq_ptr != nullptr) {
+    wq = *wq_ptr;
+  } else {
+    wq = new GrowableArray<Node*>();
+    _work_queues->put(c, wq);
+    _work_queues->maybe_grow(load_factor);
+  }
+  assert(!wq->contains(n), "should be enqueued only once");
+  wq->push(n);
+}
+
+
+PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(Node* u, Node* c) {
+  if (!_phase->has_node(u)) {
+    return NotRelated;
   }
   Node* u_c = _phase->ctrl_or_self(u);
-//  uint rpo = *_control2rpo->get(known_updates(u_c));
-//  assert(_rpo == *_control2rpo->get(c), "");
-//  assert(!_phase->is_dominator(c, u_c) || _rpo <= rpo, "");
-//  assert(!_phase->is_dominator(u_c, c) || rpo <= _rpo, "");
-  if (!(/*_rpo <= rpo &&*/ is_dominator(c, u_c)) && (u->is_CFG() || !(/*rpo <= _rpo &&*/is_dominator(u_c, c)))) {
-    return false;
+  if (u->is_Phi()) {
+    assert(u_c == u->in(0), "");
+    if (u->in(0) ==  c) {
+      return Immediate;
+    }
+    return Delayed;
   }
-//  rpo = *_control2rpo->get(known_updates(u->in(0)));
-  if (!u->is_CFG() && u->in(0) != nullptr && u->in(0)->is_CFG() && !is_dominator(u->in(0), c)) {
-    // mark as needing processing either in the pass over the CFG (control not yet processed) or on the next one
-    assert(!_visited.test(u->in(0)->_idx), "");
-    _control_dependent_node[_iterations%2].set(u->in(0)->_idx);
-    _control_dependent_node[_iterations%2].set(u->_idx);
-    return false;
+  if (c == u_c) {
+    return Immediate;
   }
-  return true;
+  if (is_dominator(c, u_c)) {
+    return Delayed;
+  }
+  if (u->is_CFG()) {
+    return NotRelated;
+  }
+  if (is_dominator(u_c, c)) {
+    return Immediate;
+  }
+  return NotRelated;
+}
+
+void PhaseConditionalPropagation::enqueue_use(Node* n, PhaseConditionalPropagation::UseType use_type) {
+  if (use_type == NotRelated) {
+    return;
+  }
+  if (use_type == Immediate) {
+    _wq.push(n);
+    return;
+  }
+  assert(use_type == Delayed, "");
+  enqueue_for_delayed_processing(n);
 }
 
 void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
@@ -155,84 +179,83 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
   assert(_phase->has_node(const_cast<Node*>(n)), "");
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* u = n->fast_out(i);
-//    if (u->outcnt() == 1 && (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpU ||
-//        u->Opcode() == Op_CmpL || u->Opcode() == Op_CmpUL)) {
-//      Node* bol = u->unique_out();
-//      if (bol->outcnt() == 1) {
-//        if (bol->unique_out()->is_If()) {
-//          continue;
-//        }
-//      }
-//    }
-    bool is_related = related_use(u, c);
+    if (_enqueued.test(u->_idx)) {
 #ifdef ASSERT
     if (UseNewCode3) {
-      tty->print(">>>> at %d %s", _phase->ctrl_or_self(u)->_idx, is_related ? "related" : "not related"); u->dump();
+      tty->print(">>>> at %d enqueued", _phase->ctrl_or_self(u)->_idx); u->dump();
     }
 #endif
-    if (is_related) {
-      _wq.push(u);
-      if (u->Opcode() == Op_AddI || u->Opcode() == Op_SubI) {
-        for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
-          Node* uu = u->fast_out(i2);
-          if (uu->Opcode() == Op_CmpU && related_use(uu, c)) {
-            _wq.push(uu);
+      continue;
+    }
+    UseType use_type = related_use(u, c);
+#ifdef ASSERT
+    if (UseNewCode3) {
+      tty->print(">>>> at %d %s", _phase->ctrl_or_self(u)->_idx, use_type == Delayed ? "delayed" : (use_type == Immediate ? "immediate" : "not_related")); u->dump();
+    }
+#endif
+    if (use_type == NotRelated) {
+      continue;
+    }
+    enqueue_use(u, use_type);
+    if (u->Opcode() == Op_AddI || u->Opcode() == Op_SubI) {
+      for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
+        Node* uu = u->fast_out(i2);
+        if (uu->Opcode() == Op_CmpU) {
+          enqueue_use(uu, related_use(uu, c));
+        }
+      }
+    }
+    if (u->is_AllocateArray()) {
+      for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
+        Node* uu = u->fast_out(i2);
+        if (uu->is_Proj() && uu->as_Proj()->_con == TypeFunc::Control) {
+          Node* catch_node = uu->find_out_with(Op_Catch);
+          if (catch_node != nullptr) {
+            assert(related_use(catch_node, c) == Delayed, "");
+            enqueue_use(catch_node, Delayed);
           }
         }
       }
-      if (u->is_AllocateArray()) {
-        for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
-          Node* uu = u->fast_out(i2);
-          if (uu->is_Proj() && uu->as_Proj()->_con == TypeFunc::Control) {
-            Node* catch_node = uu->find_out_with(Op_Catch);
-            if (catch_node != nullptr) {
-              _wq.push(catch_node);
-            }
+    }
+    if (u->Opcode() == Op_OpaqueZeroTripGuard) {
+      Node* cmp = u->unique_out();
+      enqueue_use(cmp, related_use(cmp, c));
+    }
+    if (u->is_Opaque1() && u->as_Opaque1()->original_loop_limit() == n) {
+      for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
+        Node* uu = u->fast_out(i2);
+        if (uu->Opcode() == Op_CmpI || uu->Opcode() == Op_CmpL) {
+          Node* phi = uu->as_Cmp()->countedloop_phi(u);
+          if (phi != nullptr) {
+            enqueue_use(phi, related_use(phi, c));
           }
         }
       }
-      if (u->Opcode() == Op_OpaqueZeroTripGuard) {
-        Node* cmp = u->unique_out();
-        if (related_use(cmp, c)) {
-          _wq.push(cmp);
-        }
+    }
+    if (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpL) {
+      Node* phi = u->as_Cmp()->countedloop_phi(n);
+      if (phi != nullptr) {
+        enqueue_use(phi, related_use(phi, c));
       }
-      if (u->is_Opaque1() && u->as_Opaque1()->original_loop_limit() == n) {
-        for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
-          Node* uu = u->fast_out(i2);
-          if (uu->Opcode() == Op_CmpI || uu->Opcode() == Op_CmpL) {
-            Node* phi = uu->as_Cmp()->countedloop_phi(u);
-            if (phi != nullptr && related_use(phi, c)) {
-              _wq.push(phi);
-            }
-          }
-        }
-      }
-      if (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpL) {
-        Node* phi = u->as_Cmp()->countedloop_phi(n);
-        if (phi != nullptr && related_use(phi, c)) {
-          _wq.push(phi);
-        }
-      }
+    }
 
-      if (_iterations > 1) {
-        // If this node feeds into a condition that feeds into an If, mark the if as needing work (for iterations > 1)
-        mark_if_from_cmp(u, c);
+    if (_iterations > 1) {
+      // If this node feeds into a condition that feeds into an If, mark the if as needing work (for iterations > 1)
+      mark_if_from_cmp(u, c);
 
-        if (u->Opcode() == Op_ConvL2I) {
-          for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
-            Node* u2 = u->fast_out(j);
-            mark_if_from_cmp(u2, c);
-          }
-        }
-      }
-
-      if (u->is_Region()) {
+      if (u->Opcode() == Op_ConvL2I) {
         for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
-          Node* uu = u->fast_out(j);
-          if (uu->is_Phi() && related_use(uu, c)) {
-            _wq.push(uu);
-          }
+          Node* u2 = u->fast_out(j);
+          mark_if_from_cmp(u2, c);
+        }
+      }
+    }
+
+    if (u->is_Region()) {
+      for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
+        Node* uu = u->fast_out(j);
+        if (uu->is_Phi()) {
+          enqueue_use(uu, related_use(uu, c));
         }
       }
     }
@@ -377,7 +400,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
           updated.set(c->_idx);
         }
         // Was control marked as needing work?
-        if (_control_dependent_node[_iterations % 2].test(c->_idx) || _wq.size() > 0) {
+        if (_control_dependent_node[_iterations % 2].test(c->_idx) || work_queue_at(c) != nullptr || _wq.size() > 0) {
           if (!adjust_updates_called) {
             adjust_updates(c, false);
           }
@@ -418,23 +441,43 @@ void PhaseConditionalPropagation::analyze(int rounds) {
     }
   }
 
-#if 0 //def ASSERT
-  // Verify we've indeed reached a fixed point
-  _control_dependent_node[_iterations % 2].clear();
-  _iterations++;
-  bool extra = false;
-  bool extra2 = false;
-  _visited.clear();
-  for (int i = _rpo_list.size() - 1; i >= 0; i--) {
-    int rpo = _rpo_list.size() - 1 - i;
-    Node* c = _rpo_list.at(i);
+#if 0
+#ifdef ASSERT
+  if (_work_queues->number_of_entries() != 0) {
+    auto dump_entries = [&] (Node* c, GrowableArray<Node*>* queue) {
+        tty->print("XXX "); c->dump();
+        for (int i = 0; i < queue->length(); i++) {
+          Node* n = queue->at(i);
+          n->dump();
+        }
+        return true;
+    };
+    _work_queues->iterate(dump_entries);
+  }
+#endif
+  assert(_work_queues->number_of_entries() == 0, "");
+  assert(_enqueued.is_empty(), "");
+#endif
 
-    adjust_updates(c, true);
-    bool progress = one_iteration(c, extra, extra2, true);
-    if (extra2) {
-      break;
+#ifdef ASSERT
+  if (VerifyLoopConditionalPropagation) {
+    // Verify we've indeed reached a fixed point
+    _control_dependent_node[_iterations % 2].clear();
+    _iterations++;
+    bool extra = false;
+    bool extra2 = false;
+    _visited.clear();
+    for (int i = _rpo_list.size() - 2; i >= 0; i--) {
+      int rpo = _rpo_list.size() - 1 - i;
+      Node* c = _rpo_list.at(i);
+
+      adjust_updates(c, true);
+      bool progress = one_iteration(c, extra, extra2, true);
+      if (extra2) {
+        break;
+      }
+      assert(!progress, "");
     }
-    assert(!progress, "");
   }
 #endif
 
@@ -598,14 +641,25 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
     sync(dom);
     analyze_allocate_array(c, alloc);
   }
-  if (verify || _control_dependent_node[_iterations%2].test(c->_idx)) {
-    for (DUIterator_Fast imax, i = c->fast_outs(imax); i < imax; i++) {
-      Node* u = c->fast_out(i);
-      if (!u->is_CFG() && u->in(0) == c && u->Opcode() != Op_CheckCastPP && _phase->has_node(u) && (verify || _control_dependent_node[_iterations%2].test(u->_idx))) {
-        _wq.push(u);
-      }
+
+  GrowableArray<Node*>* work_queue = work_queue_at(c);
+  if (work_queue != nullptr) {
+    while (!work_queue->is_empty()) {
+      Node* n = work_queue->pop();
+      _wq.push(n);
+      assert(_enqueued.test(n->_idx), "");
+      _enqueued.remove(n->_idx);
     }
+    _work_queues->remove(c);
   }
+//  if (verify) {
+//    for (DUIterator_Fast imax, i = c->fast_outs(imax); i < imax; i++) {
+//      Node* u = c->fast_out(i);
+//      if (!u->is_CFG() && u->in(0) == c && _phase->has_node(u)) {
+//        _wq.push(u);
+//      }
+//    }
+//  }
 
   sync(c);
   while (_wq.size() > 0) {
@@ -1353,6 +1407,7 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
                                                          Node_List& rpo_list)
         : PhaseIterGVN(&phase->igvn()),
           _updates(nullptr),
+          _work_queues(nullptr),
 //          _control2rpo(nullptr),
           _phase(phase),
           _visited(visited),
@@ -1399,6 +1454,7 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
 //    _control2rpo->maybe_grow(load_factor);
 //  }
   _updates = new Updates(8, _rpo_list.size());
+  _work_queues = new WorkQueues(8, _rpo_list.size());
 }
 
 void PhaseIdealLoop::conditional_elimination(VectorSet& visited, Node_Stack& nstack, Node_List& rpo_list, int rounds) {
