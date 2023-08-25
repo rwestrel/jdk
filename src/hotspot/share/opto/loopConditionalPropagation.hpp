@@ -154,9 +154,28 @@ private:
   Updates* _updates;
 //  using Control2Rpo = ResizeableResourceHashtable<Node*, uint, AnyObj::RESOURCE_AREA, mtInternal>;
 //  Control2Rpo* _control2rpo;
+  using WorkQueues = ResizeableResourceHashtable<Node*, GrowableArray<Node*>*, AnyObj::RESOURCE_AREA, mtInternal>;
+  WorkQueues* _work_queues;
+  VectorSet _enqueued;
 
-  bool related_use(Node* u, Node* c);
+  enum UseType {
+      NotRelated,
+      Immediate,
+      Delayed
+  };
 
+  UseType related_use(Node* u, Node* c);
+  void enqueue_for_delayed_processing(Node* n);
+
+  GrowableArray<Node*>* work_queue_at(Node* c) const {
+    GrowableArray<Node*>** work_queue_ptr = _work_queues->get(c);
+    if (work_queue_ptr == nullptr) {
+      return nullptr;
+    }
+    return *work_queue_ptr;
+  }
+
+  void enqueue_use(Node* n, UseType use_type);
   void enqueue_uses(const Node* n, Node* c);
 
   void set_type(const Node* n, const Type* t, const Type* old_t) {
