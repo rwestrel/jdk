@@ -105,7 +105,7 @@ void PhaseConditionalPropagation::enqueue_for_delayed_processing(Node* n) {
   if (_enqueued.test_set(n->_idx)) {
     return;
   }
-  Node* c = _phase->ctrl_or_self(n);
+  Node* c = _phase->find_non_split_ctrl(_phase->ctrl_or_self(n));
   if (_visited.test(c->_idx)) {
     _progress = true;
     assert(n->is_Phi(), "");
@@ -128,7 +128,7 @@ PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(No
   if (!_phase->has_node(u)) {
     return NotRelated;
   }
-  Node* u_c = _phase->ctrl_or_self(u);
+  Node* u_c = _phase->find_non_split_ctrl(_phase->ctrl_or_self(u));
   if (u->is_Phi()) {
     assert(u_c == u->in(0), "");
     if (u->in(0) ==  c) {
@@ -441,7 +441,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
     }
   }
 
-#if 0
+#if 1
 #ifdef ASSERT
   if (_work_queues->number_of_entries() != 0) {
     auto dump_entries = [&] (Node* c, GrowableArray<Node*>* queue) {
@@ -664,6 +664,12 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
   sync(c);
   while (_wq.size() > 0) {
     Node* n = _wq.pop();
+    assert(_phase->is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
+#ifdef ASSERT
+    if (UseNewCode3) {
+      tty->print("[%d] Value at %d ", _iterations, c->_idx); n->dump();
+    }
+#endif
     const Type* t = n->Value(this);
     const Type* current_type = PhaseValues::type(n);
     if (n->is_Phi() && _iterations > 1) {
