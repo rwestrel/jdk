@@ -4808,13 +4808,15 @@ void PhaseIdealLoop::build_and_optimize() {
     C->set_major_progress();
   }
 
+  bool conditional_elimination_already_ran = false;
   if (!C->major_progress() && UseLoopConditionalPropagation && C->run_loop_conditional_propagation()) {
     visited.clear();
     int rounds = max_jint;
     conditional_elimination(visited, nstack, worklist, rounds);
 //    if (!C->major_progress()) {
-//      C->set_run_loop_conditional_propagation(false);
+//    C->set_run_loop_conditional_propagation(false);
 //    }
+    conditional_elimination_already_ran = true;
   }
 
   // Perform loop predication before iteration splitting
@@ -4910,6 +4912,11 @@ void PhaseIdealLoop::build_and_optimize() {
         move_unordered_reduction_out_of_loop(lpt);
       }
     }
+  }
+  if (0 && !C->major_progress() && UseLoopConditionalPropagation && !conditional_elimination_already_ran) {
+    visited.clear();
+    int rounds = max_jint;
+    conditional_elimination(visited, nstack, worklist, rounds);
   }
 }
 

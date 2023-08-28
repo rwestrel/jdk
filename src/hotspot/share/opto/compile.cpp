@@ -891,7 +891,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
   set_allowed_deopt_reasons();
 
   // Now generate code
-//  Code_Gen();
+  Code_Gen();
 }
 
 //------------------------------Compile----------------------------------------
