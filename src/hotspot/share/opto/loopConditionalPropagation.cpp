@@ -503,137 +503,9 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
   Node* dom = _phase->idom(c);
 
   if (c->is_Region()) {
-    // Look for nodes whose types are narrowed between this region and the dominator control on all region's inputs
-    // First find the region's input that has the smallest number of type updates to keep processing as low as possible
-    uint in_idx = 1;
-    int num_types = max_jint;
-    for (uint i = 1 ; i < c->req(); ++i) {
-      Node* in = c->in(i);
-      TypeUpdate* updates = updates_at(in);
-      int cnt = 0;
-      while(updates != nullptr && updates->below(_dom_updates, _phase)) {
-        cnt += updates->length();
-        updates = updates->prev();
-      }
-      if (cnt < num_types) {
-        in_idx = i;
-        num_types = cnt;
-      }
-    }
-    Node* in = c->in(in_idx);
-    Node* ctrl = in;
-    TypeUpdate* updates = updates_at(ctrl);
-    assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
-    // now go over all type updates between this region input and the dominator
-    while(updates != nullptr && updates->below(_dom_updates, _phase)) {
-      for (int j = 0; j < updates->length(); ++j) {
-        Node* n = updates->node_at(j);
-        if (n->is_CMove()) {
-          /*
-           If we have:
-           // type of v1 is [min, max]
-           v2 = v1 > 0 ? v1 : 0; // type of v2 is [min, max]
-           if (v1 > 0) {
-             // type of v1 is [1, max]
-             ..
-             // type of v2 is [1, max]
-           } else {
-             // type of v1 is [min, 0]
-             ..
-             // type of v2 is 0
-           }
-           // type of v2 is [0, max]
-
-           The if with the identical condition helps narrow down the value of the CMove beyond what C2 can usually figure
-           out. Now if the if is eliminated as the compilation process moves on, a subsequent pass of this optimization
-           may not be able  to narrow the type of CMove again. This graph shape shows up in the loop opts pass that creates
-           the CMove (corresponding if not yet eliminated). Inconsistencies between passes of this optimization can cause
-           issues so skip merging of CMove entirely.
-           */
-          continue;
-        }
-        const Type* t = find_type_between(n, in, dom);
-        // and check if the type was updated from other region inputs
-        uint k = 1;
-        for (; k < c->req(); k++) {
-          if (k == in_idx) {
-            continue;
-          }
-          Node* other_in = c->in(k);
-          const Type* type_at_in = find_type_between(n, other_in, dom);
-          if (type_at_in == nullptr) {
-            break;
-          }
-          t = t->meet_speculative(type_at_in);
-        }
-        // If that's the case, record type update
-        if (k == c->req()) {
-          const Type* current_type = find_prev_type_between(n, in, dom);
-
-          if (_iterations > 1) {
-            t = current_type->filter(t);
-            const Type* prev_t = t;
-            const Type* prev_round_t = nullptr;
-            if (_prev_updates != nullptr && _prev_updates->control() == c) {
-              prev_round_t = _prev_updates->type_if_present(n);
-            }
-            if (prev_round_t == nullptr) {
-              prev_round_t = current_type;
-            }
-            if (prev_round_t != nullptr) {
-              t = prev_round_t->filter(t);
-              assert(t == prev_t, "");
-              t = saturate(t, prev_round_t, nullptr);
-              if (c->is_Loop() && t != prev_round_t) {
-                extra = true;
-              }
-            }
-          }
-          t = current_type->filter(t);
-
-          if (t != current_type) {
-            assert(narrows_type(current_type, t), "");
-            if (record_update(c, n, current_type, t)) {
-              enqueue_uses(n, c);
-            }
-          }
-        }
-      }
-      updates = updates->prev();
-      assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
-    }
+    handle_region(c, dom, extra);
   } else if (c->is_IfProj()) {
-    Node* iff = c->in(0);
-    assert(iff->is_If(), "");
-    if (!(iff->is_CountedLoopEnd() && iff->as_CountedLoopEnd()->loopnode() != nullptr &&
-          iff->as_CountedLoopEnd()->loopnode()->is_strip_mined())) {
-      Node* bol = iff->in(1);
-      if (iff->is_OuterStripMinedLoopEnd()) {
-        assert(iff->in(0)->in(0)->in(0)->is_CountedLoopEnd(), "");
-        bol = iff->in(0)->in(0)->in(0)->in(1);
-      }
-      if (bol->Opcode() == Op_Opaque4) {
-        bol = bol->in(1);
-      }
-      if (bol->is_Bool()) {
-        Node* cmp = bol->in(1);
-        if (cmp->Opcode() == Op_CmpI || cmp->Opcode() == Op_CmpU ||
-            cmp->Opcode() == Op_CmpL || cmp->Opcode() == Op_CmpUL) {
-          Node* cmp1 = cmp->in(1);
-          Node* cmp2 = cmp->in(2);
-          sync(iff);
-//          assert(PhaseValues::type(iff) != Type::TOP, "");
-          // narrowing the type of a LoadRange could cause a range check to optimize out and a Load to be hoisted above
-          // checks that guarantee its within bounds
-          if (cmp1->Opcode() != Op_LoadRange) {
-            analyze_if(c, cmp, cmp1);
-          }
-          if (cmp2->Opcode() != Op_LoadRange) {
-            analyze_if(c, cmp, cmp2);
-          }
-        }
-      }
-    }
+    handle_ifproj(c);
   } else if (c->is_CatchProj() && c->in(0)->in(0)->in(0)->is_AllocateArray() &&
              c->as_CatchProj()->_con == CatchProjNode::fall_through_index) {
     // If the allocation succeeds, length is > 0 and less than max supported size
@@ -642,17 +514,8 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
     analyze_allocate_array(c, alloc);
   }
 
-  GrowableArray<Node*>* work_queue = work_queue_at(c);
-  if (work_queue != nullptr) {
-    while (!work_queue->is_empty()) {
-      Node* n = work_queue->pop();
-      _wq.push(n);
-      assert(_enqueued.test(n->_idx), "");
-      _enqueued.remove(n->_idx);
-    }
-    _work_queues->remove(c);
-  }
-//  if (verify) {
+  sync_work_queue(c);
+  //  if (verify) {
 //    for (DUIterator_Fast imax, i = c->fast_outs(imax); i < imax; i++) {
 //      Node* u = c->fast_out(i);
 //      if (!u->is_CFG() && u->in(0) == c && _phase->has_node(u)) {
@@ -661,45 +524,7 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
 //    }
 //  }
 
-  sync(c);
-  while (_wq.size() > 0) {
-    Node* n = _wq.pop();
-    assert(_phase->is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
-#ifdef ASSERT
-    if (UseNewCode3) {
-      tty->print("[%d] Value at %d ", _iterations, c->_idx); n->dump();
-    }
-#endif
-    const Type* t = n->Value(this);
-    const Type* current_type = PhaseValues::type(n);
-    if (n->is_Phi() && _iterations > 1) {
-      t = current_type->filter(t);
-      const Type* prev_type = nullptr;
-      if (_prev_updates != nullptr) {
-        prev_type = _prev_updates->type_if_present(n);
-      }
-      if (prev_type != nullptr) {
-        const Type* prev_t = t;
-        t = prev_type->filter(t);
-        assert(t == prev_t, "");
-        if (!(n->in(0)->is_CountedLoop() && n->in(0)->as_CountedLoop()->phi() == n &&
-              n->in(0)->as_CountedLoop()->can_be_counted_loop(this))) {
-          t = saturate(t, prev_type, nullptr);
-        }
-      }
-      if (c->is_Loop() && t != prev_type) {
-        extra = true;
-      }
-    }
-    t = current_type->filter(t);
-    if (t != current_type) {
-#ifdef ASSERT
-      assert(narrows_type(current_type, t), "");
-#endif
-      set_type(n, t, current_type);
-      enqueue_uses(n, c);
-    }
-  }
+  propagate_types(c, extra);
 
   bool progress = false;
   if (_prev_updates == nullptr) {
@@ -767,6 +592,197 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
   }
 #endif
   return progress;
+}
+
+void PhaseConditionalPropagation::propagate_types(Node* c, bool& extra) {
+  sync(c);
+  while (_wq.size() > 0) {
+    Node* n = _wq.pop();
+    assert(is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
+#ifdef ASSERT
+    if (UseNewCode3) {
+      tty->print("[%d] Value at %d %s ", _iterations, c->_idx, _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c ? "at_control" : "above_control"); n->dump();
+    }
+#endif
+    const Type* t = n->Value(this);
+    const Type* current_type = PhaseValues::type(n);
+    if (n->is_Phi() && _iterations > 1) {
+      t = current_type->filter(t);
+      const Type* prev_type = nullptr;
+      if (_prev_updates != nullptr) {
+        prev_type = _prev_updates->type_if_present(n);
+      }
+      if (prev_type != nullptr) {
+        const Type* prev_t = t;
+        t = prev_type->filter(t);
+        assert(t == prev_t, "");
+        if (!(n->in(0)->is_CountedLoop() && n->in(0)->as_CountedLoop()->phi() == n &&
+              n->in(0)->as_CountedLoop()->can_be_counted_loop(this))) {
+          t = saturate(t, prev_type, nullptr);
+        }
+      }
+      if (c->is_Loop() && t != prev_type) {
+        extra = true;
+      }
+    }
+    t = current_type->filter(t);
+    if (t != current_type) {
+#ifdef ASSERT
+      assert(narrows_type(current_type, t), "");
+#endif
+      set_type(n, t, current_type);
+      enqueue_uses(n, c);
+    }
+  }
+}
+
+void PhaseConditionalPropagation::sync_work_queue(Node* c) {
+  GrowableArray<Node*>* work_queue = work_queue_at(c);
+  if (work_queue != nullptr) {
+    while (!work_queue->is_empty()) {
+      Node* n = work_queue->pop();
+      _wq.push(n);
+      assert(_enqueued.test(n->_idx), "");
+      _enqueued.remove(n->_idx);
+    }
+    _work_queues->remove(c);
+  }
+}
+
+void PhaseConditionalPropagation::handle_ifproj(Node* c) {
+  Node* iff = c->in(0);
+  assert(iff->is_If(), "");
+  if (!(iff->is_CountedLoopEnd() && iff->as_CountedLoopEnd()->loopnode() != nullptr &&
+        iff->as_CountedLoopEnd()->loopnode()->is_strip_mined())) {
+    Node* bol = iff->in(1);
+    if (iff->is_OuterStripMinedLoopEnd()) {
+      assert(iff->in(0)->in(0)->in(0)->is_CountedLoopEnd(), "");
+      bol = iff->in(0)->in(0)->in(0)->in(1);
+    }
+    if (bol->Opcode() == Op_Opaque4) {
+      bol = bol->in(1);
+    }
+    if (bol->is_Bool()) {
+      Node* cmp = bol->in(1);
+      if (cmp->Opcode() == Op_CmpI || cmp->Opcode() == Op_CmpU ||
+          cmp->Opcode() == Op_CmpL || cmp->Opcode() == Op_CmpUL) {
+        Node* cmp1 = cmp->in(1);
+        Node* cmp2 = cmp->in(2);
+        sync(iff);
+//          assert(PhaseValues::type(iff) != Type::TOP, "");
+        // narrowing the type of a LoadRange could cause a range check to optimize out and a Load to be hoisted above
+        // checks that guarantee its within bounds
+        if (cmp1->Opcode() != Op_LoadRange) {
+          analyze_if(c, cmp, cmp1);
+        }
+        if (cmp2->Opcode() != Op_LoadRange) {
+          analyze_if(c, cmp, cmp2);
+        }
+      }
+    }
+  }
+}
+
+void PhaseConditionalPropagation::handle_region(Node* c, Node* dom, bool& extra) {
+  // Look for nodes whose types are narrowed between this region and the dominator control on all region's inputs
+// First find the region's input that has the smallest number of type updates to keep processing as low as possible
+  uint in_idx = 1;
+  int num_types = max_jint;
+  for (uint i = 1 ; i < c->req(); ++i) {
+    Node* in = c->in(i);
+    TypeUpdate* updates = updates_at(in);
+    int cnt = 0;
+    while(updates != nullptr && updates->below(_dom_updates, _phase)) {
+      cnt += updates->length();
+      updates = updates->prev();
+    }
+    if (cnt < num_types) {
+      in_idx = i;
+      num_types = cnt;
+    }
+  }
+  Node* in = c->in(in_idx);
+  Node* ctrl = in;
+  TypeUpdate* updates = updates_at(ctrl);
+  assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
+  // now go over all type updates between this region input and the dominator
+  while(updates != nullptr && updates->below(_dom_updates, _phase)) {
+    for (int j = 0; j < updates->length(); ++j) {
+      Node* n = updates->node_at(j);
+      if (n->is_CMove()) {
+        /*
+         If we have:
+         // type of v1 is [min, max]
+         v2 = v1 > 0 ? v1 : 0; // type of v2 is [min, max]
+         if (v1 > 0) {
+           // type of v1 is [1, max]
+           ..
+           // type of v2 is [1, max]
+         } else {
+           // type of v1 is [min, 0]
+           ..
+           // type of v2 is 0
+         }
+         // type of v2 is [0, max]
+
+         The if with the identical condition helps narrow down the value of the CMove beyond what C2 can usually figure
+         out. Now if the if is eliminated as the compilation process moves on, a subsequent pass of this optimization
+         may not be able  to narrow the type of CMove again. This graph shape shows up in the loop opts pass that creates
+         the CMove (corresponding if not yet eliminated). Inconsistencies between passes of this optimization can cause
+         issues so skip merging of CMove entirely.
+         */
+        continue;
+      }
+      const Type* t = find_type_between(n, in, dom);
+      // and check if the type was updated from other region inputs
+      uint k = 1;
+      for (; k < c->req(); k++) {
+        if (k == in_idx) {
+          continue;
+        }
+        Node* other_in = c->in(k);
+        const Type* type_at_in = find_type_between(n, other_in, dom);
+        if (type_at_in == nullptr) {
+          break;
+        }
+        t = t->meet_speculative(type_at_in);
+      }
+      // If that's the case, record type update
+      if (k == c->req()) {
+        const Type* current_type = find_prev_type_between(n, in, dom);
+
+        if (_iterations > 1) {
+          t = current_type->filter(t);
+          const Type* prev_t = t;
+          const Type* prev_round_t = nullptr;
+          if (_prev_updates != nullptr && _prev_updates->control() == c) {
+            prev_round_t = _prev_updates->type_if_present(n);
+          }
+          if (prev_round_t == nullptr) {
+            prev_round_t = current_type;
+          }
+          if (prev_round_t != nullptr) {
+            t = prev_round_t->filter(t);
+            assert(t == prev_t, "");
+            t = saturate(t, prev_round_t, nullptr);
+            if (c->is_Loop() && t != prev_round_t) {
+              extra = true;
+            }
+          }
+        }
+        t = current_type->filter(t);
+
+        if (t != current_type) {
+          assert(narrows_type(current_type, t), "");
+          if (record_update(c, n, current_type, t)) {
+            enqueue_uses(n, c);
+          }
+        }
+      }
+    }
+    updates = updates->prev();
+    assert(updates != nullptr || _dom_updates == nullptr || is_dominator(c, in) || C->has_irreducible_loop(), "");
+  }
 }
 
 void PhaseConditionalPropagation::adjust_updates(Node* c, bool verify) {
@@ -1464,6 +1480,9 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
 }
 
 void PhaseIdealLoop::conditional_elimination(VectorSet& visited, Node_Stack& nstack, Node_List& rpo_list, int rounds) {
+  if (UseNewCode3) {
+    tty->print_cr(">>>>>>>>>>>>>>>>>>>");
+  }
   TraceTime tt("loop conditional propagation", UseNewCode);
   PhaseConditionalPropagation pcp(this, visited, nstack, rpo_list);
   {

@@ -282,6 +282,14 @@ public:
   bool is_dominator(Node* n, Node* m) const;
 
   uint _rpo;
+
+  void handle_region(Node* c, Node* dom, bool& extra);
+
+  void handle_ifproj(Node* c);
+
+  void sync_work_queue(Node* c);
+
+  void propagate_types(Node* c, bool& extra);
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP
