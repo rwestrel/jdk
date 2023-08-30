@@ -175,8 +175,8 @@ private:
     return *work_queue_ptr;
   }
 
-  void enqueue_use(Node* n, UseType use_type);
-  void enqueue_uses(const Node* n, Node* c);
+  void enqueue_use(Node* n, Node* c, UseType use_type, bool at_c_only);
+  void enqueue_uses(const Node* n, Node* c, bool at_c_only);
 
   void set_type(const Node* n, const Type* t, const Type* old_t) {
     record_update(_current_ctrl, n, old_t, t);
@@ -189,7 +189,7 @@ private:
 
   PhaseIdealLoop* _phase;
   VectorSet& _visited;
-  VectorSet _control_dependent_node[2];
+//  VectorSet _control_dependent_node[2];
   Node_List& _rpo_list;
   Node* _current_ctrl;
 #ifdef ASSERT
@@ -207,6 +207,8 @@ private:
 
   const DominatorTree* _dominator_tree;
 
+  bool _verify;
+
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
 
@@ -218,7 +220,7 @@ public:
 
   static const int load_factor = 8;
 
-  bool one_iteration(Node* c, bool& extra, bool& extra2, bool verify);
+  bool one_iteration(Node* c, bool& extra, bool& extra2);
 
   void analyze_allocate_array(Node* c, const AllocateArrayNode* alloc);
 

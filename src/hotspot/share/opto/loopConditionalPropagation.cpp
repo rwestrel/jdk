@@ -102,13 +102,14 @@
 #include "opto/opaquenode.hpp"
 
 void PhaseConditionalPropagation::enqueue_for_delayed_processing(Node* n) {
+  assert(!n->is_Root(), "");
   if (_enqueued.test_set(n->_idx)) {
     return;
   }
   Node* c = _phase->find_non_split_ctrl(_phase->ctrl_or_self(n));
   if (_visited.test(c->_idx)) {
     _progress = true;
-    assert(n->is_Phi(), "");
+    assert(n->is_Phi() || n->is_Region(), "");
   }
   GrowableArray<Node*>** wq_ptr = _work_queues->get(c);
   GrowableArray<Node*>* wq = nullptr;
@@ -125,13 +126,19 @@ void PhaseConditionalPropagation::enqueue_for_delayed_processing(Node* n) {
 
 
 PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(Node* u, Node* c) {
-  if (!_phase->has_node(u)) {
+  if (!_phase->has_node(u) || u->is_Root()) {
     return NotRelated;
   }
   Node* u_c = _phase->find_non_split_ctrl(_phase->ctrl_or_self(u));
   if (u->is_Phi()) {
     assert(u_c == u->in(0), "");
     if (u->in(0) ==  c) {
+      return Immediate;
+    }
+    return Delayed;
+  } else if (u->is_Region()) {
+    assert(u_c == u, "");
+    if (u ==  c) {
       return Immediate;
     }
     return Delayed;
@@ -151,7 +158,7 @@ PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(No
   return NotRelated;
 }
 
-void PhaseConditionalPropagation::enqueue_use(Node* n, PhaseConditionalPropagation::UseType use_type) {
+void PhaseConditionalPropagation::enqueue_use(Node* n, Node* c, UseType use_type, bool at_c_only) {
   if (use_type == NotRelated) {
     return;
   }
@@ -159,11 +166,50 @@ void PhaseConditionalPropagation::enqueue_use(Node* n, PhaseConditionalPropagati
     _wq.push(n);
     return;
   }
+  if (at_c_only) {
+    return;
+  }
   assert(use_type == Delayed, "");
+  if (_verify) {
+    if (n->is_Phi()) {
+      if (n->in(0) == c) {
+        _wq.push(n);
+        return;
+      }
+    } else if (n->is_CFG()) {
+#if 0 //def ASSERT
+      if (n->is_Region()) {
+        if (!is_dominator(n, c)) {
+          uint i;
+          for (i = 1; i < n->req(); ++i) {
+            if (is_dominator(c, n->in(i))) {
+              break;
+            }
+          }
+          assert(i < n->req(), "");
+        }
+      } else {
+        assert(is_dominator(c, n), "");
+      }
+#endif
+      _wq.push(n);
+      return;
+    } else {
+      if (n->in(0) == nullptr) {
+        _wq.push(n);
+        return;
+      }
+      assert(n->in(0)->is_CFG(), "");
+      if (is_dominator(n->in(0), c)) {
+        _wq.push(n);
+        return;
+      }
+    }
+  }
   enqueue_for_delayed_processing(n);
 }
 
-void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
+void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c, bool at_c_only) {
 //  if (n->outcnt() > 10) {
 //    return;
 //  }
@@ -179,7 +225,7 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
   assert(_phase->has_node(const_cast<Node*>(n)), "");
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node* u = n->fast_out(i);
-    if (_enqueued.test(u->_idx)) {
+    if (!_verify && _enqueued.test(u->_idx)) {
 #ifdef ASSERT
     if (UseNewCode3) {
       tty->print(">>>> at %d enqueued", _phase->ctrl_or_self(u)->_idx); u->dump();
@@ -193,15 +239,18 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
       tty->print(">>>> at %d %s", _phase->ctrl_or_self(u)->_idx, use_type == Delayed ? "delayed" : (use_type == Immediate ? "immediate" : "not_related")); u->dump();
     }
 #endif
-    if (use_type == NotRelated) {
+    if (use_type == NotRelated || (at_c_only && use_type == Delayed)) {
       continue;
     }
-    enqueue_use(u, use_type);
+    enqueue_use(u, c, use_type, at_c_only);
     if (u->Opcode() == Op_AddI || u->Opcode() == Op_SubI) {
       for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
         Node* uu = u->fast_out(i2);
         if (uu->Opcode() == Op_CmpU) {
-          enqueue_use(uu, related_use(uu, c));
+          enqueue_use(uu, c, related_use(uu, c), at_c_only);
+          if (_iterations > 1) {
+            mark_if_from_cmp(uu, c);
+          }
         }
       }
     }
@@ -212,14 +261,17 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
           Node* catch_node = uu->find_out_with(Op_Catch);
           if (catch_node != nullptr) {
             assert(related_use(catch_node, c) == Delayed, "");
-            enqueue_use(catch_node, Delayed);
+            enqueue_use(catch_node, c, Delayed, at_c_only);
           }
         }
       }
     }
     if (u->Opcode() == Op_OpaqueZeroTripGuard) {
       Node* cmp = u->unique_out();
-      enqueue_use(cmp, related_use(cmp, c));
+      enqueue_use(cmp, c, related_use(cmp, c), at_c_only);
+      if (_iterations > 1) {
+        mark_if_from_cmp(cmp, c);
+      }
     }
     if (u->is_Opaque1() && u->as_Opaque1()->original_loop_limit() == n) {
       for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
@@ -227,7 +279,7 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
         if (uu->Opcode() == Op_CmpI || uu->Opcode() == Op_CmpL) {
           Node* phi = uu->as_Cmp()->countedloop_phi(u);
           if (phi != nullptr) {
-            enqueue_use(phi, related_use(phi, c));
+            enqueue_use(phi, c, related_use(phi, c), at_c_only);
           }
         }
       }
@@ -235,7 +287,7 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
     if (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpL) {
       Node* phi = u->as_Cmp()->countedloop_phi(n);
       if (phi != nullptr) {
-        enqueue_use(phi, related_use(phi, c));
+        enqueue_use(phi, c, related_use(phi, c), at_c_only);
       }
     }
 
@@ -255,7 +307,7 @@ void PhaseConditionalPropagation::enqueue_uses(const Node* n, Node* c) {
       for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
         Node* uu = u->fast_out(j);
         if (uu->is_Phi()) {
-          enqueue_use(uu, related_use(uu, c));
+          enqueue_use(uu, c, related_use(uu, c), at_c_only);
         }
       }
     }
@@ -291,8 +343,10 @@ void PhaseConditionalPropagation::mark_if(IfNode* iff, Node* c) {
     ProjNode* proj_true = iff->proj_out(1);
     assert(!_visited.test(proj_false->_idx), "");
     assert(!_visited.test(proj_true->_idx), "");
-    _control_dependent_node[_iterations % 2].set(proj_false->_idx);
-    _control_dependent_node[_iterations % 2].set(proj_true->_idx);
+//    _control_dependent_node[_iterations % 2].set(proj_false->_idx);
+//    _control_dependent_node[_iterations % 2].set(proj_true->_idx);
+    enqueue_for_delayed_processing(proj_false);
+    enqueue_for_delayed_processing(proj_true);
   }
 }
 
@@ -356,8 +410,8 @@ void PhaseConditionalPropagation::analyze(int rounds) {
   bool has_infinite_loop = false;
 #endif
   VectorSet updated;
-  while (_progress) {
-    _control_dependent_node[_iterations % 2].clear();
+  do {
+//    _control_dependent_node[_iterations % 2].clear();
     _iterations++;
     assert(_iterations - extra_rounds - extra_rounds2 >= 0, "");
     assert(_iterations - extra_rounds2 <= 2 || _phase->ltree_root()->_child != nullptr || has_infinite_loop, "");
@@ -379,7 +433,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
 
         adjust_updates(c, false);
         _visited.set(c->_idx);
-        one_iteration(c, extra, extra2, false);
+        one_iteration(c, extra, extra2);
       }
     } else {
       // Another pass of the entire cfg but this time, only process those controls that were marked at previous iteration
@@ -400,11 +454,12 @@ void PhaseConditionalPropagation::analyze(int rounds) {
           updated.set(c->_idx);
         }
         // Was control marked as needing work?
-        if (_control_dependent_node[_iterations % 2].test(c->_idx) || work_queue_at(c) != nullptr || _wq.size() > 0) {
+        if (/*_control_dependent_node[_iterations % 2].test(c->_idx) || */work_queue_at(c) != nullptr ||
+                                                                          _wq.size() > 0) {
           if (!adjust_updates_called) {
             adjust_updates(c, false);
           }
-          if (one_iteration(c, extra, extra2, false)) {
+          if (one_iteration(c, extra, extra2)) {
             updated.set(c->_idx);
           }
         } else {
@@ -420,7 +475,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
                 adjust_updates(c, false);
               }
               // Process region because there was some update along some of the CFG inputs
-              if (one_iteration(c, extra, extra2, false)) {
+              if (one_iteration(c, extra, extra2)) {
                 updated.set(c->_idx);
               }
             }
@@ -439,7 +494,21 @@ void PhaseConditionalPropagation::analyze(int rounds) {
     if (rounds <= 0) {
       break;
     }
-  }
+#ifdef ASSERT
+    if (!_progress && _work_queues->number_of_entries() != 0) {
+      auto dump_entries = [&] (Node* c, GrowableArray<Node*>* queue) {
+          tty->print("XXX "); c->dump();
+          for (int i = 0; i < queue->length(); i++) {
+            Node* n = queue->at(i);
+            n->dump();
+          }
+          return true;
+      };
+      _work_queues->iterate(dump_entries);
+    }
+#endif
+    assert(_progress == (_work_queues->number_of_entries() != 0), "");
+  } while (_work_queues->number_of_entries() != 0);
 
 #if 1
 #ifdef ASSERT
@@ -461,8 +530,9 @@ void PhaseConditionalPropagation::analyze(int rounds) {
 
 #ifdef ASSERT
   if (VerifyLoopConditionalPropagation) {
+    _verify = true;
     // Verify we've indeed reached a fixed point
-    _control_dependent_node[_iterations % 2].clear();
+//    _control_dependent_node[_iterations % 2].clear();
     _iterations++;
     bool extra = false;
     bool extra2 = false;
@@ -472,7 +542,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
       Node* c = _rpo_list.at(i);
 
       adjust_updates(c, true);
-      bool progress = one_iteration(c, extra, extra2, true);
+      bool progress = one_iteration(c, extra, extra2);
       if (extra2) {
         break;
       }
@@ -499,7 +569,7 @@ void PhaseConditionalPropagation::analyze(int rounds) {
   }
 }
 
-bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extra2, bool verify) {
+bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extra2) {
   Node* dom = _phase->idom(c);
 
   if (c->is_Region()) {
@@ -563,7 +633,7 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
         j++;
       } else {
         assert(_prev_updates->find(n) == -1, "");
-        if (current_t != _current_updates->prev_type_at(i)) {
+        if (current_t != _current_updates->prev_type_at(i) && (!_verify || is_dominator(_phase->ctrl_or_self(n), c))) {
           progress = true;
         }
       }
@@ -598,7 +668,7 @@ void PhaseConditionalPropagation::propagate_types(Node* c, bool& extra) {
   sync(c);
   while (_wq.size() > 0) {
     Node* n = _wq.pop();
-    assert(is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
+    assert(_verify || is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
 #ifdef ASSERT
     if (UseNewCode3) {
       tty->print("[%d] Value at %d %s ", _iterations, c->_idx, _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c ? "at_control" : "above_control"); n->dump();
@@ -631,7 +701,7 @@ void PhaseConditionalPropagation::propagate_types(Node* c, bool& extra) {
       assert(narrows_type(current_type, t), "");
 #endif
       set_type(n, t, current_type);
-      enqueue_uses(n, c);
+      enqueue_uses(n, c, false);
     }
   }
 }
@@ -775,7 +845,7 @@ void PhaseConditionalPropagation::handle_region(Node* c, Node* dom, bool& extra)
         if (t != current_type) {
           assert(narrows_type(current_type, t), "");
           if (record_update(c, n, current_type, t)) {
-            enqueue_uses(n, c);
+            enqueue_uses(n, c, false);
           }
         }
       }
@@ -813,15 +883,16 @@ void PhaseConditionalPropagation::adjust_updates(Node* c, bool verify) {
         const Type* dom_t = PhaseValues::type(n);
         const Type* t = _current_updates->type_at(j);
         const Type* new_t = dom_t->filter(t);
+        enqueue_uses(n, c, true);
         if (new_t == dom_t) {
           _current_updates->remove_at(j);
-          enqueue_uses(n, c);
+          enqueue_uses(n, c, false);
         } else {
           _current_updates->set_prev_type_at(j, dom_t);
           if (new_t != t) {
             assert(!verify, "");
             _current_updates->set_type_at(j, new_t);
-            enqueue_uses(n, c);
+            enqueue_uses(n, c, false);
           }
           j++;
         }
@@ -845,7 +916,7 @@ void PhaseConditionalPropagation::analyze_allocate_array(Node* c, const Allocate
       assert(narrows_type(length_type, narrow_length_type), "");
       if (narrow_length_type != length_type) {
         if (record_update(c, length, length_type, narrow_length_type)) {
-          enqueue_uses(length, c);
+          enqueue_uses(length, c, false);
         }
       }
     }
@@ -909,7 +980,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
 #ifdef ASSERT
       _conditions.set(c->_idx);
 #endif
-      if (record_update(c, n, n_t, new_n_t)) {
+      if (record_update(c, n, n_t, new_n_t) || _verify) {
 #ifdef ASSERT
         if (UseNewCode3) {
           tty->print("[%d] narrowed at %d ", _iterations, c->_idx); n_t->dump(); tty->print(" -> "); new_n_t->dump(); n->dump();
@@ -919,7 +990,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
 //          tty->print("XXX"); c->dump();
 //          n_t->dump(); tty->print(" -> "); new_n_t->dump(); n->dump();
           _nb_ifs++;
-          enqueue_uses(n, c);
+        enqueue_uses(n, c, false);
           if (!n->is_Phi()) {
             _wq.push(n);
           }
@@ -938,7 +1009,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
 #ifdef ASSERT
           _conditions.set(c->_idx);
 #endif
-          if (record_update(c, in, in_t, new_in_t)) {
+          if (record_update(c, in, in_t, new_in_t) || _verify) {
 //            if (new_n_t != Type::TOP) {
 //              tty->print("XXX");
 //              c->dump();
@@ -946,7 +1017,7 @@ void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) 
 //            tty->print("XXX"); c->dump();
 //            n_t->dump(); tty->print(" -> "); new_n_t->dump(); n->dump();
               _nb_ifs++;
-              enqueue_uses(in, c);
+            enqueue_uses(in, c, false);
               if (!in->is_Phi()) {
                 _wq.push(in);
               }
@@ -1302,12 +1373,12 @@ bool PhaseConditionalPropagation::transform_helper(Node* c) {
 }
 
 const Type* PhaseConditionalPropagation::type(const Node* n, Node* c) const {
-  if (_current_ctrl == C->root()) {
+  if (_current_ctrl == C->root() || (_verify && (!_current_ctrl->is_Region() || _current_ctrl->find_edge(c) == -1))) {
     return PhaseValues::type(n);
   }
   assert(c->is_CFG(), "");
   const Type* res = nullptr;
-//  assert(_current_ctrl->is_Region() && _current_ctrl->find_edge(c) != -1, "");
+  assert(_current_ctrl->is_Region() && _current_ctrl->find_edge(c) != -1, "");
   TypeUpdate* updates = updates_at(c);
   if (updates == nullptr) {
     return PhaseValues::type(n);
@@ -1439,6 +1510,7 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
           _iterations(0),
           _nb_ifs(0),
           _dominator_tree(nullptr),
+          _verify(false),
           _current_updates(nullptr),
           _dom_updates(nullptr),
           _prev_updates(nullptr) {
