@@ -548,6 +548,8 @@ void PhaseConditionalPropagation::analyze(int rounds) {
       }
       assert(!progress, "");
     }
+    assert(extra2 || _wq2.size() == 0, "");
+    _wq2.clear();
   }
 #endif
 
@@ -629,12 +631,20 @@ bool PhaseConditionalPropagation::one_iteration(Node* c, bool& extra, bool& extr
         assert(narrows_type(prev_t, current_t), "");
         if (prev_t != current_t) {
           progress = true;
+        } else if (_verify && _wq2.member(n) && _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c) {
+          _wq2.remove(n);
         }
         j++;
       } else {
         assert(_prev_updates->find(n) == -1, "");
-        if (current_t != _current_updates->prev_type_at(i) && (!_verify || is_dominator(_phase->ctrl_or_self(n), c))) {
-          progress = true;
+        if (current_t != _current_updates->prev_type_at(i)) {
+          if (!_verify || is_dominator(_phase->ctrl_or_self(n), c)) {
+            progress = true;
+          } else {
+            _wq2.push(n);
+          }
+//        } else if (_verify && _wq2.member(n) && _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c) {
+//          _wq2.remove(n);
         }
       }
     }
@@ -886,6 +896,9 @@ void PhaseConditionalPropagation::adjust_updates(Node* c, bool verify) {
         enqueue_uses(n, c, true);
         if (new_t == dom_t) {
           _current_updates->remove_at(j);
+          if (_verify && _wq2.member(n) && _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c) {
+            _wq2.remove(n);
+          }
           enqueue_uses(n, c, false);
         } else {
           _current_updates->set_prev_type_at(j, dom_t);

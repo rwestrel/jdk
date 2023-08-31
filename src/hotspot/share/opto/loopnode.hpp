@@ -137,8 +137,8 @@ public:
   virtual int Opcode() const;
   bool can_be_counted_loop(PhaseValues* phase) const {
     return req() == 3 && in(0) != nullptr &&
-      in(1) != nullptr && phase->type(in(1)) != Type::TOP &&
-      in(2) != nullptr && phase->type(in(2)) != Type::TOP;
+      in(1) != nullptr && phase->type(in(1), in(1)) != Type::TOP &&
+      in(2) != nullptr && phase->type(in(2), in(2)) != Type::TOP;
   }
   bool is_valid_counted_loop(BasicType bt) const;
 #ifndef PRODUCT
