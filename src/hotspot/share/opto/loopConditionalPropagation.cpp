@@ -138,7 +138,7 @@ PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(No
     return Delayed;
   } else if (u->is_Region()) {
     assert(u_c == u, "");
-    if (u ==  c) {
+    if (u == c) {
       return Immediate;
     }
     return Delayed;
@@ -173,6 +173,11 @@ void PhaseConditionalPropagation::enqueue_use(Node* n, Node* c, UseType use_type
   if (_verify) {
     if (n->is_Phi()) {
       if (n->in(0) == c) {
+        _wq.push(n);
+        return;
+      }
+    } else if (n->is_Region()) {
+      if (n == c) {
         _wq.push(n);
         return;
       }
@@ -977,6 +982,8 @@ bool PhaseConditionalPropagation::record_update(Node* c, const Node* n, const Ty
     _current_updates->push_node(n, old_t, new_t);
     return true;
   } else if (_current_updates->type_at(i) != new_t) {
+    const Type* old_t = _current_updates->type_at(i);
+    assert(narrows_type(old_t, new_t), "");
     _current_updates->set_type_at(i, new_t);
     return true;
   }
@@ -986,7 +993,13 @@ bool PhaseConditionalPropagation::record_update(Node* c, const Node* n, const Ty
 void PhaseConditionalPropagation::analyze_if(Node* c, const Node* cmp, Node* n) {
   const Type* t = IfNode::filtered_int_type(this, n, c, (cmp->Opcode() == Op_CmpI || cmp->Opcode() == Op_CmpU) ? T_INT : T_LONG);
   if (t != nullptr) {
-    const Type* n_t = PhaseValues::type(n);
+    const Type* n_t = nullptr;
+    if (_current_updates != nullptr) {
+      n_t = _current_updates->type_if_present(n);
+    }
+    if (n_t == nullptr) {
+      n_t = PhaseValues::type(n);
+    }
     const Type* new_n_t = n_t->filter(t);
     assert(narrows_type(n_t, new_n_t), "");
     if (n_t != new_n_t) {
