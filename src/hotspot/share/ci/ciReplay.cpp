@@ -552,7 +552,7 @@ class CompileReplay : public StackObj {
       return k;
     }
     char* str = parse_escaped_string();
-    Symbol* klass_name = SymbolTable::new_symbol(str);
+    Symbol* klass_name = str != nullptr ? SymbolTable::new_symbol(str) : nullptr;
     if (klass_name != nullptr) {
       Klass* k = nullptr;
       if (_iklass != nullptr) {
