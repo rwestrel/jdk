@@ -1171,6 +1171,32 @@ bool PhaseConditionalPropagation::is_safe_for_replacement(Node* c, Node* node, N
   return true;
 }
 
+bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* use, const Type* t) const {
+  if (use->is_Bool() && t->isa_int()) {
+    BoolNode* bol = use->as_Bool();
+    for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
+      Node* u = use->fast_out(i);
+      if (u->is_If()) {
+        IfNode* iff = u->as_If();
+        int con = bol->_test.cc2logical(t)->is_int()->get_con();
+        Node* proj = iff->proj_out(con);
+        if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+          return false;
+        }
+      }
+    }
+  }
+  if (use->is_If() && t->isa_int()) {
+    IfNode* iff = use->as_If();
+    int con = t->is_int()->get_con();
+    Node* proj = iff->proj_out(con);
+    if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /*
  With the following code snippet:
  if (i - 1) > 0) {
@@ -1198,7 +1224,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
         if (!validate_control(node, c)) {
           return false;
         }
-        Node* iff = c->in(0);
+        IfNode* iff = c->in(0)->as_If();
         if (iff->in(0)->is_top()) {
           return false;
         }
@@ -1207,24 +1233,22 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
         const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
         if (bol_t != new_bol_t) {
           assert((c->is_IfProj() && _conditions.test(c->_idx)), "");
-          if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_t->is_int()->get_con()) {
-            // undetected dead path
-            Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
-            // can't use register_new_node here
-            register_new_node_with_optimizer(frame);
-            _phase->set_ctrl(frame, C->start());
-            Node* halt = new HaltNode(iff->in(0), frame, "dead path discovered by PhaseConditionalPropagation");
-            add_input_to(C->root(), halt);
-            // can't use register_control here
-            register_new_node_with_optimizer(halt);
-            _phase->set_loop(halt, _phase->ltree_root());
-            _phase->set_idom(halt, iff->in(0), _phase->dom_depth(iff->in(0))+1);
+          jint new_bol_con = new_bol_t->is_int()->get_con();
+          if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
+            create_halt_node(iff->in(0));
             replace_input_of(iff, 0, C->top());
           } else {
-            Node* con = makecon(new_bol_t);
-            _phase->set_ctrl(con, C->root());
-            rehash_node_delayed(iff);
-            iff->set_req_X(1, con, this);
+            if (condition_safe_to_constant_fold(iff, new_bol_t)) {
+              Node* con = makecon(new_bol_t);
+              _phase->set_ctrl(con, C->root());
+              rehash_node_delayed(iff);
+              iff->set_req_X(1, con, this);
+            } else {
+              ProjNode* proj = iff->proj_out(1 - new_bol_con);
+              Node* ctrl_use = proj->unique_ctrl_out();
+              replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
+              create_halt_node(proj);
+            }
           }
           _phase->C->set_major_progress();
 #ifdef ASSERT
@@ -1244,6 +1268,19 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
     }
   }
   return false;
+}
+
+void PhaseConditionalPropagation::create_halt_node(Node* c) {// undetected dead path
+  Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
+  // can't use register_new_node here
+  register_new_node_with_optimizer(frame);
+  _phase->set_ctrl(frame, C->start());
+  Node* halt = new HaltNode(c, frame, "dead path discovered by PhaseConditionalPropagation");
+  add_input_to(C->root(), halt);
+  // can't use register_control here
+  register_new_node_with_optimizer(halt);
+  _phase->set_loop(halt, _phase->ltree_root());
+  _phase->set_idom(halt, c, _phase->dom_depth(c)+1);
 }
 
 bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t) {
@@ -1301,7 +1338,9 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
             --i;
             imax -= nb_deleted;
           }
-        } else if (is_dominator(c, _phase->ctrl_or_self(use)) && is_safe_for_replacement(c, node, use)) {
+        } else if (is_dominator(c, _phase->ctrl_or_self(use)) &&
+                   is_safe_for_replacement(c, node, use) &&
+                   condition_safe_to_constant_fold(use, t)) {
           progress = true;
           if (con == nullptr) {
             con = makecon(t);

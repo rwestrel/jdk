@@ -292,6 +292,10 @@ public:
   void sync_work_queue(Node* c);
 
   void propagate_types(Node* c, bool& extra);
+
+  bool condition_safe_to_constant_fold(const Node* use, const Type* t) const;
+
+  void create_halt_node(Node* c);
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP
