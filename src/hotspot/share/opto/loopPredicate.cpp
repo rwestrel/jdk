@@ -395,6 +395,7 @@ void PhaseIdealLoop::get_assertion_predicates(Node* predicate, Unique_Node_List&
 // predicate again).
 IfProjNode* PhaseIdealLoop::clone_assertion_predicate_for_unswitched_loops(Node* iff, IfProjNode* predicate,
                                                                            Deoptimization::DeoptReason reason,
+                                                                           ParsePredicateSuccessProj* parse_predicate_proj) {
   Node* bol = create_bool_from_template_assertion_predicate(iff, nullptr, nullptr, parse_predicate_proj->in(0)->in(0));
   IfProjNode* if_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, iff->Opcode(), false);
   _igvn.replace_input_of(if_proj->in(0), 1, bol);
