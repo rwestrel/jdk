@@ -78,6 +78,7 @@ bool LoopNode::is_valid_counted_loop(BasicType bt) const {
     BaseCountedLoopNode*    l  = as_BaseCountedLoop();
     BaseCountedLoopEndNode* le = l->loopexit_or_null();
     if (le != nullptr &&
+        !le->in(0)->is_top() &&
         le->proj_out_or_null(1 /* true */) == l->in(LoopNode::LoopBackControl)) {
       Node* phi  = l->phi();
       Node* exit = le->proj_out_or_null(0 /* false */);
@@ -4814,7 +4815,7 @@ void PhaseIdealLoop::build_and_optimize() {
     int rounds = max_jint;
     conditional_elimination(visited, nstack, worklist, rounds);
 //    if (!C->major_progress()) {
-//    C->set_run_loop_conditional_propagation(false);
+    C->set_run_loop_conditional_propagation(false);
 //    }
     conditional_elimination_already_ran = true;
   }

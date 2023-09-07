@@ -1159,12 +1159,14 @@ bool PhaseConditionalPropagation::is_safe_for_replacement(Node* c, Node* node, N
   Node* head = loop->_head;
   if (head->is_BaseCountedLoop()) {
     BaseCountedLoopNode* cl = head->as_BaseCountedLoop();
-    Node* cmp = cl->loopexit()->cmp_node();
-    if (((node == cl->phi() && use == cl->incr()) ||
-         (node == cl->incr() && use == cmp))) {
-      const Type* cmp_t = find_type_between(cmp, cl->loopexit(), c);
-      if (cmp_t == nullptr || !cmp_t->singleton()) {
-        return false;
+    if (cl->is_valid_counted_loop(cl->bt())) {
+      Node* cmp = cl->loopexit()->cmp_node();
+      if (((node == cl->phi() && use == cl->incr()) ||
+           (node == cl->incr() && use == cmp))) {
+        const Type* cmp_t = find_type_between(cmp, cl->loopexit(), c);
+        if (cmp_t == nullptr || !cmp_t->singleton()) {
+          return false;
+        }
       }
     }
   }
@@ -1237,11 +1239,19 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
           if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
             create_halt_node(iff->in(0));
             replace_input_of(iff, 0, C->top());
+//#ifndef PRODUCT
+//            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+//#endif
           } else {
 #ifndef PRODUCT
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
 #endif
             if (condition_safe_to_constant_fold(iff, new_bol_t)) {
+#ifndef PRODUCT
+              if (iff->in(1)->Opcode() != Op_Opaque4) {
+                Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+              }
+#endif
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
               rehash_node_delayed(iff);
@@ -1253,7 +1263,6 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               create_halt_node(proj);
             }
           }
-          _phase->C->set_major_progress();
 #ifdef ASSERT
           if (PrintLoopConditionalPropagation) {
             tty->print_cr("killing path");
@@ -1265,6 +1274,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
             c->dump();
           }
 #endif
+          _phase->C->set_major_progress();
           return true;
         }
       }
@@ -1346,38 +1356,54 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
             imax -= nb_deleted;
           }
         } else if (is_dominator(c, _phase->ctrl_or_self(use)) &&
-                   is_safe_for_replacement(c, node, use) &&
-                   condition_safe_to_constant_fold(use, t)) {
-          progress = true;
-          if (con == nullptr) {
-            con = makecon(t);
-            _phase->set_ctrl(con, C->root());
-          }
-          rehash_node_delayed(use);
-          int nb = use->replace_edge(node, con, this);
-          _worklist.push(use);
-          --i, imax -= nb;
+                   is_safe_for_replacement(c, node, use) ) {
+          if (condition_safe_to_constant_fold(use, t)) {
+            progress = true;
+            if (con == nullptr) {
+              con = makecon(t);
+              _phase->set_ctrl(con, C->root());
+            }
+            bool do_not_count = use->is_If() && use->in(1)->Opcode() == Op_Opaque4;
+            rehash_node_delayed(use);
+            int nb = use->replace_edge(node, con, this);
+            _worklist.push(use);
+            --i, imax -= nb;
 #ifndef PRODUCT
-          for (int j = 0; j < nb; ++j) {
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
-          }
+              Atomic::add(&PhaseIdealLoop::_loop_conditional_constants, nb);
 #endif
 #ifdef ASSERT
-          if (PrintLoopConditionalPropagation) {
-            tty->print_cr("constant folding");
-            node->dump();
-            use->dump();
-            prev_t->dump();
-            tty->cr();
-            t->dump();
-            tty->cr();
-          }
+            if (PrintLoopConditionalPropagation) {
+              tty->print_cr("constant folding");
+              node->dump();
+              use->dump();
+              prev_t->dump();
+              tty->cr();
+              t->dump();
+              tty->cr();
+            }
 #endif
-          if (use->is_If()) {
+            if (use->is_If()) {
 #ifndef PRODUCT
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+              if (!do_not_count) {
+                Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+              }
 #endif
+              _phase->C->set_major_progress();
+            }
+          } else if (use->is_If()) {
+            IfNode* iff = use->as_If();
+            jint con = t->is_int()->get_con();
+            ProjNode* proj = iff->proj_out(1 - con);
+            Node* ctrl_use = proj->unique_ctrl_out();
+            replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
+            create_halt_node(proj);
             _phase->C->set_major_progress();
+#ifndef PRODUCT
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
+//            if (use->in(1)->Opcode() != Op_Opaque4) {
+//              Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+//            }
+#endif
           }
         }
       }
@@ -1398,8 +1424,12 @@ bool PhaseConditionalPropagation::is_safe_for_replacement_at_phi(Node* node, Nod
         node == r->as_BaseCountedLoop()->incr())) {
     return false;
   }
-  const Type* cmp_type = find_type_between(r->as_BaseCountedLoop()->loopexit()->cmp_node(),
-                                           r->as_BaseCountedLoop()->loopexit(), r);
+  BaseCountedLoopNode* cl = r->as_BaseCountedLoop();
+  if (!cl->is_valid_counted_loop(cl->bt())) {
+    return true;
+  }
+  BaseCountedLoopEndNode* le = cl->loopexit();
+  const Type* cmp_type = find_type_between(le->cmp_node(), le, r);
   return cmp_type != nullptr && cmp_type->singleton();
 }
 
