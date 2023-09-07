@@ -1238,6 +1238,9 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
             create_halt_node(iff->in(0));
             replace_input_of(iff, 0, C->top());
           } else {
+#ifndef PRODUCT
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+#endif
             if (condition_safe_to_constant_fold(iff, new_bol_t)) {
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
@@ -1320,6 +1323,10 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
                 _phase->set_ctrl(con, C->root());
               }
               replace_input_of(use, j, con);
+#ifndef PRODUCT
+              Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
+#endif
+
               nb_deleted++;
 #ifdef ASSERT
               if (PrintLoopConditionalPropagation) {
@@ -1350,6 +1357,11 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           int nb = use->replace_edge(node, con, this);
           _worklist.push(use);
           --i, imax -= nb;
+#ifndef PRODUCT
+          for (int j = 0; j < nb; ++j) {
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
+          }
+#endif
 #ifdef ASSERT
           if (PrintLoopConditionalPropagation) {
             tty->print_cr("constant folding");
@@ -1362,6 +1374,9 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           }
 #endif
           if (use->is_If()) {
+#ifndef PRODUCT
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+#endif
             _phase->C->set_major_progress();
           }
         }

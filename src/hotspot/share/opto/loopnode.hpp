@@ -1672,6 +1672,8 @@ public:
   static volatile int _long_loop_candidates;
   static volatile int _long_loop_nests;
   static volatile int _long_loop_counted_loops;
+  static volatile int _loop_conditional_constants;
+  static volatile int _loop_conditional_test;
 #endif
 
 #ifdef ASSERT

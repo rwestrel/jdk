@@ -4926,8 +4926,10 @@ int PhaseIdealLoop::_loop_work=0; // Sum of PhaseIdealLoop x unique
 volatile int PhaseIdealLoop::_long_loop_candidates=0; // Number of long loops seen
 volatile int PhaseIdealLoop::_long_loop_nests=0; // Number of long loops successfully transformed to a nest
 volatile int PhaseIdealLoop::_long_loop_counted_loops=0; // Number of long loops successfully transformed to a counted loop
+volatile int PhaseIdealLoop::_loop_conditional_constants = 0;
+volatile int PhaseIdealLoop::_loop_conditional_test = 0;
 void PhaseIdealLoop::print_statistics() {
-  tty->print_cr("PhaseIdealLoop=%d, sum _unique=%d, long loops=%d/%d/%d", _loop_invokes, _loop_work, _long_loop_counted_loops, _long_loop_nests, _long_loop_candidates);
+  tty->print_cr("PhaseIdealLoop=%d, sum _unique=%d, long loops=%d/%d/%d, conditional=%d/%d", _loop_invokes, _loop_work, _long_loop_counted_loops, _long_loop_nests, _long_loop_candidates, _loop_conditional_constants, _loop_conditional_test);
 }
 #endif
 
