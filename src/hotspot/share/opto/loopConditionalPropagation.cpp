@@ -1174,16 +1174,30 @@ bool PhaseConditionalPropagation::is_safe_for_replacement(Node* c, Node* node, N
 }
 
 bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* use, const Type* t) const {
+  if (t == Type::TOP) {
+    return true;
+  }
   if (use->is_Bool() && t->isa_int()) {
     BoolNode* bol = use->as_Bool();
+    int con = bol->_test.cc2logical(t)->is_int()->get_con();
     for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
       Node* u = use->fast_out(i);
       if (u->is_If()) {
         IfNode* iff = u->as_If();
-        int con = bol->_test.cc2logical(t)->is_int()->get_con();
         Node* proj = iff->proj_out(con);
         if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
           return false;
+        }
+      } else if (u->Opcode() == Op_Opaque4) {
+        for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
+          Node* uu = u->fast_out(j);
+          if (uu->is_If()) {
+            IfNode* iff = uu->as_If();
+            Node* proj = iff->proj_out(con);
+            if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+              return false;
+            }
+          }
         }
       }
     }
@@ -1194,6 +1208,19 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
     Node* proj = iff->proj_out(con);
     if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
       return false;
+    }
+  }
+  if (use->Opcode() == Op_Opaque4) {
+    int con = t->is_int()->get_con();
+    for (DUIterator_Fast jmax, j = use->fast_outs(jmax); j < jmax; j++) {
+      Node* u = use->fast_out(j);
+      if (u->is_If()) {
+        IfNode* iff = u->as_If();
+        Node* proj = iff->proj_out(con);
+        if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+          return false;
+        }
+      }
     }
   }
   return true;
@@ -1248,15 +1275,21 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
 #endif
             if (condition_safe_to_constant_fold(iff, new_bol_t)) {
 #ifndef PRODUCT
-              if (iff->in(1)->Opcode() != Op_Opaque4) {
-                Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
-              }
+              Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
               rehash_node_delayed(iff);
               iff->set_req_X(1, con, this);
-            } else {
+            } else if (iff->in(1)->Opcode() != Op_Opaque4) {
+              Node* con = makecon(new_bol_t);
+              _phase->set_ctrl(con, C->root());
+
+              Node* opaq = new Opaque4Node(C, iff->in(1), con);
+              register_new_node_with_optimizer(opaq);
+              _phase->set_ctrl(opaq, iff->in(0));
+              replace_input_of(iff, 1, opaq);
+
               ProjNode* proj = iff->proj_out(1 - new_bol_con);
               Node* ctrl_use = proj->unique_ctrl_out();
               replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
@@ -1305,8 +1338,10 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
       Node* con = nullptr;
       bool progress = false;
       assert(_wq2.size() == 0, "");
-      for (DUIterator_Fast imax, i = node->fast_outs(imax); i < imax; i++) {
-        Node* use = node->fast_out(i);
+      for (DUIterator i = node->outs(); node->has_out(i); i++) {
+        Node* use = node->out(i);
+//      for (DUIterator_Fast imax, i = node->fast_outs(imax); i < imax; i++) {
+//        Node* use = node->fast_out(i);
         if (_wq2.member(use)) {
           continue;
         }
@@ -1353,7 +1388,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           }
           if (nb_deleted > 0) {
             --i;
-            imax -= nb_deleted;
+//            imax -= nb_deleted;
           }
         } else if (is_dominator(c, _phase->ctrl_or_self(use)) &&
                    is_safe_for_replacement(c, node, use) ) {
@@ -1363,11 +1398,10 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
               con = makecon(t);
               _phase->set_ctrl(con, C->root());
             }
-            bool do_not_count = use->is_If() && use->in(1)->Opcode() == Op_Opaque4;
             rehash_node_delayed(use);
             int nb = use->replace_edge(node, con, this);
             _worklist.push(use);
-            --i, imax -= nb;
+            --i/*, imax -= nb*/;
 #ifndef PRODUCT
               Atomic::add(&PhaseIdealLoop::_loop_conditional_constants, nb);
 #endif
@@ -1384,25 +1418,30 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
 #endif
             if (use->is_If()) {
 #ifndef PRODUCT
-              if (!do_not_count) {
-                Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
-              }
+              Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
               _phase->C->set_major_progress();
             }
-          } else if (use->is_If()) {
+          } else if (use->is_If() && use->in(1)->Opcode() != Op_Opaque4) {
             IfNode* iff = use->as_If();
-            jint con = t->is_int()->get_con();
-            ProjNode* proj = iff->proj_out(1 - con);
+            jint int_con = t->is_int()->get_con();
+            if (con == nullptr) {
+              con = makecon(t);
+              _phase->set_ctrl(con, C->root());
+            }
+            Node* opaq = new Opaque4Node(C, iff->in(1), con);
+            register_new_node_with_optimizer(opaq);
+            _phase->set_ctrl(opaq, iff->in(0));
+            replace_input_of(iff, 1, opaq);
+            --i/*, --imax*/;
+            ProjNode* proj = iff->proj_out(1 - int_con);
             Node* ctrl_use = proj->unique_ctrl_out();
             replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
             create_halt_node(proj);
             _phase->C->set_major_progress();
 #ifndef PRODUCT
             Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
-//            if (use->in(1)->Opcode() != Op_Opaque4) {
-//              Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
-//            }
+            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
           }
         }
