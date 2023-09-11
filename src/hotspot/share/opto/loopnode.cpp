@@ -4799,7 +4799,7 @@ void PhaseIdealLoop::build_and_optimize() {
 
   // Check for aggressive application of split-if and other transforms
   // that require basic-block info (like cloning through Phi's)
-  if (0 && !C->major_progress() && SplitIfBlocks && do_split_ifs) {
+  if (!C->major_progress() && SplitIfBlocks && do_split_ifs) {
     visited.clear();
     split_if_with_blocks( visited, nstack);
     DEBUG_ONLY( if (VerifyLoopOptimizations) { verify(); } );
