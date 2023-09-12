@@ -2955,6 +2955,26 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
 
       // Get boolean condition to test
       Node *i1 = iff->in(1);
+      if (i1->Opcode() == Op_Opaque4) {
+#ifdef ASSERT
+        Node* current = exit;
+        do {
+          Node* next = nullptr;
+          for (DUIterator_Fast jmax, j = current->fast_outs(jmax); j < jmax; j++) {
+            Node* u = current->fast_out(j);
+            if (u == current) {
+              continue;
+            }
+            assert(next == nullptr, "");
+            next = u;
+          }
+          current = next;
+        } while (current->is_Region());
+        assert(current->Opcode() == Op_Halt, "");
+#endif
+        assert(_igvn.type(i1->in(2))->is_int()->get_con() == (exit->Opcode() == Op_IfTrue ? 0 : 1), "");
+        i1 = i1->in(1);
+      }
       if (!i1->is_Bool()) continue;
       BoolNode *bol = i1->as_Bool();
       BoolTest b_test = bol->_test;
@@ -3039,8 +3059,10 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
       // Adjust pre and main loop limits to guard the correct iteration set
       if (cmp->Opcode() == Op_CmpU) { // Unsigned compare is really 2 tests
         if (b_test._test == BoolTest::lt) { // Range checks always use lt
-          // The underflow and overflow limits: 0 <= scale*I+offset < limit
-          add_constraint(stride_con, lscale_con, offset, zero, limit, pre_ctrl, &pre_limit, &main_limit);
+          if (iff->in(1)->Opcode() != Op_Opaque4) {
+            // The underflow and overflow limits: 0 <= scale*I+offset < limit
+            add_constraint(stride_con, lscale_con, offset, zero, limit, pre_ctrl, &pre_limit, &main_limit);
+          }
           Node* init = cl->init_trip();
           Node* opaque_init = new OpaqueLoopInitNode(C, init);
           register_new_node(opaque_init, loop_entry);
@@ -3076,6 +3098,7 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
           continue;             // In release mode, ignore it
         }
       } else {                  // Otherwise work on normal compares
+        assert(iff->in(1)->Opcode() != Op_Opaque4, "");
         switch(b_test._test) {
         case BoolTest::gt:
           // Fall into GE case
