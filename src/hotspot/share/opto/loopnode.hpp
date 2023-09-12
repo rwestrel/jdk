@@ -1367,8 +1367,8 @@ public:
                                                ParsePredicateSuccessProj* parse_predicate_proj,
                                                IfProjNode* upper_bound_proj, int scale, Node* offset, Node* init, Node* limit,
                                                jint stride, Node* rng, bool& overflow, Deoptimization::DeoptReason reason);
-  Node* add_range_check_elimination_assertion_predicate(IdealLoopTree* loop, Node* predicate_proj, Node* scale,
-                                                        Node* offset, Node* low_limit, Node* upper_limit, Node* value);
+  Node* add_range_check_elimination_assertion_predicate(IdealLoopTree* loop, Node* predicate_proj, int scale_con,
+                                                        Node* offset, Node* limit, jint stride_con, Node* value);
 
   // Helper function to collect predicate for eliminating the useless ones
   void eliminate_useless_predicates();
@@ -1424,9 +1424,7 @@ public:
   // always holds true.  That is, either increase the number of iterations in
   // the pre-loop or the post-loop until the condition holds true in the main
   // loop.  Scale_con, offset and limit are all loop invariant.
-  void add_constraint(IdealLoopTree* loop, jlong stride_con, jlong scale_con, Node* offset, Node* low_limit,
-                      Node* upper_limit,
-                      Node* pre_ctrl, Node** pre_limit, Node** main_limit, Node*& predicate_proj);
+  void add_constraint(jlong stride_con, jlong scale_con, Node* offset, Node* low_limit, Node* upper_limit, Node* pre_ctrl, Node** pre_limit, Node** main_limit);
   // Helper function for add_constraint().
   Node* adjust_limit(bool reduce, Node* scale, Node* offset, Node* rc_limit, Node* old_limit, Node* pre_ctrl, bool round);
 
