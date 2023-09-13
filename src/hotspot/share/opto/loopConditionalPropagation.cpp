@@ -1281,6 +1281,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               _phase->set_ctrl(con, C->root());
               rehash_node_delayed(iff);
               iff->set_req_X(1, con, this);
+              _phase->C->set_major_progress();
             } else if (iff->in(1)->Opcode() != Op_Opaque4) {
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
@@ -1294,6 +1295,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               Node* ctrl_use = proj->unique_ctrl_out();
               replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
               create_halt_node(proj);
+              _phase->C->set_major_progress();
             }
           }
 #ifdef ASSERT
@@ -1307,7 +1309,6 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
             c->dump();
           }
 #endif
-          _phase->C->set_major_progress();
           return true;
         }
       }
