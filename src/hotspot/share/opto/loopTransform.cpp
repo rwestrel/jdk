@@ -2956,7 +2956,6 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
       // Get boolean condition to test
       Node *i1 = iff->in(1);
       if (i1->Opcode() == Op_Opaque4) {
-#ifdef ASSERT
         Node* current = exit;
         do {
           Node* next = nullptr;
@@ -2965,15 +2964,17 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
             if (u == current) {
               continue;
             }
-            assert(next == nullptr, "");
+            if (next != nullptr) {
+              break;
+            }
             next = u;
           }
           current = next;
         } while (current->is_Region());
-        assert(current->Opcode() == Op_Halt, "");
-#endif
-        assert(_igvn.type(i1->in(2))->is_int()->get_con() == (exit->Opcode() == Op_IfTrue ? 0 : 1), "");
-        i1 = i1->in(1);
+        if (current->Opcode() == Op_Halt) {
+          assert(_igvn.type(i1->in(2))->is_int()->get_con() == (exit->Opcode() == Op_IfTrue ? 0 : 1), "");
+          i1 = i1->in(1);
+        }
       }
       if (!i1->is_Bool()) continue;
       BoolNode *bol = i1->as_Bool();
