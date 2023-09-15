@@ -1258,6 +1258,9 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
           return false;
         }
         Node* bol = iff->in(1);
+        if (bol->Opcode() == Op_Opaque4) {
+          bol = bol->in(2);
+        }
         const Type* bol_t = bol->bottom_type();
         const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
         if (bol_t != new_bol_t) {
@@ -1505,7 +1508,11 @@ bool PhaseConditionalPropagation::transform_helper(Node* c) {
   if (c->is_IfProj()) {
     IfNode* iff = c->in(0)->as_If();
     if (!iff->in(0)->is_top()) {
-      const TypeInt* bol_t = iff->in(1)->bottom_type()->is_int();
+      Node* bol = iff->in(1);
+      if (bol->Opcode() == Op_Opaque4) {
+        bol = bol->in(2);
+      }
+      const TypeInt* bol_t = bol->bottom_type()->is_int();
       if (bol_t->is_con()) {
         if (iff->proj_out(bol_t->get_con()) == c) {
           _wq.push(c);
