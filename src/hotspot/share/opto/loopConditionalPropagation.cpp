@@ -1163,7 +1163,7 @@ bool PhaseConditionalPropagation::is_safe_for_replacement(Node* c, Node* node, N
       Node* cmp = cl->loopexit()->cmp_node();
       if (((node == cl->phi() && use == cl->incr()) ||
            (node == cl->incr() && use == cmp))) {
-        const Type* cmp_t = find_type_between(cmp, cl->loopexit(), c);
+        const Type* cmp_t = find_type_between(cmp, cl->loopexit(), _phase->idom(c));
         if (cmp_t == nullptr || !cmp_t->singleton()) {
           return false;
         }
@@ -1472,7 +1472,7 @@ bool PhaseConditionalPropagation::is_safe_for_replacement_at_phi(Node* node, Nod
     return true;
   }
   BaseCountedLoopEndNode* le = cl->loopexit();
-  const Type* cmp_type = find_type_between(le->cmp_node(), le, r);
+  const Type* cmp_type = find_type_between(le->cmp_node(), le, _phase->idom(r));
   return cmp_type != nullptr && cmp_type->singleton();
 }
 

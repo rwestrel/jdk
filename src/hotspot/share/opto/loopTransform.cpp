@@ -2479,9 +2479,7 @@ Node* PhaseIdealLoop::adjust_limit(bool is_positive_stride, Node* scale, Node* o
 // pre-loop or reduce the number of iterations in the main-loop until the condition
 // holds true in the main-loop. Stride, scale, offset and limit are all loop
 // invariant. Further, stride and scale are constants (offset and limit often are).
-void PhaseIdealLoop::add_constraint(IdealLoopTree* loop, jlong stride_con, jlong scale_con, Node* offset, Node* low_limit,
-                                    Node* upper_limit,
-                                    Node* pre_ctrl, Node** pre_limit, Node** main_limit, Node*& predicate_proj) {
+void PhaseIdealLoop::add_constraint(jlong stride_con, jlong scale_con, Node* offset, Node* low_limit, Node* upper_limit, Node* pre_ctrl, Node** pre_limit, Node** main_limit) {
   assert(_igvn.type(offset)->isa_long() != nullptr && _igvn.type(low_limit)->isa_long() != nullptr &&
          _igvn.type(upper_limit)->isa_long() != nullptr, "arguments should be long values");
 
@@ -2550,13 +2548,18 @@ void PhaseIdealLoop::add_constraint(IdealLoopTree* loop, jlong stride_con, jlong
     //   )
     *main_limit = adjust_limit(is_positive_stride, scale, plus_one, low_limit, *main_limit, pre_ctrl, false);
   }
+}
 
+void PhaseIdealLoop::add_assertion_predicates(IdealLoopTree* loop, Node* offset, Node* low_limit, Node* upper_limit,
+                                              Node*& predicate_proj, long scale_con) {
+  Node* scale = _igvn.longcon(scale_con);
+  set_ctrl(scale, C->root());
   CountedLoopNode *cl = loop->_head->as_CountedLoop();
   Node* init = cl->init_trip();
 
   // predicate on first value of first iteration
   predicate_proj = add_range_check_elimination_assertion_predicate(loop, predicate_proj, scale, offset,
-                                             low_limit, upper_limit, init);
+                                                                   low_limit, upper_limit, init);
   assert(!assertion_predicate_has_loop_opaque_node(predicate_proj->in(0)->as_If()), "unexpected");
 
   Node* opaque_init = new OpaqueLoopInitNode(C, init);
@@ -2564,7 +2567,7 @@ void PhaseIdealLoop::add_constraint(IdealLoopTree* loop, jlong stride_con, jlong
 
   // template predicate so it can be updated on next unrolling
   predicate_proj = add_range_check_elimination_assertion_predicate(loop, predicate_proj, scale, offset, low_limit, upper_limit,
-                                             opaque_init);
+                                                                   opaque_init);
   assert(assertion_predicate_has_loop_opaque_node(predicate_proj->in(0)->as_If()), "unexpected");
 
   Node* opaque_stride = new OpaqueLoopStrideNode(C, cl->stride());
@@ -2577,7 +2580,7 @@ void PhaseIdealLoop::add_constraint(IdealLoopTree* loop, jlong stride_con, jlong
   max_value = new CastIINode(predicate_proj,max_value, loop->_head->as_CountedLoop()->phi()->bottom_type());
   register_new_node(max_value, predicate_proj);
   predicate_proj = add_range_check_elimination_assertion_predicate(loop, predicate_proj, scale, offset, low_limit, upper_limit,
-                                             max_value);
+                                                                   max_value);
   assert(assertion_predicate_has_loop_opaque_node(predicate_proj->in(0)->as_If()), "unexpected");
 }
 
@@ -3102,10 +3105,13 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
       // Adjust pre and main loop limits to guard the correct iteration set
       if (cmp->Opcode() == Op_CmpU) { // Unsigned compare is really 2 tests
         if (b_test._test == BoolTest::lt) { // Range checks always use lt
-          // The underflow and overflow limits: 0 <= scale*I+offset < limit
-          add_constraint(loop, stride_con, lscale_con, offset, zero, limit, pre_ctrl, &pre_limit, &main_limit,
-                         loop_entry);
-          
+          if (iff->in(1)->Opcode() != Op_Opaque4) {
+            // The underflow and overflow limits: 0 <= scale*I+offset < limit
+            add_constraint(stride_con, lscale_con, offset, zero, limit, pre_ctrl, &pre_limit, &main_limit);
+          }
+
+          add_assertion_predicates(loop, offset, zero, limit, loop_entry, lscale_con);
+
         } else {
           if (PrintOpto) {
             tty->print_cr("missed RCE opportunity");
@@ -3113,7 +3119,6 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
           continue;             // In release mode, ignore it
         }
       } else {                  // Otherwise work on normal compares
-        assert(iff->in(1)->Opcode() != Op_Opaque4, "");
         switch(b_test._test) {
         case BoolTest::gt:
           // Fall into GE case
@@ -3133,12 +3138,15 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
           }
           // Fall into LT case
         case BoolTest::lt:
-          // The underflow and overflow limits: MIN_INT <= scale*I+offset < limit
-          // Note: (MIN_INT+1 == -MAX_INT) is used instead of MIN_INT here
-          // to avoid problem with scale == -1: MIN_INT/(-1) == MIN_INT.
-          add_constraint(loop, stride_con, lscale_con, offset, mini, limit, pre_ctrl, &pre_limit, &main_limit, loop_entry);
+          if (iff->in(1)->Opcode() != Op_Opaque4) {
+            // The underflow and overflow limits: MIN_INT <= scale*I+offset < limit
+            // Note: (MIN_INT+1 == -MAX_INT) is used instead of MIN_INT here
+            // to avoid problem with scale == -1: MIN_INT/(-1) == MIN_INT.
+            add_constraint(stride_con, lscale_con, offset, mini, limit, pre_ctrl, &pre_limit, &main_limit);
+          }
+          add_assertion_predicates(loop, offset, mini, limit, loop_entry, lscale_con);
           break;
-        default:
+          default:
           if (PrintOpto) {
             tty->print_cr("missed RCE opportunity");
           }
