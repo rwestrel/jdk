@@ -1187,6 +1187,7 @@ public:
 
     Compile* C = Compile::current();
     if (!C->failing()) {
+      C->print_method(PHASE_DEBUG, 2);
       // Cleanup any modified bits
       igvn.optimize();
       if (C->failing()) { return; }
