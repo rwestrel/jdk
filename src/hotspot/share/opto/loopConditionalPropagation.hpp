@@ -296,6 +296,8 @@ public:
   bool condition_safe_to_constant_fold(const Node* use, const Type* t) const;
 
   void create_halt_node(Node* c);
+
+  bool has_cast_with_narrowed_type(ProjNode* proj) const;
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP

@@ -1184,8 +1184,8 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
       Node* u = use->fast_out(i);
       if (u->is_If()) {
         IfNode* iff = u->as_If();
-        Node* proj = iff->proj_out(con);
-        if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+        ProjNode* proj = iff->proj_out(con);
+        if (has_cast_with_narrowed_type(proj)) {
           return false;
         }
       } else if (u->Opcode() == Op_Opaque4) {
@@ -1193,8 +1193,8 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
           Node* uu = u->fast_out(j);
           if (uu->is_If()) {
             IfNode* iff = uu->as_If();
-            Node* proj = iff->proj_out(con);
-            if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+            ProjNode* proj = iff->proj_out(con);
+            if (has_cast_with_narrowed_type(proj)) {
               return false;
             }
           }
@@ -1205,8 +1205,8 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
   if (use->is_If() && t->isa_int()) {
     IfNode* iff = use->as_If();
     int con = t->is_int()->get_con();
-    Node* proj = iff->proj_out(con);
-    if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+    ProjNode* proj = iff->proj_out(con);
+    if (has_cast_with_narrowed_type(proj)) {
       return false;
     }
   }
@@ -1216,8 +1216,8 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
       Node* u = use->fast_out(j);
       if (u->is_If()) {
         IfNode* iff = u->as_If();
-        Node* proj = iff->proj_out(con);
-        if (proj->has_out_with(Op_CastII) || proj->has_out_with(Op_CastLL)) {
+        ProjNode* proj = iff->proj_out(con);
+        if (has_cast_with_narrowed_type(proj)) {
           return false;
         }
       }
@@ -1706,6 +1706,21 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
 //  }
   _updates = new Updates(8, _rpo_list.size());
   _work_queues = new WorkQueues(8, _rpo_list.size());
+}
+
+bool PhaseConditionalPropagation::has_cast_with_narrowed_type(ProjNode* proj) const {
+  for (DUIterator_Fast imax, i = proj->fast_outs(imax); i < imax; i++) {
+    Node* u = proj->fast_out(i);
+    if (u->Opcode() == Op_CastII || u->Opcode() == Op_CastLL) {
+      Node* in1 = u->in(1);
+      const Type* narrowed_type = find_type_between(in1, proj, _phase->idom(_phase->ctrl_or_self(in1)));
+//      tty->print("XXX %s", narrowed_type != nullptr ? "narrowed" : "not narrowed"); in1->dump();
+      if (narrowed_type != nullptr) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 void PhaseIdealLoop::conditional_elimination(VectorSet& visited, Node_Stack& nstack, Node_List& rpo_list, int rounds) {
