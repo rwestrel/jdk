@@ -1713,7 +1713,12 @@ bool PhaseConditionalPropagation::has_cast_with_narrowed_type(ProjNode* proj) co
     Node* u = proj->fast_out(i);
     if (u->Opcode() == Op_CastII || u->Opcode() == Op_CastLL) {
       Node* in1 = u->in(1);
-      const Type* narrowed_type = find_type_between(in1, proj, _phase->idom(_phase->ctrl_or_self(in1)));
+      if (in1->is_Con()) {
+        continue;
+      }
+      Node* in1_c = _phase->ctrl_or_self(in1);
+      Node* cast_c = _phase->ctrl_or_self(u);
+      const Type* narrowed_type = find_type_between(in1, cast_c, _phase->idom(in1_c));
 //      tty->print("XXX %s", narrowed_type != nullptr ? "narrowed" : "not narrowed"); in1->dump();
       if (narrowed_type != nullptr) {
         return true;
