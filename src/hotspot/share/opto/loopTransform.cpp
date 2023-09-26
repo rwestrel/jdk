@@ -3144,7 +3144,7 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
             // to avoid problem with scale == -1: MIN_INT/(-1) == MIN_INT.
             add_constraint(stride_con, lscale_con, offset, mini, limit, pre_ctrl, &pre_limit, &main_limit);
           }
-          add_assertion_predicates(loop, offset, mini, limit, loop_entry, lscale_con);
+          //add_assertion_predicates(loop, offset, mini, limit, loop_entry, lscale_con);
           break;
           default:
           if (PrintOpto) {
