@@ -545,16 +545,16 @@ private:
                           Unique_Node_List &reducible_merges);
 
   // Helper methods for unique types split.
-  bool split_AddP(Node *addp, Node *base);
+//  bool split_AddP(Node *addp, Node *base);
 
-  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
-  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
+//  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
+//  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
 
-  void  move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis);
-  Node* find_inst_mem(Node* mem, int alias_idx,GrowableArray<PhiNode *>  &orig_phi_worklist);
-  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
+//  void  move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis);
+//  Node* find_inst_mem(Node* mem, int alias_idx,GrowableArray<PhiNode *>  &orig_phi_worklist);
+//  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
 
-  Node_Array _node_map; // used for bookkeeping during type splitting
+//  Node_Array _node_map; // used for bookkeeping during type splitting
                         // Used for the following purposes:
                         // Memory Phi    - most recent unique Phi split out
                         //                 from this Phi
@@ -564,17 +564,17 @@ private:
 
   // manage entries in _node_map
 
-  void  set_map(Node* from, Node* to)  {
-    ideal_nodes.push(from);
-    _node_map.map(from->_idx, to);
-  }
-
-  Node* get_map(int idx) { return _node_map[idx]; }
-
-  PhiNode* get_map_phi(int idx) {
-    Node* phi = _node_map[idx];
-    return (phi == nullptr) ? nullptr : phi->as_Phi();
-  }
+//  void  set_map(Node* from, Node* to)  {
+//    ideal_nodes.push(from);
+//    _node_map.map(from->_idx, to);
+//  }
+//
+//  Node* get_map(int idx) { return _node_map[idx]; }
+//
+//  PhiNode* get_map_phi(int idx) {
+//    Node* phi = _node_map[idx];
+//    return (phi == nullptr) ? nullptr : phi->as_Phi();
+//  }
 
   // Returns true if there is an object in the scope of sfn that does not escape globally.
   bool has_ea_local_in_scope(SafePointNode* sfn);
