@@ -402,6 +402,7 @@ void Compile::remove_useless_node(Node* dead) {
     remove_useless_late_inlines(         &_string_late_inlines, dead);
     remove_useless_late_inlines(         &_boxing_late_inlines, dead);
     remove_useless_late_inlines(&_vector_reboxing_late_inlines, dead);
+    remove_useless_late_inlines(   &_scoped_value_late_inlines, dead);
 
     if (dead->is_CallStaticJava()) {
       remove_unstable_if_trap(dead->as_CallStaticJava(), false);
@@ -460,6 +461,7 @@ void Compile::disconnect_useless_nodes(Unique_Node_List& useful, Unique_Node_Lis
   remove_useless_late_inlines(         &_string_late_inlines, useful);
   remove_useless_late_inlines(         &_boxing_late_inlines, useful);
   remove_useless_late_inlines(&_vector_reboxing_late_inlines, useful);
+  remove_useless_late_inlines(          &_scoped_value_late_inlines, useful);
   debug_only(verify_graph_edges(true/*check for no_dead_code*/);)
 }
 
@@ -660,6 +662,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
                   _string_late_inlines(comp_arena(), 2, 0, nullptr),
                   _boxing_late_inlines(comp_arena(), 2, 0, nullptr),
                   _vector_reboxing_late_inlines(comp_arena(), 2, 0, nullptr),
+                  _scoped_value_late_inlines(comp_arena(), 2, 0, nullptr),
                   _late_inlines_pos(0),
                   _number_of_mh_late_inlines(0),
                   _oom(false),
@@ -2021,6 +2024,28 @@ void Compile::inline_boxing_calls(PhaseIterGVN& igvn) {
   }
 }
 
+void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
+  if (_scoped_value_late_inlines.length() > 0) {
+    PhaseGVN* gvn = initial_gvn();
+    set_inlining_incrementally(true);
+
+    igvn_worklist()->ensure_empty(); // should be done with igvn
+
+    _late_inlines_pos = _late_inlines.length();
+
+    while (_scoped_value_late_inlines.length() > 0) {
+      CallGenerator* cg = _scoped_value_late_inlines.pop();
+      cg->do_late_inline();
+      if (failing())  return;
+    }
+    _scoped_value_late_inlines.trunc_to(0);
+
+    inline_incrementally_cleanup(igvn);
+
+    set_inlining_incrementally(false);
+  }
+}
+
 bool Compile::inline_incrementally_one() {
   assert(IncrementalInline, "incremental inlining should be on");
 
@@ -2361,6 +2386,8 @@ void Compile::Optimize() {
       // by removing some allocations and/or locks.
     } while (progress);
   }
+
+  inline_scoped_value_calls(igvn);
 
   // Loop transforms on the ideal graph.  Range Check Elimination,
   // peeling, unrolling, etc.
@@ -5266,4 +5293,9 @@ Node* Compile::narrow_value(BasicType bt, Node* value, const Type* type, PhaseGV
 
 void Compile::record_method_not_compilable_oom() {
   record_method_not_compilable(CompilationMemoryStatistic::failure_reason_memlimit());
+}
+
+CallNode* Compile::scoped_value_late_inline(int i) const {
+  CallGenerator* cg = _scoped_value_late_inlines.at(i);
+  return cg->call_node();
 }

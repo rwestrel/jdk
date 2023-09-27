@@ -3607,6 +3607,10 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
                                          GrowableArray<ArrayCopyNode*> &arraycopy_worklist,
                                          GrowableArray<MergeMemNode*> &mergemem_worklist,
                                          Unique_Node_List &reducible_merges) {
+  for (int i = 0; i < _compile->scoped_value_late_inlines_count(); ++i) {
+    CallNode* call = _compile->scoped_value_late_inline(i);
+    call->dump();
+  }
   GrowableArray<Node *>  memnode_worklist;
   GrowableArray<PhiNode *>  orig_phis;
   PhaseIterGVN  *igvn = _igvn;

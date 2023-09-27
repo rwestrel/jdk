@@ -51,6 +51,7 @@ class AddPNode;
 class Block;
 class Bundle;
 class CallGenerator;
+class CallNode;
 class CallStaticJavaNode;
 class CloneMap;
 class ConnectionGraph;
@@ -456,6 +457,7 @@ private:
   GrowableArray<CallGenerator*> _boxing_late_inlines; // same but for boxing operations
 
   GrowableArray<CallGenerator*> _vector_reboxing_late_inlines; // same but for vector reboxing operations
+  GrowableArray<CallGenerator*> _scoped_value_late_inlines; // same but for boxing operations
 
   int                           _late_inlines_pos;    // Where in the queue should the next late inlining candidate go (emulate depth first inlining)
   uint                          _number_of_mh_late_inlines; // number of method handle late inlining still pending
@@ -955,6 +957,7 @@ private:
   bool should_delay_boxing_inlining(ciMethod* call_method, JVMState* jvms);
   bool should_delay_vector_inlining(ciMethod* call_method, JVMState* jvms);
   bool should_delay_vector_reboxing_inlining(ciMethod* call_method, JVMState* jvms);
+  bool should_delay_scoped_value_inlining(ciMethod* call_method, JVMState* jvms);
 
   // Helper functions to identify inlining potential at call-site
   ciMethod* optimize_virtual_call(ciMethod* caller, ciInstanceKlass* klass,
@@ -1034,11 +1037,20 @@ private:
   void              add_boxing_late_inline(CallGenerator* cg) {
     _boxing_late_inlines.push(cg);
   }
-
   void              add_vector_reboxing_late_inline(CallGenerator* cg) {
     _vector_reboxing_late_inlines.push(cg);
   }
 
+  void              add_scoped_value_late_inline(CallGenerator* cg) {
+    _scoped_value_late_inlines.push(cg);
+  }
+  
+  int scoped_value_late_inlines_count() const {
+    return _scoped_value_late_inlines.length();
+  }
+
+  CallNode* scoped_value_late_inline(int i) const;
+  
   template<typename N, ENABLE_IF(std::is_base_of<Node, N>::value)>
   void remove_useless_nodes(GrowableArray<N*>& node_list, Unique_Node_List& useful);
 
@@ -1071,6 +1083,7 @@ private:
   void inline_incrementally(PhaseIterGVN& igvn);
   void inline_string_calls(bool parse_time);
   void inline_boxing_calls(PhaseIterGVN& igvn);
+  void inline_scoped_value_calls(PhaseIterGVN& igvn);
   bool optimize_loops(PhaseIterGVN& igvn, LoopOptsMode mode);
   void remove_root_to_sfpts_edges(PhaseIterGVN& igvn);
 

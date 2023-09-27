@@ -159,6 +159,8 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
         cg = nullptr;
       } else if (IncrementalInline && should_delay_vector_inlining(callee, jvms)) {
         return CallGenerator::for_late_inline(callee, cg);
+      } else if (should_delay_scoped_value_inlining(callee, jvms)) {
+        return CallGenerator::for_scoped_value_late_inline(callee, cg);
       } else {
         return cg;
       }
@@ -210,6 +212,9 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
             return CallGenerator::for_boxing_late_inline(callee, cg);
           } else if (should_delay_vector_reboxing_inlining(callee, jvms)) {
             return CallGenerator::for_vector_reboxing_late_inline(callee, cg);
+          } else if (should_delay_scoped_value_inlining(callee, jvms)) {
+            ShouldNotReachHere();
+            return CallGenerator::for_scoped_value_late_inline(callee, cg);
           } else if (should_delay) {
             return CallGenerator::for_late_inline(callee, cg);
           } else {
@@ -462,6 +467,10 @@ bool Compile::should_delay_vector_inlining(ciMethod* call_method, JVMState* jvms
 
 bool Compile::should_delay_vector_reboxing_inlining(ciMethod* call_method, JVMState* jvms) {
   return EnableVectorSupport && (call_method->intrinsic_id() == vmIntrinsics::_VectorRebox);
+}
+
+bool Compile::should_delay_scoped_value_inlining(ciMethod* call_method, JVMState* jvms) {
+  return call_method->intrinsic_id() == vmIntrinsics::_scopedValueCache;
 }
 
 // uncommon-trap call-sites where callee is unloaded, uninitialized or will not link

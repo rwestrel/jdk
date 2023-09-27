@@ -809,6 +809,34 @@ CallGenerator* CallGenerator::for_vector_reboxing_late_inline(ciMethod* method, 
   return new LateInlineVectorReboxingCallGenerator(method, inline_cg);
 }
 
+class LateInlineScopedValueCallGenerator : public LateInlineCallGenerator {
+
+public:
+  LateInlineScopedValueCallGenerator(ciMethod* method, CallGenerator* inline_cg) :
+          LateInlineCallGenerator(method, inline_cg, /*is_pure=*/true) {}
+
+  virtual JVMState* generate(JVMState* jvms) {
+    Compile *C = Compile::current();
+
+    C->log_inline_id(this);
+
+    C->add_scoped_value_late_inline(this);
+
+    JVMState* new_jvms = DirectCallGenerator::generate(jvms);
+    return new_jvms;
+  }
+
+  virtual CallGenerator* with_call_node(CallNode* call) {
+    LateInlineScopedValueCallGenerator* cg = new LateInlineScopedValueCallGenerator(method(), _inline_cg);
+    cg->set_call_node(call->as_CallStaticJava());
+    return cg;
+  }
+};
+
+CallGenerator* CallGenerator::for_scoped_value_late_inline(ciMethod* method, CallGenerator* inline_cg) {
+  return new LateInlineScopedValueCallGenerator(method, inline_cg);
+}
+
 //------------------------PredictedCallGenerator------------------------------
 // Internal class which handles all out-of-line calls checking receiver type.
 class PredictedCallGenerator : public CallGenerator {
