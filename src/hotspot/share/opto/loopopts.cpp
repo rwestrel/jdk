@@ -1119,6 +1119,37 @@ Node *PhaseIdealLoop::split_if_with_blocks_pre( Node *n ) {
     }
   }
 
+  if (n->Opcode() == Op_LoadN || n->Opcode() == Op_LoadP) {
+    Node* addr = n->in(MemNode::Address);
+    const Type* addr_t = _igvn.type(addr);
+    if (addr_t->isa_aryptr() &&
+        addr_t->is_aryptr()->elem()->make_oopptr() != nullptr &&
+        addr_t->is_aryptr()->elem()->make_oopptr()->isa_instptr() &&
+        addr_t->is_aryptr()->elem()->make_oopptr()->is_instptr()->instance_klass() == ciEnv::current()->Object_klass()) {
+      assert(addr->is_AddP(), "");
+      BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
+      Node* handle_load = bs->step_over_gc_barrier(addr->in(AddPNode::Base)->uncast());
+      if (handle_load->Opcode() == Op_LoadP) {
+        Node* scoped_valued_load = handle_load->in(MemNode::Address);
+        if (scoped_valued_load->Opcode() == Op_LoadP) {
+          Node* scoped_valued_load_addr = scoped_valued_load->in(MemNode::Address);
+          if (scoped_valued_load_addr->is_AddP()) {
+            intptr_t offset;
+            Node* thread_local_ptr = AddPNode::Ideal_base_and_offset(scoped_valued_load_addr, &_igvn, offset);
+            if (thread_local_ptr != nullptr &&
+                thread_local_ptr->Opcode() == Op_ThreadLocal &&
+                offset == in_bytes(JavaThread::scopedValueCache_offset())) {
+              assert(C->get_alias_index(handle_load->as_Load()->adr_type()) == Compile::AliasIdxRaw, "");
+              assert(C->get_alias_index(scoped_valued_load->as_Load()->adr_type()) == Compile::AliasIdxRaw, "");
+              assert(handle_load->in(MemNode::Memory) == scoped_valued_load->in(MemNode::Memory), "");
+              n->dump();
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Determine if the Node has inputs from some local Phi.
   // Returns the block to clone thru.
   Node *n_blk = has_local_phi_input( n );

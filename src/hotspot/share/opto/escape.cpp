@@ -3072,85 +3072,21 @@ Node* ConnectionGraph::find_second_addp(Node* addp, Node* n) {
   return nullptr;
 }
 
-class SplitUniqueTypes {
-private:
-  Compile* C;
-  PhaseIterGVN* igvn;
-  Unique_Node_List& ideal_nodes; // Used by CG construction and types splitting.
-  Node_Array _node_map; // used for bookkeeping during type splitting
-  // Used for the following purposes:
-  // Memory Phi    - most recent unique Phi split out
-  //                 from this Phi
-  // MemNode       - new memory input for this node
-  // ChecCastPP    - allocation that this is a cast of
-  // allocation    - CheckCastPP of the allocation
-  const char* _failure_reason;
-  uint _nodes_size;
-  GrowableArray<PhiNode *> orig_phis;
-  uint new_index_start;
-  GrowableArray<Node *> memnode_worklist;
-  VectorSet visited;
-  GrowableArray<MergeMemNode*>& mergemem_worklist;
-public:
-  SplitUniqueTypes(Compile* C, PhaseIterGVN* igvn, const char* failure_reason, uint nodes_size,
-                   GrowableArray<MergeMemNode*>& mergemem_worklistxx, Unique_Node_List& ideal_nodesxx) : ideal_nodes(ideal_nodesxx), _node_map(C->comp_arena()),
-                   mergemem_worklist(mergemem_worklistxx) {
-    this->C = C;
-    this->igvn = igvn;
-    _failure_reason = failure_reason;
-    _nodes_size = nodes_size;
-    new_index_start = (uint)C->num_alias_types();
-  }
-
-  Node* find_inst_mem(Node *orig_mem, int alias_idx, GrowableArray<PhiNode *>  &orig_phis);
-  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
-  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
-  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
-  void move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis);
-  bool split_AddP(Node *addp, Node *base);
-  void split_unique_types();
-
-  void  set_map(Node* from, Node* to)  {
-    ideal_nodes.push(from);
-    _node_map.map(from->_idx, to);
-  }
-
-  Node* get_map(int idx) { return _node_map[idx]; }
-
-  PhiNode* get_map_phi(int idx) {
-    Node* phi = _node_map[idx];
-    return (phi == nullptr) ? nullptr : phi->as_Phi();
-  }
-  void record_for_optimizer(Node *n) {
-    igvn->_worklist.push(n);
-    igvn->add_users_to_worklist(n);
-  }
-
-  uint nodes_size() const { return _nodes_size; }
-
-  void append_memnode_if_missing(Node* mem) {
-    memnode_worklist.append_if_missing(mem);
-  }
-
-  bool visited_test_set(Node* n) {
-    return visited.test_set(n->_idx);
-  }
-};
 
 //
 // Adjust the type and inputs of an AddP which computes the
 // address of a field of an instance
 //
 bool SplitUniqueTypes::split_AddP(Node *addp, Node *base) {
-  const TypeOopPtr *base_t = igvn->type(base)->isa_oopptr();
+  const TypeOopPtr *base_t = _igvn->type(base)->isa_oopptr();
   assert(base_t != nullptr && base_t->is_known_instance(), "expecting instance oopptr");
-  const TypeOopPtr *t = igvn->type(addp)->isa_oopptr();
+  const TypeOopPtr *t = _igvn->type(addp)->isa_oopptr();
   if (t == nullptr) {
     // We are computing a raw address for a store captured by an Initialize
     // compute an appropriate address type (cases #3 and #5).
-    assert(igvn->type(addp) == TypeRawPtr::NOTNULL, "must be raw pointer");
+    assert(_igvn->type(addp) == TypeRawPtr::NOTNULL, "must be raw pointer");
     assert(addp->in(AddPNode::Address)->is_Proj(), "base of raw address must be result projection from allocation");
-    intptr_t offs = (int)igvn->find_intptr_t_con(addp->in(AddPNode::Offset), Type::OffsetBot);
+    intptr_t offs = (int)_igvn->find_intptr_t_con(addp->in(AddPNode::Offset), Type::OffsetBot);
     assert(offs != Type::OffsetBot, "offset must be a constant");
     t = base_t->add_offset(offs)->is_oopptr();
   }
@@ -3183,7 +3119,7 @@ bool SplitUniqueTypes::split_AddP(Node *addp, Node *base) {
   // for the instance type. Note: C++ will not remove it since the call
   // has side effect.
   int alias_idx = C->get_alias_index(tinst);
-  igvn->set_type(addp, tinst);
+  _igvn->set_type(addp, tinst);
   // record the allocation in the node map
   set_map(addp, get_map(base->_idx));
   // Set addp's Base and Address to 'base'.
@@ -3195,19 +3131,19 @@ bool SplitUniqueTypes::split_AddP(Node *addp, Node *base) {
   } else {
     assert(!abase->is_top(), "sanity"); // AddP case #3
     if (abase != base) {
-      igvn->hash_delete(addp);
+      _igvn->hash_delete(addp);
       addp->set_req(AddPNode::Base, base);
       if (abase == adr) {
         addp->set_req(AddPNode::Address, base);
       } else {
         // AddP case #4 (adr is array's element offset AddP node)
 #ifdef ASSERT
-        const TypeOopPtr *atype = igvn->type(adr)->isa_oopptr();
+        const TypeOopPtr *atype = _igvn->type(adr)->isa_oopptr();
         assert(adr->is_AddP() && atype != nullptr &&
                atype->instance_id() == inst_id, "array's element offset should be processed first");
 #endif
       }
-      igvn->hash_insert(addp);
+      _igvn->hash_insert(addp);
     }
   }
   // Put on IGVN worklist since at least addp's type was changed above.
@@ -3261,7 +3197,7 @@ PhiNode *SplitUniqueTypes::create_split_phi(PhiNode *orig_phi, int alias_idx, Gr
   const TypePtr *atype = C->get_adr_type(alias_idx);
   result = PhiNode::make(orig_phi->in(0), nullptr, Type::MEMORY, atype);
   C->copy_node_notes_to(result, orig_phi);
-  igvn->set_type(result, result->bottom_type());
+  _igvn->set_type(result, result->bottom_type());
   record_for_optimizer(result);
   set_map(orig_phi, result);
   new_created = true;
@@ -3353,7 +3289,7 @@ Node* SplitUniqueTypes::step_through_mergemem(MergeMemNode *mmem, int alias_idx,
 // Move memory users to their memory slices.
 //
 void SplitUniqueTypes::move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis) {
-  const TypePtr* tp = igvn->type(n->in(MemNode::Address))->isa_ptr();
+  const TypePtr* tp = _igvn->type(n->in(MemNode::Address))->isa_ptr();
   assert(tp != nullptr, "ptr type");
   int alias_idx = C->get_alias_index(tp);
   int general_idx = C->get_general_index(alias_idx);
@@ -3391,9 +3327,9 @@ void SplitUniqueTypes::move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_ph
       uint orig_uniq = C->unique();
       Node* m = find_inst_mem(n, general_idx, orig_phis);
       assert(orig_uniq == C->unique(), "no new nodes");
-      igvn->hash_delete(use);
-      imax -= use->replace_edge(n, m, igvn);
-      igvn->hash_insert(use);
+      _igvn->hash_delete(use);
+      imax -= use->replace_edge(n, m, _igvn);
+      _igvn->hash_insert(use);
       record_for_optimizer(use);
       --i;
 #ifdef ASSERT
@@ -3403,7 +3339,7 @@ void SplitUniqueTypes::move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_ph
         continue;
       }
       // Memory nodes should have new memory input.
-      tp = igvn->type(use->in(MemNode::Address))->isa_ptr();
+      tp = _igvn->type(use->in(MemNode::Address))->isa_ptr();
       assert(tp != nullptr, "ptr type");
       int idx = C->get_alias_index(tp);
       assert(get_map(use->_idx) != nullptr || idx == alias_idx,
@@ -3441,7 +3377,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
       break;  // hit one of our sentinels
     }
     if (result->is_Mem()) {
-      const Type *at = igvn->type(result->in(MemNode::Address));
+      const Type *at = _igvn->type(result->in(MemNode::Address));
       if (at == Type::TOP) {
         break; // Dead
       }
@@ -3467,7 +3403,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
       } else if (proj_in->is_Call()) {
         // ArrayCopy node processed here as well
         CallNode *call = proj_in->as_Call();
-        if (!call->may_modify(toop, igvn)) {
+        if (!call->may_modify(toop, _igvn)) {
           result = call->in(TypeFunc::Memory);
         }
       } else if (proj_in->is_Initialize()) {
@@ -3486,7 +3422,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
         if (control_proj_ac->is_Proj() && control_proj_ac->in(0)->is_ArrayCopy()) {
           // Stop if it is a clone
           ArrayCopyNode* ac = control_proj_ac->in(0)->as_ArrayCopy();
-          if (ac->may_modify(toop, igvn)) {
+          if (ac->may_modify(toop, _igvn)) {
             break;
           }
         }
@@ -3506,7 +3442,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
       }
     } else if (result->is_Phi() &&
                C->get_alias_index(result->as_Phi()->adr_type()) != alias_idx) {
-      Node *un = result->as_Phi()->unique_input(igvn);
+      Node *un = result->as_Phi()->unique_input(_igvn);
       if (un != nullptr) {
         orig_phis.append_if_missing(result->as_Phi());
         result = un;
@@ -3514,7 +3450,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
         break;
       }
     } else if (result->is_ClearArray()) {
-      if (!ClearArrayNode::step_through(&result, (uint)toop->instance_id(), igvn)) {
+      if (!ClearArrayNode::step_through(&result, (uint)toop->instance_id(), _igvn)) {
         // Can not bypass initialization of the instance
         // we are looking for.
         break;
@@ -3530,7 +3466,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
                mem->Opcode() == Op_StrCompressedCopy, "sanity");
         adr = mem->in(3); // Memory edge corresponds to destination array
       }
-      const Type *at = igvn->type(adr);
+      const Type *at = _igvn->type(adr);
       if (at != Type::TOP) {
         assert(at->isa_ptr() != nullptr, "pointer type required.");
         int idx = C->get_alias_index(at->is_ptr());
@@ -3543,7 +3479,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
       result = mem->in(MemNode::Memory);
     } else if (result->Opcode() == Op_StrInflatedCopy) {
       Node* adr = result->in(3); // Memory edge corresponds to destination array
-      const Type *at = igvn->type(adr);
+      const Type *at = _igvn->type(adr);
       if (at != Type::TOP) {
         assert(at->isa_ptr() != nullptr, "pointer type required.");
         int idx = C->get_alias_index(at->is_ptr());
@@ -3561,7 +3497,7 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
     assert(mphi->bottom_type() == Type::MEMORY, "memory phi required");
     const TypePtr *t = mphi->adr_type();
     if (!is_instance) {
-      // Push all non-instance Phis on the orig_phis worklist to update inputs
+      // Push all non-instance Phis on the _orig_phis worklist to update inputs
       // during Phase 4 if needed.
       orig_phis.append_if_missing(mphi);
     } else if (C->get_alias_index(t) != alias_idx) {
@@ -3587,15 +3523,15 @@ Node* SplitUniqueTypes::find_inst_mem(Node *orig_mem, int alias_idx, GrowableArr
 //               casts and Phi:  push users on alloc_worklist
 //               AddP:  cast Base and Address inputs to the instance type
 //                      push any AddP users on alloc_worklist and push any memnode
-//                      users onto memnode_worklist.
-//  Phase 2:  Process MemNode's from memnode_worklist. compute new address type and
+//                      users onto _memnode_worklist.
+//  Phase 2:  Process MemNode's from _memnode_worklist. compute new address type and
 //            search the Memory chain for a store with the appropriate type
 //            address type.  If a Phi is found, create a new version with
 //            the appropriate memory slices from each of the Phi inputs.
 //            For stores, process the users as follows:
-//               MemNode:  push on memnode_worklist
-//               MergeMem: push on mergemem_worklist
-//  Phase 3:  Process MergeMem nodes from mergemem_worklist.  Walk each memory slice
+//               MemNode:  push on _memnode_worklist
+//               MergeMem: push on _mergemem_worklist
+//  Phase 3:  Process MergeMem nodes from _mergemem_worklist.  Walk each memory slice
 //            moving the first node encountered of each  instance type to the
 //            the input corresponding to its alias index.
 //            appropriate memory slice.
@@ -3671,16 +3607,12 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
 //    call->dump();
 //  }
   const char* failure_reason = nullptr;
-  if (_compile->do_escape_analysis() == true && !_compile->failing()) {
-    // Retry compilation without escape analysis.
-    // If this is the first failure, the sentinel string will "stick"
-    // to the Compile object, and the C2Compiler will see it and retry.
-    failure_reason = _invocation > 0 ? C2Compiler::retry_no_iterative_escape_analysis() : C2Compiler::retry_no_escape_analysis();
-  }
+  // Retry compilation without escape analysis.
+  // If this is the first failure, the sentinel string will "stick"
+  // to the Compile object, and the C2Compiler will see it and retry.
+  failure_reason = _invocation > 0 ? C2Compiler::retry_no_iterative_escape_analysis() : C2Compiler::retry_no_escape_analysis();
 
   PhaseIterGVN  *igvn = _igvn;
-  uint new_index_start = (uint) _compile->num_alias_types();
-  uint unique_old = _compile->unique();
 
   ideal_nodes.clear();
   SplitUniqueTypes sut(_compile, _igvn, failure_reason, nodes_size(), mergemem_worklist, ideal_nodes);
@@ -4016,14 +3948,14 @@ void SplitUniqueTypes::split_unique_types() {
   // New alias types were created in split_AddP().
   uint new_index_end = (uint) C->num_alias_types();
 
-  //  Phase 2:  Process MemNode's from memnode_worklist. compute new address type and
+  //  Phase 2:  Process MemNode's from _memnode_worklist. compute new address type and
   //            compute new values for Memory inputs  (the Memory inputs are not
   //            actually updated until phase 4.)
-  if (memnode_worklist.length() == 0)
+  if (_memnode_worklist.length() == 0)
     return;  // nothing to do
-  while (memnode_worklist.length() != 0) {
-    Node *n = memnode_worklist.pop();
-    if (visited.test_set(n->_idx)) {
+  while (_memnode_worklist.length() != 0) {
+    Node *n = _memnode_worklist.pop();
+    if (_visited.test_set(n->_idx)) {
       continue;
     }
     if (n->is_Phi() || n->is_ClearArray()) {
@@ -4042,14 +3974,14 @@ void SplitUniqueTypes::split_unique_types() {
     } else {
       assert(n->is_Mem(), "memory node required.");
       Node *addr = n->in(MemNode::Address);
-      const Type *addr_t = igvn->type(addr);
+      const Type *addr_t = _igvn->type(addr);
       if (addr_t == Type::TOP) {
         continue;
       }
       assert (addr_t->isa_ptr() != nullptr, "pointer type required.");
       int alias_idx = C->get_alias_index(addr_t->is_ptr());
       assert ((uint)alias_idx < new_index_end, "wrong alias index");
-      Node *mem = find_inst_mem(n->in(MemNode::Memory), alias_idx, orig_phis);
+      Node *mem = find_inst_mem(n->in(MemNode::Memory), alias_idx, _orig_phis);
       if (C->failing()) {
         return;
       }
@@ -4070,32 +4002,32 @@ void SplitUniqueTypes::split_unique_types() {
     for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
       Node *use = n->fast_out(i);
       if (use->is_Phi() || use->is_ClearArray()) {
-        memnode_worklist.append_if_missing(use);
+        _memnode_worklist.append_if_missing(use);
       } else if (use->is_Mem() && use->in(MemNode::Memory) == n) {
         if (use->Opcode() == Op_StoreCM) { // Ignore cardmark stores
           continue;
         }
-        memnode_worklist.append_if_missing(use);
+        _memnode_worklist.append_if_missing(use);
       } else if (use->is_MemBar()) {
         if (use->in(TypeFunc::Memory) == n) { // Ignore precedent edge
-          memnode_worklist.append_if_missing(use);
+          _memnode_worklist.append_if_missing(use);
         }
 #ifdef ASSERT
       } else if(use->is_Mem()) {
         assert(use->in(MemNode::Memory) != n, "EA: missing memory path");
       } else if (use->is_MergeMem()) {
-        assert(mergemem_worklist.contains(use->as_MergeMem()), "EA: missing MergeMem node in the worklist");
+        assert(_mergemem_worklist.contains(use->as_MergeMem()), "EA: missing MergeMem node in the worklist");
       } else if (use->Opcode() == Op_EncodeISOArray) {
         if (use->in(MemNode::Memory) == n || use->in(3) == n) {
           // EncodeISOArray overwrites destination array
-          memnode_worklist.append_if_missing(use);
+          _memnode_worklist.append_if_missing(use);
         }
       } else {
         uint op = use->Opcode();
         if ((use->in(MemNode::Memory) == n) &&
             (op == Op_StrCompressedCopy || op == Op_StrInflatedCopy)) {
           // They overwrite memory edge corresponding to destination array,
-          memnode_worklist.append_if_missing(use);
+          _memnode_worklist.append_if_missing(use);
         } else if (!(BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(use) ||
                      op == Op_AryEq || op == Op_StrComp || op == Op_CountPositives ||
                      op == Op_StrCompressedCopy || op == Op_StrInflatedCopy || op == Op_VectorizedHashCode ||
@@ -4109,19 +4041,19 @@ void SplitUniqueTypes::split_unique_types() {
     }
   }
 
-  //  Phase 3:  Process MergeMem nodes from mergemem_worklist.
+  //  Phase 3:  Process MergeMem nodes from _mergemem_worklist.
   //            Walk each memory slice moving the first node encountered of each
   //            instance type to the input corresponding to its alias index.
-  uint length = mergemem_worklist.length();
+  uint length = _mergemem_worklist.length();
   for( uint next = 0; next < length; ++next ) {
-    MergeMemNode* nmm = mergemem_worklist.at(next);
-    assert(!visited.test_set(nmm->_idx), "should not be visited before");
+    MergeMemNode* nmm = _mergemem_worklist.at(next);
+    assert(!_visited.test_set(nmm->_idx), "should not be visited before");
     // Note: we don't want to use MergeMemStream here because we only want to
     // scan inputs which exist at the start, not ones we add during processing.
     // Note 2: MergeMem may already contains instance memory slices added
     // during find_inst_mem() call when memory nodes were processed above.
-    igvn->hash_delete(nmm);
-    uint nslices = MIN2(nmm->req(), new_index_start);
+    _igvn->hash_delete(nmm);
+    uint nslices = MIN2(nmm->req(), _new_index_start);
     for (uint i = Compile::AliasIdxRaw+1; i < nslices; i++) {
       Node* mem = nmm->in(i);
       Node* cur = nullptr;
@@ -4131,7 +4063,7 @@ void SplitUniqueTypes::split_unique_types() {
       // First, update mergemem by moving memory nodes to corresponding slices
       // if their type became more precise since this mergemem was created.
       while (mem->is_Mem()) {
-        const Type *at = igvn->type(mem->in(MemNode::Address));
+        const Type *at = _igvn->type(mem->in(MemNode::Address));
         if (at != Type::TOP) {
           assert (at->isa_ptr() != nullptr, "pointer type required.");
           uint idx = (uint)C->get_alias_index(at->is_ptr());
@@ -4150,11 +4082,11 @@ void SplitUniqueTypes::split_unique_types() {
       nmm->set_memory_at(i, (cur != nullptr) ? cur : mem);
       // Find any instance of the current type if we haven't encountered
       // already a memory slice of the instance along the memory chain.
-      for (uint ni = new_index_start; ni < new_index_end; ni++) {
+      for (uint ni = _new_index_start; ni < new_index_end; ni++) {
         if((uint)C->get_general_index(ni) == i) {
           Node *m = (ni >= nmm->req()) ? nmm->empty_memory() : nmm->in(ni);
           if (nmm->is_empty_memory(m)) {
-            Node* result = find_inst_mem(mem, ni, orig_phis);
+            Node* result = find_inst_mem(mem, ni, _orig_phis);
             if (C->failing()) {
               return;
             }
@@ -4164,20 +4096,20 @@ void SplitUniqueTypes::split_unique_types() {
       }
     }
     // Find the rest of instances values
-    for (uint ni = new_index_start; ni < new_index_end; ni++) {
+    for (uint ni = _new_index_start; ni < new_index_end; ni++) {
       const TypeOopPtr *tinst = C->get_adr_type(ni)->isa_oopptr();
       Node* result = step_through_mergemem(nmm, ni, tinst);
       if (result == nmm->base_memory()) {
         // Didn't find instance memory, search through general slice recursively.
         result = nmm->memory_at(C->get_general_index(ni));
-        result = find_inst_mem(result, ni, orig_phis);
+        result = find_inst_mem(result, ni, _orig_phis);
         if (C->failing()) {
           return;
         }
         nmm->set_memory_at(ni, result);
       }
     }
-    igvn->hash_insert(nmm);
+    _igvn->hash_insert(nmm);
     record_for_optimizer(nmm);
   }
 
@@ -4188,13 +4120,13 @@ void SplitUniqueTypes::split_unique_types() {
   // to recursively process Phi's encountered on the input memory
   // chains as is done in split_memory_phi() since they  will
   // also be processed here.
-  for (int j = 0; j < orig_phis.length(); j++) {
-    PhiNode *phi = orig_phis.at(j);
+  for (int j = 0; j < _orig_phis.length(); j++) {
+    PhiNode *phi = _orig_phis.at(j);
     int alias_idx = C->get_alias_index(phi->adr_type());
-    igvn->hash_delete(phi);
+    _igvn->hash_delete(phi);
     for (uint i = 1; i < phi->req(); i++) {
       Node *mem = phi->in(i);
-      Node *new_mem = find_inst_mem(mem, alias_idx, orig_phis);
+      Node *new_mem = find_inst_mem(mem, alias_idx, _orig_phis);
       if (C->failing()) {
         return;
       }
@@ -4202,7 +4134,7 @@ void SplitUniqueTypes::split_unique_types() {
         phi->set_req(i, new_mem);
       }
     }
-    igvn->hash_insert(phi);
+    _igvn->hash_insert(phi);
     record_for_optimizer(phi);
   }
 
@@ -4214,8 +4146,8 @@ void SplitUniqueTypes::split_unique_types() {
   visited.Reset();
   Node_Stack old_mems(arena, _compile->unique() >> 2);
 #endif
-  for (uint i = 0; i < ideal_nodes.size(); i++) {
-    Node*    n = ideal_nodes.at(i);
+  for (uint i = 0; i < _ideal_nodes.size(); i++) {
+    Node*    n = _ideal_nodes.at(i);
     Node* nmem = get_map(n->_idx);
     assert(nmem != nullptr, "sanity");
     if (n->is_Mem()) {
@@ -4228,15 +4160,15 @@ void SplitUniqueTypes::split_unique_types() {
       assert(n->in(MemNode::Memory) != nmem, "sanity");
       if (!n->is_Load()) {
         // Move memory users of a store first.
-        move_inst_mem(n, orig_phis);
+        move_inst_mem(n, _orig_phis);
       }
       // Now update memory input
-      igvn->hash_delete(n);
+      _igvn->hash_delete(n);
       n->set_req(MemNode::Memory, nmem);
-      igvn->hash_insert(n);
+      _igvn->hash_insert(n);
       record_for_optimizer(n);
     } else {
-      assert(n->is_Allocate() || n->is_CheckCastPP() ||
+      assert(n->is_Allocate() || n->is_ConstraintCast() ||
              n->is_AddP() || n->is_Phi(), "unknown node used for set_map()");
     }
   }
