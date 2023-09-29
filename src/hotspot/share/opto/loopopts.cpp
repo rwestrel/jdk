@@ -1142,7 +1142,55 @@ Node *PhaseIdealLoop::split_if_with_blocks_pre( Node *n ) {
               assert(C->get_alias_index(handle_load->as_Load()->adr_type()) == Compile::AliasIdxRaw, "");
               assert(C->get_alias_index(scoped_valued_load->as_Load()->adr_type()) == Compile::AliasIdxRaw, "");
               assert(handle_load->in(MemNode::Memory) == scoped_valued_load->in(MemNode::Memory), "");
-              n->dump();
+              for (DUIterator_Fast imax, i = scoped_valued_load_addr->fast_outs(imax); i < imax; i++) {
+                Node* other_scoped_value_load = scoped_valued_load_addr->fast_out(i);
+                if (other_scoped_value_load == scoped_valued_load) {
+                  continue;
+                }
+                Node* other_scoped_value_load_c = get_ctrl(other_scoped_value_load);
+                if (!is_dominator(other_scoped_value_load_c, n_ctrl)) {
+                  continue;
+                }
+                Node* other_handle_load = other_scoped_value_load->unique_out();
+                assert(other_scoped_value_load != nullptr && other_scoped_value_load->Opcode() == Op_LoadP, "");
+                Node* to_clone = n;
+                Node_List clones;
+                while (to_clone != handle_load) {
+                  clones.push(to_clone);
+                  if (to_clone->is_Load()) {
+                    to_clone = to_clone->in(MemNode::Address);
+                  } else if (to_clone->is_AddP()) {
+                    to_clone = to_clone->in(AddPNode::Address);
+                  } else if (to_clone->is_ConstraintCast()) {
+                    to_clone = to_clone->in(1);
+                  } else if (bs->is_gc_barrier_node(to_clone)) {
+                    to_clone = bs->step_over_gc_barrier(to_clone);
+                  } else {
+                    ShouldNotReachHere();
+                  }
+                }
+                Node* current = handle_load;
+                Node* updated = other_handle_load;
+                while (clones.size() > 0) {
+                  Node* to_clone = clones.pop();
+                  Node* clone = to_clone->clone();
+                  int nb = clone->replace_edge(current, updated);
+                  assert(nb > 0, "");
+                  Node* exising = _igvn.hash_find(clone);
+                  clone->destruct(&_igvn);
+                  if (exising == nullptr) {
+                    break;
+                  }
+                  current = to_clone;
+                  updated = exising;
+                }
+//                if (clones.size() == 0) {
+//                  _igvn.replace_input_of()
+//                }
+//                prev_cloned->replace_edge(handle_load, other_handle_load);
+//                Node* exising = _igvn.hash_find_insert(prev_cloned);
+//                tty->print_cr("XXX %d", exising != nullptr ? exising->_idx : -1);
+              }
             }
           }
         }
