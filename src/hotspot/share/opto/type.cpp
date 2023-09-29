@@ -935,7 +935,6 @@ public:
 };
 
 void Type::check_symmetrical(const Type* t, const Type* mt, const VerifyMeet& verify) const {
-  return;
   Compile* C = Compile::current();
   const Type* mt2 = verify.meet(t, this);
   if (mt != mt2) {
