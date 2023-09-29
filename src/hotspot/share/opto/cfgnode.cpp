@@ -1249,7 +1249,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
             jlong stride_con = stride_t->get_con_as_long(l->bt());
             if (stride_con < 0) {          // Down-counter loop
               swap(lo, hi);
-              jlong iv_range_lower_limit = MAX2(lo->lo_as_long(), min_signed_integer(l->bt()) - stride_con -  1);
+              jlong iv_range_lower_limit = lo->lo_as_long();
               // Prevent overflow when adding one below
               if (iv_range_lower_limit < max_signed_integer(l->bt())) {
                 // The loop exit condition is: iv + stride > limit (iv is this Phi). So the loop iterates until
@@ -1269,7 +1269,7 @@ const Type* PhiNode::Value(PhaseGVN* phase) const {
               }
               return TypeInteger::make(MIN2(iv_range_lower_limit, hi->lo_as_long()), hi->hi_as_long(), 3, l->bt())->filter_speculative(_type);
             } else if (stride_con >= 0) {
-              jlong iv_range_upper_limit = MIN2(hi->hi_as_long(), max_signed_integer(l->bt()) - stride_con +  1);
+              jlong iv_range_upper_limit = hi->hi_as_long();
               // Prevent overflow when subtracting one below
               if (iv_range_upper_limit > min_signed_integer(l->bt())) {
                 // The loop exit condition is: iv + stride < limit (iv is this Phi). So the loop iterates until
