@@ -1140,7 +1140,8 @@ bool PhaseConditionalPropagation::validate_control(Node* n, Node* c) {
         }
       } else if (u->is_Phi()) {
         for (uint k = 1; k < u->req(); k++) {
-          if (u->in(k) == node && (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
+          if (u->in(k) == node && !u->in(0)->in(k) &&
+              (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
             return true;
           }
         }
@@ -1364,7 +1365,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           }
           int nb_deleted = 0;
           for (uint j = 1; j < use->req(); ++j) {
-            if (use->in(j) == node && is_dominator(c, r->in(j)) &&
+            if (use->in(j) == node && !r->in(j)->is_top() && is_dominator(c, r->in(j)) &&
                 is_safe_for_replacement_at_phi(node, use, r, j)) {
               progress = true;
               if (con == NULL) {
@@ -1648,8 +1649,8 @@ public:
 
 bool PhaseConditionalPropagation::is_dominator(Node* n, Node* d) const {
 //  assert(_phase->is_dominator(n, d) == (n == d || _dominator_tree->is_dominator(n, d)), "");
-//  return _phase->is_dominator(n, d);
-  return (n == d || _dominator_tree->is_dominator(n, d));
+  return _phase->is_dominator(n, d);
+//  return (n == d || _dominator_tree->is_dominator(n, d));
 }
 
 
