@@ -2407,6 +2407,7 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
                n->Opcode() == Op_Opaque4   ||
                n->Opcode() == Op_MaxL      ||
                n->Opcode() == Op_MinL      ||
+               n->Opcode() == Op_LoadSVCache ||
                BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n),
                "unknown node type in macro list");
       }
@@ -2502,6 +2503,15 @@ bool PhaseMacroExpand::expand_macro_nodes() {
       } else if (n->Opcode() == Op_MinL) {
         Node* repl = MaxNode::signed_min(n->in(1), n->in(2), _igvn.type(n), _igvn);
         _igvn.replace_node(n, repl);
+        success = true;
+      } else if (n->Opcode() == Op_LoadSVCache) {
+        DecoratorSet decorators = C2_READ_ACCESS | C2_CONTROL_DEPENDENT_LOAD | IN_HEAP |IS_ARRAY;
+        Node* adr_node = n->in(MemNode::Address);
+        C2AccessValuePtr addr(adr_node, n->adr_type());
+        C2OptAccess access(_igvn, n->in(0), n->in(MemNode::Memory), decorators, T_OBJECT, adr_node->in(AddPNode::Base), addr);
+        BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
+        Node* res = bs->load_at(access, n->adr_type()->isa_aryptr()->elem());
+        _igvn.replace_node(n, res);
         success = true;
       }
       assert(!success || (C->macro_count() == (old_macro_count - 1)), "elimination must have deleted one node from macro list");

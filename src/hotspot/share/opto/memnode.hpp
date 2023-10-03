@@ -499,6 +499,19 @@ public:
   virtual BasicType memory_type() const { return T_ADDRESS; }
 };
 
+class LoadSVCacheNode : public LoadNode {
+public:
+  LoadSVCacheNode(Compile* C, Node *c, Node *mem, Node *adr, const TypePtr *at, const TypePtr* t, MemOrd mo, ControlDependency control_dependency = DependsOnlyOnTest)
+    : LoadNode(c, mem, adr, at, t, mo, control_dependency) {
+    init_flags(Flag_is_macro);
+    C->add_macro_node(this);
+  }
+  virtual int Opcode() const;
+  virtual uint ideal_reg() const { ShouldNotReachHere(); return Op_RegP; }
+  virtual int store_Opcode() const { ShouldNotReachHere(); return Op_StoreP; }
+  virtual BasicType memory_type() const { ShouldNotReachHere(); return T_ADDRESS; }
+};
+
 
 //------------------------------LoadNNode--------------------------------------
 // Load a narrow oop from memory (either object or array)

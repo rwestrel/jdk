@@ -482,6 +482,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_scopedValueCache:          return inline_native_scopedValueCache();
   case vmIntrinsics::_setScopedValueCache:       return inline_native_setScopedValueCache();
+  case vmIntrinsics::_getCached:                 return inline_getCached();
 
 #if INCLUDE_JVMTI
   case vmIntrinsics::_notifyJvmtiVThreadStart:   return inline_native_notify_jvmti_funcs(CAST_FROM_FN_PTR(address, OptoRuntime::notify_jvmti_vthread_start()),
@@ -3654,6 +3655,32 @@ bool LibraryCallKit::inline_native_setScopedValueCache() {
   const TypePtr *adr_type = _gvn.type(cache_obj_handle)->isa_ptr();
   access_store_at(nullptr, cache_obj_handle, adr_type, arr, objects_type, T_OBJECT, IN_NATIVE | MO_UNORDERED);
 
+  return true;
+}
+
+bool LibraryCallKit::inline_getCached() {
+  Node* ary = argument(0);
+  const TypeAryPtr* arytype = _gvn.type(ary)->is_aryptr();
+  assert(!TypePtr::NULL_PTR->higher_equal(arytype), "must be not null");
+  const TypePtr* elemtype = arytype->is_aryptr()->elem()->make_ptr();
+  BasicType elembt = elemtype->array_element_basic_type();
+  if (elembt == T_NARROWOOP) {
+    elembt = T_OBJECT;
+  }
+
+  Node* index = argument(1);
+  Node* offset = argument(2);
+
+  Node* add = _gvn.transform(new AddINode(index, offset));
+  Node* adr = array_element_address(ary, add, elembt, arytype->size());
+  int adr_idx = C->get_alias_index(arytype);
+  Node* mem = memory(adr_idx);
+//  Node* result = access_load_at(adr, adr, arytype, elemtype, elembt, IN_HEAP | IS_ARRAY | C2_CONTROL_DEPENDENT_LOAD);
+  Node* result = _gvn.transform(new LoadSVCacheNode(C, control(), mem, adr, arytype, elemtype, MemNode::unordered));
+//  offset->dump();
+//  result->dump();
+  set_result(result);
+  
   return true;
 }
 

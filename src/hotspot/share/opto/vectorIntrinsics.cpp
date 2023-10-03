@@ -3190,3 +3190,4 @@ bool LibraryCallKit::inline_index_partially_in_upper_range() {
   C->set_max_vector_size(MAX2(C->max_vector_size(), (uint)(num_elem * type2aelembytes(elem_bt))));
   return true;
 }
+

@@ -39,6 +39,7 @@ import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.ScopedValueContainer;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.security.action.GetPropertyAction;
 
 /**
@@ -682,15 +683,20 @@ public final class ScopedValue<T> {
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
             int n = (hash & Cache.SLOT_MASK) * 2;
-            if (objects[n] == this) {
-                return (T)objects[n + 1];
+            if (getCached(objects, n, 0) == this) {
+                return (T)getCached(objects, n, 1);
             }
             n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
-            if (objects[n] == this) {
-                return (T)objects[n + 1];
+            if (getCached(objects, n, 0)== this) {
+                return (T)getCached(objects, n, 1);
             }
         }
         return slowGet();
+    }
+
+    @IntrinsicCandidate
+    private static Object getCached(Object[] objects, int n, int slot) {
+        return objects[n + slot];
     }
 
     @SuppressWarnings("unchecked")
