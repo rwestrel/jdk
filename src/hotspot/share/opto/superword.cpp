@@ -3603,7 +3603,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
       // safe to simply convert invar to an int and loose the upper 32
       // bit half.
       invar = new ConvL2INode(invar);
-      igvn().register_new_node_with_optimizer(invar);
+      phase()->register_new_node(invar, pre_ctrl);
       TRACE_ALIGN_VECTOR_NODE(invar);
    }
     if (is_sub) {
@@ -3611,8 +3611,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
     } else {
       xboi = new AddINode(xboi, invar);
     }
-    igvn().register_new_node_with_optimizer(xboi);
-    phase()->set_ctrl(xboi, pre_ctrl);
+    phase()->register_new_node(xboi, pre_ctrl);
     TRACE_ALIGN_VECTOR_NODE(xboi);
   }
 
@@ -3622,11 +3621,11 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
     // When the base() is top, we have no alignment guarantee at all.
     // Hence, we must now take the base into account for the calculation.
     Node* xbase = new CastP2XNode(nullptr, base);
-    igvn().register_new_node_with_optimizer(xbase);
+    phase()->register_new_node(xbase, pre_ctrl);
     TRACE_ALIGN_VECTOR_NODE(xbase);
 #ifdef _LP64
     xbase  = new ConvL2INode(xbase);
-    igvn().register_new_node_with_optimizer(xbase);
+    phase()->register_new_node(xbase, pre_ctrl);
     TRACE_ALIGN_VECTOR_NODE(xbase);
 #endif
     if (is_sub) {
@@ -3634,8 +3633,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
     } else {
       xboi = new AddINode(xboi, xbase);
     }
-    igvn().register_new_node_with_optimizer(xboi);
-    phase()->set_ctrl(xboi, pre_ctrl);
+    phase()->register_new_node(xboi, pre_ctrl);
     TRACE_ALIGN_VECTOR_NODE(xboi);
   }
 
@@ -3644,8 +3642,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
   //    The division is executed as shift
   Node* log2_abs_scale = igvn().intcon(exact_log2(abs(scale)));
   Node* XBOI = new URShiftINode(xboi, log2_abs_scale);
-  igvn().register_new_node_with_optimizer(XBOI);
-  phase()->set_ctrl(XBOI, pre_ctrl);
+  phase()->register_new_node(XBOI, pre_ctrl);
   TRACE_ALIGN_VECTOR_NODE(log2_abs_scale);
   TRACE_ALIGN_VECTOR_NODE(XBOI);
 
@@ -3659,8 +3656,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
   } else {
     XBOI_OP_old_limit = new AddINode(XBOI, old_limit);
   }
-  igvn().register_new_node_with_optimizer(XBOI_OP_old_limit);
-  phase()->set_ctrl(XBOI_OP_old_limit, pre_ctrl);
+  phase()->register_new_node(XBOI_OP_old_limit, pre_ctrl);
   TRACE_ALIGN_VECTOR_NODE(XBOI_OP_old_limit);
 
   // 3.2: Compute:
@@ -3671,8 +3667,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
   //    a bitmask operation.
   Node* mask_AW = igvn().intcon(AW-1);
   Node* adjust_pre_iter = new AndINode(XBOI_OP_old_limit, mask_AW);
-  igvn().register_new_node_with_optimizer(adjust_pre_iter);
-  phase()->set_ctrl(adjust_pre_iter, pre_ctrl);
+  phase()->register_new_node(adjust_pre_iter, pre_ctrl);
   TRACE_ALIGN_VECTOR_NODE(mask_AW);
   TRACE_ALIGN_VECTOR_NODE(adjust_pre_iter);
 
@@ -3685,8 +3680,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
   } else {
     new_limit = new AddINode(old_limit, adjust_pre_iter);
   }
-  igvn().register_new_node_with_optimizer(new_limit);
-  phase()->set_ctrl(new_limit, pre_ctrl);
+  phase()->register_new_node(new_limit, pre_ctrl);
   TRACE_ALIGN_VECTOR_NODE(new_limit);
 
   // 5: Compute (15a, b):
@@ -3694,8 +3688,7 @@ void SuperWord::adjust_pre_loop_limit_to_align_main_loop_vectors() {
   Node* constrained_limit =
     (stride > 0) ? (Node*) new MinINode(new_limit, orig_limit)
                  : (Node*) new MaxINode(new_limit, orig_limit);
-  igvn().register_new_node_with_optimizer(constrained_limit);
-  phase()->set_ctrl(constrained_limit, pre_ctrl);
+  phase()->register_new_node(constrained_limit, pre_ctrl);
   TRACE_ALIGN_VECTOR_NODE(constrained_limit);
 
   // 6: Hack the pre-loop limit
