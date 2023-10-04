@@ -3183,6 +3183,12 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
     set_idom(cl->skip_strip_mined(), loop_entry, dom_depth(cl->skip_strip_mined()));
   }
 
+  assert((pre_limit == pre_opaq->in(1)) ==  (main_limit == cl->limit()), "progress should change both loop limits");
+  if (pre_limit == pre_opaq->in(1)) {
+    // no progress
+    return;
+  }
+
   // Update loop limits
   if (pre_limit != orig_limit) {
     // Computed pre-loop limit can be outside of loop iterations range.
@@ -3210,8 +3216,8 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
     _igvn.replace_input_of(main_bol, 1, main_cmp);
   }
   assert(main_limit == cl->limit() || get_ctrl(main_limit) == pre_ctrl, "wrong control for added limit");
-  const TypeInt* orig_limit_t = _igvn.type(orig_limit)->is_int();
   bool upward = cl->stride_con() > 0;
+  const TypeInt* orig_limit_t = _igvn.type(orig_limit)->is_int();
   // The new loop limit is <= (for an upward loop) >= (for a downward loop) than the orig limit.
   // The expression that computes the new limit may be too complicated and the computed type of the new limit
   // may be too pessimistic. A CastII here guarantees it's not lost.
