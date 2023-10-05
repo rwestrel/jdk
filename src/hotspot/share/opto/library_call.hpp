@@ -388,6 +388,6 @@ class LibraryCallKit : public GraphKit {
 
   bool inline_blackhole();
 
-  bool inline_getCached();
+  bool inline_getFromCache();
 };
 

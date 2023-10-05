@@ -294,9 +294,9 @@ class methodHandle;
    do_signature(setScopedValueCache_signature,                   "([Ljava/lang/Object;)V")                              \
   do_intrinsic(_findScopedValueBindings,  java_lang_Thread,       findScopedValueBindings_name, void_object_signature, F_SN) \
    do_name(     findScopedValueBindings_name,                    "findScopedValueBindings")                             \
-  do_intrinsic(_getCached,                java_lang_ScopedValue, getCached_name, getCached_signature, F_S)              \
-   do_name(     getCached_name,                                  "getCached")                                           \
-   do_signature(getCached_signature,                             "([Ljava/lang/Object;II)Ljava/lang/Object;")           \
+  do_intrinsic(_getFromCache,            java_lang_ScopedValue,   getFromCache_name, getFromCache_signature, F_R)       \
+   do_name(     getFromCache_name,                               "getFromCache")                                        \
+   do_signature(getFromCache_signature,                          "(IILjava/lang/ScopedValue$CacheOperation;)Ljava/lang/Object;") \
                                                                                                                         \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
