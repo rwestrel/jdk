@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "ci/ciUtilities.inline.hpp"
+#include "ci/ciSymbols.hpp"
 #include "classfile/vmIntrinsics.hpp"
 #include "compiler/compileBroker.hpp"
 #include "compiler/compileLog.hpp"
@@ -3664,13 +3665,19 @@ bool LibraryCallKit::inline_getFromCache() {
   Node* n2 = argument(2);
   Node* op = argument(3);
 
-  sv->dump();
-  n1->dump();
-  n2->dump();
-  op->dump();
+  const TypeInstPtr* op_t = _gvn.type(op)->is_instptr();
+  assert(op_t->singleton(), "");
+  ciField* step_field = op_t->instance_klass()->get_field_by_name(ciSymbol::make("step"), ciSymbols::int_signature(),
+                                                                  false);
+  int proj_nb = op_t->const_oop()->as_instance()->field_value(step_field).as_int();
 
-  ShouldNotReachHere();
-//  const TypeAryPtr* arytype = _gvn.type(ary)->is_aryptr();
+  int alias_idx = C->get_alias_index(TypeAryPtr::OOPS);
+  Node* get_from_cache = _gvn.transform(new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(alias_idx), sv, n1, n2));
+  Node* proj = _gvn.transform(new ProjNode(get_from_cache, proj_nb));
+
+  set_result(proj);
+
+  //  const TypeAryPtr* arytype = _gvn.type(ary)->is_aryptr();
 //  assert(!TypePtr::NULL_PTR->higher_equal(arytype), "must be not null");
 //  const TypePtr* elemtype = arytype->is_aryptr()->elem()->make_ptr();
 //  BasicType elembt = elemtype->array_element_basic_type();

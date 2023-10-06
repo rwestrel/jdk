@@ -234,6 +234,9 @@ public:
                             intx lines);
   void expand_dtrace_alloc_probe(AllocateNode* alloc, Node* fast_oop, Node*&fast_oop_ctrl, Node*&fast_oop_rawmem);
   void expand_initialize_membar(AllocateNode* alloc, InitializeNode* init, Node*&fast_oop_ctrl, Node*&fast_oop_rawmem);
+
+  void replace_scoped_value_cache_load(const TypeAryPtr* objects_type, Node* load_of_cache, ProjNode* key,
+                                       ProjNode* object, Node* idx, Node* mem);
 };
 
 #endif // SHARE_OPTO_MACRO_HPP

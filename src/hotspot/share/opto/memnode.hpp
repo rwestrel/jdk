@@ -499,17 +499,63 @@ public:
   virtual BasicType memory_type() const { return T_ADDRESS; }
 };
 
-class LoadSVCacheNode : public LoadNode {
+class GetFromSVCacheNode : public MultiNode {
 public:
-  LoadSVCacheNode(Compile* C, Node *c, Node *mem, Node *adr, const TypePtr *at, const TypePtr* t, MemOrd mo, ControlDependency control_dependency = DependsOnlyOnTest)
-    : LoadNode(c, mem, adr, at, t, mo, control_dependency) {
+  enum {
+      Control = 0,
+      Mem1,
+      Mem2,
+      ScopedValue,
+      Index1,
+      Index2,
+      Inputs
+  };
+  enum {
+      GETCACHEARRAY = 0,
+      GETFIRSTCACHEKEY,
+      GETFIRSTCACHEOBJECT,
+      GETSECONDCACHEKEY,
+      GETSECONDCACHEOBJECT
+  };
+  GetFromSVCacheNode(Compile* C, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
+    : MultiNode(6) {
+    init_req(Mem1, mem1);
+    init_req(Mem2, mem2);
+    init_req(ScopedValue, sv);
+    init_req(Index1, n1);
+    init_req(Index2, n2);
     init_flags(Flag_is_macro);
     C->add_macro_node(this);
   }
   virtual int Opcode() const;
-  virtual uint ideal_reg() const { ShouldNotReachHere(); return Op_RegP; }
-  virtual int store_Opcode() const { ShouldNotReachHere(); return Op_StoreP; }
-  virtual BasicType memory_type() const { ShouldNotReachHere(); return T_ADDRESS; }
+
+  const Type* bottom_type() const {
+    return TypeTuple::GET_FROM_SV_CACHE;
+  }
+
+  virtual uint hash() const { return Node::hash(); }
+//  virtual uint hash() const { return NO_HASH; }
+  virtual Node* Identity(PhaseGVN* phase) { return this; }
+  virtual Node *Ideal(PhaseGVN *phase, bool can_reshape) { return nullptr; }
+  virtual const Type* Value(PhaseGVN* phase)  const { return bottom_type(); }
+  virtual bool is_CFG() const  { return false; }
+  virtual uint ideal_reg() const { return NotAMachineReg; }
+
+  ProjNode* get_cache_array() const {
+    return proj_out_or_null(GETCACHEARRAY);
+  }
+  ProjNode* get_first_cache_key() const {
+    return proj_out_or_null(GETFIRSTCACHEKEY);
+  }
+  ProjNode* get_second_cache_key() const {
+    return proj_out_or_null(GETSECONDCACHEKEY);
+  }
+  ProjNode* get_first_cache_object() const {
+    return proj_out_or_null(GETFIRSTCACHEOBJECT);
+  }
+  ProjNode* get_second_cache_object() const {
+    return proj_out_or_null(GETSECONDCACHEOBJECT);
+  }
 };
 
 

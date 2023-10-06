@@ -559,6 +559,14 @@ void Type::Initialize_shared(Compile* current) {
 
   TypeNarrowKlass::NULL_PTR = TypeNarrowKlass::make( TypePtr::NULL_PTR );
 
+  const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(5*sizeof(Type*));
+  fgetfromcache[0] = TypeInstPtr::BOTTOM;
+  fgetfromcache[1] = TypeInstPtr::BOTTOM;
+  fgetfromcache[2] = TypeInstPtr::BOTTOM;
+  fgetfromcache[3] = TypeInstPtr::BOTTOM;
+  fgetfromcache[4] = TypeInstPtr::BOTTOM;
+  TypeTuple::GET_FROM_SV_CACHE = TypeTuple::make(5, fgetfromcache);
+
   mreg2type[Op_Node] = Type::BOTTOM;
   mreg2type[Op_Set ] = 0;
   mreg2type[Op_RegN] = TypeNarrowOop::BOTTOM;
@@ -2121,6 +2129,7 @@ const TypeTuple *TypeTuple::INT_PAIR;
 const TypeTuple *TypeTuple::LONG_PAIR;
 const TypeTuple *TypeTuple::INT_CC_PAIR;
 const TypeTuple *TypeTuple::LONG_CC_PAIR;
+const TypeTuple* TypeTuple::GET_FROM_SV_CACHE;
 
 //------------------------------make-------------------------------------------
 // Make a TypeTuple from the range of a method signature
