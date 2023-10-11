@@ -3867,8 +3867,6 @@ bool LibraryCallKit::inline_slowGet() {
     prob = (1 - get_cache_prob) + get_cache_prob * (get_first_prob + (1 - get_first_prob) * get_second_prob);
   }
 
-  tty->print_cr("XXX %f %f %f %f %f -- %p", get_cache_prob, get_first_prob, get_second_prob, prob, PROB_ALWAYS, get_second_iff);
-
   Node* cmp = _gvn.transform(new CmpINode(hits_in_the_cache, _gvn.intcon(1)));
   Node* bol = _gvn.transform(new BoolNode(cmp, BoolTest::ne));
   IfNode* iff = new IfNode(control(), bol, prob, get_cache_iff->_fcnt);

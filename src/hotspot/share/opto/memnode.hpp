@@ -511,8 +511,8 @@ public:
       Mem1,
       Mem2,
       ScopedValue,
-      Index1,
-      Index2,
+      Offset1,
+      Offset2,
       Inputs
   };
   enum {
@@ -529,8 +529,8 @@ public:
     init_req(Mem1, mem1);
     init_req(Mem2, mem2);
     init_req(ScopedValue, sv);
-    init_req(Index1, n1);
-    init_req(Index2, n2);
+    init_req(Offset1, n1);
+    init_req(Offset2, n2);
     init_flags(Flag_is_macro);
     C->add_macro_node(this);
   }
@@ -547,6 +547,14 @@ public:
   virtual const Type* Value(PhaseGVN* phase)  const { return bottom_type(); }
   virtual bool is_CFG() const  { return false; }
   virtual uint ideal_reg() const { return NotAMachineReg; }
+
+  ProjNode* hits_in_the_cache() const {
+    return proj_out_or_null(HitsInTheCache);
+  }
+
+  ProjNode* cached_value() const {
+    return proj_out_or_null(CachedValue);
+  }
 
 //  ProjNode* get_cache_array() const {
 //    return proj_out_or_null(GETCACHEARRAY);
@@ -568,6 +576,11 @@ public:
     assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
     _profile_data[i]._cnt = cnt;
     _profile_data[i]._prob = prob;
+  }
+
+ float prob(uint i) const {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    return _profile_data[i]._prob;
   }
 };
 
