@@ -500,6 +500,11 @@ public:
 };
 
 class GetFromSVCacheNode : public MultiNode {
+private:
+  struct {
+   float _cnt;
+   float _prob;
+  } _profile_data[3];
 public:
   enum {
       Control = 0,
@@ -511,11 +516,13 @@ public:
       Inputs
   };
   enum {
-      GETCACHEARRAY = 0,
-      GETFIRSTCACHEKEY,
-      GETFIRSTCACHEOBJECT,
-      GETSECONDCACHEKEY,
-      GETSECONDCACHEOBJECT
+      HitsInTheCache,
+      CachedValue
+//      GETCACHEARRAY = 0,
+//      GETFIRSTCACHEKEY,
+//      GETFIRSTCACHEOBJECT,
+//      GETSECONDCACHEKEY,
+//      GETSECONDCACHEOBJECT
   };
   GetFromSVCacheNode(Compile* C, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
     : MultiNode(6) {
@@ -533,28 +540,34 @@ public:
     return TypeTuple::GET_FROM_SV_CACHE;
   }
 
-  virtual uint hash() const { return Node::hash(); }
-//  virtual uint hash() const { return NO_HASH; }
+//  virtual uint hash() const { return Node::hash(); }
+  virtual uint hash() const { return NO_HASH; }
   virtual Node* Identity(PhaseGVN* phase) { return this; }
   virtual Node *Ideal(PhaseGVN *phase, bool can_reshape) { return nullptr; }
   virtual const Type* Value(PhaseGVN* phase)  const { return bottom_type(); }
   virtual bool is_CFG() const  { return false; }
   virtual uint ideal_reg() const { return NotAMachineReg; }
 
-  ProjNode* get_cache_array() const {
-    return proj_out_or_null(GETCACHEARRAY);
-  }
-  ProjNode* get_first_cache_key() const {
-    return proj_out_or_null(GETFIRSTCACHEKEY);
-  }
-  ProjNode* get_second_cache_key() const {
-    return proj_out_or_null(GETSECONDCACHEKEY);
-  }
-  ProjNode* get_first_cache_object() const {
-    return proj_out_or_null(GETFIRSTCACHEOBJECT);
-  }
-  ProjNode* get_second_cache_object() const {
-    return proj_out_or_null(GETSECONDCACHEOBJECT);
+//  ProjNode* get_cache_array() const {
+//    return proj_out_or_null(GETCACHEARRAY);
+//  }
+//  ProjNode* get_first_cache_key() const {
+//    return proj_out_or_null(GETFIRSTCACHEKEY);
+//  }
+//  ProjNode* get_second_cache_key() const {
+//    return proj_out_or_null(GETSECONDCACHEKEY);
+//  }
+//  ProjNode* get_first_cache_object() const {
+//    return proj_out_or_null(GETFIRSTCACHEOBJECT);
+//  }
+//  ProjNode* get_second_cache_object() const {
+//    return proj_out_or_null(GETSECONDCACHEOBJECT);
+//  }
+
+  void set_profile_data(uint i, float cnt, float prob) {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    _profile_data[i]._cnt = cnt;
+    _profile_data[i]._prob = prob;
   }
 };
 

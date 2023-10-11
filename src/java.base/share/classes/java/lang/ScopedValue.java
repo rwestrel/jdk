@@ -691,23 +691,44 @@ public final class ScopedValue<T> {
     @ForceInline
     @SuppressWarnings("unchecked")
     public T get() {
-        int n1 = (hash & Cache.SLOT_MASK) * 2;
-        int n2 = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
         boolean cacheHit = false;
         Object cacheResult = null;
-        if (getFromCache(n1, n2, CacheOperation.GETCACHEARRAY) != null) {
+        Object[] objects;
+        if ((objects = scopedValueCache()) != null) {
             // This code should perhaps be in class Cache. We do it
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
-            if (getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEKEY) == this) {
+            int n = (hash & Cache.SLOT_MASK) * 2;
+            if (objects[n] == this) {
                 cacheHit = true;
-                cacheResult = getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEOBJECT);
-            } else if (getFromCache(n1, n2, CacheOperation.GETSECONDCACHEKEY)== this) {
-                cacheHit = true;
-                cacheResult = getFromCache(n1, n2, CacheOperation.GETSECONDCACHEOBJECT);
+                cacheResult = objects[n + 1];
+            } else {
+                n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
+                if (objects[n] == this) {
+                    cacheHit = true;
+                    cacheResult = objects[n + 1];
+                }
             }
         }
         return slowGet(cacheHit, cacheResult);
+//        return slowGet();
+//        int n1 = (hash & Cache.SLOT_MASK) * 2;
+//        int n2 = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
+//        boolean cacheHit = false;
+//        Object cacheResult = null;
+//        if (getFromCache(n1, n2, CacheOperation.GETCACHEARRAY) != null) {
+//            // This code should perhaps be in class Cache. We do it
+//            // here because the generated code is small and fast and
+//            // we really want it to be inlined in the caller.
+//            if (getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEKEY) == this) {
+//                cacheHit = true;
+//                cacheResult = getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEOBJECT);
+//            } else if (getFromCache(n1, n2, CacheOperation.GETSECONDCACHEKEY)== this) {
+//                cacheHit = true;
+//                cacheResult = getFromCache(n1, n2, CacheOperation.GETSECONDCACHEOBJECT);
+//            }
+//        }
+//        return slowGet(cacheHit, cacheResult);
     }
 
     @IntrinsicCandidate
@@ -735,6 +756,7 @@ public final class ScopedValue<T> {
     }
 
     @SuppressWarnings("unchecked")
+    @IntrinsicCandidate
     private T slowGet(boolean cacheHit, Object cacheResult) {
         if (cacheHit) {
             return (T) cacheResult;

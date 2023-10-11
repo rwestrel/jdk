@@ -484,6 +484,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_scopedValueCache:          return inline_native_scopedValueCache();
   case vmIntrinsics::_setScopedValueCache:       return inline_native_setScopedValueCache();
   case vmIntrinsics::_getFromCache:              return inline_getFromCache();
+  case vmIntrinsics::_slowGet:                   return inline_slowGet();
 
 #if INCLUDE_JVMTI
   case vmIntrinsics::_notifyJvmtiVThreadStart:   return inline_native_notify_jvmti_funcs(CAST_FROM_FN_PTR(address, OptoRuntime::notify_jvmti_vthread_start()),
@@ -3640,11 +3641,12 @@ Node* LibraryCallKit::scopedValueCache_helper() {
 
 //------------------------inline_native_scopedValueCache------------------
 bool LibraryCallKit::inline_native_scopedValueCache() {
-  Node* cache_obj_handle = scopedValueCache_helper();
-  const Type* objects_type = scopedValueCache_type();
-  set_result(access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE));
-
-  return true;
+  return false;
+//  Node* cache_obj_handle = scopedValueCache_helper();
+//  const Type* objects_type = scopedValueCache_type();
+//  set_result(access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE));
+//
+//  return true;
 }
 
 //------------------------inline_native_setScopedValueCache------------------
@@ -3676,30 +3678,241 @@ bool LibraryCallKit::inline_getFromCache() {
   Node* proj = _gvn.transform(new ProjNode(get_from_cache, proj_nb));
 
   set_result(proj);
-
-  //  const TypeAryPtr* arytype = _gvn.type(ary)->is_aryptr();
-//  assert(!TypePtr::NULL_PTR->higher_equal(arytype), "must be not null");
-//  const TypePtr* elemtype = arytype->is_aryptr()->elem()->make_ptr();
-//  BasicType elembt = elemtype->array_element_basic_type();
-//  if (elembt == T_NARROWOOP) {
-//    elembt = T_OBJECT;
-//  }
-//
-//  Node* index = argument(1);
-//  Node* offset = argument(2);
-//
-//  Node* add = _gvn.transform(new AddINode(index, offset));
-//  Node* adr = array_element_address(ary, add, elembt, arytype->size());
-//  int adr_idx = C->get_alias_index(arytype);
-//  Node* mem = memory(adr_idx);
-////  Node* result = access_load_at(adr, adr, arytype, elemtype, elembt, IN_HEAP | IS_ARRAY | C2_CONTROL_DEPENDENT_LOAD);
-//  Node* result = _gvn.transform(new LoadSVCacheNode(C, control(), mem, adr, arytype, elemtype, MemNode::unordered));
-////  offset->dump();
-////  result->dump();
-//  set_result(result);
-//
   return true;
 }
+
+bool LibraryCallKit::inline_slowGet() {
+  if (!UseNewCode2) {
+    return false;
+  }
+  Node* sv = argument(0);
+  Node* cache_hit = argument(1);
+  Node* cache_result = argument(2);
+
+  Node* scoped_value_cache = nullptr;
+  IfNode* get_cache_iff = nullptr;
+  IfNode* get_first_iff = nullptr;
+  IfNode* get_second_iff = nullptr;
+  Node* first_off = nullptr;
+  Node* second_off = nullptr;
+  {
+    ResourceMark rm;
+    Unique_Node_List wq;
+    wq.push(control());
+    for (uint i = 0; i < wq.size(); ++i) {
+      Node* c = wq.at(i);
+      if (c->is_Region()) {
+        for (uint j = 1; j < c->req(); ++j) {
+          Node* in = c->in(j);
+          if (in != nullptr) {
+            assert(!in->is_top(), "");
+            wq.push(in);
+          }
+        }
+      } else {
+        if (c->Opcode() == Op_If) {
+          Node* bol = c->in(1);
+          assert(bol->is_Bool(), "");
+          Node* cmp = bol->in(1);
+          assert(cmp->Opcode() == Op_CmpP, "");
+          Node* in1 = cmp->in(1);
+          Node* in2 = cmp->in(2);
+          if (in1->is_Proj() && in1->in(0)->is_Call() &&
+              in1->in(0)->as_CallJava()->method()->intrinsic_id() == vmIntrinsics::_scopedValueCache) {
+            assert(in2->bottom_type() == TypePtr::NULL_PTR, "");
+            assert(get_cache_iff == nullptr, "");
+            get_cache_iff = c->as_If();
+            if (scoped_value_cache == nullptr) {
+              scoped_value_cache = in1->in(0);
+            } else {
+              assert(scoped_value_cache == in1->in(0), "");
+            }
+            continue;
+          } else if (in2->is_Proj() && in2->in(0)->is_Call() &&
+                     in2->in(0)->as_CallJava()->method()->intrinsic_id() == vmIntrinsics::_scopedValueCache) {
+            assert(in1->bottom_type() == TypePtr::NULL_PTR, "");
+            assert(get_cache_iff == nullptr, "");
+            get_cache_iff = c->as_If();
+            if (scoped_value_cache == nullptr) {
+              scoped_value_cache = in1->in(0);
+            } else {
+              assert(scoped_value_cache == in1->in(0), "");
+            }
+            continue;
+          } else {
+            Node* in;
+            if (in1 == sv) {
+              in = in2;
+            } else {
+              assert(in2 = sv, "");
+              in = in1;
+            }
+            BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
+            in = bs->step_over_gc_barrier(in);
+            if (in->Opcode() == Op_DecodeN) {
+              in = in->in(1);
+            }
+            assert(in->Opcode() == Op_LoadP || in->Opcode() == Op_LoadN, "");
+            assert(C->get_alias_index(in->adr_type()) == C->get_alias_index(TypeAryPtr::OOPS), "");
+            Node* addp1 = in->in(MemNode::Address);
+            assert(addp1->is_AddP(), "");
+            assert(addp1->in(AddPNode::Base)->uncast()->is_Proj() &&
+                   addp1->in(AddPNode::Base)->uncast()->in(0)->as_CallJava()->method()->intrinsic_id() ==
+                   vmIntrinsics::_scopedValueCache, "");
+            if (scoped_value_cache == nullptr) {
+              scoped_value_cache = addp1->in(AddPNode::Base)->uncast()->in(0);
+            } else {
+              assert(scoped_value_cache == addp1->in(AddPNode::Base)->uncast()->in(0), "");
+            }
+            assert(in->in(MemNode::Memory)->is_Proj() && in->in(MemNode::Memory)->in(0) == scoped_value_cache, "");
+            Node* addp2 = addp1->in(AddPNode::Address);
+            Node* offset = nullptr;
+            if (addp2->is_AddP()) {
+              assert(!addp2->in(AddPNode::Address)->is_AddP() && addp2->in(AddPNode::Base) == addp1->in(AddPNode::Base),
+                     "");
+              offset = _gvn.transform(new AddXNode(addp1->in(AddPNode::Offset), addp2->in(AddPNode::Offset)));
+            } else {
+              offset = addp1->in(AddPNode::Offset);
+            }
+
+            if (get_first_iff == nullptr) {
+              get_first_iff = c->as_If();
+              first_off = offset;
+            } else {
+              assert(get_second_iff == nullptr, "");
+              get_second_iff = c->as_If();
+              second_off = offset;
+            }
+          }
+        } else {
+          assert(c->is_IfProj() || c->Opcode() == Op_RangeCheck, "");
+        }
+        wq.push(c->in(0));
+      }
+    }
+    if (get_second_iff != nullptr) {
+      Node_Stack stack(0);
+      stack.push(get_cache_iff, 0);
+      while (stack.is_nonempty()) {
+        Node* c = stack.node();
+        uint i = stack.index();
+        if (i < c->outcnt()) {
+          stack.set_index(i + 1);
+          Node* u = c->raw_out(i);
+          if (wq.member(u) && u != c) {
+            if (u == get_first_iff) {
+              break;
+            } else if (u == get_second_iff) {
+              swap(get_first_iff, get_second_iff);
+              break;
+            }
+            stack.push(u, 0);
+          }
+        } else {
+          stack.pop();
+        }
+      }
+    }
+  }
+
+  assert(get_cache_iff != nullptr, "");
+  assert(get_first_iff != nullptr, "");
+  assert(get_second_iff == nullptr || get_first_iff != nullptr, "");
+  Node* mem = scoped_value_cache->in(TypeFunc::Memory);
+  Node* c = scoped_value_cache->in(TypeFunc::Control);
+  Node* io = scoped_value_cache->in(TypeFunc::I_O);
+  set_control(c);
+  set_all_memory(mem);
+  set_i_o(io);
+
+  _gvn.hash_delete(scoped_value_cache);
+  scoped_value_cache->set_req(0, C->top());
+  C->record_for_igvn(scoped_value_cache);
+
+  GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(TypeAryPtr::OOPS), sv, first_off, second_off);
+  float get_cache_prob = get_cache_iff->_prob;
+  if (!get_cache_iff->in(1)->as_Bool()->_test.is_canonical()) {
+    get_cache_prob = 1 - get_cache_prob;
+  }
+  get_from_cache->set_profile_data(0, get_cache_iff->_fcnt, get_cache_prob);
+  float get_first_prob = get_first_iff->_prob;
+  if (!get_first_iff->in(1)->as_Bool()->_test.is_canonical()) {
+    get_first_prob = 1 - get_first_prob;
+  }
+  get_from_cache->set_profile_data(1, get_first_iff->_fcnt, get_first_prob);
+  float get_second_prob = 0;
+  if (get_second_iff != nullptr) {
+    get_second_prob = get_second_iff->_prob;
+    if (!get_second_iff->in(1)->as_Bool()->_test.is_canonical()) {
+      get_second_prob = 1 - get_second_prob;
+    }
+    get_from_cache->set_profile_data(2, get_second_iff->_fcnt, get_second_prob);
+  } else {
+    get_from_cache->set_profile_data(2, 0, 0);
+  }
+  Node* transformed_get_from_cache = _gvn.transform(get_from_cache);
+  assert(transformed_get_from_cache == get_from_cache, "");
+
+  Node* hits_in_the_cache = _gvn.transform(new ProjNode(get_from_cache, GetFromSVCacheNode::HitsInTheCache));
+  Node* cache_value = _gvn.transform(new ProjNode(get_from_cache, GetFromSVCacheNode::CachedValue));
+
+  float prob;
+  // get_cache_prob: probability that cache array is not null
+  // get_first_prob: probability of a miss
+  // get_second_prob: probability of a miss
+  // prob of a miss
+  if (get_cache_prob == PROB_UNKNOWN || get_first_prob == PROB_UNKNOWN || get_second_prob == PROB_UNKNOWN) {
+    prob = PROB_UNKNOWN;
+  } else {
+    prob = (1 - get_cache_prob) + get_cache_prob * (get_first_prob + (1 - get_first_prob) * get_second_prob);
+  }
+
+  tty->print_cr("XXX %f %f %f %f %f -- %p", get_cache_prob, get_first_prob, get_second_prob, prob, PROB_ALWAYS, get_second_iff);
+
+  Node* cmp = _gvn.transform(new CmpINode(hits_in_the_cache, _gvn.intcon(1)));
+  Node* bol = _gvn.transform(new BoolNode(cmp, BoolTest::ne));
+  IfNode* iff = new IfNode(control(), bol, prob, get_cache_iff->_fcnt);
+  Node* transformed_iff = _gvn.transform(iff);
+  assert(transformed_iff == iff, "");
+  Node* not_in_cache = _gvn.transform(new IfTrueNode(iff));
+  Node* in_cache = _gvn.transform(new IfFalseNode(iff));
+  Node* r = new RegionNode(3);
+  Node* phi_cache_hit = new PhiNode(r, TypeInt::BOOL);
+  Node* phi_cache_value = new PhiNode(r, TypeInstPtr::BOTTOM);
+
+  r->init_req(1, not_in_cache);
+  r->init_req(2, in_cache);
+  phi_cache_hit->init_req(1, _gvn.intcon(0));
+  phi_cache_hit->init_req(2, _gvn.intcon(1));
+  phi_cache_value->init_req(1, _gvn.makecon(TypePtr::NULL_PTR));
+  phi_cache_value->init_req(2, cache_value);
+
+  Node* transformed_r = _gvn.transform(r);
+  assert(r == transformed_r, "");
+  phi_cache_hit = _gvn.transform(phi_cache_hit);
+  Node* transformed_phi_cache_value = _gvn.transform(phi_cache_value);
+  assert(transformed_phi_cache_value == phi_cache_value, "");
+
+  set_control(r);
+  ciMethod* method = callee();
+  const TypeFunc* tf = TypeFunc::make(method);
+  assert(!gvn().type(argument(0))->maybe_null(), "should not be null");
+  CallStaticJavaNode* call = new CallStaticJavaNode(C, tf,
+                                                   SharedRuntime::get_resolve_opt_virtual_call_stub(), method);
+  call->set_optimized_virtual(true);
+  uint nargs = call->method()->arg_size();
+  assert(nargs == 3, "");
+  call->init_req(TypeFunc::Parms, sv);
+  call->init_req(TypeFunc::Parms+1, phi_cache_hit);
+  call->init_req(TypeFunc::Parms+2, phi_cache_value);
+  set_edges_for_java_call(call);
+
+  Node* res = set_results_for_java_call(call);
+  set_result(res);
+
+  return true;
+}
+
 
 //---------------------------load_mirror_from_klass----------------------------
 // Given a klass oop, load its java mirror (a java.lang.Class oop).

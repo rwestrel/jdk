@@ -176,6 +176,10 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
     return cg;
   }
 
+  if (callee->intrinsic_id() == vmIntrinsics::_scopedValueCache) {
+    return CallGenerator::for_direct_call(callee);
+  }
+
   // Attempt to inline...
   if (allow_inline) {
     // The profile data is only partly attributable to this caller,

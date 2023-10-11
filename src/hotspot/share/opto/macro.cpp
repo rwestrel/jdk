@@ -2668,7 +2668,7 @@ void PhaseMacroExpand::replace_scoped_value_cache_load(const TypeAryPtr* objects
     assert(object == nullptr, "");
     return;
   }
-  Node* cmp = key->unique_out();
+  Node* cmp = key->find_out_with(Op_CmpP);
   assert(cmp->Opcode() == Op_CmpP, "");
   Node* bol = cmp->unique_out();
   assert(bol->is_Bool(), "");
@@ -2694,7 +2694,7 @@ void PhaseMacroExpand::replace_scoped_value_cache_load(const TypeAryPtr* objects
 //  int nb = cmp->replace_edge(key, cache_load);
 //  assert(nb == 1, "");
   _igvn.replace_node(key, cache_load);
-
+  assert(key->find_out_with(Op_CmpP) == nullptr, "");
 
   if (object != nullptr) {
     idx = _igvn.transform(new AddINode(idx, _igvn.intcon(1)));
