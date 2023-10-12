@@ -235,8 +235,11 @@ public:
   void expand_dtrace_alloc_probe(AllocateNode* alloc, Node* fast_oop, Node*&fast_oop_ctrl, Node*&fast_oop_rawmem);
   void expand_initialize_membar(AllocateNode* alloc, InitializeNode* init, Node*&fast_oop_ctrl, Node*&fast_oop_rawmem);
 
-  void test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* offset,
-                                Node* c);
+  void test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* index,
+                                Node* c, float prob, float cnt, Node* sv, Node*& failure, Node*& hit,
+                                Node*& res);
+
+  void expand_get_from_sv_cache(const Node* n);
 };
 
 #endif // SHARE_OPTO_MACRO_HPP

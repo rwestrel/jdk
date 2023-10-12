@@ -511,8 +511,8 @@ public:
       Mem1,
       Mem2,
       ScopedValue,
-      Offset1,
-      Offset2,
+      Index1,
+      Index2,
       Inputs
   };
   enum {
@@ -529,8 +529,8 @@ public:
     init_req(Mem1, mem1);
     init_req(Mem2, mem2);
     init_req(ScopedValue, sv);
-    init_req(Offset1, n1);
-    init_req(Offset2, n2);
+    init_req(Index1, n1);
+    init_req(Index2, n2);
     init_flags(Flag_is_macro);
     C->add_macro_node(this);
   }
@@ -581,6 +581,11 @@ public:
  float prob(uint i) const {
     assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
     return _profile_data[i]._prob;
+  }
+
+ float cnt(uint i) const {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    return _profile_data[i]._cnt;
   }
 };
 

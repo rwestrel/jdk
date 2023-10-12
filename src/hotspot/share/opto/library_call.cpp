@@ -3689,12 +3689,12 @@ bool LibraryCallKit::inline_slowGet() {
   Node* cache_hit = argument(1);
   Node* cache_result = argument(2);
 
-  Node* scoped_value_cache = nullptr;
+  CallNode* scoped_value_cache = nullptr;
   IfNode* get_cache_iff = nullptr;
   IfNode* get_first_iff = nullptr;
   IfNode* get_second_iff = nullptr;
-  Node* first_off = nullptr;
-  Node* second_off = nullptr;
+  Node* first_index = nullptr;
+  Node* second_index = nullptr;
   {
     ResourceMark rm;
     Unique_Node_List wq;
@@ -3723,7 +3723,7 @@ bool LibraryCallKit::inline_slowGet() {
             assert(get_cache_iff == nullptr, "");
             get_cache_iff = c->as_If();
             if (scoped_value_cache == nullptr) {
-              scoped_value_cache = in1->in(0);
+              scoped_value_cache = in1->in(0)->as_Call();
             } else {
               assert(scoped_value_cache == in1->in(0), "");
             }
@@ -3734,7 +3734,7 @@ bool LibraryCallKit::inline_slowGet() {
             assert(get_cache_iff == nullptr, "");
             get_cache_iff = c->as_If();
             if (scoped_value_cache == nullptr) {
-              scoped_value_cache = in1->in(0);
+              scoped_value_cache = in1->in(0)->as_Call();
             } else {
               assert(scoped_value_cache == in1->in(0), "");
             }
@@ -3760,28 +3760,45 @@ bool LibraryCallKit::inline_slowGet() {
                    addp1->in(AddPNode::Base)->uncast()->in(0)->as_CallJava()->method()->intrinsic_id() ==
                    vmIntrinsics::_scopedValueCache, "");
             if (scoped_value_cache == nullptr) {
-              scoped_value_cache = addp1->in(AddPNode::Base)->uncast()->in(0);
+              scoped_value_cache = addp1->in(AddPNode::Base)->uncast()->in(0)->as_Call();
             } else {
               assert(scoped_value_cache == addp1->in(AddPNode::Base)->uncast()->in(0), "");
             }
             assert(in->in(MemNode::Memory)->is_Proj() && in->in(MemNode::Memory)->in(0) == scoped_value_cache, "");
             Node* addp2 = addp1->in(AddPNode::Address);
-            Node* offset = nullptr;
+            Node* offset1 = addp1->in(AddPNode::Offset);
+            intptr_t const_offset = offset1->find_intptr_t_con(-1);
+            BasicType bt = TypeAryPtr::OOPS->array_element_basic_type();
+            int shift  = exact_log2(type2aelembytes(bt));
+            int header = arrayOopDesc::base_offset_in_bytes(bt);
+            assert(const_offset >= header, "");
+            const_offset -= header;
+
+            Node* index = _gvn.intcon(const_offset >> shift);
             if (addp2->is_AddP()) {
               assert(!addp2->in(AddPNode::Address)->is_AddP() && addp2->in(AddPNode::Base) == addp1->in(AddPNode::Base),
                      "");
-              offset = _gvn.transform(new AddXNode(addp1->in(AddPNode::Offset), addp2->in(AddPNode::Offset)));
-            } else {
-              offset = addp1->in(AddPNode::Offset);
+              Node* offset2 = addp2->in(AddPNode::Offset);
+              assert(offset2->Opcode() == Op_LShiftX && offset2->in(2)->find_int_con(-1) == shift, "");
+              offset2 = offset2->in(1);
+#ifdef _LP64
+              assert(offset2->Opcode() == Op_ConvI2L, "");
+              offset2 = offset2->in(1);
+              if (offset2->Opcode() == Op_CastII && offset2->in(0)->is_Proj() && offset2->in(0)->in(0) == get_cache_iff) {
+                ShouldNotReachHere();
+                offset2 = offset2->in(1);
+              }
+#endif
+              index = _gvn.transform(new AddINode(offset2, index));
             }
 
             if (get_first_iff == nullptr) {
               get_first_iff = c->as_If();
-              first_off = offset;
+              first_index = index;
             } else {
               assert(get_second_iff == nullptr, "");
               get_second_iff = c->as_If();
-              second_off = offset;
+              second_index = index;
             }
           }
         } else {
@@ -3821,15 +3838,24 @@ bool LibraryCallKit::inline_slowGet() {
   Node* mem = scoped_value_cache->in(TypeFunc::Memory);
   Node* c = scoped_value_cache->in(TypeFunc::Control);
   Node* io = scoped_value_cache->in(TypeFunc::I_O);
+  
   set_control(c);
   set_all_memory(mem);
   set_i_o(io);
+
+  CallProjections projs = CallProjections();
+  scoped_value_cache->extract_projections(&projs, true);
+
+  C->gvn_replace_by(projs.fallthrough_proj, c);
+  C->gvn_replace_by(projs.fallthrough_memproj, mem);
+  C->gvn_replace_by(projs.fallthrough_ioproj, io);
 
   _gvn.hash_delete(scoped_value_cache);
   scoped_value_cache->set_req(0, C->top());
   C->record_for_igvn(scoped_value_cache);
 
-  GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(TypeAryPtr::OOPS), sv, first_off, second_off);
+  GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(TypeAryPtr::OOPS), sv, first_index, second_index ==
+          nullptr ? C->top() : second_index);
   float get_cache_prob = get_cache_iff->_prob;
   if (!get_cache_iff->in(1)->as_Bool()->_test.is_canonical()) {
     get_cache_prob = 1 - get_cache_prob;
@@ -3861,6 +3887,7 @@ bool LibraryCallKit::inline_slowGet() {
   // get_first_prob: probability of a miss
   // get_second_prob: probability of a miss
   // prob of a miss
+  tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
   if (get_cache_prob == PROB_UNKNOWN || get_first_prob == PROB_UNKNOWN || get_second_prob == PROB_UNKNOWN) {
     prob = PROB_UNKNOWN;
   } else {

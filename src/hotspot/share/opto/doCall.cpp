@@ -177,7 +177,7 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
   }
 
   if (callee->intrinsic_id() == vmIntrinsics::_scopedValueCache) {
-    return CallGenerator::for_direct_call(callee);
+    return CallGenerator::for_direct_call(callee, true);
   }
 
   // Attempt to inline...
