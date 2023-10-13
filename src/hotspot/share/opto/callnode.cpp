@@ -1100,6 +1100,31 @@ Node* CallStaticJavaNode::Ideal(PhaseGVN* phase, bool can_reshape) {
       }
     }
   }
+  if (can_reshape && method() != nullptr && method()->intrinsic_id() == vmIntrinsics::_slowGet) {
+    Node* cache_hit = in(TypeFunc::Parms + 1);
+    if (cache_hit != nullptr) {
+      const TypeInt* cache_hit_t = phase->type(cache_hit)->isa_int();
+      assert(cache_hit_t || phase->type(cache_hit) == Type::TOP, "");
+      if (cache_hit_t && cache_hit_t->is_con() && cache_hit_t->get_con() == 1) {
+        CallProjections projs;
+        extract_projections(&projs, true, false);
+        PhaseIterGVN* igvn = phase->is_IterGVN();
+        if (projs.fallthrough_catchproj != nullptr) {
+          igvn->replace_node(projs.fallthrough_catchproj, in(TypeFunc::Control));
+        }
+        if (projs.fallthrough_memproj != nullptr) {
+          igvn->replace_node(projs.fallthrough_memproj, in(TypeFunc::Memory));
+        }
+        if (projs.fallthrough_ioproj != nullptr) {
+          igvn->replace_node(projs.fallthrough_proj, in(TypeFunc::I_O));
+        }
+        if (projs.resproj != nullptr) {
+          igvn->replace_node(projs.resproj, in(TypeFunc::Parms + 2));
+        }
+        set_req(0, phase->C->top());
+      }
+    }
+  }
   return CallNode::Ideal(phase, can_reshape);
 }
 

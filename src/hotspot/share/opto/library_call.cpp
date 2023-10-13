@@ -3846,7 +3846,7 @@ bool LibraryCallKit::inline_slowGet() {
   CallProjections projs = CallProjections();
   scoped_value_cache->extract_projections(&projs, true);
 
-  C->gvn_replace_by(projs.fallthrough_proj, c);
+  C->gvn_replace_by(projs.fallthrough_catchproj, c);
   C->gvn_replace_by(projs.fallthrough_memproj, mem);
   C->gvn_replace_by(projs.fallthrough_ioproj, io);
 
@@ -3857,19 +3857,20 @@ bool LibraryCallKit::inline_slowGet() {
   GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(TypeAryPtr::OOPS), sv, first_index, second_index ==
           nullptr ? C->top() : second_index);
   float get_cache_prob = get_cache_iff->_prob;
-  if (!get_cache_iff->in(1)->as_Bool()->_test.is_canonical()) {
+  BoolNode* get_cache_bool = get_cache_iff->in(1)->as_Bool();
+  if (get_cache_prob != PROB_UNKNOWN && !get_cache_bool->_test.is_canonical()) {
     get_cache_prob = 1 - get_cache_prob;
   }
   get_from_cache->set_profile_data(0, get_cache_iff->_fcnt, get_cache_prob);
   float get_first_prob = get_first_iff->_prob;
-  if (!get_first_iff->in(1)->as_Bool()->_test.is_canonical()) {
+  if (get_first_prob != PROB_UNKNOWN && !get_first_iff->in(1)->as_Bool()->_test.is_canonical()) {
     get_first_prob = 1 - get_first_prob;
   }
   get_from_cache->set_profile_data(1, get_first_iff->_fcnt, get_first_prob);
   float get_second_prob = 0;
   if (get_second_iff != nullptr) {
     get_second_prob = get_second_iff->_prob;
-    if (!get_second_iff->in(1)->as_Bool()->_test.is_canonical()) {
+    if (get_second_prob != PROB_UNKNOWN && !get_second_iff->in(1)->as_Bool()->_test.is_canonical()) {
       get_second_prob = 1 - get_second_prob;
     }
     get_from_cache->set_profile_data(2, get_second_iff->_fcnt, get_second_prob);
@@ -3905,20 +3906,26 @@ bool LibraryCallKit::inline_slowGet() {
   Node* phi_cache_hit = new PhiNode(r, TypeInt::BOOL);
   Node* phi_cache_value = new PhiNode(r, TypeInstPtr::BOTTOM);
 
-  r->init_req(1, not_in_cache);
+  const TypeInt* cache_hit_t = _gvn.type(cache_hit)->is_int();
+  if (cache_hit_t->is_con()) {
+    assert(cache_hit_t->get_con() == 1, "");
+    ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
+    CallStaticJavaNode* unc = get_cache_failure_proj->is_uncommon_trap_proj(Deoptimization::Reason_none);
+    r->init_req(1, C->top());
+    phi_cache_hit->init_req(1, C->top());
+    phi_cache_value->init_req(1, C->top());
+    _gvn.hash_delete(unc);
+    unc->set_req(0, not_in_cache);
+  } else {
+    r->init_req(1, not_in_cache);
+    phi_cache_hit->init_req(1, _gvn.intcon(0));
+    phi_cache_value->init_req(1, _gvn.makecon(TypePtr::NULL_PTR));
+  }
   r->init_req(2, in_cache);
-  phi_cache_hit->init_req(1, _gvn.intcon(0));
   phi_cache_hit->init_req(2, _gvn.intcon(1));
-  phi_cache_value->init_req(1, _gvn.makecon(TypePtr::NULL_PTR));
   phi_cache_value->init_req(2, cache_value);
 
-  Node* transformed_r = _gvn.transform(r);
-  assert(r == transformed_r, "");
-  phi_cache_hit = _gvn.transform(phi_cache_hit);
-  Node* transformed_phi_cache_value = _gvn.transform(phi_cache_value);
-  assert(transformed_phi_cache_value == phi_cache_value, "");
-
-  set_control(r);
+  set_control(_gvn.transform(r));
   ciMethod* method = callee();
   const TypeFunc* tf = TypeFunc::make(method);
   assert(!gvn().type(argument(0))->maybe_null(), "should not be null");
@@ -3928,11 +3935,11 @@ bool LibraryCallKit::inline_slowGet() {
   uint nargs = call->method()->arg_size();
   assert(nargs == 3, "");
   call->init_req(TypeFunc::Parms, sv);
-  call->init_req(TypeFunc::Parms+1, phi_cache_hit);
-  call->init_req(TypeFunc::Parms+2, phi_cache_value);
-  set_edges_for_java_call(call);
-
-  Node* res = set_results_for_java_call(call);
+  call->init_req(TypeFunc::Parms+1, _gvn.transform(phi_cache_hit));
+  call->init_req(TypeFunc::Parms+2, _gvn.transform(phi_cache_value));
+  set_edges_for_java_call(call, false, true);
+  C->record_for_igvn(call);
+  Node* res = set_results_for_java_call(call, true);
   set_result(res);
 
   return true;

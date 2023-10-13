@@ -2681,8 +2681,7 @@ void PhaseMacroExpand::expand_get_from_sv_cache(const Node* n) {
   }
   float second_cnt = get_from_cache->cnt(2);
 
-  if (second_prob < first_prob) {
-    assert(second_index != nullptr, "");
+  if (second_index != C->top() && second_prob < first_prob) {
     swap(first_index, second_index);
     swap(first_prob, second_prob);
     second_prob = (1- first_prob) * second_prob;
