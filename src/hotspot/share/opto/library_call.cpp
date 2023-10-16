@@ -3686,6 +3686,12 @@ bool LibraryCallKit::inline_slowGet() {
     return false;
   }
   Node* sv = argument(0);
+
+  sv = null_check(sv);
+  if (stopped()) {
+    return true;
+  }
+
   Node* cache_hit = argument(1);
   Node* cache_result = argument(2);
 
