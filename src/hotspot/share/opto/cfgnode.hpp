@@ -711,5 +711,24 @@ public:
 #endif
 };
 
+class ScopedValueGetResultNode : public  MultiNode {
+public:
+  enum {
+      Control = 0,
+      ScopedValue,
+      GetResult
+  };
+  enum {
+      ControlOut = 0,
+      Result
+  };
+  ScopedValueGetResultNode(Node* ctrl, Node* sv, Node* res) : MultiNode(3) {
+    init_req(Control, ctrl);
+    init_req(ScopedValue, sv);
+    init_req(GetResult, res);
+  }
+  virtual int   Opcode() const;
+  virtual const Type* bottom_type() const { return TypeTuple::SV_GET_RESULT; }
+};
 
 #endif // SHARE_OPTO_CFGNODE_HPP

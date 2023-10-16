@@ -219,6 +219,10 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
           } else if (should_delay_scoped_value_inlining(callee, jvms)) {
             ShouldNotReachHere();
             return CallGenerator::for_scoped_value_late_inline(callee, cg);
+          } else if (callee->intrinsic_id() == vmIntrinsics::_SVget) {
+            return CallGenerator::for_scoped_value_late_inline(callee, cg);
+          } else if (callee->intrinsic_id() == vmIntrinsics::_slowGet) {
+            return CallGenerator::for_late_inline(callee, cg);
           } else if (should_delay) {
             return CallGenerator::for_late_inline(callee, cg);
           } else {

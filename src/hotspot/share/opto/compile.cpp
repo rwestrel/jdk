@@ -2025,120 +2025,123 @@ void Compile::inline_boxing_calls(PhaseIterGVN& igvn) {
 }
 
 void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
+
+
   if (_scoped_value_late_inlines.length() > 0) {
-    if (UseNewCode) {
-
-      Unique_Node_List ideal_nodes;
-      GrowableArray<MergeMemNode*> mergemem_worklist;
-      Unique_Node_List worklist;
-      SplitUniqueTypes sut(this, &igvn, "out of nodes during scoped value optimization", C->unique(), mergemem_worklist, ideal_nodes);
-      for (int i = 0; i < _scoped_value_late_inlines.length(); ++i) {
-        CallNode* call = _scoped_value_late_inlines.at(i)->call_node();
-        CallProjections callprojs;
-        call->extract_projections(&callprojs, true);
-        Node* res = callprojs.resproj;
-        Node* out_c = callprojs.fallthrough_catchproj;
-        if (res != nullptr) {
-          const TypeOopPtr* t = igvn.type(res)->isa_oopptr();
-          const TypeOopPtr* tinst = t->cast_to_exactness(true)->cast_to_instance_id(call->_idx);
-          // Allocate an alias index for the header fields. Accesses to
-          // the header emitted during macro expansion wouldn't have
-          // correct memory state otherwise.
-          get_alias_index(tinst->add_offset(oopDesc::mark_offset_in_bytes()));
-          get_alias_index(tinst->add_offset(oopDesc::klass_offset_in_bytes()));
-          CheckCastPPNode* cast = new CheckCastPPNode(out_c, res, tinst);
-          sut.set_map(cast, cast);
-          igvn.register_new_node_with_optimizer(cast);
-          for (DUIterator_Fast jmax, j = res->fast_outs(jmax); j < jmax; j++) {
-            Node* u = res->fast_out(j);
-            if (u == cast) {
-              continue;
-            }
-            igvn.rehash_node_delayed(u);
-            int nb = u->replace_edge(res, cast);
-            --j, jmax -= nb;
-            worklist.push(u);
-          }
-        }
-      }
-      for (uint i = 0; i < worklist.size(); ++i) {
-        Node* n = worklist.at(i);
-        assert(!sut.visited_test_set(n), "");
-        if (n->is_Call()) {
-          assert(n->is_CallStaticJava() && n->as_CallStaticJava()->is_uncommon_trap(), "");
-          continue;
-        } else if (n->is_AddP()) {
-          Node *base = n->in(AddPNode::Base);  // CheckCastPP node
-          const TypeOopPtr *base_t = igvn.type(base)->is_oopptr();
-          assert(base_t->is_known_instance(), "expecting instance oopptr");
-          const TypeOopPtr *t = igvn.type(n)->is_oopptr();
-          int inst_id =  base_t->instance_id();
-          if (!t->is_known_instance() &&
-              !base_t->maybe_java_subtype_of(t)) {
-            ShouldNotReachHere();
-          }
-//        assert(!t->is_known_instance() || t->instance_id() == inst_id,
-//               "old type must be non-instance or match new type");
-          const TypeOopPtr *tinst = base_t->add_offset(t->offset())->is_oopptr();
-          int alias_idx = C->get_alias_index(tinst);
-          igvn.set_type(n, tinst);
-          sut.set_map(n, sut.get_map(base->_idx));
-          sut.record_for_optimizer(n);
-
-//        bool success = sut.split_AddP(n, base);
-//        assert(success, "");
-        } else if (n->is_CheckCastPP() ||
-                   (n->is_ConstraintCast() && n->Opcode() == Op_CastPP)) {
-          Node* val = n->in(1);
-          sut.set_map(n, sut.get_map(val->_idx));
-          TypeNode* tn = n->as_Type();
-          const TypeOopPtr* tinst = igvn.type(val)->isa_oopptr();
-          assert(tinst != nullptr && tinst->is_known_instance()/* &&
-               tinst->instance_id() == jobj->idx()*/ , "instance type expected.");
-
-          const Type* tn_type = igvn.type(tn);
-          const TypeOopPtr* tn_t = tn_type->make_oopptr();
-          if (tn_t != nullptr && tinst->maybe_java_subtype_of(tn_t)) {
-            if (tn_type->isa_narrowoop()) {
-              tn_type = tinst->make_narrowoop();
-            } else {
-              tn_type = tinst;
-            }
-            igvn.hash_delete(tn);
-            igvn.set_type(tn, tn_type);
-            tn->set_type(tn_type);
-            igvn.hash_insert(tn);
-            sut.record_for_optimizer(n);
-          } else {
-            ShouldNotReachHere();
-          }
-        } else if (n->Opcode() == Op_CmpP) {
-          continue;
-        } else {
-          ShouldNotReachHere();
-        }
-        for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
-          Node *use = n->fast_out(i);
-          if(use->is_Mem() && use->in(MemNode::Address) == n) {
-            // Load/store to instance's field
-            sut.append_memnode_if_missing(use);
-          } else if (use->is_AddP() && use->outcnt() > 0) { // No dead nodes
-            worklist.push(use);
-          } else if (use->is_CheckCastPP() ||
-                     (use->is_ConstraintCast() && use->Opcode() == Op_CastPP)) {
-            worklist.push(use);
-          } else {
-            worklist.push(use);
-          }
-        }
-      }
-
-      sut.split_unique_types();
-
-      igvn.optimize();
-
-      C->print_method(PHASE_DEBUG, 2);
-    }
+//    if (UseNewCode) {
+//
+//      Unique_Node_List ideal_nodes;
+//      GrowableArray<MergeMemNode*> mergemem_worklist;
+//      Unique_Node_List worklist;
+//      SplitUniqueTypes sut(this, &igvn, "out of nodes during scoped value optimization", C->unique(), mergemem_worklist, ideal_nodes);
+//      for (int i = 0; i < _scoped_value_late_inlines.length(); ++i) {
+//        CallNode* call = _scoped_value_late_inlines.at(i)->call_node();
+//        CallProjections callprojs;
+//        call->extract_projections(&callprojs, true);
+//        Node* res = callprojs.resproj;
+//        Node* out_c = callprojs.fallthrough_catchproj;
+//        if (res != nullptr) {
+//          const TypeOopPtr* t = igvn.type(res)->isa_oopptr();
+//          const TypeOopPtr* tinst = t->cast_to_exactness(true)->cast_to_instance_id(call->_idx);
+//          // Allocate an alias index for the header fields. Accesses to
+//          // the header emitted during macro expansion wouldn't have
+//          // correct memory state otherwise.
+//          get_alias_index(tinst->add_offset(oopDesc::mark_offset_in_bytes()));
+//          get_alias_index(tinst->add_offset(oopDesc::klass_offset_in_bytes()));
+//          CheckCastPPNode* cast = new CheckCastPPNode(out_c, res, tinst);
+//          sut.set_map(cast, cast);
+//          igvn.register_new_node_with_optimizer(cast);
+//          for (DUIterator_Fast jmax, j = res->fast_outs(jmax); j < jmax; j++) {
+//            Node* u = res->fast_out(j);
+//            if (u == cast) {
+//              continue;
+//            }
+//            igvn.rehash_node_delayed(u);
+//            int nb = u->replace_edge(res, cast);
+//            --j, jmax -= nb;
+//            worklist.push(u);
+//          }
+//        }
+//      }
+//      for (uint i = 0; i < worklist.size(); ++i) {
+//        Node* n = worklist.at(i);
+//        assert(!sut.visited_test_set(n), "");
+//        if (n->is_Call()) {
+//          assert(n->is_CallStaticJava() && n->as_CallStaticJava()->is_uncommon_trap(), "");
+//          continue;
+//        } else if (n->is_AddP()) {
+//          Node *base = n->in(AddPNode::Base);  // CheckCastPP node
+//          const TypeOopPtr *base_t = igvn.type(base)->is_oopptr();
+//          assert(base_t->is_known_instance(), "expecting instance oopptr");
+//          const TypeOopPtr *t = igvn.type(n)->is_oopptr();
+//          int inst_id =  base_t->instance_id();
+//          if (!t->is_known_instance() &&
+//              !base_t->maybe_java_subtype_of(t)) {
+//            ShouldNotReachHere();
+//          }
+////        assert(!t->is_known_instance() || t->instance_id() == inst_id,
+////               "old type must be non-instance or match new type");
+//          const TypeOopPtr *tinst = base_t->add_offset(t->offset())->is_oopptr();
+//          int alias_idx = C->get_alias_index(tinst);
+//          igvn.set_type(n, tinst);
+//          sut.set_map(n, sut.get_map(base->_idx));
+//          sut.record_for_optimizer(n);
+//
+////        bool success = sut.split_AddP(n, base);
+////        assert(success, "");
+//        } else if (n->is_CheckCastPP() ||
+//                   (n->is_ConstraintCast() && n->Opcode() == Op_CastPP)) {
+//          Node* val = n->in(1);
+//          sut.set_map(n, sut.get_map(val->_idx));
+//          TypeNode* tn = n->as_Type();
+//          const TypeOopPtr* tinst = igvn.type(val)->isa_oopptr();
+//          assert(tinst != nullptr && tinst->is_known_instance()/* &&
+//               tinst->instance_id() == jobj->idx()*/ , "instance type expected.");
+//
+//          const Type* tn_type = igvn.type(tn);
+//          const TypeOopPtr* tn_t = tn_type->make_oopptr();
+//          if (tn_t != nullptr && tinst->maybe_java_subtype_of(tn_t)) {
+//            if (tn_type->isa_narrowoop()) {
+//              tn_type = tinst->make_narrowoop();
+//            } else {
+//              tn_type = tinst;
+//            }
+//            igvn.hash_delete(tn);
+//            igvn.set_type(tn, tn_type);
+//            tn->set_type(tn_type);
+//            igvn.hash_insert(tn);
+//            sut.record_for_optimizer(n);
+//          } else {
+//            ShouldNotReachHere();
+//          }
+//        } else if (n->Opcode() == Op_CmpP) {
+//          continue;
+//        } else {
+//          ShouldNotReachHere();
+//        }
+//        for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
+//          Node *use = n->fast_out(i);
+//          if(use->is_Mem() && use->in(MemNode::Address) == n) {
+//            // Load/store to instance's field
+//            sut.append_memnode_if_missing(use);
+//          } else if (use->is_AddP() && use->outcnt() > 0) { // No dead nodes
+//            worklist.push(use);
+//          } else if (use->is_CheckCastPP() ||
+//                     (use->is_ConstraintCast() && use->Opcode() == Op_CastPP)) {
+//            worklist.push(use);
+//          } else {
+//            worklist.push(use);
+//          }
+//        }
+//      }
+//
+//      sut.split_unique_types();
+//
+//      igvn.optimize();
+//
+//      C->print_method(PHASE_DEBUG, 2);
+//    }
+//
 
     PhaseGVN* gvn = initial_gvn();
     set_inlining_incrementally(true);
@@ -2149,8 +2152,34 @@ void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
 
     while (_scoped_value_late_inlines.length() > 0) {
       CallGenerator* cg = _scoped_value_late_inlines.pop();
+      CallNode* call = cg->call_node();
+      CallProjections projs;
+      call->extract_projections(&projs, true);
+      Node* sv = call->in(TypeFunc::Parms);
+      Node* control_out = projs.fallthrough_catchproj;
+      Node* res = projs.resproj;
+      control_out = control_out->clone();
+      res = res->clone();
+      ScopedValueGetResultNode* sv_get_result = new ScopedValueGetResultNode(control_out, sv, res);
+      Node* sv_get_resultx = gvn->transform(sv_get_result);
+      assert(sv_get_resultx == sv_get_result, "");
+      Node* control_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::ControlOut));
+      Node* res_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::Result));
+
+      C->gvn_replace_by(projs.fallthrough_catchproj, control_proj);
+      C->gvn_replace_by(projs.resproj, res_proj);
+
+      Node* control_projx = gvn->transform(control_proj);
+      assert(control_projx == control_proj, "");
+      Node* res_projx = gvn->transform(res_proj);
+      assert(res_projx == res_proj, "");
+
+      C->print_method(PHASE_DEBUG, 2);
+
       cg->do_late_inline();
-      if (failing())  return;
+      if (failing()) return;
+
+      C->print_method(PHASE_DEBUG, 2);
     }
     _scoped_value_late_inlines.trunc_to(0);
 
@@ -2391,6 +2420,8 @@ void Compile::Optimize() {
 
   if (failing())  return;
 
+  inline_scoped_value_calls(igvn);
+
   inline_incrementally(igvn);
 
   print_method(PHASE_INCREMENTAL_INLINE, 2);
@@ -2411,8 +2442,6 @@ void Compile::Optimize() {
 
     if (failing())  return;
   }
-
-  inline_scoped_value_calls(igvn);
 
   if (AlwaysIncrementalInline) {
     inline_incrementally(igvn);
@@ -3989,6 +4018,16 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
       Node* cmp = new CmpLNode(andl, n->in(2));
       n->subsume_by(cmp, this);
     }
+    break;
+  }
+  case Op_ScopedValueGetResult: {
+    ScopedValueGetResultNode* scoped_value_get_result = (ScopedValueGetResultNode*)n;
+    Node* control_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::ControlOut);
+    Node* res_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::Result);
+    Node* control_input = scoped_value_get_result->in(0);
+    Node* get_result = scoped_value_get_result->in(ScopedValueGetResultNode::GetResult);
+    res_proj->subsume_by(get_result, this);
+    control_proj->subsume_by(control_input, this);
     break;
   }
   default:

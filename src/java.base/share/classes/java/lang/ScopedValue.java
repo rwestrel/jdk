@@ -689,10 +689,9 @@ public final class ScopedValue<T> {
      * @throws NoSuchElementException if the scoped value is not bound
      */
     @ForceInline
+    @IntrinsicCandidate
     @SuppressWarnings("unchecked")
     public T get() {
-        boolean cacheHit = false;
-        Object cacheResult = null;
         Object[] objects;
         if ((objects = scopedValueCache()) != null) {
             // This code should perhaps be in class Cache. We do it
@@ -700,17 +699,15 @@ public final class ScopedValue<T> {
             // we really want it to be inlined in the caller.
             int n = (hash & Cache.SLOT_MASK) * 2;
             if (objects[n] == this) {
-                cacheHit = true;
-                cacheResult = objects[n + 1];
+                return (T)objects[n + 1];
             } else {
                 n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
                 if (objects[n] == this) {
-                    cacheHit = true;
-                    cacheResult = objects[n + 1];
+                    return (T)objects[n + 1];
                 }
             }
         }
-        return slowGet(cacheHit, cacheResult);
+        return slowGet();
 //        return slowGet();
 //        int n1 = (hash & Cache.SLOT_MASK) * 2;
 //        int n2 = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
@@ -757,10 +754,7 @@ public final class ScopedValue<T> {
 
     @SuppressWarnings("unchecked")
     @IntrinsicCandidate
-    private T slowGet(boolean cacheHit, Object cacheResult) {
-        if (cacheHit) {
-            return (T) cacheResult;
-        }
+    private T slowGet() {
         var value = findBinding();
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();

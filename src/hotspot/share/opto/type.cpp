@@ -563,6 +563,10 @@ void Type::Initialize_shared(Compile* current) {
   fgetfromcache[0] = TypeInt::BOOL;
   fgetfromcache[1] = TypeInstPtr::BOTTOM;
   TypeTuple::GET_FROM_SV_CACHE = TypeTuple::make(2, fgetfromcache);
+  const Type **fsvgetresult =(const Type**)shared_type_arena->AmallocWords(2*sizeof(Type*));
+  fsvgetresult[0] = Type::CONTROL;
+  fsvgetresult[1] = TypeInstPtr::BOTTOM;
+  TypeTuple::SV_GET_RESULT = TypeTuple::make(2, fsvgetresult);
 //const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(5*sizeof(Type*));
 //  fgetfromcache[0] = TypeInstPtr::BOTTOM;
 //  fgetfromcache[1] = TypeInstPtr::BOTTOM;
@@ -2134,6 +2138,7 @@ const TypeTuple *TypeTuple::LONG_PAIR;
 const TypeTuple *TypeTuple::INT_CC_PAIR;
 const TypeTuple *TypeTuple::LONG_CC_PAIR;
 const TypeTuple* TypeTuple::GET_FROM_SV_CACHE;
+const TypeTuple* TypeTuple::SV_GET_RESULT;
 
 //------------------------------make-------------------------------------------
 // Make a TypeTuple from the range of a method signature

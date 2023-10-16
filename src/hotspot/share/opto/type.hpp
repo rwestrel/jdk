@@ -745,6 +745,7 @@ public:
   static const TypeTuple *INT_CC_PAIR;
   static const TypeTuple *LONG_CC_PAIR;
   static const TypeTuple *GET_FROM_SV_CACHE;
+  static const TypeTuple *SV_GET_RESULT;
 #ifndef PRODUCT
   virtual void dump2( Dict &d, uint, outputStream *st  ) const; // Specialized per-Type dumping
 #endif

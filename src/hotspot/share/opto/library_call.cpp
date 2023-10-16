@@ -484,7 +484,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_scopedValueCache:          return inline_native_scopedValueCache();
   case vmIntrinsics::_setScopedValueCache:       return inline_native_setScopedValueCache();
   case vmIntrinsics::_getFromCache:              return inline_getFromCache();
-  case vmIntrinsics::_slowGet:                   return inline_slowGet();
+  // case vmIntrinsics::_slowGet:                   return inline_slowGet();
 
 #if INCLUDE_JVMTI
   case vmIntrinsics::_notifyJvmtiVThreadStart:   return inline_native_notify_jvmti_funcs(CAST_FROM_FN_PTR(address, OptoRuntime::notify_jvmti_vthread_start()),
@@ -3681,7 +3681,9 @@ bool LibraryCallKit::inline_getFromCache() {
   return true;
 }
 
+
 bool LibraryCallKit::inline_slowGet() {
+  return false;
   if (!UseNewCode2) {
     return false;
   }

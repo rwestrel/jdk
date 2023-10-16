@@ -297,9 +297,9 @@ class methodHandle;
   do_intrinsic(_getFromCache,            java_lang_ScopedValue,   getFromCache_name, getFromCache_signature, F_R)       \
    do_name(     getFromCache_name,                               "getFromCache")                                        \
    do_signature(getFromCache_signature,                          "(IILjava/lang/ScopedValue$CacheOperation;)Ljava/lang/Object;") \
-  do_intrinsic(_slowGet,                 java_lang_ScopedValue,   slowGet_name, slowGet_signature, F_R)                 \
+  do_intrinsic(_SVget,                   java_lang_ScopedValue,   get_name, void_object_signature, F_R)                 \
+  do_intrinsic(_slowGet,                 java_lang_ScopedValue,   slowGet_name, void_object_signature, F_R)             \
    do_name(     slowGet_name,                                    "slowGet")                                             \
-   do_signature(slowGet_signature,                               "(ZLjava/lang/Object;)Ljava/lang/Object;")             \
                                                                                                                         \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \

@@ -30,6 +30,7 @@
 #include "opto/compile.hpp"
 #include "opto/type.hpp"
 #include "runtime/deoptimization.hpp"
+#include "graphKit.hpp"
 
 //---------------------------CallGenerator-------------------------------------
 // The subclasses of this class handle generation of ideal nodes for
@@ -194,6 +195,8 @@ private:
       C->print_inlining(callee, inline_level, bci, result, msg);
     }
   }
+
+  virtual void process_result(GraphKit& kit) {}
 };
 
 

@@ -133,6 +133,7 @@ bool vmIntrinsics::can_trap(vmIntrinsics::ID id) {
   case vmIntrinsics::_scopedValueCache:
   case vmIntrinsics::_setScopedValueCache:
   case vmIntrinsics::_getFromCache:
+  case vmIntrinsics::_SVget:
   case vmIntrinsics::_slowGet:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_fabs:
@@ -274,6 +275,7 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_scopedValueCache:
   case vmIntrinsics::_setScopedValueCache:
   case vmIntrinsics::_getFromCache:
+  case vmIntrinsics::_SVget:
   case vmIntrinsics::_slowGet:
   case vmIntrinsics::_floatToRawIntBits:
   case vmIntrinsics::_intBitsToFloat:
