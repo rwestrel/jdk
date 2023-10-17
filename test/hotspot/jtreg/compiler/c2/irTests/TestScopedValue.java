@@ -57,8 +57,10 @@ public class TestScopedValue {
         ScopedValue.where(sv, 42L).run(
                 () -> {
                     Long unused = sv.get();
-                    if (test1() != 42 + 42) {
-                        throw new RuntimeException();
+                    for (int i = 0; i < 20_000; i++) {
+                        if (test1() != 42 + 42) {
+                            throw new RuntimeException();
+                        }
                     }
                 });
     }
