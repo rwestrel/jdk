@@ -1068,6 +1068,7 @@ public:
     Node* in_cache = kit.gvn().transform(new IfFalseNode(iff));
     Node* r = new RegionNode(3);
     Node* phi_cache_value = new PhiNode(r, TypeInstPtr::BOTTOM);
+//    Node* phi_cache_hit = new PhiNode(r, TypeInt::BOOL);
     Node* phi_mem = new PhiNode(r, Type::MEMORY, TypePtr::BOTTOM);
     Node* phi_io = new PhiNode(r, Type::ABIO);
 
@@ -1075,6 +1076,7 @@ public:
       ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
       CallStaticJavaNode* unc = get_cache_failure_proj->is_uncommon_trap_proj(Deoptimization::Reason_none);
       r->init_req(1, C->top());
+      phi_cache_value->init_req(1, C->top());
       phi_cache_value->init_req(1, C->top());
       kit.gvn().hash_delete(unc);
       unc->set_req(0, not_in_cache);
@@ -1089,9 +1091,11 @@ public:
       phi_mem->init_req(1, slow_projs.fallthrough_memproj);
       phi_io->init_req(1, slow_projs.fallthrough_ioproj);
       phi_cache_value->init_req(1, slow_projs.resproj);
+//      phi_cache_hit->init_req(1, kit.gvn().intcon(0));
     }
     r->init_req(2, in_cache);
     phi_cache_value->init_req(2, cache_value);
+//    phi_cache_hit->init_req(2, _gvn.intcon(1));
     phi_mem->init_req(2, kit.reset_memory());
     phi_io->init_req(2, kit.i_o());
     kit.set_all_memory(kit.gvn().transform(phi_mem));
