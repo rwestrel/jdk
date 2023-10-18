@@ -1052,7 +1052,7 @@ public:
     // get_first_prob: probability of a miss
     // get_second_prob: probability of a miss
     // prob of a miss
-    tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
+//    tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
     if (get_cache_prob == PROB_UNKNOWN || get_first_prob == PROB_UNKNOWN || get_second_prob == PROB_UNKNOWN) {
       prob = PROB_UNKNOWN;
     } else {
@@ -1076,7 +1076,6 @@ public:
       ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
       CallStaticJavaNode* unc = get_cache_failure_proj->is_uncommon_trap_proj(Deoptimization::Reason_none);
       r->init_req(1, C->top());
-      phi_cache_value->init_req(1, C->top());
       phi_cache_value->init_req(1, C->top());
       kit.gvn().hash_delete(unc);
       unc->set_req(0, not_in_cache);

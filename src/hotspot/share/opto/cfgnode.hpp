@@ -729,6 +729,10 @@ public:
   }
   virtual int   Opcode() const;
   virtual const Type* bottom_type() const { return TypeTuple::SV_GET_RESULT; }
+
+  ProjNode* result() {
+    return proj_out(Result);
+  }
 };
 
 #endif // SHARE_OPTO_CFGNODE_HPP

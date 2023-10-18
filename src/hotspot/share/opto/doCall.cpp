@@ -159,7 +159,7 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
         cg = nullptr;
       } else if (IncrementalInline && should_delay_vector_inlining(callee, jvms)) {
         return CallGenerator::for_late_inline(callee, cg);
-      } else if (should_delay_scoped_value_inlining(callee, jvms)) {
+      } else if (0 && should_delay_scoped_value_inlining(callee, jvms)) {
         return CallGenerator::for_scoped_value_late_inline(callee, cg);
       } else {
         return cg;

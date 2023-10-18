@@ -3896,7 +3896,7 @@ bool LibraryCallKit::inline_slowGet() {
   // get_first_prob: probability of a miss
   // get_second_prob: probability of a miss
   // prob of a miss
-  tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
+//  tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
   if (get_cache_prob == PROB_UNKNOWN || get_first_prob == PROB_UNKNOWN || get_second_prob == PROB_UNKNOWN) {
     prob = PROB_UNKNOWN;
   } else {
