@@ -397,6 +397,9 @@ void Compile::remove_useless_node(Node* dead) {
   if (dead->for_post_loop_opts_igvn()) {
     remove_from_post_loop_opts_igvn(dead);
   }
+  if (dead->Opcode() == Op_GetFromSVCache || dead->Opcode() == Op_ScopedValueGetResult) {
+    remove_scoped_value_get_node(dead);
+  }
   if (dead->is_Call()) {
     remove_useless_late_inlines(                &_late_inlines, dead);
     remove_useless_late_inlines(         &_string_late_inlines, dead);
@@ -446,6 +449,7 @@ void Compile::disconnect_useless_nodes(Unique_Node_List& useful, Unique_Node_Lis
   remove_useless_nodes(_template_assertion_predicate_opaqs, useful); // remove useless Assertion Predicate opaque nodes
   remove_useless_nodes(_expensive_nodes,    useful); // remove useless expensive nodes
   remove_useless_nodes(_for_post_loop_igvn, useful); // remove useless node recorded for post loop opts IGVN pass
+  remove_useless_nodes(_scoped_value_get_nodes, useful);
   remove_useless_unstable_if_traps(useful);          // remove useless unstable_if traps
   remove_useless_coarsened_locks(useful);            // remove useless coarsened locks nodes
 #ifdef ASSERT
@@ -644,6 +648,7 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
                   _for_post_loop_igvn(comp_arena(), 8, 0, nullptr),
                   _unstable_if_traps (comp_arena(), 8, 0, nullptr),
                   _coarsened_locks   (comp_arena(), 8, 0, nullptr),
+                  _scoped_value_get_nodes (comp_arena(), 8, 0, nullptr),
                   _congraph(nullptr),
                   NOT_PRODUCT(_igv_printer(nullptr) COMMA)
                   _unique(0),
@@ -2161,7 +2166,7 @@ void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
       Node* res = projs.resproj;
       control_out = control_out->clone();
       res = res->clone();
-      ScopedValueGetResultNode* sv_get_result = new ScopedValueGetResultNode(control_out, sv, res);
+      ScopedValueGetResultNode* sv_get_result = new ScopedValueGetResultNode(C, control_out, sv, res);
       Node* sv_get_resultx = gvn->transform(sv_get_result);
       assert(sv_get_resultx == sv_get_result, "");
       Node* control_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::ControlOut));
@@ -4024,15 +4029,16 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
     }
     break;
   }
-  case Op_ScopedValueGetResult: {
+  case Op_ScopedValueGetResult:
+  case Op_GetFromSVCache: {
     ShouldNotReachHere();
-    ScopedValueGetResultNode* scoped_value_get_result = (ScopedValueGetResultNode*)n;
-    Node* control_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::ControlOut);
-    Node* res_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::Result);
-    Node* control_input = scoped_value_get_result->in(0);
-    Node* get_result = scoped_value_get_result->in(ScopedValueGetResultNode::GetResult);
-    res_proj->subsume_by(get_result, this);
-    control_proj->subsume_by(control_input, this);
+//    ScopedValueGetResultNode* scoped_value_get_result = (ScopedValueGetResultNode*)n;
+//    Node* control_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::ControlOut);
+//    Node* res_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::Result);
+//    Node* control_input = scoped_value_get_result->in(0);
+//    Node* get_result = scoped_value_get_result->in(ScopedValueGetResultNode::GetResult);
+//    res_proj->subsume_by(get_result, this);
+//    control_proj->subsume_by(control_input, this);
     break;
   }
   default:
@@ -5464,4 +5470,17 @@ void Compile::record_method_not_compilable_oom() {
 CallNode* Compile::scoped_value_late_inline(int i) const {
   CallGenerator* cg = _scoped_value_late_inlines.at(i);
   return cg->call_node();
+}
+
+void Compile::add_scoped_value_get_node(Node* n) {
+  assert(n->Opcode() == Op_GetFromSVCache || n->Opcode() == Op_ScopedValueGetResult, "");
+  assert(!_scoped_value_get_nodes.contains(n), "duplicate entry in ScopedValue get list");
+  _scoped_value_get_nodes.append(n);
+}
+
+void Compile::remove_scoped_value_get_node(Node* n) {
+  assert(n->Opcode() == Op_GetFromSVCache || n->Opcode() == Op_ScopedValueGetResult, "");
+  if (scoped_value_get_count() > 0) {
+    _scoped_value_get_nodes.remove_if_existing(n);
+  }
 }

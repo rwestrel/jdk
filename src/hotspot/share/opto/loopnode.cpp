@@ -4368,7 +4368,7 @@ void PhaseIdealLoop::build_and_optimize() {
   BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
   // Nothing to do, so get out
   bool stop_early = !C->has_loops() && !skip_loop_opts && !do_split_ifs && !do_max_unroll && !_verify_me &&
-          !_verify_only && !bs->is_gc_specific_loop_opts_pass(_mode);
+          !_verify_only && !bs->is_gc_specific_loop_opts_pass(_mode) && C->scoped_value_get_count() == 0;
   bool do_expensive_nodes = C->should_optimize_expensive_nodes(_igvn);
   bool strip_mined_loops_expanded = bs->strip_mined_loops_expanded(_mode);
   if (stop_early && !do_expensive_nodes) {
@@ -4643,8 +4643,8 @@ void PhaseIdealLoop::build_and_optimize() {
   if (!C->major_progress()) {
     assert(!_igvn.delay_transform(), "");
     _igvn.set_delay_transform(true);
-    while (_scoped_value_get_nodes.size() > 0) {
-      Node* n = _scoped_value_get_nodes.pop();
+    for (int i = C->scoped_value_get_count(); i > 0; i--) {
+      Node* n = C->scoped_value_get_node(i-1);
       if (n->Opcode() == Op_ScopedValueGetResult) {
         ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*)n;
         _igvn.replace_node(get_result->result(), get_result->in(ScopedValueGetResultNode::GetResult));
@@ -6125,9 +6125,6 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
       pinned = false;
     }
     if( pinned ) {
-      if (!_verify_only && n->Opcode() == Op_ScopedValueGetResult) {
-        _scoped_value_get_nodes.push(n);
-      }
       IdealLoopTree *chosen_loop = get_loop(n->is_CFG() ? n : get_ctrl(n));
       if( !chosen_loop->_child )       // Inner loop?
         chosen_loop->_body.push(n); // Collect inner loops
@@ -6259,8 +6256,6 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
   if (!_verify_only) {
     if (n->Opcode() == Op_OpaqueZeroTripGuard) {
       _zero_trip_guard_opaque_nodes.push(n);
-    } else if (n->Opcode() == Op_GetFromSVCache) {
-      _scoped_value_get_nodes.push(n);
     }
   }
 }

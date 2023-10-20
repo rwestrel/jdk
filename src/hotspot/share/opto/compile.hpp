@@ -372,6 +372,7 @@ class Compile : public Phase {
   GrowableArray<Node*>  _for_post_loop_igvn;    // List of nodes for IGVN after loop opts are over
   GrowableArray<UnstableIfTrap*> _unstable_if_traps;        // List of ifnodes after IGVN
   GrowableArray<Node_List*> _coarsened_locks;   // List of coarsened Lock and Unlock nodes
+  GrowableArray<Node*>  _scoped_value_get_nodes;
   ConnectionGraph*      _congraph;
 #ifndef PRODUCT
   IdealGraphPrinter*    _igv_printer;
@@ -725,8 +726,10 @@ private:
   int           template_assertion_predicate_count() const { return _template_assertion_predicate_opaqs.length(); }
   int           expensive_count()         const { return _expensive_nodes.length(); }
   int           coarsened_count()         const { return _coarsened_locks.length(); }
+  int           scoped_value_get_count()   const { return _scoped_value_get_nodes.length(); }
 
   Node*         macro_node(int idx)       const { return _macro_nodes.at(idx); }
+  Node*         scoped_value_get_node(int idx) const { return _scoped_value_get_nodes.at(idx); }
   ParsePredicateNode* parse_predicate(int idx) const { return _parse_predicates.at(idx); }
 
   Node* template_assertion_predicate_opaq_node(int idx) const {
@@ -778,6 +781,9 @@ private:
       _template_assertion_predicate_opaqs.remove_if_existing(n);
     }
   }
+  void add_scoped_value_get_node(Node* n);
+
+  void remove_scoped_value_get_node(Node* n);
   void add_coarsened_locks(GrowableArray<AbstractLockNode*>& locks);
   void remove_coarsened_lock(Node* n);
   bool coarsened_locks_consistent();

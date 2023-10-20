@@ -722,10 +722,11 @@ public:
       ControlOut = 0,
       Result
   };
-  ScopedValueGetResultNode(Node* ctrl, Node* sv, Node* res) : MultiNode(3) {
+  ScopedValueGetResultNode(Compile* C, Node* ctrl, Node* sv, Node* res) : MultiNode(3) {
     init_req(Control, ctrl);
     init_req(ScopedValue, sv);
     init_req(GetResult, res);
+    C->add_scoped_value_get_node(this);
   }
   virtual int   Opcode() const;
   virtual const Type* bottom_type() const { return TypeTuple::SV_GET_RESULT; }

@@ -533,8 +533,7 @@ public:
     init_req(ScopedValue, sv);
     init_req(Index1, n1);
     init_req(Index2, n2);
-    init_flags(Flag_is_macro);
-    C->add_macro_node(this);
+    C->add_scoped_value_get_node(this);
   }
   virtual int Opcode() const;
 

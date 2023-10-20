@@ -1003,8 +1003,11 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
     }
     case Op_Proj: {
       // we are only interested in the oop result projection from a call
-      if (n->as_Proj()->_con == TypeFunc::Parms && n->in(0)->is_Call() &&
-          n->in(0)->as_Call()->returns_pointer()) {
+      if ((n->as_Proj()->_con == TypeFunc::Parms && n->in(0)->is_Call() &&
+           n->in(0)->as_Call()->returns_pointer()) ||
+          (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+          (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+          (n->as_Proj()->_con == ScopedValueGetResultNode::Result && n->in(0)->Opcode() == Op_ScopedValueGetResult)) {
         add_local_var_and_edge(n, PointsToNode::NoEscape, n->in(0), delayed_worklist);
       }
       break;
@@ -1178,6 +1181,7 @@ void ConnectionGraph::add_final_edges(Node *n) {
       assert((n->as_Proj()->_con == TypeFunc::Parms && n->in(0)->is_Call() &&
              n->in(0)->as_Call()->returns_pointer()) ||
              (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+             (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
              (n->as_Proj()->_con == ScopedValueGetResultNode::Result && n->in(0)->Opcode() == Op_ScopedValueGetResult), "Unexpected node type");
       add_local_var_and_edge(n, PointsToNode::NoEscape, n->in(0), nullptr);
       break;
