@@ -1110,6 +1110,7 @@ void Compile::Init(bool aliasing) {
   Copy::zero_to_bytes(_alias_cache, sizeof(_alias_cache));
   // A null adr_type hits in the cache right away.  Preload the right answer.
   probe_alias_cache(nullptr)->_index = AliasIdxTop;
+  _needs_split_if = false;
 }
 
 //---------------------------init_start----------------------------------------
@@ -2338,6 +2339,9 @@ void Compile::process_late_inline_calls_no_inline(PhaseIterGVN& igvn) {
 }
 
 bool Compile::optimize_loops(PhaseIterGVN& igvn, LoopOptsMode mode) {
+  if (C->needs_split_if()) {
+    C->set_major_progress();
+  }
   if (_loop_opts_cnt > 0) {
     while (major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
@@ -2555,7 +2559,7 @@ void Compile::Optimize() {
     // Loop opts pass if partial peeling occurred in previous pass
     if(PartialPeelLoop && major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop::optimize(igvn, LoopOptsDefault);
+      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP2, 2);
       if (failing())  return;
@@ -2563,7 +2567,7 @@ void Compile::Optimize() {
     // Loop opts pass for loop-unrolling before CCP
     if(major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop::optimize(igvn, LoopOptsDefault);
+      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP3, 2);
     }

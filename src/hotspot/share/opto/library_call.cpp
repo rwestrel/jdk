@@ -3675,7 +3675,7 @@ bool LibraryCallKit::inline_getFromCache() {
 
   int alias_idx = C->get_alias_index(TypeAryPtr::OOPS);
   Node* get_from_cache = _gvn.transform(new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(alias_idx), sv,
-                                                               n1, n2, false));
+                                                               n1, n2));
   Node* proj = _gvn.transform(new ProjNode(get_from_cache, proj_nb));
 
   set_result(proj);
@@ -3865,8 +3865,7 @@ bool LibraryCallKit::inline_slowGet() {
 
   GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, memory(Compile::AliasIdxRaw), memory(TypeAryPtr::OOPS),
                                                               sv, first_index, second_index ==
-                                                                               nullptr ? C->top() : second_index,
-                                                              false);
+                                                                               nullptr ? C->top() : second_index);
   float get_cache_prob = get_cache_iff->_prob;
   BoolNode* get_cache_bool = get_cache_iff->in(1)->as_Bool();
   if (get_cache_prob != PROB_UNKNOWN && !get_cache_bool->_test.is_canonical()) {

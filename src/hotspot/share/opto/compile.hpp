@@ -355,6 +355,7 @@ class Compile : public Phase {
   RTMState              _rtm_state;             // State of Restricted Transactional Memory usage
   int                   _loop_opts_cnt;         // loop opts round
   uint                  _stress_seed;           // Seed for stress testing
+  bool                  _needs_split_if;
 
   // Compilation environment.
   Arena                 _comp_arena;            // Arena with lifetime equivalent to Compile
@@ -673,6 +674,8 @@ private:
   void          set_clinit_barrier_on_entry(bool z) { _clinit_barrier_on_entry = z; }
   bool              has_monitors() const         { return _has_monitors; }
   void          set_has_monitors(bool v)         { _has_monitors = v; }
+  bool              needs_split_if() const       { return _needs_split_if; }
+  void          set_needs_split_if(bool v)       { _needs_split_if = v; }
 
   // check the CompilerOracle for special behaviours for this compile
   bool          method_has_option(enum CompileCommand option) {

@@ -1004,14 +1004,18 @@ public:
     assert(get_first_iff != nullptr, "");
     assert(get_second_iff == nullptr || get_first_iff != nullptr, "");
 
-    bool first_never_succeeds = false;
+    tty->print_cr("XXX %p", second_index);
+
 //    ProjNode* get_cache_iff_failure = get_cache_iff->proj_out(get_cache_iff->in(1)->as_Bool()->_test._test == BoolTest::eq);
 //    CallStaticJavaNode* get_cache_iff_unc = get_cache_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
     if (get_second_iff != nullptr) {
       ProjNode* get_first_iff_failure = get_first_iff->proj_out(get_first_iff->in(1)->as_Bool()->_test._test == BoolTest::ne ? 0 : 1);
       CallStaticJavaNode* get_first_iff_unc = get_first_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
       if (get_first_iff_unc != nullptr) {
-        first_never_succeeds = true;
+        swap(get_first_iff, get_second_iff);
+        swap(first_index, second_index);
+        get_second_iff = nullptr;
+        second_index = nullptr;
       }
     }
 
@@ -1050,8 +1054,7 @@ public:
     GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, kit.memory(Compile::AliasIdxRaw),
                                                                 kit.memory(TypeAryPtr::OOPS), _sv,
                                                                 first_index,
-                                                                second_index == nullptr ? C->top() : second_index,
-                                                                first_never_succeeds);
+                                                                second_index == nullptr ? C->top() : second_index);
     float get_cache_prob = get_cache_iff->_prob;
     BoolNode* get_cache_bool = get_cache_iff->in(1)->as_Bool();
     if (get_cache_prob != PROB_UNKNOWN && !get_cache_bool->_test.is_canonical()) {

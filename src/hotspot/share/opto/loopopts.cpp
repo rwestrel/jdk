@@ -1967,6 +1967,7 @@ bool PhaseIdealLoop::ctrl_of_use_out_of_loop(const Node* n, Node* n_ctrl, IdealL
 // Check for aggressive application of 'split-if' optimization,
 // using basic block level info.
 void PhaseIdealLoop::split_if_with_blocks(VectorSet &visited, Node_Stack &nstack) {
+  C->set_needs_split_if(false);
   Node* root = C->root();
   visited.set(root->_idx); // first, mark root as visited
   // Do pre-visit work for root
@@ -4552,8 +4553,6 @@ void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache
   }
   float second_cnt = get_from_cache->cnt(2);
 
-  bool first_never_succeeds = get_from_cache->first_never_succeeds();
-  bool second_never_succeeds = false;
   if (second_index != C->top() && second_prob < first_prob) {
     swap(first_index, second_index);
     swap(first_prob, second_prob);
@@ -4561,7 +4560,6 @@ void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache
     if (first_cnt != COUNT_UNKNOWN && first_prob != PROB_UNKNOWN) {
       second_cnt = first_cnt * first_prob;
     }
-    swap(first_never_succeeds, second_never_succeeds);
   }
 
   test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, first_index, cache_not_null_proj,

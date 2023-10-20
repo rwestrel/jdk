@@ -4655,6 +4655,7 @@ void PhaseIdealLoop::build_and_optimize() {
         expand_get_from_sv_cache(get_from_cache);
       }
       C->set_major_progress();
+      C->set_needs_split_if(true);
     }
     _igvn.set_delay_transform(false);
   }
