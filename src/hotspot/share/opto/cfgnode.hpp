@@ -731,7 +731,11 @@ public:
   virtual const Type* bottom_type() const { return TypeTuple::SV_GET_RESULT; }
 
   ProjNode* result() {
-    return proj_out(Result);
+    return proj_out_or_null(Result);
+  }
+
+  ProjNode* control() {
+    return proj_out(ControlOut);
   }
 };
 

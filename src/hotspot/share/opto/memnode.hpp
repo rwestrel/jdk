@@ -505,6 +505,9 @@ private:
    float _cnt;
    float _prob;
   } _profile_data[3];
+
+  bool _first_never_succeeds;
+
 public:
   enum {
       Control = 0,
@@ -517,15 +520,17 @@ public:
   };
   enum {
       HitsInTheCache,
-      CachedValue
+      CachedValue,
+      ScopedValueCache,
 //      GETCACHEARRAY = 0,
 //      GETFIRSTCACHEKEY,
 //      GETFIRSTCACHEOBJECT,
 //      GETSECONDCACHEKEY,
 //      GETSECONDCACHEOBJECT
   };
-  GetFromSVCacheNode(Compile* C, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
-    : MultiNode(6) {
+  GetFromSVCacheNode(Compile* C, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2, bool first_never_succeeds)
+    : MultiNode(6),
+    _first_never_succeeds(first_never_succeeds) {
     init_req(Mem1, mem1);
     init_req(Mem2, mem2);
     init_req(ScopedValue, sv);
@@ -554,6 +559,10 @@ public:
 
   ProjNode* cached_value() const {
     return proj_out_or_null(CachedValue);
+  }
+
+  ProjNode* scoped_value_cache() const {
+    return proj_out_or_null(ScopedValueCache);
   }
 
 //  ProjNode* get_cache_array() const {
@@ -587,6 +596,11 @@ public:
     assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
     return _profile_data[i]._cnt;
   }
+
+  bool first_never_succeeds() const {
+    return _first_never_succeeds;
+  }
+
 };
 
 

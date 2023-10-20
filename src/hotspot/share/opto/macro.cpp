@@ -2505,6 +2505,7 @@ bool PhaseMacroExpand::expand_macro_nodes() {
         _igvn.replace_node(n, repl);
         success = true;
       } else if (n->Opcode() == Op_GetFromSVCache) {
+        ShouldNotReachHere();
         expand_get_from_sv_cache(n);
         success = true;
       }

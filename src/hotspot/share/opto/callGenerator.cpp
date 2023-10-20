@@ -926,14 +926,15 @@ public:
               Node* offset1 = addp1->in(AddPNode::Offset);
               intptr_t const_offset = offset1->find_intptr_t_con(-1);
               BasicType bt = TypeAryPtr::OOPS->array_element_basic_type();
-              int shift  = exact_log2(type2aelembytes(bt));
+              int shift = exact_log2(type2aelembytes(bt));
               int header = arrayOopDesc::base_offset_in_bytes(bt);
               assert(const_offset >= header, "");
               const_offset -= header;
 
               Node* index = kit.gvn().intcon(const_offset >> shift);
               if (addp2->is_AddP()) {
-                assert(!addp2->in(AddPNode::Address)->is_AddP() && addp2->in(AddPNode::Base) == addp1->in(AddPNode::Base),
+                assert(!addp2->in(AddPNode::Address)->is_AddP() &&
+                       addp2->in(AddPNode::Base) == addp1->in(AddPNode::Base),
                        "");
                 Node* offset2 = addp2->in(AddPNode::Offset);
                 assert(offset2->Opcode() == Op_LShiftX && offset2->in(2)->find_int_con(-1) == shift, "");
@@ -941,7 +942,8 @@ public:
 #ifdef _LP64
                 assert(offset2->Opcode() == Op_ConvI2L, "");
                 offset2 = offset2->in(1);
-                if (offset2->Opcode() == Op_CastII && offset2->in(0)->is_Proj() && offset2->in(0)->in(0) == get_cache_iff) {
+                if (offset2->Opcode() == Op_CastII && offset2->in(0)->is_Proj() &&
+                    offset2->in(0)->in(0) == get_cache_iff) {
                   ShouldNotReachHere();
                   offset2 = offset2->in(1);
                 }
@@ -958,12 +960,16 @@ public:
                 second_index = index;
               }
             }
+          } else if (c->is_RangeCheck()) {
+            kit.gvn().hash_delete(c);
+            c->set_req(1, kit.gvn().intcon(1));
+            C->record_for_igvn(c);
           } else if (c->is_CallStaticJava()) {
             assert(slow_call == nullptr, "");
             slow_call = c->as_CallStaticJava();
             assert(slow_call->method()->intrinsic_id() == vmIntrinsics::_slowGet, "");
           } else {
-            assert(c->is_Proj() || c->Opcode() == Op_RangeCheck || c->is_Catch(), "");
+            assert(c->is_Proj() || c->is_Catch(), "");
           }
           wq.push(c->in(0));
         }
@@ -982,6 +988,7 @@ public:
                 break;
               } else if (u == get_second_iff) {
                 swap(get_first_iff, get_second_iff);
+                swap(first_index, second_index);
                 break;
               }
               stack.push(u, 0);
@@ -997,6 +1004,30 @@ public:
     assert(get_first_iff != nullptr, "");
     assert(get_second_iff == nullptr || get_first_iff != nullptr, "");
 
+    bool first_never_succeeds = false;
+//    ProjNode* get_cache_iff_failure = get_cache_iff->proj_out(get_cache_iff->in(1)->as_Bool()->_test._test == BoolTest::eq);
+//    CallStaticJavaNode* get_cache_iff_unc = get_cache_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
+    if (get_second_iff != nullptr) {
+      ProjNode* get_first_iff_failure = get_first_iff->proj_out(get_first_iff->in(1)->as_Bool()->_test._test == BoolTest::ne ? 0 : 1);
+      CallStaticJavaNode* get_first_iff_unc = get_first_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
+      if (get_first_iff_unc != nullptr) {
+        first_never_succeeds = true;
+      }
+    }
+
+//    ProjNode* get_second_iff_failure = nullptr;
+//    CallStaticJavaNode* get_second_iff_unc = nullptr;
+//    if (get_second_iff != nullptr) {
+//      get_second_iff_failure = get_second_iff->proj_out(get_second_iff->in(1)->as_Bool()->_test._test == BoolTest::ne);
+//      get_second_iff_unc = get_second_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
+//    }
+
+    Node* current_ctrl = kit.control();
+    Node* frame = kit.gvn().transform(new ParmNode(C->start(), TypeFunc::FramePtr));
+    Node* halt = kit.gvn().transform(new HaltNode(current_ctrl, frame, "Dead path for ScopedValueCall::get"));
+    C->root()->add_req(halt);
+    current_ctrl = nullptr;
+
     Node* mem = scoped_value_cache->in(TypeFunc::Memory);
     Node* c = scoped_value_cache->in(TypeFunc::Control);
     Node* io = scoped_value_cache->in(TypeFunc::I_O);
@@ -1005,12 +1036,12 @@ public:
     kit.set_all_memory(mem);
     kit.set_i_o(io);
 
-    CallProjections projs = CallProjections();
-    scoped_value_cache->extract_projections(&projs, true);
+    CallProjections scoped_value_cache_projs = CallProjections();
+    scoped_value_cache->extract_projections(&scoped_value_cache_projs, true);
 
-    C->gvn_replace_by(projs.fallthrough_catchproj, c);
-    C->gvn_replace_by(projs.fallthrough_memproj, mem);
-    C->gvn_replace_by(projs.fallthrough_ioproj, io);
+//    C->gvn_replace_by(scoped_value_cache_projs.fallthrough_catchproj, c);
+    C->gvn_replace_by(scoped_value_cache_projs.fallthrough_memproj, mem);
+    C->gvn_replace_by(scoped_value_cache_projs.fallthrough_ioproj, io);
 
     kit.gvn().hash_delete(scoped_value_cache);
     scoped_value_cache->set_req(0, C->top());
@@ -1019,7 +1050,8 @@ public:
     GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, kit.memory(Compile::AliasIdxRaw),
                                                                 kit.memory(TypeAryPtr::OOPS), _sv,
                                                                 first_index,
-                                                                second_index == nullptr ? C->top() : second_index);
+                                                                second_index == nullptr ? C->top() : second_index,
+                                                                first_never_succeeds);
     float get_cache_prob = get_cache_iff->_prob;
     BoolNode* get_cache_bool = get_cache_iff->in(1)->as_Bool();
     if (get_cache_prob != PROB_UNKNOWN && !get_cache_bool->_test.is_canonical()) {
@@ -1046,18 +1078,19 @@ public:
 
     Node* hits_in_the_cache = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::HitsInTheCache));
     Node* cache_value = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::CachedValue));
+    Node* scoped_valued_cache = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::ScopedValueCache));
 
     float prob;
     // get_cache_prob: probability that cache array is not null
     // get_first_prob: probability of a miss
     // get_second_prob: probability of a miss
     // prob of a miss
-//    tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
     if (get_cache_prob == PROB_UNKNOWN || get_first_prob == PROB_UNKNOWN || get_second_prob == PROB_UNKNOWN) {
       prob = PROB_UNKNOWN;
     } else {
       prob = (1 - get_cache_prob) + get_cache_prob * (get_first_prob + (1 - get_first_prob) * get_second_prob);
     }
+    tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
 
     Node* cmp = kit.gvn().transform(new CmpINode(hits_in_the_cache, kit.gvn().intcon(1)));
     Node* bol = kit.gvn().transform(new BoolNode(cmp, BoolTest::ne));
@@ -1072,21 +1105,27 @@ public:
     Node* phi_mem = new PhiNode(r, Type::MEMORY, TypePtr::BOTTOM);
     Node* phi_io = new PhiNode(r, Type::ABIO);
 
+    C->gvn_replace_by(scoped_value_cache_projs.fallthrough_catchproj, not_in_cache);
+    C->gvn_replace_by(scoped_value_cache_projs.resproj, scoped_valued_cache);
+
     if (slow_call == nullptr) {
-      ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
-      CallStaticJavaNode* unc = get_cache_failure_proj->is_uncommon_trap_proj(Deoptimization::Reason_none);
+//      ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
+//      CallStaticJavaNode* unc = get_cache_failure_proj->is_uncommon_trap_proj(Deoptimization::Reason_none);
       r->init_req(1, C->top());
       phi_cache_value->init_req(1, C->top());
-      kit.gvn().hash_delete(unc);
-      unc->set_req(0, not_in_cache);
+//      kit.gvn().hash_delete(unc);
+//      unc->set_req(0, not_in_cache);
       phi_mem->init_req(1, C->top());
       phi_io->init_req(1, C->top());
     } else {
       CallProjections slow_projs;
       slow_call->extract_projections(&slow_projs, false);
-      r->init_req(1, slow_projs.fallthrough_catchproj);
-      kit.gvn().hash_delete(slow_call);
-      slow_call->set_req(0, not_in_cache);
+      Node* fallthrough = slow_projs.fallthrough_catchproj->clone();
+      kit.gvn().set_type(fallthrough, fallthrough->bottom_type());
+      r->init_req(1, fallthrough);
+      C->gvn_replace_by(slow_projs.fallthrough_catchproj, C->top());
+//      kit.gvn().hash_delete(slow_call);
+//      slow_call->set_req(0, not_in_cache);
       phi_mem->init_req(1, slow_projs.fallthrough_memproj);
       phi_io->init_req(1, slow_projs.fallthrough_ioproj);
       phi_cache_value->init_req(1, slow_projs.resproj);

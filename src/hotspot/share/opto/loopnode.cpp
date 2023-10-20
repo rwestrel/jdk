@@ -4640,6 +4640,25 @@ void PhaseIdealLoop::build_and_optimize() {
      C->set_major_progress();
   }
 
+  if (!C->major_progress()) {
+    assert(!_igvn.delay_transform(), "");
+    _igvn.set_delay_transform(true);
+    while (_scoped_value_get_nodes.size() > 0) {
+      Node* n = _scoped_value_get_nodes.pop();
+      if (n->Opcode() == Op_ScopedValueGetResult) {
+        ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*)n;
+        _igvn.replace_node(get_result->result(), get_result->in(ScopedValueGetResultNode::GetResult));
+        lazy_replace(get_result->control(), get_result->in(ScopedValueGetResultNode::Control));
+      } else {
+        assert(n->Opcode() == Op_GetFromSVCache, "");
+        GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*)n;
+        expand_get_from_sv_cache(get_from_cache);
+      }
+      C->set_major_progress();
+    }
+    _igvn.set_delay_transform(false);
+  }
+
   // Convert scalar to superword operations at the end of all loop opts.
   if (C->do_superword() && C->has_loops() && !C->major_progress()) {
     // SuperWord transform
@@ -6105,6 +6124,9 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
       pinned = false;
     }
     if( pinned ) {
+      if (!_verify_only && n->Opcode() == Op_ScopedValueGetResult) {
+        _scoped_value_get_nodes.push(n);
+      }
       IdealLoopTree *chosen_loop = get_loop(n->is_CFG() ? n : get_ctrl(n));
       if( !chosen_loop->_child )       // Inner loop?
         chosen_loop->_body.push(n); // Collect inner loops
@@ -6233,10 +6255,13 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
   if( !chosen_loop->_child )   // Inner loop?
     chosen_loop->_body.push(n);// Collect inner loops
 
-  if (!_verify_only && n->Opcode() == Op_OpaqueZeroTripGuard) {
-    _zero_trip_guard_opaque_nodes.push(n);
+  if (!_verify_only) {
+    if (n->Opcode() == Op_OpaqueZeroTripGuard) {
+      _zero_trip_guard_opaque_nodes.push(n);
+    } else if (n->Opcode() == Op_GetFromSVCache) {
+      _scoped_value_get_nodes.push(n);
+    }
   }
-
 }
 
 #ifdef ASSERT

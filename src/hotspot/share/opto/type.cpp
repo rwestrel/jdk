@@ -559,14 +559,6 @@ void Type::Initialize_shared(Compile* current) {
 
   TypeNarrowKlass::NULL_PTR = TypeNarrowKlass::make( TypePtr::NULL_PTR );
 
-  const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(2*sizeof(Type*));
-  fgetfromcache[0] = TypeInt::BOOL;
-  fgetfromcache[1] = TypeInstPtr::BOTTOM;
-  TypeTuple::GET_FROM_SV_CACHE = TypeTuple::make(2, fgetfromcache);
-  const Type **fsvgetresult =(const Type**)shared_type_arena->AmallocWords(2*sizeof(Type*));
-  fsvgetresult[0] = Type::CONTROL;
-  fsvgetresult[1] = TypeInstPtr::BOTTOM;
-  TypeTuple::SV_GET_RESULT = TypeTuple::make(2, fsvgetresult);
 //const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(5*sizeof(Type*));
 //  fgetfromcache[0] = TypeInstPtr::BOTTOM;
 //  fgetfromcache[1] = TypeInstPtr::BOTTOM;
@@ -628,6 +620,16 @@ void Type::Initialize_shared(Compile* current) {
 
   TypeInstKlassPtr::OBJECT = TypeInstKlassPtr::make(TypePtr::NotNull, current->env()->Object_klass(), 0);
   TypeInstKlassPtr::OBJECT_OR_NULL = TypeInstKlassPtr::make(TypePtr::BotPTR, current->env()->Object_klass(), 0);
+
+  const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(3*sizeof(Type*));
+  fgetfromcache[0] = TypeInt::BOOL;
+  fgetfromcache[1] = TypeInstPtr::BOTTOM;
+  fgetfromcache[2] = TypeAryPtr::OOPS;
+  TypeTuple::GET_FROM_SV_CACHE = TypeTuple::make(3, fgetfromcache);
+  const Type **fsvgetresult =(const Type**)shared_type_arena->AmallocWords(2*sizeof(Type*));
+  fsvgetresult[0] = Type::CONTROL;
+  fsvgetresult[1] = TypeInstPtr::BOTTOM;
+  TypeTuple::SV_GET_RESULT = TypeTuple::make(2, fsvgetresult);
 
   const Type **fi2c = TypeTuple::fields(2);
   fi2c[TypeFunc::Parms+0] = TypeInstPtr::BOTTOM; // Method*

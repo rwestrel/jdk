@@ -890,6 +890,7 @@ private:
   // clear out dead code after build_loop_late
   Node_List _deadlist;
   Node_List _zero_trip_guard_opaque_nodes;
+  Node_List _scoped_value_get_nodes;
 
   // Support for faster execution of get_late_ctrl()/dom_lca()
   // when a node has many uses and dominator depth is deep.
@@ -1735,6 +1736,11 @@ public:
   Node* similar_subtype_check(const Node* x, Node* r_in);
 
   void update_addp_chain_base(Node* x, Node* old_base, Node* new_base);
+
+  void expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache);
+  void test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* index,
+                                Node* c, float prob, float cnt, Node* sv, Node*& failure, Node*& hit,
+                                Node*& res);
 };
 
 

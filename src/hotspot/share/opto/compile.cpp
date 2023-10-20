@@ -2555,7 +2555,7 @@ void Compile::Optimize() {
     // Loop opts pass if partial peeling occurred in previous pass
     if(PartialPeelLoop && major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
+      PhaseIdealLoop::optimize(igvn, LoopOptsDefault);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP2, 2);
       if (failing())  return;
@@ -2563,7 +2563,7 @@ void Compile::Optimize() {
     // Loop opts pass for loop-unrolling before CCP
     if(major_progress() && (_loop_opts_cnt > 0)) {
       TracePhase tp("idealLoop", &timers[_t_idealLoop]);
-      PhaseIdealLoop::optimize(igvn, LoopOptsSkipSplitIf);
+      PhaseIdealLoop::optimize(igvn, LoopOptsDefault);
       _loop_opts_cnt--;
       if (major_progress()) print_method(PHASE_PHASEIDEALLOOP3, 2);
     }
@@ -4021,6 +4021,7 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
     break;
   }
   case Op_ScopedValueGetResult: {
+    ShouldNotReachHere();
     ScopedValueGetResultNode* scoped_value_get_result = (ScopedValueGetResultNode*)n;
     Node* control_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::ControlOut);
     Node* res_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::Result);
