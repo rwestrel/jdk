@@ -1585,6 +1585,18 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
   try_sink_out_of_loop(n);
 
   try_move_store_after_loop(n);
+
+  if (n->Opcode() == Op_ScopedValueGetResult) {
+    Node* sv = n->in(ScopedValueGetResultNode::ScopedValue);
+    Node* cutoff = get_ctrl(sv);
+    Node *prevdom = n;
+    Node *dom = idom(prevdom);
+
+    while (dom != cutoff) {
+      prevdom = dom;
+      dom = idom(prevdom);
+    }
+  }
 }
 
 // Transform:

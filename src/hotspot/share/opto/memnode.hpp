@@ -506,6 +506,7 @@ private:
    float _prob;
   } _profile_data[3];
 
+  virtual uint size_of() const { return sizeof(*this); }
 public:
   enum {
       Control = 0,
