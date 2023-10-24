@@ -1586,17 +1586,48 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
 
   try_move_store_after_loop(n);
 
-  if (n->Opcode() == Op_ScopedValueGetResult) {
-    Node* sv = n->in(ScopedValueGetResultNode::ScopedValue);
+  GetFromSVCacheNode* get_from_sv_cache = is_get_from_sv_cache_if(n);
+  ScopedValueGetResultNode* sv_get_result = (n->Opcode() == Op_ScopedValueGetResult) ? (ScopedValueGetResultNode*) n : nullptr;
+  if (sv_get_result != nullptr ||
+      get_from_sv_cache != nullptr) {
+    Node* sv = sv_get_result != nullptr ? sv_get_result->scoped_value() : get_from_sv_cache->scoped_value();
     Node* cutoff = get_ctrl(sv);
     Node *prevdom = n;
     Node *dom = idom(prevdom);
 
     while (dom != cutoff) {
+      GetFromSVCacheNode* get_from_sv_cache_dom = is_get_from_sv_cache_if(dom);
+      if (get_from_sv_cache_dom != nullptr && get_from_sv_cache_dom->scoped_value() == sv &&
+          prevdom->in(0) == dom) {
+        assert(dom->in(1)->as_Bool()->_test._test == BoolTest::ne, "");
+        assert(dom->in(1)->in(1)->in(2)->find_int_con(-1) == 1, "");
+        if (prevdom->is_IfFalse()) {
+          if (sv_get_result != nullptr) {
+            lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
+            _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
+          } else {
+            assert(get_from_sv_cache != nullptr, "");
+            _igvn.replace_node(get_from_sv_cache->cached_value(), get_from_sv_cache_dom->cached_value());
+            Node* one = _igvn.intcon(1);
+            set_ctrl(one, C->root());
+            _igvn.replace_node(get_from_sv_cache->hits_in_the_cache(), one);
+          }
+          C->set_major_progress();
+          return;
+        }
+      }
       prevdom = dom;
       dom = idom(prevdom);
     }
   }
+}
+
+GetFromSVCacheNode* PhaseIdealLoop::is_get_from_sv_cache_if(const Node* n) const {
+  if (n->is_If() && n->in(1)->is_Bool() && n->in(1)->in(1)->Opcode() == Op_CmpI &&
+      n->in(1)->in(1)->in(1)->is_Proj() && n->in(1)->in(1)->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
+    return (GetFromSVCacheNode*)n->in(1)->in(1)->in(1)->in(0);
+  }
+  return nullptr;
 }
 
 // Transform:

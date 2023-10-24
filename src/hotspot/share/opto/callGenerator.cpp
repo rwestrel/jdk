@@ -1051,7 +1051,7 @@ public:
     scoped_value_cache->set_req(0, C->top());
     C->record_for_igvn(scoped_value_cache);
 
-    GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, kit.memory(Compile::AliasIdxRaw),
+    GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, kit.control(), kit.memory(Compile::AliasIdxRaw),
                                                                 kit.memory(TypeAryPtr::OOPS), _sv,
                                                                 first_index,
                                                                 second_index == nullptr ? C->top() : second_index);

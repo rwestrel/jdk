@@ -4641,23 +4641,27 @@ void PhaseIdealLoop::build_and_optimize() {
   }
 
   if (!C->major_progress()) {
-    assert(!_igvn.delay_transform(), "");
-    _igvn.set_delay_transform(true);
-    for (int i = C->scoped_value_get_count(); i > 0; i--) {
-      Node* n = C->scoped_value_get_node(i-1);
-      if (n->Opcode() == Op_ScopedValueGetResult) {
-        ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*)n;
-        _igvn.replace_node(get_result->result(), get_result->in(ScopedValueGetResultNode::GetResult));
-        lazy_replace(get_result->control(), get_result->in(ScopedValueGetResultNode::Control));
-      } else {
-        assert(n->Opcode() == Op_GetFromSVCache, "");
-        GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*)n;
-        expand_get_from_sv_cache(get_from_cache);
-      }
-      C->set_major_progress();
+    if (!do_split_ifs) {
       C->set_needs_split_if(true);
+    } else {
+      assert(!_igvn.delay_transform(), "");
+      _igvn.set_delay_transform(true);
+      for (int i = C->scoped_value_get_count(); i > 0; i--) {
+        Node* n = C->scoped_value_get_node(i - 1);
+        if (n->Opcode() == Op_ScopedValueGetResult) {
+          ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*) n;
+          _igvn.replace_node(get_result->result_out(), get_result->in(ScopedValueGetResultNode::GetResult));
+          lazy_replace(get_result->control_out(), get_result->in(ScopedValueGetResultNode::Control));
+        } else {
+          assert(n->Opcode() == Op_GetFromSVCache, "");
+          GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*) n;
+          expand_get_from_sv_cache(get_from_cache);
+        }
+        C->set_major_progress();
+        C->set_needs_split_if(true);
+      }
+      _igvn.set_delay_transform(false);
     }
-    _igvn.set_delay_transform(false);
   }
 
   // Convert scalar to superword operations at the end of all loop opts.
@@ -4680,14 +4684,14 @@ void PhaseIdealLoop::build_and_optimize() {
         }
       }
     }
-  }
 
-  // Move UnorderedReduction out of counted loop. Can be introduced by SuperWord.
-  if (C->has_loops() && !C->major_progress()) {
-    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
-      IdealLoopTree* lpt = iter.current();
-      if (lpt->is_counted() && lpt->is_innermost()) {
-        move_unordered_reduction_out_of_loop(lpt);
+    // Move UnorderedReduction out of counted loop. Can be introduced by SuperWord.
+    if (C->has_loops() && !C->major_progress()) {
+      for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+        IdealLoopTree* lpt = iter.current();
+        if (lpt->is_counted() && lpt->is_innermost()) {
+          move_unordered_reduction_out_of_loop(lpt);
+        }
       }
     }
   }

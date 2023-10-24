@@ -1085,7 +1085,7 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
     case Op_ScopedValueGetResult: {
       ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*)n;
       map_ideal_node(get_result, phantom_obj);
-      add_local_var_and_edge(get_result->result(), PointsToNode::NoEscape, get_result, delayed_worklist);
+      add_local_var_and_edge(get_result->result_out(), PointsToNode::NoEscape, get_result, delayed_worklist);
       delayed_worklist->push(n);
       break;
     }

@@ -527,8 +527,9 @@ public:
 //      GETSECONDCACHEKEY,
 //      GETSECONDCACHEOBJECT
   };
-  GetFromSVCacheNode(Compile* C, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
+  GetFromSVCacheNode(Compile* C, Node* c, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
     : MultiNode(6) {
+    init_req(Control, c);
     init_req(Mem1, mem1);
     init_req(Mem2, mem2);
     init_req(ScopedValue, sv);
@@ -560,6 +561,10 @@ public:
 
   ProjNode* scoped_value_cache() const {
     return proj_out_or_null(ScopedValueCache);
+  }
+
+  Node* scoped_value() const {
+    return in(ScopedValue);
   }
 
 //  ProjNode* get_cache_array() const {

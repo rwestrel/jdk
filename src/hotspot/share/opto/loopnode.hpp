@@ -1740,6 +1740,8 @@ public:
   void test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* index,
                                 Node* c, float prob, float cnt, Node* sv, Node*& failure, Node*& hit,
                                 Node*& res);
+
+  GetFromSVCacheNode* is_get_from_sv_cache_if(const Node* n) const;
 };
 
 

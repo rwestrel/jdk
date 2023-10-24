@@ -123,4 +123,6 @@ public:
 
 };
 
+class
+
 #endif // SHARE_OPTO_LOCKNODE_HPP

@@ -731,12 +731,19 @@ public:
   virtual int   Opcode() const;
   virtual const Type* bottom_type() const { return TypeTuple::SV_GET_RESULT; }
 
-  ProjNode* result() {
+  ProjNode* result_out() {
     return proj_out_or_null(Result);
   }
 
-  ProjNode* control() {
+  ProjNode* control_out() {
     return proj_out(ControlOut);
+  }
+
+  Node* scoped_value() const {
+    return in(ScopedValue);
+  }
+  Node* result_in() const {
+    return in(GetResult);
   }
 };
 
