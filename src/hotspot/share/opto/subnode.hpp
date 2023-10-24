@@ -297,6 +297,24 @@ public:
   virtual uint ideal_reg() const { return Op_RegI; }
 };
 
+class ScopedValueGetHitsInCache : public CmpNode {
+private:
+  struct {
+      float _cnt;
+      float _prob;
+  } _profile_data[3];
+
+  virtual uint size_of() const { return sizeof(*this); }
+
+public:
+  ScopedValueGetHitsInCache(Compile* C, Node* c, Node* scoped_value_cache, Node* null, Node* sv, Node* mem, Node* index1, Node* index2) :
+          CmpNode(scoped_value_cache, null) {
+    add_req(sv);
+    add_req(mem);
+    add_req(index1);
+    add_req(index2);
+  }
+};
 
 //------------------------------BoolTest---------------------------------------
 // Convert condition codes to a boolean test value (0 or -1).

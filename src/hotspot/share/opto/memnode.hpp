@@ -499,106 +499,80 @@ public:
   virtual BasicType memory_type() const { return T_ADDRESS; }
 };
 
-class GetFromSVCacheNode : public MultiNode {
-private:
-  struct {
-   float _cnt;
-   float _prob;
-  } _profile_data[3];
-
-  virtual uint size_of() const { return sizeof(*this); }
-public:
-  enum {
-      Control = 0,
-      Mem1,
-      Mem2,
-      ScopedValue,
-      Index1,
-      Index2,
-      Inputs
-  };
-  enum {
-      HitsInTheCache,
-      CachedValue,
-      ScopedValueCache,
-//      GETCACHEARRAY = 0,
-//      GETFIRSTCACHEKEY,
-//      GETFIRSTCACHEOBJECT,
-//      GETSECONDCACHEKEY,
-//      GETSECONDCACHEOBJECT
-  };
-  GetFromSVCacheNode(Compile* C, Node* c, Node* mem1, Node* mem2, Node* sv, Node* n1, Node* n2)
-    : MultiNode(6) {
-    init_req(Control, c);
-    init_req(Mem1, mem1);
-    init_req(Mem2, mem2);
-    init_req(ScopedValue, sv);
-    init_req(Index1, n1);
-    init_req(Index2, n2);
-    C->add_scoped_value_get_node(this);
-  }
-  virtual int Opcode() const;
-
-  const Type* bottom_type() const {
-    return TypeTuple::GET_FROM_SV_CACHE;
-  }
-
-//  virtual uint hash() const { return Node::hash(); }
-  virtual uint hash() const { return NO_HASH; }
-  virtual Node* Identity(PhaseGVN* phase) { return this; }
-  virtual Node *Ideal(PhaseGVN *phase, bool can_reshape) { return nullptr; }
-  virtual const Type* Value(PhaseGVN* phase)  const { return bottom_type(); }
-  virtual bool is_CFG() const  { return false; }
-  virtual uint ideal_reg() const { return NotAMachineReg; }
-
-  ProjNode* hits_in_the_cache() const {
-    return proj_out_or_null(HitsInTheCache);
-  }
-
-  ProjNode* cached_value() const {
-    return proj_out_or_null(CachedValue);
-  }
-
-  ProjNode* scoped_value_cache() const {
-    return proj_out_or_null(ScopedValueCache);
-  }
-
-  Node* scoped_value() const {
-    return in(ScopedValue);
-  }
-
-//  ProjNode* get_cache_array() const {
-//    return proj_out_or_null(GETCACHEARRAY);
+//class ScopedValueGetLoadFromCache : public Node {
+//public:
+//  ScopedValueGetLoadFromCache(Compile* C, Node* c, Node* mem, )
+//    : MultiNode(6) {
+//    init_req(Control, c);
+//    init_req(Mem1, mem1);
+//    init_req(Mem2, mem2);
+//    init_req(ScopedValue, sv);
+//    init_req(Index1, n1);
+//    init_req(Index2, n2);
+//    C->add_scoped_value_get_node(this);
 //  }
-//  ProjNode* get_first_cache_key() const {
-//    return proj_out_or_null(GETFIRSTCACHEKEY);
+//  virtual int Opcode() const;
+//
+//  const Type* bottom_type() const {
+//    return TypeTuple::GET_FROM_SV_CACHE;
 //  }
-//  ProjNode* get_second_cache_key() const {
-//    return proj_out_or_null(GETSECONDCACHEKEY);
+//
+////  virtual uint hash() const { return Node::hash(); }
+//  virtual uint hash() const { return NO_HASH; }
+//  virtual Node* Identity(PhaseGVN* phase) { return this; }
+//  virtual Node *Ideal(PhaseGVN *phase, bool can_reshape) { return nullptr; }
+//  virtual const Type* Value(PhaseGVN* phase)  const { return bottom_type(); }
+//  virtual bool is_CFG() const  { return false; }
+//  virtual uint ideal_reg() const { return NotAMachineReg; }
+//
+//  ProjNode* hits_in_the_cache() const {
+//    return proj_out_or_null(HitsInTheCache);
 //  }
-//  ProjNode* get_first_cache_object() const {
-//    return proj_out_or_null(GETFIRSTCACHEOBJECT);
+//
+//  ProjNode* cached_value() const {
+//    return proj_out_or_null(CachedValue);
 //  }
-//  ProjNode* get_second_cache_object() const {
-//    return proj_out_or_null(GETSECONDCACHEOBJECT);
+//
+//  ProjNode* scoped_value_cache() const {
+//    return proj_out_or_null(ScopedValueCache);
 //  }
-
-  void set_profile_data(uint i, float cnt, float prob) {
-    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
-    _profile_data[i]._cnt = cnt;
-    _profile_data[i]._prob = prob;
-  }
-
- float prob(uint i) const {
-    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
-    return _profile_data[i]._prob;
-  }
-
- float cnt(uint i) const {
-    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
-    return _profile_data[i]._cnt;
-  }
-};
+//
+//  Node* scoped_value() const {
+//    return in(ScopedValue);
+//  }
+//
+////  ProjNode* get_cache_array() const {
+////    return proj_out_or_null(GETCACHEARRAY);
+////  }
+////  ProjNode* get_first_cache_key() const {
+////    return proj_out_or_null(GETFIRSTCACHEKEY);
+////  }
+////  ProjNode* get_second_cache_key() const {
+////    return proj_out_or_null(GETSECONDCACHEKEY);
+////  }
+////  ProjNode* get_first_cache_object() const {
+////    return proj_out_or_null(GETFIRSTCACHEOBJECT);
+////  }
+////  ProjNode* get_second_cache_object() const {
+////    return proj_out_or_null(GETSECONDCACHEOBJECT);
+////  }
+//
+//  void set_profile_data(uint i, float cnt, float prob) {
+//    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+//    _profile_data[i]._cnt = cnt;
+//    _profile_data[i]._prob = prob;
+//  }
+//
+// float prob(uint i) const {
+//    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+//    return _profile_data[i]._prob;
+//  }
+//
+// float cnt(uint i) const {
+//    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+//    return _profile_data[i]._cnt;
+//  }
+//};
 
 
 //------------------------------LoadNNode--------------------------------------
