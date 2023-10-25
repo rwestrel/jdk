@@ -2407,7 +2407,7 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
                n->Opcode() == Op_Opaque4   ||
                n->Opcode() == Op_MaxL      ||
                n->Opcode() == Op_MinL      ||
-               n->Opcode() == Op_GetFromSVCache ||
+//               n->Opcode() == Op_GetFromSVCache ||
                BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n),
                "unknown node type in macro list");
       }
@@ -2504,10 +2504,10 @@ bool PhaseMacroExpand::expand_macro_nodes() {
         Node* repl = MaxNode::signed_min(n->in(1), n->in(2), _igvn.type(n), _igvn);
         _igvn.replace_node(n, repl);
         success = true;
-      } else if (n->Opcode() == Op_GetFromSVCache) {
-        ShouldNotReachHere();
-        expand_get_from_sv_cache(n);
-        success = true;
+//      } else if (n->Opcode() == Op_GetFromSVCache) {
+//        ShouldNotReachHere();
+//        expand_get_from_sv_cache(n);
+//        success = true;
       }
       assert(!success || (C->macro_count() == (old_macro_count - 1)), "elimination must have deleted one node from macro list");
       progress = progress || success;
@@ -2626,94 +2626,94 @@ bool PhaseMacroExpand::expand_macro_nodes() {
   return false;
 }
 
-void PhaseMacroExpand::expand_get_from_sv_cache(const Node* n) {
-  GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*) n;
-  ProjNode* hits_in_the_cache = get_from_cache->hits_in_the_cache();
-  ProjNode* cached_value = get_from_cache->cached_value();
-
-  Node* cmp = hits_in_the_cache->find_unique_out_with(Op_CmpI);
-  BoolNode* bol = cmp->unique_out()->as_Bool();
-  assert(bol->_test._test == BoolTest::ne, "");
-
-  IfNode* iff = bol->unique_ctrl_out()->as_If();
-  ProjNode* success = iff->proj_out(0);
-  ProjNode* failure = iff->proj_out(1);
-
-  Node* thread = _igvn.transform(new ThreadLocalNode());
-  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedValueCache_offset()));
-  Node* handle_load = LoadNode::make(_igvn, nullptr, n->in(GetFromSVCacheNode::Mem1), p, p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
-  handle_load = _igvn.transform(handle_load);
-
-  ciInstanceKlass* object_klass = ciEnv::current()->Object_klass();
-  const TypeOopPtr* etype = TypeOopPtr::make_from_klass(object_klass);
-  const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
-  const TypeAryPtr* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, nullptr, true, 0);
-
-  DecoratorSet decorators = C2_READ_ACCESS | IN_NATIVE;
-  C2AccessValuePtr addr(handle_load, TypeRawPtr::NOTNULL);
-  C2OptAccess access(_igvn, nullptr, n->in(GetFromSVCacheNode::Mem1), decorators, T_OBJECT, nullptr, addr);
-  BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
-  Node* load_of_cache = bs->load_at(access, objects_type);
-
-  Node* cache_not_null_cmp = _igvn.transform(new CmpPNode(load_of_cache, makecon(TypePtr::NULL_PTR)));
-  Node* cache_not_null_bol = _igvn.transform(new BoolNode(cache_not_null_cmp, BoolTest::ne));
-  IfNode* cache_not_null_iff = _igvn.transform(new IfNode(iff->in(0), cache_not_null_bol, get_from_cache->prob(0), get_from_cache->cnt(0)))->as_If();
-  Node* cache_not_null_proj = _igvn.transform(new IfTrueNode(cache_not_null_iff));
-  Node* cache_null_proj = _igvn.transform(new IfFalseNode(cache_not_null_iff));
-
-  Node* not_null_load_of_cache = _igvn.transform(new CheckCastPPNode(cache_not_null_proj, load_of_cache, objects_type->join(TypePtr::NOTNULL)));
-
-  Node* mem2 = get_from_cache->in(GetFromSVCacheNode::Mem2);
-  Node* first_index = get_from_cache->in(GetFromSVCacheNode::Index1);
-  Node* second_index = get_from_cache->in(GetFromSVCacheNode::Index2);
-
-  Node* sv = get_from_cache->in(GetFromSVCacheNode::ScopedValue);
-  Node* hit_proj = nullptr;
-  Node* failure_proj = nullptr;
-  Node* res = nullptr;
-  Node* success_region = new RegionNode(3);
-  Node* success_phi = new PhiNode(success_region, TypeInstPtr::BOTTOM);
-  Node* failure_region = new RegionNode(3);
-  float first_prob = get_from_cache->prob(1);
-  float first_cnt = get_from_cache->cnt(1);
-  float second_prob = get_from_cache->prob(2);
-  if (first_prob != PROB_UNKNOWN && second_prob != PROB_UNKNOWN) {
-    second_prob = (1 - first_prob) * second_prob;
-  }
-  float second_cnt = get_from_cache->cnt(2);
-
-  if (second_index != C->top() && second_prob < first_prob) {
-    swap(first_index, second_index);
-    swap(first_prob, second_prob);
-    second_prob = (1- first_prob) * second_prob;
-    if (first_cnt != COUNT_UNKNOWN && first_prob != PROB_UNKNOWN) {
-      second_cnt = first_cnt * first_prob;
-    }
-  }
-
-  test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
-                           first_prob, first_cnt, sv, failure_proj, hit_proj, res);
-  success_region->init_req(1, hit_proj);
-  success_phi->init_req(1, res);
-  if (second_index != C->top()) {
-    test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, second_index, failure_proj,
-                             second_prob, second_cnt, sv, failure_proj, hit_proj, res);
-    success_region->init_req(2, hit_proj);
-    success_phi->init_req(2, res);
-  }
-
-  failure_region->init_req(1, cache_null_proj);
-  failure_region->init_req(2, failure_proj);
-
-  success_region = _igvn.transform(success_region);
-  failure_region = _igvn.transform(failure_region);
-  success_phi = _igvn.transform(success_phi);
-
-  _igvn.replace_node(success, success_region);
-  _igvn.replace_node(failure, failure_region);
-  _igvn.replace_node(cached_value, success_phi);
-  _igvn.replace_node(get_from_cache, C->top());
-}
+//void PhaseMacroExpand::expand_get_from_sv_cache(const Node* n) {
+//  GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*) n;
+//  ProjNode* hits_in_the_cache = get_from_cache->hits_in_the_cache();
+//  ProjNode* cached_value = get_from_cache->cached_value();
+//
+//  Node* cmp = hits_in_the_cache->find_unique_out_with(Op_CmpI);
+//  BoolNode* bol = cmp->unique_out()->as_Bool();
+//  assert(bol->_test._test == BoolTest::ne, "");
+//
+//  IfNode* iff = bol->unique_ctrl_out()->as_If();
+//  ProjNode* success = iff->proj_out(0);
+//  ProjNode* failure = iff->proj_out(1);
+//
+//  Node* thread = _igvn.transform(new ThreadLocalNode());
+//  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::scopedValueCache_offset()));
+//  Node* handle_load = LoadNode::make(_igvn, nullptr, n->in(GetFromSVCacheNode::Mem1), p, p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
+//  handle_load = _igvn.transform(handle_load);
+//
+//  ciInstanceKlass* object_klass = ciEnv::current()->Object_klass();
+//  const TypeOopPtr* etype = TypeOopPtr::make_from_klass(object_klass);
+//  const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
+//  const TypeAryPtr* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, nullptr, true, 0);
+//
+//  DecoratorSet decorators = C2_READ_ACCESS | IN_NATIVE;
+//  C2AccessValuePtr addr(handle_load, TypeRawPtr::NOTNULL);
+//  C2OptAccess access(_igvn, nullptr, n->in(GetFromSVCacheNode::Mem1), decorators, T_OBJECT, nullptr, addr);
+//  BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
+//  Node* load_of_cache = bs->load_at(access, objects_type);
+//
+//  Node* cache_not_null_cmp = _igvn.transform(new CmpPNode(load_of_cache, makecon(TypePtr::NULL_PTR)));
+//  Node* cache_not_null_bol = _igvn.transform(new BoolNode(cache_not_null_cmp, BoolTest::ne));
+//  IfNode* cache_not_null_iff = _igvn.transform(new IfNode(iff->in(0), cache_not_null_bol, get_from_cache->prob(0), get_from_cache->cnt(0)))->as_If();
+//  Node* cache_not_null_proj = _igvn.transform(new IfTrueNode(cache_not_null_iff));
+//  Node* cache_null_proj = _igvn.transform(new IfFalseNode(cache_not_null_iff));
+//
+//  Node* not_null_load_of_cache = _igvn.transform(new CheckCastPPNode(cache_not_null_proj, load_of_cache, objects_type->join(TypePtr::NOTNULL)));
+//
+//  Node* mem2 = get_from_cache->in(GetFromSVCacheNode::Mem2);
+//  Node* first_index = get_from_cache->in(GetFromSVCacheNode::Index1);
+//  Node* second_index = get_from_cache->in(GetFromSVCacheNode::Index2);
+//
+//  Node* sv = get_from_cache->in(GetFromSVCacheNode::ScopedValue);
+//  Node* hit_proj = nullptr;
+//  Node* failure_proj = nullptr;
+//  Node* res = nullptr;
+//  Node* success_region = new RegionNode(3);
+//  Node* success_phi = new PhiNode(success_region, TypeInstPtr::BOTTOM);
+//  Node* failure_region = new RegionNode(3);
+//  float first_prob = get_from_cache->prob(1);
+//  float first_cnt = get_from_cache->cnt(1);
+//  float second_prob = get_from_cache->prob(2);
+//  if (first_prob != PROB_UNKNOWN && second_prob != PROB_UNKNOWN) {
+//    second_prob = (1 - first_prob) * second_prob;
+//  }
+//  float second_cnt = get_from_cache->cnt(2);
+//
+//  if (second_index != C->top() && second_prob < first_prob) {
+//    swap(first_index, second_index);
+//    swap(first_prob, second_prob);
+//    second_prob = (1- first_prob) * second_prob;
+//    if (first_cnt != COUNT_UNKNOWN && first_prob != PROB_UNKNOWN) {
+//      second_cnt = first_cnt * first_prob;
+//    }
+//  }
+//
+//  test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
+//                           first_prob, first_cnt, sv, failure_proj, hit_proj, res);
+//  success_region->init_req(1, hit_proj);
+//  success_phi->init_req(1, res);
+//  if (second_index != C->top()) {
+//    test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, second_index, failure_proj,
+//                             second_prob, second_cnt, sv, failure_proj, hit_proj, res);
+//    success_region->init_req(2, hit_proj);
+//    success_phi->init_req(2, res);
+//  }
+//
+//  failure_region->init_req(1, cache_null_proj);
+//  failure_region->init_req(2, failure_proj);
+//
+//  success_region = _igvn.transform(success_region);
+//  failure_region = _igvn.transform(failure_region);
+//  success_phi = _igvn.transform(success_phi);
+//
+//  _igvn.replace_node(success, success_region);
+//  _igvn.replace_node(failure, failure_region);
+//  _igvn.replace_node(cached_value, success_phi);
+//  _igvn.replace_node(get_from_cache, C->top());
+//}
 
 void PhaseMacroExpand::test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* index,
                                                 Node* c, float prob, float cnt, Node* sv, Node*& failure, Node*& hit,

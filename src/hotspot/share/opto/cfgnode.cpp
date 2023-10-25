@@ -1583,9 +1583,9 @@ static Node *is_x2logic( PhaseGVN *phase, PhiNode *phi, int true_path ) {
   BoolNode *b = (BoolNode*)iff->in(1);
   const CmpNode *cmp = (CmpNode*)b->in(1);
 
-  if (cmp->in(1) != nullptr && cmp->in(1)->is_Proj() && cmp->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
-    return nullptr;
-  }
+//  if (cmp->in(1) != nullptr && cmp->in(1)->is_Proj() && cmp->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
+//    return nullptr;
+//  }
 
   Node *zero = phi->in(1);
   Node *one  = phi->in(2);

@@ -36,6 +36,7 @@
 #include "opto/cfgnode.hpp"
 #include "opto/compile.hpp"
 #include "opto/escape.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/macro.hpp"
 #include "opto/phaseX.hpp"
 #include "opto/movenode.hpp"
@@ -1005,8 +1006,8 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
       // we are only interested in the oop result projection from a call
       if ((n->as_Proj()->_con == TypeFunc::Parms && n->in(0)->is_Call() &&
            n->in(0)->as_Call()->returns_pointer()) ||
-          (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
-          (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+//          (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+//          (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
           (n->as_Proj()->_con == ScopedValueGetResultNode::Result && n->in(0)->Opcode() == Op_ScopedValueGetResult)) {
         add_local_var_and_edge(n, PointsToNode::NoEscape, n->in(0), delayed_worklist);
       }
@@ -1075,10 +1076,10 @@ void ConnectionGraph::add_node_to_connection_graph(Node *n, Unique_Node_List *de
       }
       break;
     }
-    case Op_GetFromSVCache: {
-      GetFromSVCacheNode* get_from_cache = (GetFromSVCacheNode*)n;
+    case Op_ScopedValueGetLoadFromCache: {
+      ScopedValueGetLoadFromCacheNode* get_from_cache = (ScopedValueGetLoadFromCacheNode*)n;
       map_ideal_node(get_from_cache, phantom_obj);
-      add_local_var_and_edge(get_from_cache->cached_value(), PointsToNode::NoEscape, get_from_cache, delayed_worklist);
+//      add_local_var_and_edge(get_from_cache->cached_value(), PointsToNode::NoEscape, get_from_cache, delayed_worklist);
       delayed_worklist->push(n);
       break;
     }
@@ -1180,8 +1181,8 @@ void ConnectionGraph::add_final_edges(Node *n) {
       // we are only interested in the oop result projection from a call
       assert((n->as_Proj()->_con == TypeFunc::Parms && n->in(0)->is_Call() &&
              n->in(0)->as_Call()->returns_pointer()) ||
-             (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
-             (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+//             (n->as_Proj()->_con == GetFromSVCacheNode::CachedValue && n->in(0)->Opcode() == Op_GetFromSVCache) ||
+//             (n->as_Proj()->_con == GetFromSVCacheNode::ScopedValueCache && n->in(0)->Opcode() == Op_GetFromSVCache) ||
              (n->as_Proj()->_con == ScopedValueGetResultNode::Result && n->in(0)->Opcode() == Op_ScopedValueGetResult), "Unexpected node type");
       add_local_var_and_edge(n, PointsToNode::NoEscape, n->in(0), nullptr);
       break;
@@ -1261,8 +1262,8 @@ void ConnectionGraph::add_final_edges(Node *n) {
       }
       break;
     }
-    case Op_GetFromSVCache: {
-      Node* sv = n->in(GetFromSVCacheNode::ScopedValue);
+    case Op_ScopedValueGetLoadFromCache: {
+      Node* sv = ((ScopedValueGetLoadFromCacheNode*)n)->scoped_value();
       PointsToNode* sv_ptn = ptnode_adr(sv->_idx);
       assert(sv_ptn != nullptr, "should be registered");
       set_escape_state(sv_ptn, PointsToNode::ArgEscape NOT_PRODUCT(COMMA "GetFromSVCache"));
@@ -3920,7 +3921,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
               op == Op_StrEquals || op == Op_VectorizedHashCode ||
               op == Op_StrIndexOf || op == Op_StrIndexOfChar ||
               op == Op_SubTypeCheck ||
-              op == Op_GetFromSVCache || op == Op_ScopedValueGetResult ||
+              op == Op_ScopedValueGetLoadFromCache || op == Op_ScopedValueGetResult ||
               BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(use))) {
           n->dump();
           use->dump();
@@ -4068,7 +4069,7 @@ void SplitUniqueTypes::split_unique_types() {
                      op == Op_AryEq || op == Op_StrComp || op == Op_CountPositives ||
                      op == Op_StrCompressedCopy || op == Op_StrInflatedCopy || op == Op_VectorizedHashCode ||
                      op == Op_StrEquals || op == Op_StrIndexOf || op == Op_StrIndexOfChar ||
-                     op == Op_GetFromSVCache || op == Op_ScopedValueGetResult)) {
+                     op == Op_ScopedValueGetLoadFromCache || op == Op_ScopedValueGetResult)) {
           n->dump();
           use->dump();
           assert(false, "EA: missing memory path");

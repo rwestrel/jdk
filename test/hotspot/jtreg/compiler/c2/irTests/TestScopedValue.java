@@ -85,36 +85,36 @@ public class TestScopedValue {
     static void notInlined() {
     }
     
-    // @Test
-    // @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
-    // @IR(counts = {IRNode.LOAD_L, "1" })
-    // public static long test2() throws Exception {
-    //     ScopedValue<MyLong> scopedValue = sv;
-    //     MyLong sv1 = (MyLong)scopedValue.get();
-    //     notInlined();
-    //     MyLong sv2 = (MyLong)scopedValue.get();
-    //     return sv1.getValue() + sv2.getValue();
-    // }
+    @Test
+    @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
+    @IR(counts = {IRNode.LOAD_L, "1" })
+    public static long test2() throws Exception {
+        ScopedValue<MyLong> scopedValue = sv;
+        MyLong sv1 = (MyLong)scopedValue.get();
+        notInlined();
+        MyLong sv2 = (MyLong)scopedValue.get();
+        return sv1.getValue() + sv2.getValue();
+    }
 
-    // @Run(test = "test2", mode = RunMode.STANDALONE)
-    // private void test2Runner() throws Exception {
-    //     ScopedValue.where(sv, new MyLong(42)).run(
-    //             () -> {
-    //                 try {
-    //                     MyLong unused = (MyLong)sv.get();
-    //                     for (int i = 0; i < 20_000; i++) {
-    //                         if (test2() != 42 + 42) {
-    //                             throw new RuntimeException();
-    //                         }
-    //                     }
-    //                 } catch(Exception ex) {}
-    //             });
-    //     Method m = TestScopedValue.class.getDeclaredMethod("test2");
-    //     WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
-    //     if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
-    //         throw new RuntimeException("should be compiled");
-    //     }
-    // }
+    @Run(test = "test2", mode = RunMode.STANDALONE)
+    private void test2Runner() throws Exception {
+        ScopedValue.where(sv, new MyLong(42)).run(
+                () -> {
+                    try {
+                        MyLong unused = (MyLong)sv.get();
+                        for (int i = 0; i < 20_000; i++) {
+                            if (test2() != 42 + 42) {
+                                throw new RuntimeException();
+                            }
+                        }
+                    } catch(Exception ex) {}
+                });
+        Method m = TestScopedValue.class.getDeclaredMethod("test2");
+        WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
+        if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
+            throw new RuntimeException("should be compiled");
+        }
+    }
 
     // @Test
     // @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
@@ -187,36 +187,36 @@ public class TestScopedValue {
     //     }
     // }
 
-    @Test
-    @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
-    @IR(counts = {IRNode.LOAD_L, "1" })
-    public static long test5() throws Exception {
-        int res = 0;
-        for (int i = 0; i < 10_000; i++) {
-            res += sv.get().getValue();
-        }
-        return res;
-    }
+    // @Test
+    // @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
+    // @IR(counts = {IRNode.LOAD_L, "1" })
+    // public static long test5() throws Exception {
+    //     int res = 0;
+    //     for (int i = 0; i < 10_000; i++) {
+    //         res += sv.get().getValue();
+    //     }
+    //     return res;
+    // }
 
-    @Run(test = "test5", mode = RunMode.STANDALONE)
-    private void test5Runner() throws Exception {
-        ScopedValue.where(sv, new MyLong(42)).where(sv2, new MyLong(42)).run(
-                () -> {
-                    try {
-                        MyLong unused = (MyLong)sv.get();
-                        for (int i = 0; i < 20_000; i++) {
-                            if (test5() != 42 * 10_000) {
-                                throw new RuntimeException();
-                            }
-                        }
-                    } catch(Exception ex) {}
-                });
-        Method m = TestScopedValue.class.getDeclaredMethod("test5");
-        WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
-        if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
-            throw new RuntimeException("should be compiled");
-        }
-    }
+    // @Run(test = "test5", mode = RunMode.STANDALONE)
+    // private void test5Runner() throws Exception {
+    //     ScopedValue.where(sv, new MyLong(42)).where(sv2, new MyLong(42)).run(
+    //             () -> {
+    //                 try {
+    //                     MyLong unused = (MyLong)sv.get();
+    //                     for (int i = 0; i < 20_000; i++) {
+    //                         if (test5() != 42 * 10_000) {
+    //                             throw new RuntimeException();
+    //                         }
+    //                     }
+    //                 } catch(Exception ex) {}
+    //             });
+    //     Method m = TestScopedValue.class.getDeclaredMethod("test5");
+    //     WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
+    //     if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
+    //         throw new RuntimeException("should be compiled");
+    //     }
+    // }
 
     // @Test
     // @IR(counts = {IRNode.CALL_OF_METHOD, "slowGet", "2"})

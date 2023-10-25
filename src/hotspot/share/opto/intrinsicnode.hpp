@@ -339,4 +339,21 @@ class IsFiniteDNode : public Node {
   virtual uint ideal_reg() const { return Op_RegI; }
 };
 
+class ScopedValueGetLoadFromCacheNode : public Node {
+public:
+  ScopedValueGetLoadFromCacheNode(Compile* C, Node* c, Node* hits_in_cache)
+          : Node(c, hits_in_cache) {
+    C->add_scoped_value_get_node(this);
+  }
+
+  Node* scoped_value() const;
+
+  virtual int Opcode() const;
+  virtual uint hash() const { return NO_HASH; }
+
+  const Type* bottom_type() const {
+    return TypeInstPtr::BOTTOM;
+  }
+};
+
 #endif // SHARE_OPTO_INTRINSICNODE_HPP

@@ -1586,49 +1586,49 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
 
   try_move_store_after_loop(n);
 
-  GetFromSVCacheNode* get_from_sv_cache = is_get_from_sv_cache_if(n);
-  ScopedValueGetResultNode* sv_get_result = (n->Opcode() == Op_ScopedValueGetResult) ? (ScopedValueGetResultNode*) n : nullptr;
-  if (sv_get_result != nullptr ||
-      get_from_sv_cache != nullptr) {
-    Node* sv = sv_get_result != nullptr ? sv_get_result->scoped_value() : get_from_sv_cache->scoped_value();
-    Node* cutoff = get_ctrl(sv);
-    Node *prevdom = n;
-    Node *dom = idom(prevdom);
-
-    while (dom != cutoff) {
-      GetFromSVCacheNode* get_from_sv_cache_dom = is_get_from_sv_cache_if(dom);
-      if (get_from_sv_cache_dom != nullptr && get_from_sv_cache_dom->scoped_value() == sv &&
-          prevdom->in(0) == dom) {
-        assert(dom->in(1)->as_Bool()->_test._test == BoolTest::ne, "");
-        assert(dom->in(1)->in(1)->in(2)->find_int_con(-1) == 1, "");
-        if (prevdom->is_IfFalse()) {
-          if (sv_get_result != nullptr) {
-            lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
-            _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
-          } else {
-            assert(get_from_sv_cache != nullptr, "");
-            _igvn.replace_node(get_from_sv_cache->cached_value(), get_from_sv_cache_dom->cached_value());
-            Node* one = _igvn.intcon(1);
-            set_ctrl(one, C->root());
-            _igvn.replace_node(get_from_sv_cache->hits_in_the_cache(), one);
-          }
-          C->set_major_progress();
-          return;
-        }
-      }
-      prevdom = dom;
-      dom = idom(prevdom);
-    }
-  }
+//  GetFromSVCacheNode* get_from_sv_cache = is_get_from_sv_cache_if(n);
+//  ScopedValueGetResultNode* sv_get_result = (n->Opcode() == Op_ScopedValueGetResult) ? (ScopedValueGetResultNode*) n : nullptr;
+//  if (sv_get_result != nullptr ||
+//      get_from_sv_cache != nullptr) {
+//    Node* sv = sv_get_result != nullptr ? sv_get_result->scoped_value() : get_from_sv_cache->scoped_value();
+//    Node* cutoff = get_ctrl(sv);
+//    Node *prevdom = n;
+//    Node *dom = idom(prevdom);
+//
+//    while (dom != cutoff) {
+//      GetFromSVCacheNode* get_from_sv_cache_dom = is_get_from_sv_cache_if(dom);
+//      if (get_from_sv_cache_dom != nullptr && get_from_sv_cache_dom->scoped_value() == sv &&
+//          prevdom->in(0) == dom) {
+//        assert(dom->in(1)->as_Bool()->_test._test == BoolTest::ne, "");
+//        assert(dom->in(1)->in(1)->in(2)->find_int_con(-1) == 1, "");
+//        if (prevdom->is_IfFalse()) {
+//          if (sv_get_result != nullptr) {
+//            lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
+//            _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
+//          } else {
+//            assert(get_from_sv_cache != nullptr, "");
+//            _igvn.replace_node(get_from_sv_cache->cached_value(), get_from_sv_cache_dom->cached_value());
+//            Node* one = _igvn.intcon(1);
+//            set_ctrl(one, C->root());
+//            _igvn.replace_node(get_from_sv_cache->hits_in_the_cache(), one);
+//          }
+//          C->set_major_progress();
+//          return;
+//        }
+//      }
+//      prevdom = dom;
+//      dom = idom(prevdom);
+//    }
+//  }
 }
 
-GetFromSVCacheNode* PhaseIdealLoop::is_get_from_sv_cache_if(const Node* n) const {
-  if (n->is_If() && n->in(1)->is_Bool() && n->in(1)->in(1)->Opcode() == Op_CmpI &&
-      n->in(1)->in(1)->in(1)->is_Proj() && n->in(1)->in(1)->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
-    return (GetFromSVCacheNode*)n->in(1)->in(1)->in(1)->in(0);
-  }
-  return nullptr;
-}
+//GetFromSVCacheNode* PhaseIdealLoop::is_get_from_sv_cache_if(const Node* n) const {
+//  if (n->is_If() && n->in(1)->is_Bool() && n->in(1)->in(1)->Opcode() == Op_CmpI &&
+//      n->in(1)->in(1)->in(1)->is_Proj() && n->in(1)->in(1)->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
+//    return (GetFromSVCacheNode*)n->in(1)->in(1)->in(1)->in(0);
+//  }
+//  return nullptr;
+//}
 
 // Transform:
 //
@@ -4523,43 +4523,17 @@ void PhaseIdealLoop::move_unordered_reduction_out_of_loop(IdealLoopTree* loop) {
   }
 }
 
-void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache) {
-  ProjNode* hits_in_the_cache = get_from_cache->hits_in_the_cache();
-  ProjNode* cached_value = get_from_cache->cached_value();
-  ProjNode* scoped_value_cache = get_from_cache->scoped_value_cache();
-
-  Node* cmp = hits_in_the_cache->find_unique_out_with(Op_CmpI);
-  BoolNode* bol = cmp->unique_out()->as_Bool();
+void PhaseIdealLoop::expand_get_from_sv_cache(ScopedValueGetHitsInCacheNode* get_from_cache) {
+  BoolNode* bol = get_from_cache->find_unique_out_with(Op_Bool)->as_Bool();
   assert(bol->_test._test == BoolTest::ne, "");
 
   IfNode* iff = bol->unique_ctrl_out()->as_If();
-  ProjNode* success = iff->proj_out(0);
-  ProjNode* failure = iff->proj_out(1);
+  ProjNode* success = iff->proj_out(1);
+  ProjNode* failure = iff->proj_out(0);
 
-  Node* thread = new ThreadLocalNode();
-  register_new_node(thread, C->root());
-  Node* scoped_value_cache_offset = _igvn.MakeConX(in_bytes(JavaThread::scopedValueCache_offset()));
-  set_ctrl(scoped_value_cache_offset, C->root());
-  Node* p = new AddPNode(C->top(), thread, scoped_value_cache_offset);
-  register_new_node(p, C->root());
-  Node* handle_load = LoadNode::make(_igvn, nullptr, get_from_cache->in(GetFromSVCacheNode::Mem1), p, p->bottom_type()->is_ptr(), TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered);
-  _igvn.register_new_node_with_optimizer(handle_load);
-  set_subtree_ctrl(handle_load, true);
+  Node* load_of_cache = get_from_cache->in(1);
 
-  ciInstanceKlass* object_klass = ciEnv::current()->Object_klass();
-  const TypeOopPtr* etype = TypeOopPtr::make_from_klass(object_klass);
-  const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
-  const TypeAryPtr* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, nullptr, true, 0);
-
-  DecoratorSet decorators = C2_READ_ACCESS | IN_NATIVE;
-  C2AccessValuePtr addr(handle_load, TypeRawPtr::NOTNULL);
-  C2OptAccess access(_igvn, nullptr, get_from_cache->in(GetFromSVCacheNode::Mem1), decorators, T_OBJECT, nullptr, addr);
-  BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
-  Node* load_of_cache = bs->load_at(access, objects_type);
-  set_subtree_ctrl(load_of_cache, true);
-
-  Node* null_ptr = _igvn.makecon(TypePtr::NULL_PTR);
-  set_ctrl(null_ptr, C->root());
+  Node* null_ptr = get_from_cache->in(2);
   Node* cache_not_null_cmp = new CmpPNode(load_of_cache, null_ptr);
   _igvn.register_new_node_with_optimizer(cache_not_null_cmp);
   Node* cache_not_null_bol = new BoolNode(cache_not_null_cmp, BoolTest::ne);
@@ -4573,15 +4547,15 @@ void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache
   Node* cache_null_proj = new IfFalseNode(cache_not_null_iff);
   register_control(cache_null_proj, loop, cache_not_null_iff);
 
-  Node* not_null_load_of_cache = new CastPPNode(load_of_cache, objects_type->join(TypePtr::NOTNULL));
+  Node* not_null_load_of_cache = new CastPPNode(load_of_cache, _igvn.type(load_of_cache)->join(TypePtr::NOTNULL));
   not_null_load_of_cache->set_req(0, cache_not_null_proj);
   register_new_node(not_null_load_of_cache, cache_not_null_proj);
 
-  Node* mem2 = get_from_cache->in(GetFromSVCacheNode::Mem2);
-  Node* first_index = get_from_cache->in(GetFromSVCacheNode::Index1);
-  Node* second_index = get_from_cache->in(GetFromSVCacheNode::Index2);
+  Node* mem2 = get_from_cache->mem();
+  Node* first_index = get_from_cache->index1();
+  Node* second_index = get_from_cache->index2();
 
-  Node* sv = get_from_cache->in(GetFromSVCacheNode::ScopedValue);
+  Node* sv = get_from_cache->scoped_value();
   Node* hit_proj = nullptr;
   Node* failure_proj = nullptr;
   Node* res = nullptr;
@@ -4605,13 +4579,13 @@ void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache
     }
   }
 
-  test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
+  test_and_load_from_cache(not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
                            first_prob, first_cnt, sv, failure_proj, hit_proj, res);
   Node* success_region_dom = hit_proj;
   success_region->init_req(1, hit_proj);
   success_phi->init_req(1, res);
   if (second_index != C->top()) {
-    test_and_load_from_cache(objects_type, not_null_load_of_cache, mem2, second_index, failure_proj,
+    test_and_load_from_cache(not_null_load_of_cache, mem2, second_index, failure_proj,
                              second_prob, second_cnt, sv, failure_proj, hit_proj, res);
 //    if (second_never_succeeds) {
 //
@@ -4633,15 +4607,15 @@ void PhaseIdealLoop::expand_get_from_sv_cache(GetFromSVCacheNode* get_from_cache
 
   lazy_replace(success, success_region);
   lazy_replace(failure, failure_region);
-  _igvn.replace_node(cached_value, success_phi);
+  _igvn.replace_node(get_from_cache->find_unique_out_with(Op_ScopedValueGetLoadFromCache), success_phi);
   _igvn.replace_node(get_from_cache, C->top());
-  _igvn.replace_node(scoped_value_cache, load_of_cache);
+//  _igvn.replace_node(scoped_value_cache, load_of_cache);
 }
 
-void PhaseIdealLoop::test_and_load_from_cache(const TypeAryPtr* objects_type, Node* load_of_cache, Node* mem, Node* index,
-                                              Node* c, float prob, float cnt, Node* sv, Node*& failure, Node*& hit,
-                                              Node*& res) {
-  BasicType bt = objects_type->array_element_basic_type();
+void
+PhaseIdealLoop::test_and_load_from_cache(Node* load_of_cache, Node* mem, Node* index, Node* c, float prob, float cnt,
+                                         Node* sv, Node*& failure, Node*& hit, Node*& res) {
+  BasicType bt = TypeAryPtr::OOPS->array_element_basic_type();
   uint shift  = exact_log2(type2aelembytes(bt));
   uint header = arrayOopDesc::base_offset_in_bytes(bt);
 
@@ -4661,7 +4635,7 @@ void PhaseIdealLoop::test_and_load_from_cache(const TypeAryPtr* objects_type, No
   C2AccessValuePtr addr(adr, TypeAryPtr::OOPS);
   C2OptAccess access(_igvn, c, mem, decorators, bt, load_of_cache, addr);
   BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
-  Node* cache_load = bs->load_at(access, objects_type->elem());
+  Node* cache_load = bs->load_at(access, TypeAryPtr::OOPS->elem());
 
   Node* cmp = new CmpPNode(cache_load, sv);
   _igvn.register_new_node_with_optimizer(cmp);
@@ -4685,6 +4659,6 @@ void PhaseIdealLoop::test_and_load_from_cache(const TypeAryPtr* objects_type, No
   _igvn.register_new_node_with_optimizer(adr);
   C2AccessValuePtr addr_res(adr, TypeAryPtr::OOPS);
   C2OptAccess access_res(_igvn, c, mem, decorators, bt, load_of_cache, addr_res);
-  res = bs->load_at(access_res, objects_type->elem());
+  res = bs->load_at(access_res, TypeAryPtr::OOPS->elem());
   set_subtree_ctrl(res, true);
 }

@@ -397,7 +397,7 @@ void Compile::remove_useless_node(Node* dead) {
   if (dead->for_post_loop_opts_igvn()) {
     remove_from_post_loop_opts_igvn(dead);
   }
-  if (dead->Opcode() == Op_GetFromSVCache || dead->Opcode() == Op_ScopedValueGetResult) {
+  if (dead->Opcode() == Op_ScopedValueGetHitsInCache || dead->Opcode() == Op_ScopedValueGetLoadFromCache || dead->Opcode() == Op_ScopedValueGetResult) {
     remove_scoped_value_get_node(dead);
   }
   if (dead->is_Call()) {
@@ -4030,7 +4030,8 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
     break;
   }
   case Op_ScopedValueGetResult:
-  case Op_GetFromSVCache: {
+  case Op_ScopedValueGetHitsInCache:
+  case Op_ScopedValueGetLoadFromCache: {
     ShouldNotReachHere();
 //    ScopedValueGetResultNode* scoped_value_get_result = (ScopedValueGetResultNode*)n;
 //    Node* control_proj = scoped_value_get_result->proj_out(ScopedValueGetResultNode::ControlOut);
@@ -5473,13 +5474,13 @@ CallNode* Compile::scoped_value_late_inline(int i) const {
 }
 
 void Compile::add_scoped_value_get_node(Node* n) {
-  assert(n->Opcode() == Op_GetFromSVCache || n->Opcode() == Op_ScopedValueGetResult, "");
+  assert(n->Opcode() == Op_ScopedValueGetHitsInCache || n->Opcode() == Op_ScopedValueGetLoadFromCache || n->Opcode() == Op_ScopedValueGetResult, "");
   assert(!_scoped_value_get_nodes.contains(n), "duplicate entry in ScopedValue get list");
   _scoped_value_get_nodes.append(n);
 }
 
 void Compile::remove_scoped_value_get_node(Node* n) {
-  assert(n->Opcode() == Op_GetFromSVCache || n->Opcode() == Op_ScopedValueGetResult, "");
+  assert(n->Opcode() == Op_ScopedValueGetHitsInCache || n->Opcode() == Op_ScopedValueGetLoadFromCache || n->Opcode() == Op_ScopedValueGetResult, "");
   if (scoped_value_get_count() > 0) {
     _scoped_value_get_nodes.remove_if_existing(n);
   }

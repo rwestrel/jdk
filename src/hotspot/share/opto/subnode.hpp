@@ -297,7 +297,7 @@ public:
   virtual uint ideal_reg() const { return Op_RegI; }
 };
 
-class ScopedValueGetHitsInCache : public CmpNode {
+class ScopedValueGetHitsInCacheNode : public CmpNode {
 private:
   struct {
       float _cnt;
@@ -307,12 +307,52 @@ private:
   virtual uint size_of() const { return sizeof(*this); }
 
 public:
-  ScopedValueGetHitsInCache(Compile* C, Node* c, Node* scoped_value_cache, Node* null, Node* sv, Node* mem, Node* index1, Node* index2) :
-          CmpNode(scoped_value_cache, null) {
+  ScopedValueGetHitsInCacheNode(Compile* C, Node* c, Node* scoped_value_cache, Node* null_con, Node* mem, Node* sv,
+                                Node* index1, Node* index2) :
+          CmpNode(scoped_value_cache, null_con) {
+    init_req(0, c);
     add_req(sv);
     add_req(mem);
     add_req(index1);
     add_req(index2);
+    C->add_scoped_value_get_node(this);
+  }
+
+  Node* scoped_value() const {
+    return in(3);
+  }
+
+  Node* mem() const {
+    return in(4);
+  }
+
+  Node* index1() const {
+    return in(5);
+  }
+
+  Node* index2() const {
+    return in(6);
+  }
+
+  virtual int Opcode() const;
+
+  const Type* sub(const Type* type, const Type* type1) const {
+    return CmpNode::bottom_type();
+  }
+  void set_profile_data(uint i, float cnt, float prob) {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    _profile_data[i]._cnt = cnt;
+    _profile_data[i]._prob = prob;
+  }
+
+ float prob(uint i) const {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    return _profile_data[i]._prob;
+  }
+
+ float cnt(uint i) const {
+    assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
+    return _profile_data[i]._cnt;
   }
 };
 

@@ -36,6 +36,7 @@
 #include "opto/callnode.hpp"
 #include "opto/castnode.hpp"
 #include "opto/cfgnode.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/parse.hpp"
 #include "opto/rootnode.hpp"
 #include "opto/runtime.hpp"
@@ -1051,37 +1052,46 @@ public:
     scoped_value_cache->set_req(0, C->top());
     C->record_for_igvn(scoped_value_cache);
 
-    GetFromSVCacheNode* get_from_cache = new GetFromSVCacheNode(C, kit.control(), kit.memory(Compile::AliasIdxRaw),
-                                                                kit.memory(TypeAryPtr::OOPS), _sv,
-                                                                first_index,
-                                                                second_index == nullptr ? C->top() : second_index);
+    Node* thread = kit.gvn().transform(new ThreadLocalNode());
+    Node* p = kit.basic_plus_adr(C->top()/*!oop*/, thread, in_bytes(JavaThread::scopedValueCache_offset()));
+    Node* cache_obj_handle =  kit.make_load(nullptr, p, p->bottom_type()->is_ptr(), T_ADDRESS, MemNode::unordered);
+    ciInstanceKlass* object_klass = ciEnv::current()->Object_klass();
+    const TypeOopPtr* etype = TypeOopPtr::make_from_klass(object_klass);
+    const TypeAry* arr0 = TypeAry::make(etype, TypeInt::POS);
+    const TypeAryPtr* objects_type = TypeAryPtr::make(TypePtr::BotPTR, arr0, nullptr, true, 0);
+    Node* scoped_value_cache_load = kit.access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE);
+
+    ScopedValueGetHitsInCacheNode* sv_hits_in_cache = new ScopedValueGetHitsInCacheNode(C, kit.control(),
+                                                                                        scoped_value_cache_load,
+                                                                                        kit.gvn().makecon(TypePtr::NULL_PTR),
+                                                                                        kit.memory(TypeAryPtr::OOPS),
+                                                                                        _sv,
+                                                                                        first_index,
+                                                                                        second_index == nullptr ? C->top() : second_index);
+
     float get_cache_prob = get_cache_iff->_prob;
     BoolNode* get_cache_bool = get_cache_iff->in(1)->as_Bool();
     if (get_cache_prob != PROB_UNKNOWN && !get_cache_bool->_test.is_canonical()) {
       get_cache_prob = 1 - get_cache_prob;
     }
-    get_from_cache->set_profile_data(0, get_cache_iff->_fcnt, get_cache_prob);
+    sv_hits_in_cache->set_profile_data(0, get_cache_iff->_fcnt, get_cache_prob);
     float get_first_prob = get_first_iff->_prob;
     if (get_first_prob != PROB_UNKNOWN && !get_first_iff->in(1)->as_Bool()->_test.is_canonical()) {
       get_first_prob = 1 - get_first_prob;
     }
-    get_from_cache->set_profile_data(1, get_first_iff->_fcnt, get_first_prob);
+    sv_hits_in_cache->set_profile_data(1, get_first_iff->_fcnt, get_first_prob);
     float get_second_prob = 0;
     if (get_second_iff != nullptr) {
       get_second_prob = get_second_iff->_prob;
       if (get_second_prob != PROB_UNKNOWN && !get_second_iff->in(1)->as_Bool()->_test.is_canonical()) {
         get_second_prob = 1 - get_second_prob;
       }
-      get_from_cache->set_profile_data(2, get_second_iff->_fcnt, get_second_prob);
+      sv_hits_in_cache->set_profile_data(2, get_second_iff->_fcnt, get_second_prob);
     } else {
-      get_from_cache->set_profile_data(2, 0, 0);
+      sv_hits_in_cache->set_profile_data(2, 0, 0);
     }
-    Node* transformed_get_from_cache = kit.gvn().transform(get_from_cache);
-    assert(transformed_get_from_cache == get_from_cache, "");
-
-    Node* hits_in_the_cache = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::HitsInTheCache));
-    Node* cache_value = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::CachedValue));
-    Node* scoped_valued_cache = kit.gvn().transform(new ProjNode(get_from_cache, GetFromSVCacheNode::ScopedValueCache));
+    Node* sv_hits_in_cachex = kit.gvn().transform(sv_hits_in_cache);
+    assert(sv_hits_in_cachex == sv_hits_in_cache, "");
 
     float prob;
     // get_cache_prob: probability that cache array is not null
@@ -1095,13 +1105,12 @@ public:
     }
     tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
 
-    Node* cmp = kit.gvn().transform(new CmpINode(hits_in_the_cache, kit.gvn().intcon(1)));
-    Node* bol = kit.gvn().transform(new BoolNode(cmp, BoolTest::ne));
+    Node* bol = kit.gvn().transform(new BoolNode(sv_hits_in_cache, BoolTest::ne));
     IfNode* iff = new IfNode(kit.control(), bol, prob, get_cache_iff->_fcnt);
     Node* transformed_iff = kit.gvn().transform(iff);
     assert(transformed_iff == iff, "");
-    Node* not_in_cache = kit.gvn().transform(new IfTrueNode(iff));
-    Node* in_cache = kit.gvn().transform(new IfFalseNode(iff));
+    Node* not_in_cache = kit.gvn().transform(new IfFalseNode(iff));
+    Node* in_cache = kit.gvn().transform(new IfTrueNode(iff));
     Node* r = new RegionNode(3);
     Node* phi_cache_value = new PhiNode(r, TypeInstPtr::BOTTOM);
 //    Node* phi_cache_hit = new PhiNode(r, TypeInt::BOOL);
@@ -1109,7 +1118,7 @@ public:
     Node* phi_io = new PhiNode(r, Type::ABIO);
 
     C->gvn_replace_by(scoped_value_cache_projs.fallthrough_catchproj, not_in_cache);
-    C->gvn_replace_by(scoped_value_cache_projs.resproj, scoped_valued_cache);
+    C->gvn_replace_by(scoped_value_cache_projs.resproj, scoped_value_cache_load);
 
     if (slow_call == nullptr) {
 //      ProjNode* get_cache_failure_proj = get_cache_iff->proj_out(get_cache_bool->_test._test == BoolTest::ne ? 0 : 1);
@@ -1135,6 +1144,8 @@ public:
 //      phi_cache_hit->init_req(1, kit.gvn().intcon(0));
     }
     r->init_req(2, in_cache);
+
+    Node* cache_value = kit.gvn().transform(new ScopedValueGetLoadFromCacheNode(C, in_cache, sv_hits_in_cache));
     phi_cache_value->init_req(2, cache_value);
 //    phi_cache_hit->init_req(2, _gvn.intcon(1));
     phi_mem->init_req(2, kit.reset_memory());

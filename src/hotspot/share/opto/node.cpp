@@ -619,7 +619,7 @@ void Node::destruct(PhaseValues* phase) {
   if (for_post_loop_opts_igvn()) {
     compile->remove_from_post_loop_opts_igvn(this);
   }
-  if (Opcode() == Op_GetFromSVCache || Opcode() == Op_ScopedValueGetResult) {
+  if (Opcode() == Op_ScopedValueGetHitsInCache || Opcode() == Op_ScopedValueGetLoadFromCache || Opcode() == Op_ScopedValueGetResult) {
     compile->remove_scoped_value_get_node(this);
   }
 
