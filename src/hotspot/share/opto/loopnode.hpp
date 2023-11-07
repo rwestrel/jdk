@@ -701,9 +701,9 @@ public:
 
   // Return TRUE or FALSE if the loop should be peeled or not. Peel if we can
   // move some loop-invariant test (usually a null-check) before the loop.
-  bool policy_peeling(PhaseIdealLoop *phase);
+  bool policy_peeling(PhaseIdealLoop* phase, bool scoped_value_only);
 
-  uint estimate_peeling(PhaseIdealLoop *phase);
+  uint estimate_peeling(PhaseIdealLoop* phase, bool scoped_value_only);
 
   // Return TRUE or FALSE if the loop should be maximally unrolled. Stash any
   // known trip count in the counted loop node.
@@ -1740,7 +1740,9 @@ public:
   void test_and_load_from_cache(Node* load_of_cache, Node* mem, Node* index, Node* c, float prob, float cnt,
                                 Node* sv, Node*& failure, Node*& hit, Node*& res);
 
-//  GetFromSVCacheNode* is_get_from_sv_cache_if(const Node* n) const;
+  ScopedValueGetHitsInCacheNode* is_get_from_sv_cache_if(const Node* n) const;
+
+  bool is_uncommon_trap_if_pattern(IfProjNode* proj);
 };
 
 

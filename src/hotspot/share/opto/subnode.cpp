@@ -1965,3 +1965,13 @@ Node* ReverseLNode::Identity(PhaseGVN* phase) {
   }
   return this;
 }
+
+const Type* ScopedValueGetHitsInCacheNode::Value(PhaseGVN* phase) const {
+  if (phase->is_IterGVN()) {
+    if (load_from_cache() == nullptr) {
+      return TypeInt::CC_GT;
+    }
+  }
+  return SubNode::Value(phase);
+}
+

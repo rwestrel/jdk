@@ -511,6 +511,10 @@ Node *Node::clone() const {
   if (n->is_ParsePredicate()) {
     C->add_parse_predicate(n->as_ParsePredicate());
   }
+  if (/*Opcode() == Op_ScopedValueGetLoadFromCache || */Opcode() == Op_ScopedValueGetHitsInCache ||
+      Opcode() == Op_ScopedValueGetResult) {
+    C->add_scoped_value_get_node(n);
+  }
 
   BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
   bs->register_potential_barrier_node(n);
@@ -977,7 +981,7 @@ Node* Node::find_out_with(int opcode) {
   return nullptr;
 }
 
-Node* Node::find_unique_out_with(int opcode) {
+Node* Node::find_unique_out_with(int opcode) const {
   Node* res = nullptr;
   for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
     Node* use = fast_out(i);
@@ -1468,7 +1472,11 @@ static void kill_dead_code( Node *dead, PhaseIterGVN *igvn ) {
             // store/store and store/load to the same address.
             // The restriction (outcnt() <= 2) is the same as in set_req_X()
             // and remove_globally_dead_node().
-            igvn->add_users_to_worklist( n );
+            igvn->add_users_to_worklist(n);
+          } else if (n->Opcode() == Op_ScopedValueGetResult && ((ScopedValueGetResultNode*)n)->result_out() == nullptr) {
+            igvn->_worklist.push(n);
+          } else if (n->Opcode() == Op_ScopedValueGetHitsInCache && ((ScopedValueGetHitsInCacheNode*)n)->load_from_cache() == nullptr) {
+            igvn->_worklist.push(n);
           } else {
             BarrierSet::barrier_set()->barrier_set_c2()->enqueue_useful_gc_barrier(igvn, n);
           }

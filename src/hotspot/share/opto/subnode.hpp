@@ -297,6 +297,7 @@ public:
   virtual uint ideal_reg() const { return Op_RegI; }
 };
 
+class ScopedValueGetLoadFromCacheNode;
 class ScopedValueGetHitsInCacheNode : public CmpNode {
 private:
   struct {
@@ -305,36 +306,53 @@ private:
   } _profile_data[3];
 
   virtual uint size_of() const { return sizeof(*this); }
+  uint hash() const { return NO_HASH; }
 
 public:
+  enum {
+      ScopedValue = 3,
+      Memory,
+      Index1,
+      Index2
+  };
+
   ScopedValueGetHitsInCacheNode(Compile* C, Node* c, Node* scoped_value_cache, Node* null_con, Node* mem, Node* sv,
                                 Node* index1, Node* index2) :
           CmpNode(scoped_value_cache, null_con) {
     init_req(0, c);
+    assert(req() == ScopedValue, "");
     add_req(sv);
+    assert(req() == Memory, "");
     add_req(mem);
+    assert(req() == Index1, "");
     add_req(index1);
+    assert(req() == Index2, "");
     add_req(index2);
     C->add_scoped_value_get_node(this);
   }
 
   Node* scoped_value() const {
-    return in(3);
+    return in(ScopedValue);
   }
 
   Node* mem() const {
-    return in(4);
+    return in(Memory);
   }
 
   Node* index1() const {
-    return in(5);
+    return in(Index1);
   }
 
   Node* index2() const {
-    return in(6);
+    return in(Index2);
+  }
+
+  ScopedValueGetLoadFromCacheNode* load_from_cache() const {
+    return (ScopedValueGetLoadFromCacheNode*)find_unique_out_with(Op_ScopedValueGetLoadFromCache);
   }
 
   virtual int Opcode() const;
+
 
   const Type* sub(const Type* type, const Type* type1) const {
     return CmpNode::bottom_type();
@@ -354,6 +372,8 @@ public:
     assert(i < sizeof(_profile_data) / sizeof(_profile_data[0]), "");
     return _profile_data[i]._cnt;
   }
+
+  const Type* Value(PhaseGVN* phase) const override;
 };
 
 //------------------------------BoolTest---------------------------------------

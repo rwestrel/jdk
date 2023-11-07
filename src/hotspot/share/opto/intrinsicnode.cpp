@@ -375,3 +375,4 @@ Node* ScopedValueGetLoadFromCacheNode::scoped_value() const {
   assert(hits_in_cache->Opcode() == Op_ScopedValueGetHitsInCache, "");
   return ((ScopedValueGetHitsInCacheNode*)hits_in_cache)->scoped_value();
 }
+

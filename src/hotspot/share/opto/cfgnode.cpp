@@ -3053,3 +3053,16 @@ void BlackholeNode::format(PhaseRegAlloc* ra, outputStream* st) const {
 }
 #endif
 
+Node* ScopedValueGetResultNode::Ideal(PhaseGVN* phase, bool can_reshape) {
+  if (can_reshape) {
+    Node* r_out = result_out();
+    if (r_out == nullptr) {
+      Node* c_out = control_out();
+      Node* c_in = in(0);
+      PhaseIterGVN* igvn = phase->is_IterGVN();
+      igvn->replace_node(c_out, c_in);
+      return phase->C->top();
+    }
+  }
+  return nullptr;
+}

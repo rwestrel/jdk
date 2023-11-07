@@ -2164,21 +2164,23 @@ void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
       Node* sv = call->in(TypeFunc::Parms);
       Node* control_out = projs.fallthrough_catchproj;
       Node* res = projs.resproj;
-      control_out = control_out->clone();
-      res = res->clone();
-      ScopedValueGetResultNode* sv_get_result = new ScopedValueGetResultNode(C, control_out, sv, res);
-      Node* sv_get_resultx = gvn->transform(sv_get_result);
-      assert(sv_get_resultx == sv_get_result, "");
-      Node* control_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::ControlOut));
-      Node* res_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::Result));
+      if (res != nullptr) {
+        control_out = control_out->clone();
+        res = res->clone();
+        ScopedValueGetResultNode* sv_get_result = new ScopedValueGetResultNode(C, control_out, sv, res);
+        Node* sv_get_resultx = gvn->transform(sv_get_result);
+        assert(sv_get_resultx == sv_get_result, "");
+        Node* control_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::ControlOut));
+        Node* res_proj = gvn->transform(new ProjNode(sv_get_result, ScopedValueGetResultNode::Result));
 
-      C->gvn_replace_by(projs.fallthrough_catchproj, control_proj);
-      C->gvn_replace_by(projs.resproj, res_proj);
+        C->gvn_replace_by(projs.fallthrough_catchproj, control_proj);
+        C->gvn_replace_by(projs.resproj, res_proj);
 
-      Node* control_projx = gvn->transform(control_proj);
-      assert(control_projx == control_proj, "");
-      Node* res_projx = gvn->transform(res_proj);
-      assert(res_projx == res_proj, "");
+        Node* control_projx = gvn->transform(control_proj);
+        assert(control_projx == control_proj, "");
+        Node* res_projx = gvn->transform(res_proj);
+        assert(res_projx == res_proj, "");
+      }
 
       C->print_method(PHASE_DEBUG, 2);
 

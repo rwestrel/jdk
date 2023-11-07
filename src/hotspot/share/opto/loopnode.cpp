@@ -4650,9 +4650,21 @@ void PhaseIdealLoop::build_and_optimize() {
         Node* n = C->scoped_value_get_node(i - 1);
         if (n->Opcode() == Op_ScopedValueGetResult) {
           ScopedValueGetResultNode* get_result = (ScopedValueGetResultNode*) n;
-          _igvn.replace_node(get_result->result_out(), get_result->in(ScopedValueGetResultNode::GetResult));
+          Node* result_out = get_result->result_out();
+          Node* result_in = get_result->in(ScopedValueGetResultNode::GetResult);
+          if (result_out != nullptr) {
+            _igvn.replace_node(result_out, result_in);
+          } else {
+            _igvn.replace_input_of(get_result, ScopedValueGetResultNode::GetResult, C->top());
+          }
           lazy_replace(get_result->control_out(), get_result->in(ScopedValueGetResultNode::Control));
-        } else if (n->Opcode() == Op_ScopedValueGetHitsInCache) {
+        }
+        C->set_major_progress();
+        C->set_needs_split_if(true);
+      }
+      for (int i = C->scoped_value_get_count(); i > 0; i--) {
+        Node* n = C->scoped_value_get_node(i - 1);
+        if (n->Opcode() == Op_ScopedValueGetHitsInCache) {
           ScopedValueGetHitsInCacheNode* get_from_cache = (ScopedValueGetHitsInCacheNode*) n;
           expand_get_from_sv_cache(get_from_cache);
         }

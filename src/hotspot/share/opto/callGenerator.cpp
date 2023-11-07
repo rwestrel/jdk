@@ -818,7 +818,7 @@ class LateInlineScopedValueCallGenerator : public LateInlineCallGenerator {
 
 public:
   LateInlineScopedValueCallGenerator(ciMethod* method, CallGenerator* inline_cg) :
-          LateInlineCallGenerator(method, inline_cg), _sv(nullptr) {}
+          LateInlineCallGenerator(method, inline_cg, true), _sv(nullptr) {}
 
   virtual JVMState* generate(JVMState* jvms) {
     Compile *C = Compile::current();
@@ -1106,7 +1106,7 @@ public:
     tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
 
     Node* bol = kit.gvn().transform(new BoolNode(sv_hits_in_cache, BoolTest::ne));
-    IfNode* iff = new IfNode(kit.control(), bol, prob, get_cache_iff->_fcnt);
+    IfNode* iff = new IfNode(kit.control(), bol, 1-prob, get_cache_iff->_fcnt);
     Node* transformed_iff = kit.gvn().transform(iff);
     assert(transformed_iff == iff, "");
     Node* not_in_cache = kit.gvn().transform(new IfFalseNode(iff));

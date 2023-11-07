@@ -745,6 +745,8 @@ public:
   Node* result_in() const {
     return in(GetResult);
   }
+
+  Node* Ideal(PhaseGVN* phase, bool can_reshape) override;
 };
 
 #endif // SHARE_OPTO_CFGNODE_HPP

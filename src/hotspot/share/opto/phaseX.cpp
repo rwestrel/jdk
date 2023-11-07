@@ -1347,6 +1347,10 @@ void PhaseIterGVN::remove_globally_dead_node( Node *dead ) {
                 }
                 assert(!(i < imax), "sanity");
               }
+            } else if (in->Opcode() == Op_ScopedValueGetResult && ((ScopedValueGetResultNode*)in)->result_out() == nullptr) {
+              _worklist.push(in);
+            } else if (in->Opcode() == Op_ScopedValueGetHitsInCache && ((ScopedValueGetHitsInCacheNode*)in)->load_from_cache() == nullptr) {
+              _worklist.push(in);
             } else {
               BarrierSet::barrier_set()->barrier_set_c2()->enqueue_useful_gc_barrier(this, in);
             }
@@ -2302,7 +2306,11 @@ void Node::set_req_X( uint i, Node *n, PhaseIterGVN *igvn ) {
     default:
       break;
     }
-
+    if (old->Opcode() == Op_ScopedValueGetResult && ((ScopedValueGetResultNode*)old)->result_out() == nullptr) {
+      igvn->_worklist.push(old);
+    } else if (old->Opcode() == Op_ScopedValueGetHitsInCache && ((ScopedValueGetHitsInCacheNode*)old)->load_from_cache() == nullptr) {
+      igvn->_worklist.push(old);
+    }
     BarrierSet::barrier_set()->barrier_set_c2()->enqueue_useful_gc_barrier(igvn, old);
   }
 }

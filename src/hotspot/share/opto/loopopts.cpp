@@ -33,6 +33,7 @@
 #include "opto/connode.hpp"
 #include "opto/castnode.hpp"
 #include "opto/divnode.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/loopnode.hpp"
 #include "opto/matcher.hpp"
 #include "opto/mulnode.hpp"
@@ -1586,49 +1587,72 @@ void PhaseIdealLoop::split_if_with_blocks_post(Node *n) {
 
   try_move_store_after_loop(n);
 
-//  GetFromSVCacheNode* get_from_sv_cache = is_get_from_sv_cache_if(n);
-//  ScopedValueGetResultNode* sv_get_result = (n->Opcode() == Op_ScopedValueGetResult) ? (ScopedValueGetResultNode*) n : nullptr;
-//  if (sv_get_result != nullptr ||
-//      get_from_sv_cache != nullptr) {
-//    Node* sv = sv_get_result != nullptr ? sv_get_result->scoped_value() : get_from_sv_cache->scoped_value();
-//    Node* cutoff = get_ctrl(sv);
-//    Node *prevdom = n;
-//    Node *dom = idom(prevdom);
-//
-//    while (dom != cutoff) {
-//      GetFromSVCacheNode* get_from_sv_cache_dom = is_get_from_sv_cache_if(dom);
-//      if (get_from_sv_cache_dom != nullptr && get_from_sv_cache_dom->scoped_value() == sv &&
-//          prevdom->in(0) == dom) {
-//        assert(dom->in(1)->as_Bool()->_test._test == BoolTest::ne, "");
-//        assert(dom->in(1)->in(1)->in(2)->find_int_con(-1) == 1, "");
-//        if (prevdom->is_IfFalse()) {
-//          if (sv_get_result != nullptr) {
-//            lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
-//            _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
-//          } else {
-//            assert(get_from_sv_cache != nullptr, "");
-//            _igvn.replace_node(get_from_sv_cache->cached_value(), get_from_sv_cache_dom->cached_value());
+  ScopedValueGetHitsInCacheNode* get_from_sv_cache = is_get_from_sv_cache_if(n);
+  ScopedValueGetResultNode* sv_get_result = (n->Opcode() == Op_ScopedValueGetResult) ? (ScopedValueGetResultNode*) n : nullptr;
+  if (sv_get_result != nullptr ||
+      get_from_sv_cache != nullptr) {
+    Node* sv = sv_get_result != nullptr ? sv_get_result->scoped_value() : get_from_sv_cache->scoped_value();
+    Node* cutoff = get_ctrl(sv);
+    Node *prevdom = n;
+    Node *dom = idom(prevdom);
+
+    while (dom != cutoff) {
+      ScopedValueGetHitsInCacheNode* get_from_sv_cache_dom = is_get_from_sv_cache_if(dom);
+      if (get_from_sv_cache_dom != nullptr && get_from_sv_cache_dom->scoped_value() == sv &&
+          prevdom->in(0) == dom) {
+        assert(dom->in(1)->as_Bool()->_test._test == BoolTest::ne, "");
+        if (prevdom->is_IfTrue()) {
+          if (sv_get_result != nullptr) {
+            lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
+            _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
+          } else {
+            assert(get_from_sv_cache != nullptr, "");
+            Node* load_from_cache = get_from_sv_cache->load_from_cache();
+            Node* load_from_cache_dom = get_from_sv_cache_dom->load_from_cache();
+            _igvn.replace_node(get_from_sv_cache, get_from_sv_cache_dom);
+            if (load_from_cache != nullptr && load_from_cache_dom != nullptr) {
+              _igvn.replace_node(load_from_cache, load_from_cache_dom);
+            }
 //            Node* one = _igvn.intcon(1);
 //            set_ctrl(one, C->root());
 //            _igvn.replace_node(get_from_sv_cache->hits_in_the_cache(), one);
-//          }
-//          C->set_major_progress();
-//          return;
-//        }
-//      }
-//      prevdom = dom;
-//      dom = idom(prevdom);
-//    }
-//  }
+            dominated_by(prevdom->as_IfProj(), n->as_If(), false, false);
+          }
+          C->set_major_progress();
+          return;
+        }
+      }
+      if (dom->Opcode() == Op_ScopedValueGetResult && ((ScopedValueGetResultNode*)dom)->scoped_value() == sv) {
+        ScopedValueGetResultNode* sv_get_result_dom = (ScopedValueGetResultNode*) dom;
+        if (sv_get_result != nullptr) {
+          lazy_replace(sv_get_result->control_out(), sv_get_result->in(0));
+          _igvn.replace_node(sv_get_result->result_out(), sv_get_result->in(ScopedValueGetResultNode::GetResult));
+        } else {
+          assert(get_from_sv_cache != nullptr, "");
+          Node* one = _igvn.intcon(1);
+          set_ctrl(one, C->root());
+          _igvn.replace_input_of(n, 1, one);
+          Node* load_from_cache = get_from_sv_cache->load_from_cache();
+          if (load_from_cache != nullptr) {
+            _igvn.replace_node(load_from_cache, sv_get_result_dom->result_out());
+          }
+        }
+        C->set_major_progress();
+        return;
+      }
+      prevdom = dom;
+      dom = idom(prevdom);
+    }
+  }
 }
 
-//GetFromSVCacheNode* PhaseIdealLoop::is_get_from_sv_cache_if(const Node* n) const {
-//  if (n->is_If() && n->in(1)->is_Bool() && n->in(1)->in(1)->Opcode() == Op_CmpI &&
-//      n->in(1)->in(1)->in(1)->is_Proj() && n->in(1)->in(1)->in(1)->in(0)->Opcode() == Op_GetFromSVCache) {
-//    return (GetFromSVCacheNode*)n->in(1)->in(1)->in(1)->in(0);
-//  }
-//  return nullptr;
-//}
+ScopedValueGetHitsInCacheNode* PhaseIdealLoop::is_get_from_sv_cache_if(const Node* n) const {
+  if (n->is_If() && n->in(1)->is_Bool() &&
+      n->in(1)->in(1)->Opcode() == Op_ScopedValueGetHitsInCache) {
+    return (ScopedValueGetHitsInCacheNode*)n->in(1)->in(1);
+  }
+  return nullptr;
+}
 
 // Transform:
 //
@@ -4524,92 +4548,117 @@ void PhaseIdealLoop::move_unordered_reduction_out_of_loop(IdealLoopTree* loop) {
 }
 
 void PhaseIdealLoop::expand_get_from_sv_cache(ScopedValueGetHitsInCacheNode* get_from_cache) {
+#ifdef ASSERT
+  for (DUIterator_Fast imax, i = get_from_cache->fast_outs(imax); i < imax; i++) {
+    Node* u = get_from_cache->fast_out(i);
+    assert(u->is_Bool() || u->Opcode() == Op_ScopedValueGetLoadFromCache, "");
+  }
+#endif
   BoolNode* bol = get_from_cache->find_unique_out_with(Op_Bool)->as_Bool();
   assert(bol->_test._test == BoolTest::ne, "");
+  for (DUIterator_Fast imax, i = bol->fast_outs(imax); i < imax; i++) {
+    Node* u = bol->fast_out(i);
 
-  IfNode* iff = bol->unique_ctrl_out()->as_If();
-  ProjNode* success = iff->proj_out(1);
-  ProjNode* failure = iff->proj_out(0);
-
-  Node* load_of_cache = get_from_cache->in(1);
-
-  Node* null_ptr = get_from_cache->in(2);
-  Node* cache_not_null_cmp = new CmpPNode(load_of_cache, null_ptr);
-  _igvn.register_new_node_with_optimizer(cache_not_null_cmp);
-  Node* cache_not_null_bol = new BoolNode(cache_not_null_cmp, BoolTest::ne);
-  _igvn.register_new_node_with_optimizer(cache_not_null_bol);
-  set_subtree_ctrl(cache_not_null_bol, true);
-  IfNode* cache_not_null_iff = new IfNode(iff->in(0), cache_not_null_bol, get_from_cache->prob(0), get_from_cache->cnt(0));
-  IdealLoopTree* loop = get_loop(iff->in(0));
-  register_control(cache_not_null_iff, loop, iff->in(0));
-  Node* cache_not_null_proj = new IfTrueNode(cache_not_null_iff);
-  register_control(cache_not_null_proj, loop, cache_not_null_iff);
-  Node* cache_null_proj = new IfFalseNode(cache_not_null_iff);
-  register_control(cache_null_proj, loop, cache_not_null_iff);
-
-  Node* not_null_load_of_cache = new CastPPNode(load_of_cache, _igvn.type(load_of_cache)->join(TypePtr::NOTNULL));
-  not_null_load_of_cache->set_req(0, cache_not_null_proj);
-  register_new_node(not_null_load_of_cache, cache_not_null_proj);
-
-  Node* mem2 = get_from_cache->mem();
-  Node* first_index = get_from_cache->index1();
-  Node* second_index = get_from_cache->index2();
-
-  Node* sv = get_from_cache->scoped_value();
-  Node* hit_proj = nullptr;
-  Node* failure_proj = nullptr;
-  Node* res = nullptr;
-  Node* success_region = new RegionNode(3);
-  Node* success_phi = new PhiNode(success_region, TypeInstPtr::BOTTOM);
-  Node* failure_region = new RegionNode(3);
-  float first_prob = get_from_cache->prob(1);
-  float first_cnt = get_from_cache->cnt(1);
-  float second_prob = get_from_cache->prob(2);
-  if (first_prob != PROB_UNKNOWN && second_prob != PROB_UNKNOWN) {
-    second_prob = (1 - first_prob) * second_prob;
-  }
-  float second_cnt = get_from_cache->cnt(2);
-
-  if (second_index != C->top() && second_prob < first_prob) {
-    swap(first_index, second_index);
-    swap(first_prob, second_prob);
-    second_prob = (1- first_prob) * second_prob;
-    if (first_cnt != COUNT_UNKNOWN && first_prob != PROB_UNKNOWN) {
-      second_cnt = first_cnt * first_prob;
+    if (!u->is_If()) {
+      continue;
     }
-  }
+    IfNode* iff = u->as_If();
+    ProjNode* success = iff->proj_out(1);
+    ProjNode* failure = iff->proj_out(0);
 
-  test_and_load_from_cache(not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
-                           first_prob, first_cnt, sv, failure_proj, hit_proj, res);
-  Node* success_region_dom = hit_proj;
-  success_region->init_req(1, hit_proj);
-  success_phi->init_req(1, res);
-  if (second_index != C->top()) {
-    test_and_load_from_cache(not_null_load_of_cache, mem2, second_index, failure_proj,
-                             second_prob, second_cnt, sv, failure_proj, hit_proj, res);
+    Node* load_from_cache = success->find_unique_out_with(Op_ScopedValueGetLoadFromCache);
+
+    if (load_from_cache == nullptr) {
+      Node* one = _igvn.intcon(1);
+      set_ctrl(one, C->root());
+      _igvn.replace_input_of(iff, 1, one);
+      --i; --imax;
+      continue;
+    }
+    assert(load_from_cache->in(1) == get_from_cache, "");
+
+    Node* load_of_cache = get_from_cache->in(1);
+
+    Node* null_ptr = get_from_cache->in(2);
+    Node* cache_not_null_cmp = new CmpPNode(load_of_cache, null_ptr);
+    _igvn.register_new_node_with_optimizer(cache_not_null_cmp);
+    Node* cache_not_null_bol = new BoolNode(cache_not_null_cmp, BoolTest::ne);
+    _igvn.register_new_node_with_optimizer(cache_not_null_bol);
+    set_subtree_ctrl(cache_not_null_bol, true);
+    IfNode* cache_not_null_iff = new IfNode(iff->in(0), cache_not_null_bol, get_from_cache->prob(0),
+                                            get_from_cache->cnt(0));
+    IdealLoopTree* loop = get_loop(iff->in(0));
+    register_control(cache_not_null_iff, loop, iff->in(0));
+    Node* cache_not_null_proj = new IfTrueNode(cache_not_null_iff);
+    register_control(cache_not_null_proj, loop, cache_not_null_iff);
+    Node* cache_null_proj = new IfFalseNode(cache_not_null_iff);
+    register_control(cache_null_proj, loop, cache_not_null_iff);
+
+    Node* not_null_load_of_cache = new CastPPNode(load_of_cache, _igvn.type(load_of_cache)->join(TypePtr::NOTNULL));
+    not_null_load_of_cache->set_req(0, cache_not_null_proj);
+    register_new_node(not_null_load_of_cache, cache_not_null_proj);
+
+    Node* mem2 = get_from_cache->mem();
+    Node* first_index = get_from_cache->index1();
+    Node* second_index = get_from_cache->index2();
+
+    Node* sv = get_from_cache->scoped_value();
+    Node* hit_proj = nullptr;
+    Node* failure_proj = nullptr;
+    Node* res = nullptr;
+    Node* success_region = new RegionNode(3);
+    Node* success_phi = new PhiNode(success_region, TypeInstPtr::BOTTOM);
+    Node* failure_region = new RegionNode(3);
+    float first_prob = get_from_cache->prob(1);
+    float first_cnt = get_from_cache->cnt(1);
+    float second_prob = get_from_cache->prob(2);
+    if (first_prob != PROB_UNKNOWN && second_prob != PROB_UNKNOWN) {
+      second_prob = (1 - first_prob) * second_prob;
+    }
+    float second_cnt = get_from_cache->cnt(2);
+
+    if (second_index != C->top() && second_prob < first_prob) {
+      swap(first_index, second_index);
+      swap(first_prob, second_prob);
+      second_prob = (1 - first_prob) * second_prob;
+      if (first_cnt != COUNT_UNKNOWN && first_prob != PROB_UNKNOWN) {
+        second_cnt = first_cnt * first_prob;
+      }
+    }
+
+    test_and_load_from_cache(not_null_load_of_cache, mem2, first_index, cache_not_null_proj,
+                             first_prob, first_cnt, sv, failure_proj, hit_proj, res);
+    Node* success_region_dom = hit_proj;
+    success_region->init_req(1, hit_proj);
+    success_phi->init_req(1, res);
+    if (second_index != C->top()) {
+      test_and_load_from_cache(not_null_load_of_cache, mem2, second_index, failure_proj,
+                               second_prob, second_cnt, sv, failure_proj, hit_proj, res);
 //    if (second_never_succeeds) {
 //
 //    } else {
-    success_region->init_req(2, hit_proj);
+      success_region->init_req(2, hit_proj);
 //    }
-    success_phi->init_req(2, res);
-    success_region_dom = success_region_dom->in(0);
-  }
+      success_phi->init_req(2, res);
+      success_region_dom = success_region_dom->in(0);
+    }
 
-  failure_region->init_req(1, cache_null_proj);
-  failure_region->init_req(2, failure_proj);
+    failure_region->init_req(1, cache_null_proj);
+    failure_region->init_req(2, failure_proj);
 
-  register_control(success_region, loop, success_region_dom);
-  register_control(failure_region, loop, cache_not_null_iff);
-  register_new_node(success_phi, success_region);
+    register_control(success_region, loop, success_region_dom);
+    register_control(failure_region, loop, cache_not_null_iff);
+    register_new_node(success_phi, success_region);
 
-  Node* failure_path = failure->unique_ctrl_out();
+    Node* failure_path = failure->unique_ctrl_out();
 
-  lazy_replace(success, success_region);
-  lazy_replace(failure, failure_region);
-  _igvn.replace_node(get_from_cache->find_unique_out_with(Op_ScopedValueGetLoadFromCache), success_phi);
-  _igvn.replace_node(get_from_cache, C->top());
+    lazy_replace(success, success_region);
+    lazy_replace(failure, failure_region);
+    _igvn.replace_node(load_from_cache, success_phi);
 //  _igvn.replace_node(scoped_value_cache, load_of_cache);
+    --i; --imax;
+  }
+  _igvn.replace_node(get_from_cache, C->top());
 }
 
 void
@@ -4662,3 +4711,4 @@ PhaseIdealLoop::test_and_load_from_cache(Node* load_of_cache, Node* mem, Node* i
   res = bs->load_at(access_res, TypeAryPtr::OOPS->elem());
   set_subtree_ctrl(res, true);
 }
+
