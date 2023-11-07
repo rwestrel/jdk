@@ -545,16 +545,16 @@ private:
                           Unique_Node_List &reducible_merges);
 
   // Helper methods for unique types split.
-//  bool split_AddP(Node *addp, Node *base);
+  bool split_AddP(Node *addp, Node *base);
 
-//  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
-//  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
+  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
+  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
 
-//  void  move_inst_mem(Node* n, GrowableArray<PhiNode *>  &_orig_phis);
-//  Node* find_inst_mem(Node* mem, int alias_idx,GrowableArray<PhiNode *>  &orig_phi_worklist);
-//  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
+  void  move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis);
+  Node* find_inst_mem(Node* mem, int alias_idx,GrowableArray<PhiNode *>  &orig_phi_worklist);
+  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
 
-//  Node_Array _node_map; // used for bookkeeping during type splitting
+  Node_Array _node_map; // used for bookkeeping during type splitting
                         // Used for the following purposes:
                         // Memory Phi    - most recent unique Phi split out
                         //                 from this Phi
@@ -564,17 +564,17 @@ private:
 
   // manage entries in _node_map
 
-//  void  set_map(Node* from, Node* to)  {
-//    ideal_nodes.push(from);
-//    _node_map.map(from->_idx, to);
-//  }
-//
-//  Node* get_map(int idx) { return _node_map[idx]; }
-//
-//  PhiNode* get_map_phi(int idx) {
-//    Node* phi = _node_map[idx];
-//    return (phi == nullptr) ? nullptr : phi->as_Phi();
-//  }
+  void  set_map(Node* from, Node* to)  {
+    ideal_nodes.push(from);
+    _node_map.map(from->_idx, to);
+  }
+
+  Node* get_map(int idx) { return _node_map[idx]; }
+
+  PhiNode* get_map_phi(int idx) {
+    Node* phi = _node_map[idx];
+    return (phi == nullptr) ? nullptr : phi->as_Phi();
+  }
 
   // Returns true if there is an object in the scope of sfn that does not escape globally.
   bool has_ea_local_in_scope(SafePointNode* sfn);
@@ -690,73 +690,5 @@ inline FieldNode::FieldNode(ConnectionGraph *CG, Node* n, EscapeState es, int of
   _offset(offs), _is_oop(is_oop),
   _has_unknown_base(false) {
 }
-
-class SplitUniqueTypes : public StackObj {
-private:
-  Compile* C;
-  PhaseIterGVN* _igvn;
-  Unique_Node_List& _ideal_nodes; // Used by CG construction and types splitting.
-  Node_Array _node_map; // used for bookkeeping during type splitting
-  // Used for the following purposes:
-  // Memory Phi    - most recent unique Phi split out
-  //                 from this Phi
-  // MemNode       - new memory input for this node
-  // ChecCastPP    - allocation that this is a cast of
-  // allocation    - CheckCastPP of the allocation
-  const char* _failure_reason;
-  uint _nodes_size;
-  GrowableArray<PhiNode *> _orig_phis;
-  uint _new_index_start;
-  GrowableArray<Node *> _memnode_worklist;
-  VectorSet _visited;
-  GrowableArray<MergeMemNode*>& _mergemem_worklist;
-public:
-  SplitUniqueTypes(Compile* C, PhaseIterGVN* igvn, const char* failure_reason, uint nodes_size,
-                   GrowableArray<MergeMemNode*>& mergemem_worklist, Unique_Node_List& ideal_nodes) :
-          _igvn(igvn),
-          _ideal_nodes(ideal_nodes),
-          _node_map(C->comp_arena()),
-          _failure_reason(failure_reason),
-          _nodes_size(nodes_size),
-          _mergemem_worklist(mergemem_worklist) {
-    this->C = C;
-    _new_index_start = (uint)C->num_alias_types();
-  }
-
-  Node* find_inst_mem(Node *orig_mem, int alias_idx, GrowableArray<PhiNode *>  &orig_phis);
-  Node* step_through_mergemem(MergeMemNode *mmem, int alias_idx, const TypeOopPtr *toop);
-  PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
-  PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
-  void move_inst_mem(Node* n, GrowableArray<PhiNode *>  &orig_phis);
-  bool split_AddP(Node *addp, Node *base);
-  void split_unique_types();
-
-  void  set_map(Node* from, Node* to)  {
-    _ideal_nodes.push(from);
-    _node_map.map(from->_idx, to);
-  }
-
-  Node* get_map(int idx) { return _node_map[idx]; }
-
-  PhiNode* get_map_phi(int idx) {
-    Node* phi = _node_map[idx];
-    return (phi == nullptr) ? nullptr : phi->as_Phi();
-  }
-  void record_for_optimizer(Node *n) {
-    _igvn->_worklist.push(n);
-    _igvn->add_users_to_worklist(n);
-  }
-
-  uint nodes_size() const { return _nodes_size; }
-
-  void append_memnode_if_missing(Node* mem) {
-    _memnode_worklist.append_if_missing(mem);
-  }
-
-  bool visited_test_set(Node* n) {
-    return _visited.test_set(n->_idx);
-  }
-};
-
 
 #endif // SHARE_OPTO_ESCAPE_HPP

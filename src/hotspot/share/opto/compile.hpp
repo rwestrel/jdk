@@ -969,7 +969,6 @@ private:
   bool should_delay_boxing_inlining(ciMethod* call_method, JVMState* jvms);
   bool should_delay_vector_inlining(ciMethod* call_method, JVMState* jvms);
   bool should_delay_vector_reboxing_inlining(ciMethod* call_method, JVMState* jvms);
-  bool should_delay_scoped_value_inlining(ciMethod* call_method, JVMState* jvms);
 
   // Helper functions to identify inlining potential at call-site
   ciMethod* optimize_virtual_call(ciMethod* caller, ciInstanceKlass* klass,

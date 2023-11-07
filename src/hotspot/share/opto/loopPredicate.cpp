@@ -1624,7 +1624,8 @@ bool PhaseIdealLoop::is_uncommon_trap_if_pattern(IfProjNode* proj) {
   if (proj->is_uncommon_trap_if_pattern()) {
     return true;
   }
-  if (proj->in(0)->in(1)->is_Bool() && proj->in(0)->in(1)->in(1)->Opcode() == Op_ScopedValueGetHitsInCache) {
+  if (proj->in(0)->in(1)->is_Bool() && proj->in(0)->in(1)->in(1)->Opcode() == Op_ScopedValueGetHitsInCache &&
+      proj->is_multi_uncommon_trap_if_pattern()) {
     return true;
   }
   return false;

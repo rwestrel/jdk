@@ -559,14 +559,6 @@ void Type::Initialize_shared(Compile* current) {
 
   TypeNarrowKlass::NULL_PTR = TypeNarrowKlass::make( TypePtr::NULL_PTR );
 
-//const Type **fgetfromcache =(const Type**)shared_type_arena->AmallocWords(5*sizeof(Type*));
-//  fgetfromcache[0] = TypeInstPtr::BOTTOM;
-//  fgetfromcache[1] = TypeInstPtr::BOTTOM;
-//  fgetfromcache[2] = TypeInstPtr::BOTTOM;
-//  fgetfromcache[3] = TypeInstPtr::BOTTOM;
-//  fgetfromcache[4] = TypeInstPtr::BOTTOM;
-//  TypeTuple::GET_FROM_SV_CACHE = TypeTuple::make(5, fgetfromcache);
-
   mreg2type[Op_Node] = Type::BOTTOM;
   mreg2type[Op_Set ] = 0;
   mreg2type[Op_RegN] = TypeNarrowOop::BOTTOM;

@@ -669,20 +669,6 @@ public final class ScopedValue<T> {
         return new ScopedValue<T>();
     }
 
-    private enum CacheOperation {
-        GETCACHEARRAY(0),
-        GETFIRSTCACHEKEY(1),
-        GETFIRSTCACHEOBJECT(2),
-        GETSECONDCACHEKEY(3),
-        GETSECONDCACHEOBJECT(4);
-
-        private final int step;
-
-        CacheOperation(int step) {
-            this.step = step;
-        }
-    }
-
     /**
      * {@return the value of the scoped value if bound in the current thread}
      *
@@ -700,56 +686,13 @@ public final class ScopedValue<T> {
             int n = (hash & Cache.SLOT_MASK) * 2;
             if (objects[n] == this) {
                 return (T)objects[n + 1];
-            } else {
-                n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
-                if (objects[n] == this) {
-                    return (T)objects[n + 1];
-                }
+            }
+            n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
+            if (objects[n] == this) {
+                return (T)objects[n + 1];
             }
         }
         return slowGet();
-//        return slowGet();
-//        int n1 = (hash & Cache.SLOT_MASK) * 2;
-//        int n2 = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
-//        boolean cacheHit = false;
-//        Object cacheResult = null;
-//        if (getFromCache(n1, n2, CacheOperation.GETCACHEARRAY) != null) {
-//            // This code should perhaps be in class Cache. We do it
-//            // here because the generated code is small and fast and
-//            // we really want it to be inlined in the caller.
-//            if (getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEKEY) == this) {
-//                cacheHit = true;
-//                cacheResult = getFromCache(n1, n2, CacheOperation.GETFIRSTCACHEOBJECT);
-//            } else if (getFromCache(n1, n2, CacheOperation.GETSECONDCACHEKEY)== this) {
-//                cacheHit = true;
-//                cacheResult = getFromCache(n1, n2, CacheOperation.GETSECONDCACHEOBJECT);
-//            }
-//        }
-//        return slowGet(cacheHit, cacheResult);
-    }
-
-    @IntrinsicCandidate
-    private Object getFromCache(int n1, int n2, CacheOperation op) {
-        return switch (op) {
-            case GETCACHEARRAY -> scopedValueCache();
-            case GETFIRSTCACHEKEY -> {
-                Object[] objects = scopedValueCache();
-                yield objects[n1];
-            }
-
-            case GETFIRSTCACHEOBJECT -> {
-                Object[] objects = scopedValueCache();
-                yield objects[n1 + 1];
-            }
-            case GETSECONDCACHEKEY -> {
-                Object[] objects = scopedValueCache();
-                yield objects[n2];
-            }
-            case GETSECONDCACHEOBJECT -> {
-                Object[] objects = scopedValueCache();
-                yield objects[n2 + 1];
-            }
-        };
     }
 
     @SuppressWarnings("unchecked")

@@ -6276,11 +6276,10 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
   if( !chosen_loop->_child )   // Inner loop?
     chosen_loop->_body.push(n);// Collect inner loops
 
-  if (!_verify_only) {
-    if (n->Opcode() == Op_OpaqueZeroTripGuard) {
-      _zero_trip_guard_opaque_nodes.push(n);
-    }
+  if (!_verify_only && n->Opcode() == Op_OpaqueZeroTripGuard) {
+    _zero_trip_guard_opaque_nodes.push(n);
   }
+
 }
 
 #ifdef ASSERT

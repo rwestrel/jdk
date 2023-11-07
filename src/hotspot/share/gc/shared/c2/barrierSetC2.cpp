@@ -360,12 +360,6 @@ void C2Access::fixup_decorators() {
 
   _decorators = AccessInternal::decorator_fixup(_decorators, _type);
 
-//  const TypePtr* adr_type = _addr.type();
-//  if (!Compile::current()->alias_type(adr_type)->is_rewritable()) {
-//    assert(is_read, "");
-//    _decorators |= C2_IMMUTABLE_MEMORY;
-//  }
-
   if (is_read && !is_write && anonymous) {
     // To be valid, unsafe loads may depend on other conditions than
     // the one that guards them: pin the Load node
