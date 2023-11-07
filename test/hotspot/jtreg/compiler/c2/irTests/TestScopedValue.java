@@ -55,7 +55,7 @@ public class TestScopedValue {
     
     public static void main(String[] args) {
         List<String> tests = List.of("testFastPath1", "testFastPath2", "testFastPath3", "testFastPath5", "testFastPath6", "testFastPath7", "testFastPath8", "testFastPath9",
-                                     "testSlowPath1,testSlowPath2,testSlowPath3,testSlowPath4,testSlowPath5");
+                                     "testSlowPath1,testSlowPath2,testSlowPath3,testSlowPath4,testSlowPath5,testSlowPath6");
         for (String test : tests) {
             TestFramework.runWithFlags("--enable-preview", "-XX:CompileCommand=dontinline,java.lang.ScopedValue::slowGet", "-DTest=" + test);
         }
@@ -65,8 +65,8 @@ public class TestScopedValue {
     @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
     @IR(counts = {IRNode.LOAD_L, "1" })
     public static long testFastPath1() {
-        MyLong sv1 = (MyLong)sv.get();
-        MyLong sv2 = (MyLong)sv.get();
+        MyLong sv1 = sv.get();
+        MyLong sv2 = sv.get();
         return sv1.getValue() + sv2.getValue();
     }
 
@@ -74,7 +74,7 @@ public class TestScopedValue {
     private void testFastPath1Runner() throws Exception {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)sv.get();
+                    MyLong unused = sv.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath1() != 42 + 42) {
                             throw new RuntimeException();
@@ -97,9 +97,9 @@ public class TestScopedValue {
     @IR(counts = {IRNode.LOAD_L, "1" })
     public static long testFastPath2() {
         ScopedValue<MyLong> scopedValue = sv;
-        MyLong sv1 = (MyLong)scopedValue.get();
+        MyLong sv1 = scopedValue.get();
         notInlined();
-        MyLong sv2 = (MyLong)scopedValue.get();
+        MyLong sv2 = scopedValue.get();
         return sv1.getValue() + sv2.getValue();
     }
 
@@ -107,7 +107,7 @@ public class TestScopedValue {
     private void testFastPath2Runner() throws Exception {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)sv.get();
+                    MyLong unused = sv.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath2() != 42 + 42) {
                             throw new RuntimeException();
@@ -125,9 +125,9 @@ public class TestScopedValue {
     @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
     @IR(counts = {IRNode.LOAD_L, "2" })
     public static long testFastPath3() {
-        MyLong sv1 = (MyLong)sv.get();
+        MyLong sv1 = sv.get();
         notInlined();
-        MyLong sv2 = (MyLong)sv.get();
+        MyLong sv2 = sv.get();
         return sv1.getValue() + sv2.getValue();
     }
 
@@ -135,7 +135,7 @@ public class TestScopedValue {
     private void testFastPath3Runner() throws Exception {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)sv.get();
+                    MyLong unused = sv.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath3() != 42 + 42) {
                             throw new RuntimeException();
@@ -205,7 +205,7 @@ public class TestScopedValue {
     private void testFastPath5Runner() throws Exception {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)sv.get();
+                    MyLong unused = sv.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath5() != 42) {
                             throw new RuntimeException();
@@ -299,7 +299,7 @@ public class TestScopedValue {
         boolean[] allFalse = new boolean[10_000];
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)sv.get();
+                    MyLong unused = sv.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath8(allTrue) != 42) {
                             throw new RuntimeException();
@@ -339,7 +339,7 @@ public class TestScopedValue {
         boolean[] allFalse = new boolean[10_000];
         ScopedValue.where(svFinal, new MyLong(42)).run(
                 () -> {
-                    MyLong unused = (MyLong)svFinal.get();
+                    MyLong unused = svFinal.get();
                     for (int i = 0; i < 20_000; i++) {
                         if (testFastPath9(allTrue) != 42) {
                             throw new RuntimeException();
@@ -360,8 +360,8 @@ public class TestScopedValue {
     @IR(counts = {IRNode.LOAD_L, "1", IRNode.CALL_OF_METHOD, "slowGet", "1" })
     public static long testSlowPath1() {
         ScopedValue<MyLong> localSV = sv;
-        MyLong sv1 = (MyLong)localSV.get();
-        MyLong sv2 = (MyLong)localSV.get();
+        MyLong sv1 = localSV.get();
+        MyLong sv2 = localSV.get();
         return sv1.getValue() + sv2.getValue();
     }
 
@@ -379,9 +379,9 @@ public class TestScopedValue {
     @IR(counts = {IRNode.LOAD_L, "1", IRNode.CALL_OF_METHOD, "slowGet", "1" })
     public static long testSlowPath2() {
         ScopedValue<MyLong> localSV = sv;
-        MyLong sv1 = (MyLong)localSV.get();
+        MyLong sv1 = localSV.get();
         notInlined();
-        MyLong sv2 = (MyLong)localSV.get();
+        MyLong sv2 = localSV.get();
         return sv1.getValue() + sv2.getValue();
     }
 
@@ -454,6 +454,26 @@ public class TestScopedValue {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
                     if (testSlowPath5() != 42) {
+                        throw new RuntimeException();
+                    }
+                });
+    }
+
+
+    @Test
+    @IR(counts = {IRNode.LOAD_L, "1", IRNode.CALL_OF_METHOD, "slowGet", "1" })
+    public static long testSlowPath6() {
+        ScopedValue<MyLong> localSV = sv;
+        MyLong sv1 = localSV.get();
+        MyLong sv2 = ScopedValue.where(sv, new MyLong(0x42)).get(() -> localSV.get());
+        return sv1.getValue() + sv2.getValue();
+    }
+
+    @Run(test = "testSlowPath6")
+    private void testSlowPath6Runner() throws Exception {
+        ScopedValue.where(sv, new MyLong(42)).run(
+                () -> {
+                    if (testSlowPath6() != 42 + 42) {
                         throw new RuntimeException();
                     }
                 });
