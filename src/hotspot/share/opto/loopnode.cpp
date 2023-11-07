@@ -38,6 +38,7 @@
 #include "opto/convertnode.hpp"
 #include "opto/divnode.hpp"
 #include "opto/idealGraphPrinter.hpp"
+#include "opto/intrinsicnode.hpp"
 #include "opto/loopnode.hpp"
 #include "opto/movenode.hpp"
 #include "opto/mulnode.hpp"
@@ -5579,6 +5580,13 @@ void PhaseIdealLoop::build_loop_early( VectorSet &visited, Node_List &worklist, 
 
         // Compute earliest point this Node can go.
         // CFG, Phi, pinned nodes already know their controlling input.
+#ifdef ASSERT
+        if (n->Opcode() == Op_ScopedValueGetHitsInCache) {
+          ((ScopedValueGetHitsInCacheNode*) n)->verify();
+        } else if (n->Opcode() == Op_ScopedValueGetLoadFromCache) {
+          ((ScopedValueGetLoadFromCacheNode*) n)->verify();
+        }
+#endif
         if (!has_node(n)) {
           // Record earliest legal location
           set_early_ctrl(n, false);

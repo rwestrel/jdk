@@ -376,3 +376,11 @@ Node* ScopedValueGetLoadFromCacheNode::scoped_value() const {
   return ((ScopedValueGetHitsInCacheNode*)hits_in_cache)->scoped_value();
 }
 
+#ifdef ASSERT
+void ScopedValueGetLoadFromCacheNode::verify() const {
+  assert(in(0)->Opcode() == Op_IfTrue, "");
+  assert(in(0)->in(0)->in(1)->is_Bool(), "");
+  assert(in(0)->in(0)->in(1)->in(1)->Opcode() == Op_ScopedValueGetHitsInCache, "");
+  assert(in(0)->in(0)->in(1)->in(1) == in(1), "");
+}
+#endif

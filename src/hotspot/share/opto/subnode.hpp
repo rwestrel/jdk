@@ -374,6 +374,8 @@ public:
   }
 
   const Type* Value(PhaseGVN* phase) const override;
+
+  void verify() const PRODUCT_RETURN;
 };
 
 //------------------------------BoolTest---------------------------------------

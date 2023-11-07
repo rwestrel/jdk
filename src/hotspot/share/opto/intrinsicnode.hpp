@@ -353,6 +353,8 @@ public:
   const Type* bottom_type() const {
     return TypeInstPtr::BOTTOM;
   }
+
+  void verify() const PRODUCT_RETURN;
 };
 
 #endif // SHARE_OPTO_INTRINSICNODE_HPP
