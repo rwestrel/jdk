@@ -815,10 +815,11 @@ CallGenerator* CallGenerator::for_vector_reboxing_late_inline(ciMethod* method, 
 
 class LateInlineScopedValueCallGenerator : public LateInlineCallGenerator {
   Node* _sv;
+  bool _process_result;
 
 public:
-  LateInlineScopedValueCallGenerator(ciMethod* method, CallGenerator* inline_cg) :
-          LateInlineCallGenerator(method, inline_cg, true), _sv(nullptr) {}
+  LateInlineScopedValueCallGenerator(ciMethod* method, CallGenerator* inline_cg, bool process_result) :
+          LateInlineCallGenerator(method, inline_cg, true), _sv(nullptr), _process_result(process_result) {}
 
   virtual JVMState* generate(JVMState* jvms) {
     Compile *C = Compile::current();
@@ -832,7 +833,7 @@ public:
   }
 
   virtual CallGenerator* with_call_node(CallNode* call) {
-    LateInlineScopedValueCallGenerator* cg = new LateInlineScopedValueCallGenerator(method(), _inline_cg);
+    LateInlineScopedValueCallGenerator* cg = new LateInlineScopedValueCallGenerator(method(), _inline_cg, false);
     cg->set_call_node(call->as_CallStaticJava());
     return cg;
   }
@@ -843,8 +844,15 @@ public:
     CallGenerator::do_late_inline_helper();
   }
 
+  virtual void set_process_result(bool v) {
+    _process_result = v;
+  }
 
   virtual void process_result(GraphKit& kit) {
+    if (!_process_result) {
+      return;
+    }
+    assert(method()->intrinsic_id() == vmIntrinsics::_SVget, "");
     Compile *C = Compile::current();
     CallNode* scoped_value_cache = nullptr;
     IfNode* get_cache_iff = nullptr;
@@ -1159,8 +1167,9 @@ public:
   }
 };
 
-CallGenerator* CallGenerator::for_scoped_value_late_inline(ciMethod* method, CallGenerator* inline_cg) {
-  return new LateInlineScopedValueCallGenerator(method, inline_cg);
+CallGenerator* CallGenerator::for_scoped_value_late_inline(ciMethod* method, CallGenerator* inline_cg,
+                                                           bool process_result) {
+  return new LateInlineScopedValueCallGenerator(method, inline_cg, process_result);
 }
 
 //------------------------PredictedCallGenerator------------------------------

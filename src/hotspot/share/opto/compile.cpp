@@ -1116,6 +1116,7 @@ void Compile::Init(bool aliasing) {
   // A null adr_type hits in the cache right away.  Preload the right answer.
   probe_alias_cache(nullptr)->_index = AliasIdxTop;
   _needs_split_if = false;
+  _has_scoped_value_invalidate = false;
 }
 
 //---------------------------init_start----------------------------------------
@@ -2158,6 +2159,11 @@ void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
 
     while (_scoped_value_late_inlines.length() > 0) {
       CallGenerator* cg = _scoped_value_late_inlines.pop();
+      if (cg->method()->intrinsic_id() != vmIntrinsics::_SVget || has_scoped_value_invalidate()) {
+        cg->set_process_result(false);
+        C->add_late_inline(cg);
+        continue;
+      }
       CallNode* call = cg->call_node();
       CallProjections projs;
       call->extract_projections(&projs, true);
@@ -2189,11 +2195,12 @@ void Compile::inline_scoped_value_calls(PhaseIterGVN& igvn) {
 
       C->print_method(PHASE_DEBUG, 2);
     }
-    _scoped_value_late_inlines.trunc_to(0);
 
     inline_incrementally_cleanup(igvn);
 
     set_inlining_incrementally(false);
+
+    inline_incrementally(igvn);
   }
 }
 
@@ -2431,11 +2438,15 @@ void Compile::Optimize() {
 
   if (failing())  return;
 
-  inline_scoped_value_calls(igvn);
-
   inline_incrementally(igvn);
 
   print_method(PHASE_INCREMENTAL_INLINE, 2);
+
+  if (failing())  return;
+
+  inline_scoped_value_calls(igvn);
+
+  print_method(PHASE_INCREMENTAL_SCOPED_VALUE_INLINE, 2);
 
   if (failing())  return;
 
@@ -2457,8 +2468,6 @@ void Compile::Optimize() {
   if (AlwaysIncrementalInline) {
     inline_incrementally(igvn);
   }
-
-  print_method(PHASE_INCREMENTAL_SCOPED_VALUE_INLINE, 2);
 
   if (failing())  return;
 

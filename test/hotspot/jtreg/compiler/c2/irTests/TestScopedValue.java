@@ -461,7 +461,7 @@ public class TestScopedValue {
 
 
     @Test
-    @IR(counts = {IRNode.LOAD_L, "1", IRNode.CALL_OF_METHOD, "slowGet", "1" })
+    @IR(counts = {IRNode.CALL_OF_METHOD, "slowGet", "2" })
     public static long testSlowPath6() {
         ScopedValue<MyLong> localSV = sv;
         MyLong sv1 = localSV.get();
@@ -473,7 +473,7 @@ public class TestScopedValue {
     private void testSlowPath6Runner() throws Exception {
         ScopedValue.where(sv, new MyLong(42)).run(
                 () -> {
-                    if (testSlowPath6() != 42 + 42) {
+                    if (testSlowPath6() != 42 + 0x42) {
                         throw new RuntimeException();
                     }
                 });

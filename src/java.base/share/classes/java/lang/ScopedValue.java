@@ -1014,6 +1014,7 @@ public final class ScopedValue<T> {
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
+        @IntrinsicCandidate
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;

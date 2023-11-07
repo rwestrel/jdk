@@ -356,6 +356,7 @@ class Compile : public Phase {
   int                   _loop_opts_cnt;         // loop opts round
   uint                  _stress_seed;           // Seed for stress testing
   bool                  _needs_split_if;
+  bool                  _has_scoped_value_invalidate;
 
   // Compilation environment.
   Arena                 _comp_arena;            // Arena with lifetime equivalent to Compile
@@ -677,6 +678,8 @@ private:
   void          set_has_monitors(bool v)         { _has_monitors = v; }
   bool              needs_split_if() const       { return _needs_split_if; }
   void          set_needs_split_if(bool v)       { _needs_split_if = v; }
+  bool              has_scoped_value_invalidate() const { return _has_scoped_value_invalidate; }
+  void          set_has_scoped_value_invalidate(bool v) { _has_scoped_value_invalidate = v; }
 
   // check the CompilerOracle for special behaviours for this compile
   bool          method_has_option(enum CompileCommand option) {

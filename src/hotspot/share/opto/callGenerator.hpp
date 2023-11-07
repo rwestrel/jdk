@@ -142,7 +142,7 @@ class CallGenerator : public ArenaObj {
   static CallGenerator* for_string_late_inline(ciMethod* m, CallGenerator* inline_cg);
   static CallGenerator* for_boxing_late_inline(ciMethod* m, CallGenerator* inline_cg);
   static CallGenerator* for_vector_reboxing_late_inline(ciMethod* m, CallGenerator* inline_cg);
-  static CallGenerator* for_scoped_value_late_inline(ciMethod* m, CallGenerator* inline_cg);
+  static CallGenerator* for_scoped_value_late_inline(ciMethod* m, CallGenerator* inline_cg, bool process_result);
   static CallGenerator* for_late_inline_virtual(ciMethod* m, int vtable_index, float expected_uses);
 
   // How to make a call that optimistically assumes a receiver type:
@@ -187,6 +187,8 @@ class CallGenerator : public ArenaObj {
   static bool is_inlined_method_handle_intrinsic(JVMState* jvms, ciMethod* m);
   static bool is_inlined_method_handle_intrinsic(ciMethod* caller, int bci, ciMethod* m);
   static bool is_inlined_method_handle_intrinsic(ciMethod* symbolic_info, ciMethod* m);
+
+  virtual void set_process_result(bool v) {}
 
 private:
   static void print_inlining_impl(Compile* C, ciMethod* callee, int inline_level, int bci,
