@@ -216,8 +216,10 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
             return CallGenerator::for_boxing_late_inline(callee, cg);
           } else if (should_delay_vector_reboxing_inlining(callee, jvms)) {
             return CallGenerator::for_vector_reboxing_late_inline(callee, cg);
-          } else if (callee->intrinsic_id() == vmIntrinsics::_SVget || callee->intrinsic_id() == vmIntrinsics::_slowGet) {
-            return CallGenerator::for_scoped_value_late_inline(callee, cg, callee->intrinsic_id() == vmIntrinsics::_SVget);
+          } else if (callee->intrinsic_id() == vmIntrinsics::_SVget) {
+            return CallGenerator::for_scoped_value_late_inline(callee, cg, true);
+          } else if (callee->intrinsic_id() == vmIntrinsics::_slowGet) {
+            return CallGenerator::for_late_inline(callee, cg);
           } else if (should_delay) {
             return CallGenerator::for_late_inline(callee, cg);
           } else {
