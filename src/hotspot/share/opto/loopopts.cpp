@@ -1696,7 +1696,8 @@ void PhaseIdealLoop::try_sink_out_of_loop(Node* n) {
       !n->is_MergeMem() &&
       !n->is_CMove() &&
       n->Opcode() != Op_Opaque4 &&
-      !n->is_Type()) {
+      !n->is_Type() &&
+      n->Opcode() != Op_ScopedValueGetLoadFromCache) {
     Node *n_ctrl = get_ctrl(n);
     IdealLoopTree *n_loop = get_loop(n_ctrl);
 

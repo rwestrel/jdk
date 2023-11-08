@@ -52,10 +52,13 @@ public class TestScopedValue {
     static final ScopedValue<MyLong> svFinal = ScopedValue.newInstance();
     static final ScopedValue<MyLong> svFinal2 = ScopedValue.newInstance();
     static ScopedValue<Object> sv3 = ScopedValue.newInstance();
-    
+    private static volatile int volatileField;
+
     public static void main(String[] args) {
-        List<String> tests = List.of("testFastPath1", "testFastPath2", "testFastPath3", "testFastPath5", "testFastPath6", "testFastPath7", "testFastPath8", "testFastPath9",
-                                     "testSlowPath1,testSlowPath2,testSlowPath3,testSlowPath4,testSlowPath5,testSlowPath6");
+        List<String> tests = List.of("testFastPath1", "testFastPath2", "testFastPath3", "testFastPath5",
+                "testFastPath6", "testFastPath7", "testFastPath8", "testFastPath9", "testFastPath10",
+                "testFastPath11",
+                "testSlowPath1,testSlowPath2,testSlowPath3,testSlowPath4,testSlowPath5,testSlowPath6");
         for (String test : tests) {
             TestFramework.runWithFlags("--enable-preview", "-XX:CompileCommand=dontinline,java.lang.ScopedValue::slowGet", "-DTest=" + test);
         }
@@ -350,6 +353,73 @@ public class TestScopedValue {
                     }
                 });
         Method m = TestScopedValue.class.getDeclaredMethod("testFastPath9", boolean[].class);
+        WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
+        if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
+            throw new RuntimeException("should be compiled");
+        }
+    }
+
+    @Test
+    @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
+    public static Object testFastPath10(boolean[] flags) {
+        Object res = null;
+        for (int i = 0; i < 10_000; i++) {
+            notInlined();
+            res = sv3.get();
+            if (flags[i]) {
+                break;
+            }
+        }
+        return res;
+    }
+
+    @Run(test = "testFastPath10", mode = RunMode.STANDALONE)
+    private void testFastPath10Runner() throws Exception {
+        boolean[] allTrue = new boolean[10_000];
+        Arrays.fill(allTrue, true);
+        boolean[] allFalse = new boolean[10_000];
+        ScopedValue.where(sv3, new MyLong(42)).run(
+                () -> {
+                    Object unused = sv3.get();
+                    for (int i = 0; i < 20_000; i++) {
+                        testFastPath10(allTrue);
+                        testFastPath10(allFalse);
+                    }
+                });
+        Method m = TestScopedValue.class.getDeclaredMethod("testFastPath10", boolean[].class);
+        WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
+        if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
+            throw new RuntimeException("should be compiled");
+        }
+    }
+    @Test
+    @IR(failOn = {IRNode.CALL_OF_METHOD, "slowGet"})
+    public static Object testFastPath11(boolean[] flags) {
+        for (int i = 0; i < 10_000; i++) {
+            volatileField = 0x42;
+            final boolean flag = flags[i];
+            Object res = sv3.get();
+            if (flag) {
+                return res;
+            }
+        }
+        return null;
+    }
+
+    @Run(test = "testFastPath11", mode = RunMode.STANDALONE)
+    private void testFastPath11Runner() throws Exception {
+        boolean[] allTrue = new boolean[10_000];
+        Arrays.fill(allTrue, true);
+        boolean[] allFalse = new boolean[10_000];
+        ScopedValue.where(sv3, new MyLong(42)).run(
+                () -> {
+                    Object unused = sv3.get();
+                    for (int i = 0; i < 20_000; i++) {
+                        testFastPath11(allTrue);
+                        testFastPath11(allFalse);
+                    }
+                });
+        Method m = TestScopedValue.class.getDeclaredMethod("testFastPath11", boolean[].class);
         WHITE_BOX.enqueueMethodForCompilation(m, CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION);
         if (!WHITE_BOX.isMethodCompiled(m) || WHITE_BOX.getMethodCompilationLevel(m) != CompilerWhiteBoxTest.COMP_LEVEL_FULL_OPTIMIZATION) {
             throw new RuntimeException("should be compiled");
