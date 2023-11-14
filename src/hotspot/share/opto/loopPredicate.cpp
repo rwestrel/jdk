@@ -1225,6 +1225,7 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
     C2OptAccess access(_igvn, nullptr, raw_mem, decorators, T_OBJECT, nullptr, addr);
     BarrierSetC2* bs = BarrierSet::barrier_set()->barrier_set_c2();
     Node* load_of_cache = bs->load_at(access, objects_type);
+    set_subtree_ctrl(load_of_cache, true);
 
     _igvn.replace_input_of(new_hits_in_the_cache, 1, load_of_cache);
     Node* oop_mem = mm != nullptr ? mm->memory_at(C->get_alias_index(TypeAryPtr::OOPS)) : all_mem;

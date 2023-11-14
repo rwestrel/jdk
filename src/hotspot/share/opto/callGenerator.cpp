@@ -1013,8 +1013,6 @@ public:
     assert(get_first_iff != nullptr, "");
     assert(get_second_iff == nullptr || get_first_iff != nullptr, "");
 
-    tty->print_cr("XXX %p", second_index);
-
 //    ProjNode* get_cache_iff_failure = get_cache_iff->proj_out(get_cache_iff->in(1)->as_Bool()->_test._test == BoolTest::eq);
 //    CallStaticJavaNode* get_cache_iff_unc = get_cache_iff_failure->is_uncommon_trap_proj(Deoptimization::Reason_none);
     if (get_second_iff != nullptr) {
@@ -1111,7 +1109,6 @@ public:
     } else {
       prob = (1 - get_cache_prob) + get_cache_prob * (get_first_prob + (1 - get_first_prob) * get_second_prob);
     }
-    tty->print_cr("XXX %f %f %f/%p -> %f", get_cache_prob, get_first_prob, get_second_prob, second_index, prob);
 
     Node* bol = kit.gvn().transform(new BoolNode(sv_hits_in_cache, BoolTest::ne));
     IfNode* iff = new IfNode(kit.control(), bol, 1-prob, get_cache_iff->_fcnt);

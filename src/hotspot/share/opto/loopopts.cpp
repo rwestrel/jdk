@@ -3771,6 +3771,20 @@ bool PhaseIdealLoop::partial_peel( IdealLoopTree *loop, Node_List &old_new ) {
                             n->_idx, get_ctrl(n)->_idx);
             }
 #endif
+          } else if (n->Opcode() == Op_ScopedValueGetHitsInCache) {
+            ScopedValueGetHitsInCacheNode* sv_hits_in_cache = (ScopedValueGetHitsInCacheNode*)n;
+            sv_hits_in_cache->verify();
+            ScopedValueGetLoadFromCacheNode* load_from_cache = sv_hits_in_cache->load_from_cache();
+            assert(load_from_cache == nullptr || not_peel.test(load_from_cache->_idx), "");
+            Node* bol = sv_hits_in_cache->find_unique_out_with(Op_Bool);
+            assert(not_peel.test(bol->_idx), "");
+            Node* iff = bol->unique_ctrl_out();
+            assert(not_peel.test(iff->_idx), "");
+            sink_list.push(n);
+            peel.remove(n->_idx);
+            not_peel.set(n->_idx);
+            peel_list.remove(i);
+            incr = false;
           }
         } else {
           // Otherwise check for special def-use cases that span
