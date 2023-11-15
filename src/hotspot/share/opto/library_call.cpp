@@ -3639,12 +3639,11 @@ Node* LibraryCallKit::scopedValueCache_helper() {
 
 //------------------------inline_native_scopedValueCache------------------
 bool LibraryCallKit::inline_native_scopedValueCache() {
-  return false;
-//  Node* cache_obj_handle = scopedValueCache_helper();
-//  const Type* objects_type = scopedValueCache_type();
-//  set_result(access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE));
-//
-//  return true;
+  Node* cache_obj_handle = scopedValueCache_helper();
+  const Type* objects_type = scopedValueCache_type();
+  set_result(access_load(cache_obj_handle, objects_type, T_OBJECT, IN_NATIVE));
+
+  return true;
 }
 
 //------------------------inline_native_setScopedValueCache------------------
