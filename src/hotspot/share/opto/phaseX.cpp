@@ -1706,7 +1706,7 @@ void PhaseIterGVN::add_users_of_use_to_worklist(Node* n, Node* use, Unique_Node_
         if (u->Opcode() == Op_CmpI || u->Opcode() == Op_CmpL) {
           Node* phi = u->as_Cmp()->countedloop_phi(use);
           if (phi != nullptr) {
-            _worklist.push(phi);
+            worklist.push(phi);
           }
         }
       }
