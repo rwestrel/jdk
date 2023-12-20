@@ -24,6 +24,7 @@
 package compiler.c2.irTests;
 
 import compiler.lib.ir_framework.*;
+
 import java.util.Objects;
 
 /*
@@ -36,7 +37,10 @@ import java.util.Objects;
 
 public class TestLoopConditionalPropagation {
     public static void main(String[] args) {
-        TestFramework.runWithFlags("-XX:-UseLoopPredicate", "-XX:-LoopUnswitching");
+//        TestFramework.runWithFlags("-XX:-UseLoopPredicate", "-XX:-LoopUnswitching");
+//        TestFramework.runWithFlags("-XX:-LoopUnswitching");
+        TestFramework.runWithFlags("-XX:-LoopUnswitching", "-XX:-RangeCheckElimination", "-XX:+UseLoopPredicate");
+        TestFramework.runWithFlags("-XX:-LoopUnswitching", "-XX:+RangeCheckElimination", "-XX:-UseLoopPredicate");
     }
 
     @Test
@@ -395,7 +399,7 @@ public class TestLoopConditionalPropagation {
 
     @Run(test = "test13")
     @Warmup(10_000)
-    public static void test13_runner() {
+    public static void test13Runner() {
         C c = new C();
         test13Helper(42, c);
         test13Helper(2, c);
@@ -664,67 +668,78 @@ public class TestLoopConditionalPropagation {
         }
     }
 
-    // @Test
-    // @IR(counts = { IRNode.CMOVE_I, "1" })
-    // @IR(failOn = { IRNode.IF })
-    // private static int test14(int i) {
-    //     if (i < 0) {
-    //         i = 0;
-    //     }
-    //     if (i - 1 < -1) {
-    //         throw new RuntimeException("never taken");
-    //     }
-    //     return i;
-    // }
+    @Test
+    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP})
+    @IR(applyIf = { "UseLoopPredicate", "false" }, counts = {IRNode.COUNTED_LOOP, "2"}, failOn = {IRNode.COUNTED_LOOP_MAIN})
+    private static float test16(int start, int stop) {
+        float[] array = new float[1000];
+        if (start < 0) {
 
-    // @Run(test = "test14")
-    // @Warmup(10_000)
-    // public static void test14_runner() {
-    //     test14(-42);
-    //     test14(42);
-    // }
+        }
+        if (stop > 1000) {
 
-    // @Test
-    // @IR(counts = { IRNode.CMOVE_I, "1" })
-    // @IR(failOn = { IRNode.IF })
-    // private static int test15(int i) {
-    //     if (i < 0) {
-    //         i = 0;
-    //     } else {
-    //         i = i - 1;
-    //     }
-    //     if (i - 1 < -2) {
-    //         throw new RuntimeException("never taken");
-    //     }
-    //     return i;
-    // }
+        }
+        float v = 0;
+        for (int i = start; i < stop; i++) {
+            v = array[i];
+        }
+        return v;
+    }
 
-    // @Run(test = "test15")
-    // @Warmup(10_000)
-    // public static void test15_runner() {
-    //     test15(-42);
-    //     test15(42);
-    // }
+    @Run(test = "test16")
+    @Warmup(10_000)
+    public static void test16Runner() {
+        test16(0, 1000);
+    }
 
-    // @Test
-    // @IR(counts = { IRNode.CMOVE_I, "1" })
-    // @IR(failOn = { IRNode.IF })
-    // private static int test16(int i) {
-    //     if (i < 0) {
-    //         i = 0;
-    //     } else {
-    //         i = i / 13 * 11;
-    //     }
-    //     if (i - 1 < -1) {
-    //         throw new RuntimeException("never taken");
-    //     }
-    //     return i;
-    // }
+    @Test
+    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP})
+    private static float test17(int start, int stop, boolean flag) {
+        float[] array = new float[1000];
+        if (start < 0) {
 
-    // @Run(test = "test16")
-    // @Warmup(10_000)
-    // public static void test16_runner() {
-    //     test16(-42);
-    //     test16(42);
-    // }
+        }
+        if (stop > 1000) {
+
+        }
+        float v = 0;
+        for (int i = start; i < stop; i++) {
+            if (flag) {
+                v = array[i];
+            } else {
+                v = array[i];
+            }
+        }
+        return v;
+    }
+
+    @Run(test = "test17")
+    @Warmup(10_000)
+    public static void test17Runner() {
+        test17(0, 1000, true);
+        test17(0, 1000, false);
+    }
+
+    @Test
+    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP, IRNode.LONG_COUNTED_LOOP}, counts = {IRNode.LOOP, "1"})
+    @IR(applyIf = { "UseLoopPredicate", "false" }, counts = {IRNode.COUNTED_LOOP, "1"}, failOn = {IRNode.COUNTED_LOOP_MAIN})
+    private static float test18(long start, long stop) {
+        if (start < 0) {
+
+        }
+        if (stop > 1000) {
+
+        }
+        float v = 0;
+        for (long i = start; i < stop; i++) {
+            Objects.checkIndex(i, 1000);
+        }
+        return v;
+    }
+
+    @Run(test = "test18")
+    @Warmup(10_000)
+    public static void test18Runner() {
+        test18(0, 1000);
+    }
 }
