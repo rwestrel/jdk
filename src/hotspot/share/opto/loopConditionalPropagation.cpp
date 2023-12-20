@@ -1287,7 +1287,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               rehash_node_delayed(iff);
               iff->set_req_X(1, con, this);
               _phase->C->set_major_progress();
-            } else if (true || iff->in(1)->Opcode() != Op_Opaque4) {
+            } else if (iff->in(1)->Opcode() != Op_Opaque4) {
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
 
