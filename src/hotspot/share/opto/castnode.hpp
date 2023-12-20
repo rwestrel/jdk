@@ -81,6 +81,7 @@ public:
   Node* optimize_integer_cast(PhaseGVN* phase, BasicType bt);
 
   bool higher_equal_types(PhaseGVN* phase, const Node* other) const;
+  bool higher_equal_types(const Type* t) const;
 
   int extra_types_count() const {
     return _extra_types == nullptr ? 0 : _extra_types->cnt();

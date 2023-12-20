@@ -1366,8 +1366,8 @@ public:
                                         Node_List& if_proj_list);
   IfProjNode* add_template_assertion_predicate(IfNode* iff, IdealLoopTree* loop, IfProjNode* if_proj,
                                                ParsePredicateSuccessProj* parse_predicate_proj,
-                                               IfProjNode* upper_bound_proj, int scale, Node* offset, Node* init, Node* limit,
-                                               jint stride, Node* rng, bool& overflow, Deoptimization::DeoptReason reason);
+                                               Node* ctrl, const int scale, Node* offset, Node* init, Node* limit,
+                                               const jint stride, Node* rng, bool& overflow, Deoptimization::DeoptReason reason);
   Node* add_range_check_elimination_assertion_predicate(IdealLoopTree* loop, Node* predicate_proj, Node* scale,
                                                         Node* offset, Node* low_limit, Node* upper_limit, Node* value);
 

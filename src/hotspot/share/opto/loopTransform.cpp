@@ -1165,6 +1165,9 @@ bool IdealLoopTree::policy_range_check(PhaseIdealLoop* phase, bool provisional, 
 
       // Comparing trip+off vs limit
       Node *bol = iff->in(1);
+      if (bol->Opcode() == Op_Opaque4) {
+        bol = bol->in(1);
+      }
       if (bol->req() != 2) {
         continue; // dead constant test
       }
@@ -3000,26 +3003,8 @@ void PhaseIdealLoop::do_range_check(IdealLoopTree *loop, Node_List &old_new) {
 
       // Get boolean condition to test
       Node *i1 = iff->in(1);
-      if (i1->Opcode() == Op_Opaque4) {
-        Node* current = exit;
-        do {
-          Node* next = nullptr;
-          for (DUIterator_Fast jmax, j = current->fast_outs(jmax); j < jmax; j++) {
-            Node* u = current->fast_out(j);
-            if (u == current) {
-              continue;
-            }
-            if (next != nullptr) {
-              break;
-            }
-            next = u;
-          }
-          current = next;
-        } while (current->is_Region());
-        if (current->Opcode() == Op_Halt) {
-          assert(_igvn.type(i1->in(2))->is_int()->get_con() == (exit->Opcode() == Op_IfTrue ? 0 : 1), "");
-          i1 = i1->in(1);
-        }
+      if (exit->as_Proj()->is_assert_proj()) {
+        i1 = i1->in(1);
       }
       if (!i1->is_Bool()) continue;
       BoolNode *bol = i1->as_Bool();

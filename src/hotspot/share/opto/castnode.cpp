@@ -178,6 +178,10 @@ TypeNode* ConstraintCastNode::dominating_cast(PhaseGVN* gvn, PhaseTransform* pt)
 
 bool ConstraintCastNode::higher_equal_types(PhaseGVN* phase, const Node* other) const {
   const Type* t = phase->type(other);
+  return higher_equal_types(t);
+}
+
+bool ConstraintCastNode::higher_equal_types(const Type* t) const {
   if (!t->higher_equal_speculative(type())) {
     return false;
   }

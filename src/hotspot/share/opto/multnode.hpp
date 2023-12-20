@@ -100,6 +100,8 @@ public:
   //                                             other_proj->[region->..]call_uct"
   // null otherwise
   CallStaticJavaNode* is_uncommon_trap_if_pattern(Deoptimization::DeoptReason reason = Deoptimization::Reason_none) const;
+  bool is_assert_proj() const;
+  bool is_assert_if_pattern() const;
 
   // Return other proj node when this is a If proj node
   ProjNode* other_if_proj() const;

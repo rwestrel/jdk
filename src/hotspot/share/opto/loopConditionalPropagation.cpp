@@ -98,6 +98,7 @@
 #include "precompiled.hpp"
 #include "opto/loopConditionalPropagation.hpp"
 #include "opto/callnode.hpp"
+#include "opto/castnode.hpp"
 #include "opto/movenode.hpp"
 #include "opto/opaquenode.hpp"
 
@@ -1286,7 +1287,7 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               rehash_node_delayed(iff);
               iff->set_req_X(1, con, this);
               _phase->C->set_major_progress();
-            } else if (iff->in(1)->Opcode() != Op_Opaque4) {
+            } else if (true || iff->in(1)->Opcode() != Op_Opaque4) {
               Node* con = makecon(new_bol_t);
               _phase->set_ctrl(con, C->root());
 
@@ -1479,6 +1480,30 @@ bool PhaseConditionalPropagation::is_safe_for_replacement_at_phi(Node* node, Nod
 
 bool PhaseConditionalPropagation::transform_helper(Node* c) {
   bool progress = false;
+#if 0 //def ASSERT
+  {
+    for (DUIterator_Fast imax, i = c->fast_outs(imax); i < imax; i++) {
+      Node* u = c->fast_out(i);
+      if (u->Opcode() == Op_CastII || u->Opcode() == Op_CastLL) {
+        Node* in1 = u->in(1);
+        Node* in1_c = _phase->ctrl_or_self(in1);
+        Node* cast_c = _phase->ctrl_or_self(u);
+        const Type* narrowed_type = find_type_between(in1, cast_c, _phase->idom(in1_c));
+        if (narrowed_type != nullptr) {
+          assert(_current_ctrl == C->root(), "");
+          if (u->as_ConstraintCast()->higher_equal_types(narrowed_type) &&
+              // test that guards the cast must have been optimized out
+              // the cast does narrow down the type of its input
+              Type::cmp(u->bottom_type(), PhaseValues::type(in1)) &&
+              u->bottom_type()->higher_equal(PhaseValues::type(in1))) {
+            assert(u->depends_only_on_test() || (u->Opcode() == Op_CastII && ((CastIINode*)u)->has_range_check()),
+                   "");
+          }
+        }
+      }
+    }
+  }
+#endif
   {
     TypeUpdate* updates = updates_at(c);
     if (updates != nullptr && updates->control() == c) {
@@ -1722,7 +1747,15 @@ bool PhaseConditionalPropagation::has_cast_with_narrowed_type(ProjNode* proj) co
       const Type* narrowed_type = find_type_between(in1, cast_c, _phase->idom(in1_c));
 //      tty->print("XXX %s", narrowed_type != nullptr ? "narrowed" : "not narrowed"); in1->dump();
       if (narrowed_type != nullptr) {
-        return true;
+        assert(_current_ctrl == C->root(), "");
+        if (u->as_ConstraintCast()->higher_equal_types(narrowed_type) && // test that guards the cast must have been optimized out
+            // the cast does narrow down the type of its input
+            Type::cmp(u->bottom_type(), PhaseValues::type(in1)) &&
+            u->bottom_type()->higher_equal(PhaseValues::type(in1)) &&
+            u->depends_only_on_test()) {
+//          assert(u->depends_only_on_test() || (u->Opcode() == Op_CastII && ((CastIINode*)u)->has_range_check()), "");
+          return true;
+        }
       }
     }
   }

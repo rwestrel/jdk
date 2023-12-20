@@ -651,10 +651,14 @@ bool IdealLoopTree::is_range_check_if(IfProjNode* if_success_proj, PhaseIdealLoo
   if (!is_loop_exit(iff)) {
     return false;
   }
-  if (!iff->in(1)->is_Bool()) {
+  Node* in1 = iff->in(1);
+  if (in1->Opcode() == Op_Opaque4) {
+    in1 = in1->in(1);
+  }
+  if (!in1->is_Bool()) {
     return false;
   }
-  const BoolNode *bol = iff->in(1)->as_Bool();
+  const BoolNode* bol = in1->as_Bool();
   if (bol->_test._test != BoolTest::lt || if_success_proj->is_IfFalse()) {
     // We don't have the required range check pattern:
     // if (scale*iv + offset <u limit) {
@@ -1150,7 +1154,7 @@ void PhaseIdealLoop::loop_predication_follow_branches(Node *n, IdealLoopTree *lo
           stack.push(in, 1);
           break;
         } else if (in->is_IfProj() &&
-                   in->as_Proj()->is_uncommon_trap_if_pattern() &&
+                   (in->as_Proj()->is_uncommon_trap_if_pattern() || in->as_Proj()->is_assert_if_pattern()) &&
                    (in->in(0)->Opcode() == Op_If ||
                     in->in(0)->Opcode() == Op_RangeCheck)) {
           if (pf.to(in) * loop_trip_cnt >= 1) {
@@ -1178,6 +1182,9 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
   IfProjNode* new_predicate_proj = nullptr;
   IfNode*   iff  = if_success_proj->in(0)->as_If();
   Node*     test = iff->in(1);
+  if (test->Opcode() == Op_Opaque4) {
+    test = test->in(1);
+  }
   if (!test->is_Bool()) { //Conv2B, ...
     return false;
   }
@@ -1219,7 +1226,11 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
     C->print_method(PHASE_BEFORE_LOOP_PREDICATION_RC, 4, iff);
     // Range check for counted loops
     assert(if_success_proj->is_IfTrue(), "trap must be on false projection for a range check");
-    const Node*    cmp    = bol->in(1)->as_Cmp();
+    Node* in1 = bol->in(1);
+    if (in1->Opcode() == Op_Opaque4) {
+      in1 = in1->in(1);
+    }
+    const Node*    cmp    = in1->as_Cmp();
     Node*          idx    = cmp->in(1);
     assert(!invar.is_invariant(idx), "index is variant");
     Node* rng = cmp->in(2);
@@ -1312,18 +1323,18 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
 // loops are removed properly.
 IfProjNode* PhaseIdealLoop::add_template_assertion_predicate(IfNode* iff, IdealLoopTree* loop, IfProjNode* if_proj,
                                                              ParsePredicateSuccessProj* parse_predicate_proj,
-                                                             IfProjNode* upper_bound_proj, const int scale, Node* offset,
+                                                             Node* ctrl, const int scale, Node* offset,
                                                              Node* init, Node* limit, const jint stride,
                                                              Node* rng, bool& overflow, Deoptimization::DeoptReason reason) {
   // First predicate for the initial value on first loop iteration
   Node* opaque_init = new OpaqueLoopInitNode(C, init);
-  register_new_node(opaque_init, upper_bound_proj);
+  register_new_node(opaque_init, ctrl);
   bool negate = (if_proj->_con != parse_predicate_proj->_con);
-  BoolNode* bol = rc_predicate(loop, upper_bound_proj, scale, offset, opaque_init, limit, stride, rng,
+  BoolNode* bol = rc_predicate(loop, ctrl, scale, offset, opaque_init, limit, stride, rng,
                                (stride > 0) != (scale > 0), overflow);
   Node* opaque_bol = new Opaque4Node(C, bol, _igvn.intcon(1)); // This will go away once loop opts are over
   C->add_template_assertion_predicate_opaq(opaque_bol);
-  register_new_node(opaque_bol, upper_bound_proj);
+  register_new_node(opaque_bol, ctrl);
   IfProjNode* new_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, overflow ? Op_If : iff->Opcode());
   _igvn.replace_input_of(new_proj->in(0), 1, opaque_bol);
   assert(opaque_init->outcnt() > 0, "should be used");
@@ -1438,7 +1449,7 @@ bool PhaseIdealLoop::loop_predication_impl(IdealLoopTree* loop) {
       IfNode* iff = if_proj->in(0)->as_If();
 
       CallStaticJavaNode* call = if_proj->is_uncommon_trap_if_pattern();
-      if (call == nullptr) {
+      if (call == nullptr && !if_proj->is_assert_if_pattern()) {
         if (loop->is_loop_exit(iff)) {
           // stop processing the remaining projs in the list because the execution of them
           // depends on the condition of "iff" (iff->in(1)).
@@ -1454,9 +1465,11 @@ bool PhaseIdealLoop::loop_predication_impl(IdealLoopTree* loop) {
           continue;
         }
       }
-      Deoptimization::DeoptReason reason = Deoptimization::trap_request_reason(call->uncommon_trap_request());
-      if (reason == Deoptimization::Reason_predicate) {
-        break;
+      if (call != nullptr) {
+        Deoptimization::DeoptReason reason = Deoptimization::trap_request_reason(call->uncommon_trap_request());
+        if (reason == Deoptimization::Reason_predicate) {
+          break;
+        }
       }
 
       if (loop_predicate_block->has_parse_predicate()) {
@@ -1475,7 +1488,7 @@ bool PhaseIdealLoop::loop_predication_impl(IdealLoopTree* loop) {
     while (if_proj_list.size() > 0) {
       Node* if_proj = if_proj_list.pop();
       float f = pf.to(if_proj);
-      if (if_proj->as_Proj()->is_uncommon_trap_if_pattern() &&
+      if ((if_proj->as_Proj()->is_uncommon_trap_if_pattern() || if_proj->as_Proj()->is_assert_if_pattern()) &&
           f * loop_trip_cnt >= 1) {
         ParsePredicateSuccessProj* profiled_loop_parse_predicate_proj =
             profiled_loop_predicate_block->parse_predicate_success_proj();

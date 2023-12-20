@@ -1106,7 +1106,7 @@ int PhaseIdealLoop::extract_long_range_checks(const IdealLoopTree* loop, jlong s
     if (c->is_IfProj() && c->in(0)->is_RangeCheck()) {
       IfProjNode* if_proj = c->as_IfProj();
       CallStaticJavaNode* call = if_proj->is_uncommon_trap_if_pattern();
-      if (call != nullptr) {
+      if (call != nullptr || if_proj->is_assert_if_pattern()) {
         Node* range = nullptr;
         Node* offset = nullptr;
         jlong scale = 0;
@@ -1274,6 +1274,9 @@ void PhaseIdealLoop::transform_long_range_checks(int stride_con, const Node_List
     jlong scale = 0;
     Node* offset = nullptr;
     Node* rc_bol = rc->in(1);
+    if (rc_bol->Opcode() == Op_Opaque4) {
+      rc_bol = rc_bol->in(1);
+    }
     Node* rc_cmp = rc_bol->in(1);
     if (rc_cmp->Opcode() == Op_CmpU) {
       // could be shared and have already been taken care of

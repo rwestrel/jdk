@@ -208,6 +208,31 @@ CallStaticJavaNode* ProjNode::is_uncommon_trap_proj(Deoptimization::DeoptReason 
   return nullptr;
 }
 
+bool ProjNode::is_assert_proj() const {
+  if (in(0) == nullptr ||
+      !in(0)->is_If() ||
+      in(0)->in(1) == nullptr ||
+      in(0)->in(1)->Opcode() != Op_Opaque4) {
+    return false;
+  }
+  if (in(0)->in(1)->in(2)->find_int_con(-1) != (int)(1 - _con)) {
+    return false;
+  }
+  const int path_limit = 10;
+  const Node* out = this;
+  for (int ct = 0; ct < path_limit; ct++) {
+    out = out->unique_ctrl_out_or_null();
+    if (out == nullptr)
+      return false;
+    if (out->Opcode() == Op_Halt) {
+      return true;
+    }
+    if (out->Opcode() != Op_Region)
+      return false;
+  }
+  return false;
+}
+
 //-------------------------------is_uncommon_trap_if_pattern-------------------------
 // Return uncommon trap call node for    "if(test)-> proj -> ...
 //                                                 |
@@ -221,6 +246,15 @@ CallStaticJavaNode* ProjNode::is_uncommon_trap_if_pattern(Deoptimization::DeoptR
     return nullptr;
   }
   return other_if_proj()->is_uncommon_trap_proj(reason);
+}
+
+bool ProjNode::is_assert_if_pattern() const {
+  Node* iff = in(0);
+  if (!iff->is_If() || iff->outcnt() < 2) {
+    // Not a projection of an If or variation of a dead If node.
+    return false;
+  }
+  return other_if_proj()->is_assert_proj();
 }
 
 ProjNode* ProjNode::other_if_proj() const {
