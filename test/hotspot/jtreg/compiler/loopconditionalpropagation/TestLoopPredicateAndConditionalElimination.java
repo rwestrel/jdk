@@ -37,13 +37,16 @@ public class TestLoopPredicateAndConditionalElimination {
     public static void main(String[] args) {
         float[] array = new float[1000];
         for (int i = 0; i < 20_000; i++) {
-            test(false, 0);
+            test1(false, 0);
             inlined1(0, array, 42, true, 0);
             inlined1(0, array, 2, true, 0);
+            test2(false, 0, 1000, 1000);
+            inlined2(0, array, 42, true, 0, 1000, 1000);
+            inlined2(0, array, 2, true, 0, 1000, 1000);
         }
     }
 
-    private static float test(boolean flag, int other) {
+    private static float test1(boolean flag, int other) {
         float[] array = new float[1000];
         notInlined1(array);
         int j = 1;
@@ -69,6 +72,51 @@ public class TestLoopPredicateAndConditionalElimination {
                 if (j == 2) {
                     break;
                 }
+            }
+        } else {
+            volatileBarrier = 42;
+            v = floatField;
+        }
+        return v;
+    }
+    private static float test2(boolean flag, int other, int stop, int other2) {
+        float[] array = new float[1000];
+        notInlined1(array);
+        int j = 1;
+        for (; j < 2; j *= 2) {
+        }
+        int k = 1;
+        for (; k < 2; k *= 2) {
+        }
+        final float v = inlined2(k * 1000, array, j, flag, other, stop, other2);
+        return v;
+    }
+
+    private static float inlined2(int start, float[] array, int j, boolean flag, int other, int stop, int other2) {
+        float v = 0;
+        if (flag) {
+            if (other < 0) {
+            }
+            if (start < other) {
+            }
+            if (other2 > 1000) {
+            }
+            if (stop > other2) {
+            }
+            if (start < stop) {
+                int i = start;
+                do {
+                    synchronized (new Object()) {
+                    }
+                    v = array[i];
+                    if (j == 2) {
+                        break;
+                    }
+                    i++;
+                } while (i < stop);
+            } else {
+                volatileBarrier = 42;
+                v = floatField;
             }
         } else {
             volatileBarrier = 42;
