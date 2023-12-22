@@ -799,6 +799,8 @@
   develop(bool, VerifyLoopConditionalPropagation, false,                    \
           "expensive Loop Conditional Propagation verification")            \
                                                                             \
+  develop(bool, LoopConditionalPropagationALot, false,                      \
+          "run Loop Conditional Propagation on every round of loop opts")   \
                                                                             \
 
 // end of C2_FLAGS
