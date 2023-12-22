@@ -209,6 +209,8 @@ private:
 
   bool _verify;
 
+  VectorSet _tests_to_preserve;
+
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
 

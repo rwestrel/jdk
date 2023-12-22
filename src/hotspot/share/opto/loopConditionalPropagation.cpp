@@ -1096,6 +1096,74 @@ bool PhaseConditionalPropagation::narrows_type(const Type* old_t, const Type* ne
 #endif
 
 void PhaseConditionalPropagation::do_transform() {
+  if (UseNewCode) {
+    for (LoopTreeIterator iter(_phase->ltree_root()); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      if (lpt->is_counted()) {
+        CountedLoopNode* cl = lpt->_head->as_CountedLoop();
+        TypeUpdate* updates = updates_at(cl);
+        if (updates != nullptr && updates->control() == cl) {
+          Node* iv_phi = cl->phi();
+          const Type* iv_phi_t = updates->type_if_present(iv_phi);
+          if (iv_phi_t != nullptr) {
+//            tty->print("XXX "); iv_phi_t->dump(); tty->cr();
+            Node* init = cl->init_trip();
+            const Type* init_t = find_type_between(init, cl, _phase->get_ctrl(init));
+            Node* limit = cl->limit();
+            const Type* limit_t = find_type_between(limit, cl, _phase->get_ctrl(limit));
+//            if (init_t != nullptr) {
+//              tty->print("XXX init "); init_t->dump(); tty->cr();
+//            }
+//            if (limit_t != nullptr) {
+//              tty->print("XXX limit "); limit_t->dump(); tty->cr();
+//            }
+            if (cl->is_normal_loop()) {
+              Node* entry = cl->skip_strip_mined()->in(LoopNode::EntryControl);
+              const Predicates predicates(entry);
+              const PredicateBlock* loop_predicate_block = predicates.loop_predicate_block();
+              if (loop_predicate_block->has_parse_predicate()) {
+                if (init_t != nullptr) {
+                  Node* low_bound = _phase->igvn().intcon(init_t->is_int()->_lo);
+                  Node* bounds = _phase->igvn().intcon(init_t->is_int()->_hi - init_t->is_int()->_lo);
+                  Node* sub = new SubINode(init, low_bound);
+                  Node* cmp = new CmpUNode(sub, bounds);
+                  Node* bol = new BoolNode(cmp, BoolTest::le);
+
+                  ParsePredicateSuccessProj* parse_predicate_proj = loop_predicate_block->parse_predicate_success_proj();
+                  Node* ctrl = parse_predicate_proj->in(0)->as_If()->in(0);
+                  IfProjNode* init_proj = _phase->create_new_if_for_predicate(parse_predicate_proj, nullptr, Deoptimization::Reason_predicate, Op_If);
+                  IfNode* init_iff = init_proj->in(0)->as_If();
+                  _phase->set_ctrl(low_bound, C->root());
+                  _phase->set_ctrl(bounds, C->root());
+                  _phase->register_new_node(sub, ctrl);
+                  _phase->register_new_node(cmp, ctrl);
+                  _phase->igvn().register_new_node_with_optimizer(bol);
+                  Node* one = _phase->igvn().intcon(1);
+                  _phase->set_ctrl(one, C->root());
+                  Node* opaque = new Opaque4Node(C, bol, one);
+                  _phase->register_new_node(opaque, ctrl);
+                  _phase->igvn().replace_input_of(init_iff, 1, opaque);
+                }
+//
+//              Node* opaque_init = new OpaqueLoopInitNode(C, init);
+//              _phase->register_new_node(opaque_init, ctrl);
+//              Node* opaque_bol = new Opaque4Node(C, bol, _igvn.intcon(1)); // This will go away once loop opts are over
+//              C->add_template_assertion_predicate_opaq(opaque_bol);
+//              _phase->register_new_node(opaque_bol, ctrl);
+//              IfProjNode* new_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, overflow ? Op_If : iff->Opcode());
+//              _phase->igvn().replace_input_of(new_proj->in(0), 1, opaque_bol);
+//              assert(opaque_init->outcnt() > 0, "should be used");
+//
+              }
+            } else {
+//              ShouldNotReachHere();
+            }
+          }
+        }
+      }
+    }
+  }
+
   _wq.push(_phase->C->root());
   bool progress = false;
   for (uint i = 0; i < _wq.size(); i++) {
@@ -1192,6 +1260,9 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
           return false;
         }
       } else if (u->Opcode() == Op_Opaque4) {
+        if (u->in(2)->find_int_con(-1) == con) {
+          return false;
+        }
         for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
           Node* uu = u->fast_out(j);
           if (uu->is_If()) {
@@ -1212,9 +1283,17 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
     if (has_cast_with_narrowed_type(proj)) {
       return false;
     }
+    if (use->in(1)->Opcode() == Op_Opaque4) {
+      if (use->in(1)->in(2)->find_int_con(-1) == con) {
+        return false;
+      }
+    }
   }
   if (use->Opcode() == Op_Opaque4) {
     int con = t->is_int()->get_con();
+    if (use->in(2)->find_int_con(-1) == con) {
+      return false;
+    }
     for (DUIterator_Fast jmax, j = use->fast_outs(jmax); j < jmax; j++) {
       Node* u = use->fast_out(j);
       if (u->is_If()) {
@@ -1325,15 +1404,17 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
 
 void PhaseConditionalPropagation::create_halt_node(Node* c) {// undetected dead path
   Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
+  _phase->register_new_node(frame, C->start());
   // can't use register_new_node here
-  _phase->igvn().register_new_node_with_optimizer(frame);
-  _phase->set_ctrl(frame, C->start());
+//  _phase->igvn().register_new_node_with_optimizer(frame);
+//  _phase->set_ctrl(frame, C->start());
   Node* halt = new HaltNode(c, frame, "dead path discovered by PhaseConditionalPropagation");
   add_input_to(C->root(), halt);
   // can't use register_control here
-  _phase->igvn().register_new_node_with_optimizer(halt);
-  _phase->set_loop(halt, _phase->ltree_root());
-  _phase->set_idom(halt, c, _phase->dom_depth(c)+1);
+  _phase->register_control(halt, _phase->ltree_root(), c);
+//  _phase->igvn().register_new_node_with_optimizer(halt);
+//  _phase->set_loop(halt, _phase->ltree_root());
+//  _phase->set_idom(halt, c, _phase->dom_depth(c)+1);
 }
 
 bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t) {
@@ -1551,68 +1632,6 @@ bool PhaseConditionalPropagation::transform_helper(Node* c) {
     }
   } else {
     _wq.push(c);
-  }
-
-  if (0 && c->is_CountedLoop()) {
-    CountedLoopNode* cl = c->as_CountedLoop();
-    TypeUpdate* updates = updates_at(c);
-    if (updates != nullptr && updates->control() == c) {
-      Node* iv_phi = cl->phi();
-      const Type* iv_phi_t = updates->type_if_present(iv_phi);
-      if (iv_phi_t != nullptr) {
-        tty->print("XXX "); iv_phi_t->dump(); tty->cr();
-        Node* init = cl->init_trip();
-        const Type* init_t = find_type_between(init, cl, _phase->get_ctrl(init));
-        Node* limit = cl->limit();
-        const Type* limit_t = find_type_between(limit, cl, _phase->get_ctrl(limit));
-        if (init_t != nullptr) {
-          tty->print("XXX init "); init_t->dump(); tty->cr();
-        }
-        if (limit_t != nullptr) {
-          tty->print("XXX limit "); limit_t->dump(); tty->cr();
-        }
-        if (cl->is_normal_loop()) {
-          Node* entry = cl->skip_strip_mined()->in(LoopNode::EntryControl);
-          const Predicates predicates(entry);
-          const PredicateBlock* loop_predicate_block = predicates.loop_predicate_block();
-          if (loop_predicate_block->has_parse_predicate()) {
-            if (init_t != nullptr) {
-              ParsePredicateSuccessProj* parse_predicate_proj = loop_predicate_block->parse_predicate_success_proj();
-              Node* ctrl = parse_predicate_proj->in(0)->as_If()->in(0);
-              IfProjNode* lower_bound_proj = _phase->create_new_if_for_predicate(parse_predicate_proj, nullptr, Deoptimization::Reason_predicate, Op_If);
-              IfNode* lower_bound_iff = lower_bound_proj->in(0)->as_If();
-              if (cl->stride_con() > 0) {
-                Node* init_bound = _phase->igvn().intcon(init_t->is_int()->_lo);
-                _phase->set_ctrl(init_bound, C->root());
-                Node* cmp = new CmpINode(init, init_bound);
-                _phase->igvn().register_new_node_with_optimizer(cmp);
-                _phase->set_ctrl(cmp, ctrl);
-                Node* bol = new BoolNode(cmp, BoolTest::ge);
-                _phase->igvn().register_new_node_with_optimizer(bol);
-                _phase->set_ctrl(bol, ctrl);
-//                _phase->set_loop(halt, _phase->ltree_root());
-//                _phase->set_idom(halt, c, _phase->dom_depth(c)+1);
-
-              } else {
-
-              }
-//
-//              Node* opaque_init = new OpaqueLoopInitNode(C, init);
-//              _phase->register_new_node(opaque_init, ctrl);
-//              Node* opaque_bol = new Opaque4Node(C, bol, _igvn.intcon(1)); // This will go away once loop opts are over
-//              C->add_template_assertion_predicate_opaq(opaque_bol);
-//              _phase->register_new_node(opaque_bol, ctrl);
-//              IfProjNode* new_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, overflow ? Op_If : iff->Opcode());
-//              _phase->igvn().replace_input_of(new_proj->in(0), 1, opaque_bol);
-//              assert(opaque_init->outcnt() > 0, "should be used");
-//
-            }
-          }
-        } else {
-          ShouldNotReachHere();
-        }
-      }
-    }
   }
 
   return progress;
