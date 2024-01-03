@@ -1256,19 +1256,19 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
       if (u->is_If()) {
         IfNode* iff = u->as_If();
         ProjNode* proj = iff->proj_out(con);
-        if (has_cast_with_narrowed_type(proj)) {
+        if (has_cast_with_narrowed_type(proj) || proj->is_uncommon_trap_if_pattern() != nullptr) {
           return false;
         }
       } else if (u->Opcode() == Op_Opaque4) {
-        if (u->in(2)->find_int_con(-1) == con) {
-          return false;
-        }
+//        if (u->in(2)->find_int_con(-1) == con) {
+//          return false;
+//        }
         for (DUIterator_Fast jmax, j = u->fast_outs(jmax); j < jmax; j++) {
           Node* uu = u->fast_out(j);
           if (uu->is_If()) {
             IfNode* iff = uu->as_If();
             ProjNode* proj = iff->proj_out(con);
-            if (has_cast_with_narrowed_type(proj)) {
+            if (has_cast_with_narrowed_type(proj) || proj->is_uncommon_trap_if_pattern() != nullptr) {
               return false;
             }
           }
@@ -1280,26 +1280,26 @@ bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* us
     IfNode* iff = use->as_If();
     int con = t->is_int()->get_con();
     ProjNode* proj = iff->proj_out(con);
-    if (has_cast_with_narrowed_type(proj)) {
+    if (has_cast_with_narrowed_type(proj) || proj->is_uncommon_trap_if_pattern() != nullptr) {
       return false;
     }
-    if (use->in(1)->Opcode() == Op_Opaque4) {
-      if (use->in(1)->in(2)->find_int_con(-1) == con) {
-        return false;
-      }
-    }
+//    if (use->in(1)->Opcode() == Op_Opaque4) {
+//      if (use->in(1)->in(2)->find_int_con(-1) == con) {
+//        return false;
+//      }
+//    }
   }
   if (use->Opcode() == Op_Opaque4) {
     int con = t->is_int()->get_con();
-    if (use->in(2)->find_int_con(-1) == con) {
-      return false;
-    }
+//    if (use->in(2)->find_int_con(-1) == con) {
+//      return false;
+//    }
     for (DUIterator_Fast jmax, j = use->fast_outs(jmax); j < jmax; j++) {
       Node* u = use->fast_out(j);
       if (u->is_If()) {
         IfNode* iff = u->as_If();
         ProjNode* proj = iff->proj_out(con);
-        if (has_cast_with_narrowed_type(proj)) {
+        if (has_cast_with_narrowed_type(proj) || proj->is_uncommon_trap_if_pattern() != nullptr) {
           return false;
         }
       }
@@ -1368,19 +1368,19 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               iff->set_req_X(1, con, this);
               _phase->C->set_major_progress();
             } else if (iff->in(1)->Opcode() != Op_Opaque4) {
-              Node* con = makecon(new_bol_t);
-              _phase->set_ctrl(con, C->root());
-
-              Node* opaq = new Opaque4Node(C, iff->in(1), con);
-              _phase->igvn().register_new_node_with_optimizer(opaq);
-              _phase->set_ctrl(opaq, iff->in(0));
-              replace_input_of(iff, 1, opaq);
-
               ProjNode* proj = iff->proj_out(1 - new_bol_con);
-              Node* ctrl_use = proj->unique_ctrl_out();
-              replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
-              create_halt_node(proj);
-              _phase->C->set_major_progress();
+              if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
+                  proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
+                Node* con = makecon(new_bol_t);
+                _phase->set_ctrl(con, C->root());
+                Node* opaq = new Opaque4Node(C, iff->in(1), con);
+                _phase->register_new_node(opaq, iff->in(0));
+                replace_input_of(iff, 1, opaq);
+                Node* ctrl_use = proj->unique_ctrl_out();
+                replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
+                create_halt_node(proj);
+                _phase->C->set_major_progress();
+              }
             }
           }
 #ifdef ASSERT
@@ -1513,20 +1513,22 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
           } else if (use->is_If() && use->in(1)->Opcode() != Op_Opaque4) {
             IfNode* iff = use->as_If();
             jint int_con = t->is_int()->get_con();
-            if (con == nullptr) {
-              con = makecon(t);
-              _phase->set_ctrl(con, C->root());
-            }
-            Node* opaq = new Opaque4Node(C, iff->in(1), con);
-            _phase->igvn().register_new_node_with_optimizer(opaq);
-            _phase->set_ctrl(opaq, iff->in(0));
-            replace_input_of(iff, 1, opaq);
-            --i/*, --imax*/;
             ProjNode* proj = iff->proj_out(1 - int_con);
-            Node* ctrl_use = proj->unique_ctrl_out();
-            replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
-            create_halt_node(proj);
-            _phase->C->set_major_progress();
+//            if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
+//                proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
+              if (con == nullptr) {
+                con = makecon(t);
+                _phase->set_ctrl(con, C->root());
+              }
+              Node* opaq = new Opaque4Node(C, iff->in(1), con);
+              _phase->register_new_node(opaq, iff->in(0));
+              replace_input_of(iff, 1, opaq);
+              --i/*, --imax*/;
+              Node* ctrl_use = proj->unique_ctrl_out();
+              replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
+              create_halt_node(proj);
+              _phase->C->set_major_progress();
+//            }
 #ifndef PRODUCT
             Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
             Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
