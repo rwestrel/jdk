@@ -30,6 +30,8 @@
  *                   -XX:+IgnoreUnrecognizedVMOptions -XX:+LoopConditionalPropagationALot TestLoopPredicateAndConditionalElimination
  */
 
+import java.util.Objects;
+
 public class TestLoopPredicateAndConditionalElimination {
     private static volatile int volatileBarrier;
     private static float floatField;
@@ -37,15 +39,15 @@ public class TestLoopPredicateAndConditionalElimination {
     public static void main(String[] args) {
         float[] array = new float[1000];
         for (int i = 0; i < 20_000; i++) {
-            test1(false, 0);
-            inlined1(0, array, 42, true, 0);
-            inlined1(0, array, 2, true, 0);
-            test2(false, 0, 1000, 1000);
-            inlined2(0, array, 42, true, 0, 1000, 1000);
-            inlined2(0, array, 2, true, 0, 1000, 1000);
-//            test3(false, 0);
-//            inlined3(0, array, 42, true, 0);
-//            inlined3(0, array, 2, true, 0);
+//            test1(false, 0);
+//            inlined1(0, array, 42, true, 0);
+//            inlined1(0, array, 2, true, 0);
+//            test2(false, 0, 1000, 1000);
+//            inlined2(0, array, 42, true, 0, 1000, 1000);
+//            inlined2(0, array, 2, true, 0, 1000, 1000);
+            test3(false, 0);
+            inlined3(0, array, 42, true, 0);
+            inlined3(0, array, 2, true, 0);
         }
     }
 
@@ -149,9 +151,9 @@ public class TestLoopPredicateAndConditionalElimination {
             volatileBarrier = 42;
             if (start < other) {
             }
-            if (Integer.compareUnsigned(start, 1000) >= 0) {
-
+            if (start >= 1000) {
             }
+            final float unused = array[start];
             for (int i = start; i < 1000; i++) {
                 v = array[i];
                 if (j == 2) {
