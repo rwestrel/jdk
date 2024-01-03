@@ -1096,7 +1096,7 @@ bool PhaseConditionalPropagation::narrows_type(const Type* old_t, const Type* ne
 #endif
 
 void PhaseConditionalPropagation::do_transform() {
-  if (UseNewCode) {
+  if (UseNewCode && 0) {
     for (LoopTreeIterator iter(_phase->ltree_root()); !iter.done(); iter.next()) {
       IdealLoopTree* lpt = iter.current();
       if (lpt->is_counted()) {
