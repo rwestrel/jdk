@@ -1514,8 +1514,8 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
             IfNode* iff = use->as_If();
             jint int_con = t->is_int()->get_con();
             ProjNode* proj = iff->proj_out(1 - int_con);
-//            if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
-//                proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
+            if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
+                proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
               if (con == nullptr) {
                 con = makecon(t);
                 _phase->set_ctrl(con, C->root());
@@ -1528,7 +1528,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
               replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
               create_halt_node(proj);
               _phase->C->set_major_progress();
-//            }
+            }
 #ifndef PRODUCT
             Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
             Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
