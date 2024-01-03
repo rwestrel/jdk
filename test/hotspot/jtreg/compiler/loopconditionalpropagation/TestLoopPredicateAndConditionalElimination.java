@@ -43,6 +43,9 @@ public class TestLoopPredicateAndConditionalElimination {
             test2(false, 0, 1000, 1000);
             inlined2(0, array, 42, true, 0, 1000, 1000);
             inlined2(0, array, 2, true, 0, 1000, 1000);
+//            test3(false, 0);
+//            inlined3(0, array, 42, true, 0);
+//            inlined3(0, array, 2, true, 0);
         }
     }
 
@@ -117,6 +120,43 @@ public class TestLoopPredicateAndConditionalElimination {
             } else {
                 volatileBarrier = 42;
                 v = floatField;
+            }
+        } else {
+            volatileBarrier = 42;
+            v = floatField;
+        }
+        return v;
+    }
+
+    private static float test3(boolean flag, int other) {
+        float[] array = new float[1000];
+        notInlined1(array);
+        int j = 1;
+        for (; j < 2; j *= 2) {
+        }
+        int k = 1;
+        for (; k < 2; k *= 2) {
+        }
+        final float v = inlined3(k - 3, array, j, flag, other);
+        return v;
+    }
+
+    private static float inlined3(int start, float[] array, int j, boolean flag, int other) {
+        float v = 0;
+        if (flag) {
+            if (other < 0) {
+            }
+            volatileBarrier = 42;
+            if (start < other) {
+            }
+            if (Integer.compareUnsigned(start, 1000) >= 0) {
+
+            }
+            for (int i = start; i < 1000; i++) {
+                v = array[i];
+                if (j == 2) {
+                    break;
+                }
             }
         } else {
             volatileBarrier = 42;
