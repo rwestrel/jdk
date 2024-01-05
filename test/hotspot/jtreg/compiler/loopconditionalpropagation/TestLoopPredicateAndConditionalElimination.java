@@ -46,7 +46,7 @@ public class TestLoopPredicateAndConditionalElimination {
 //            inlined2(0, array, 42, true, 0, 1000, 1000);
 //            inlined2(0, array, 2, true, 0, 1000, 1000);
             test3(false, 0);
-            inlined3(0, array, 42, true, 0);
+            inlined3(0, array, -42, true, 0);
             inlined3(0, array, 2, true, 0);
         }
     }
@@ -143,9 +143,43 @@ public class TestLoopPredicateAndConditionalElimination {
         return v;
     }
 
+    private static int[] intArray = new int[10];
+    private static int intField;
+    private static int otherIntField;
+    private static boolean[] boolArray = {true, false, true, false, true, false, true, false, true, false};
+
+    static class C {
+        int intField;
+    }
+
+    private static C c = new C();
+
     private static float inlined3(int start, float[] array, int j, boolean flag, int other) {
         float v = 0;
         if (flag) {
+            int k;
+            int idx = 0;
+            for (k = 0; k < 10; k++) {
+//                if (boolArray[k]) {
+//                    if (boolArray[(k + 1) % 10]) {
+//                        otherIntField = 42;
+//                    }
+//                } else {
+//                    otherIntField = 42;
+//                }
+                final boolean[] localBoolArray = boolArray;
+                if (localBoolArray == null) {
+                }
+                if (localBoolArray[k]) {
+                    idx = c.intField;
+                } else {
+                    idx = c.intField;
+                }
+                if (localBoolArray[(k + 1) %10]) {
+                        otherIntField = 42;
+                }
+                idx = idx - c.intField;
+            }
             if (other < 0) {
             }
             volatileBarrier = 42;
@@ -153,9 +187,12 @@ public class TestLoopPredicateAndConditionalElimination {
             }
             if (start >= 1000) {
             }
-            final float unused = array[start];
+//            final float unused = array[start + idx];
+            if (Long.compareUnsigned(((long) start) + idx, array.length) >= 0) {
+
+            }
             for (int i = start; i < 1000; i++) {
-                v = array[i];
+                v = array[i + idx];
                 if (j == 2) {
                     break;
                 }
