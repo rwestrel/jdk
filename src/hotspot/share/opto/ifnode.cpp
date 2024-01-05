@@ -1553,6 +1553,15 @@ Node* IfNode::search_identical(int dist, PhaseIterGVN* igvn) {
     return nullptr;
   }
 
+  if (prev_dom != nullptr) {
+    ProjNode* proj = proj_out(prev_dom->as_Proj()->_con);
+    if (in(1)->is_Bool() && in(1)->in(1) != nullptr &&
+        (in(1)->in(1)->Opcode() == Op_CmpU || in(1)->in(1)->Opcode() == Op_CmpUL) &&
+        (proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+         proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr)) {
+      return nullptr;
+    }
+  }
 #ifndef PRODUCT
   if (dist > 2) { // Add to count of null checks elided
     explicit_null_checks_elided++;
@@ -1668,12 +1677,17 @@ Node* IfNode::simple_subsuming(PhaseIterGVN* igvn) {
 #endif
   // Replace condition with constant True(1)/False(0).
   bool is_always_true = br == tb;
+  ProjNode* always_taken_proj = proj_out(is_always_true);
+  if (always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+      always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr) {
+    return nullptr;
+  }
+
   set_req(1, igvn->intcon(is_always_true ? 1 : 0));
 
   // Update any data dependencies to the directly dominating test. This subsumed test is not immediately removed by igvn
   // and therefore subsequent optimizations might miss these data dependencies otherwise. There might be a dead loop
   // ('always_taken_proj' == 'pre') that is cleaned up later. Skip this case to make the iterator work properly.
-  Node* always_taken_proj = proj_out(is_always_true);
   if (always_taken_proj != pre) {
     for (DUIterator_Fast imax, i = always_taken_proj->fast_outs(imax); i < imax; i++) {
       Node* u = always_taken_proj->fast_out(i);
