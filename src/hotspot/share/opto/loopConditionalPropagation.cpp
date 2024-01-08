@@ -1245,6 +1245,7 @@ bool PhaseConditionalPropagation::is_safe_for_replacement(Node* c, Node* node, N
 }
 
 bool PhaseConditionalPropagation::condition_safe_to_constant_fold(const Node* use, const Type* t) const {
+  return true;
   if (t == Type::TOP) {
     return true;
   }
@@ -1369,13 +1370,13 @@ bool PhaseConditionalPropagation::transform_when_top_seen(Node* c, Node* node, c
               _phase->C->set_major_progress();
             } else if (iff->in(1)->Opcode() != Op_Opaque4) {
               ProjNode* proj = iff->proj_out(1 - new_bol_con);
+              Node* con = makecon(new_bol_t);
+              _phase->set_ctrl(con, C->root());
+              Node* opaq = new Opaque4Node(C, iff->in(1), con);
+              _phase->register_new_node(opaq, iff->in(0));
+              replace_input_of(iff, 1, opaq);
               if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
                   proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
-                Node* con = makecon(new_bol_t);
-                _phase->set_ctrl(con, C->root());
-                Node* opaq = new Opaque4Node(C, iff->in(1), con);
-                _phase->register_new_node(opaq, iff->in(0));
-                replace_input_of(iff, 1, opaq);
                 Node* ctrl_use = proj->unique_ctrl_out();
                 replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
                 create_halt_node(proj);
@@ -1514,16 +1515,16 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
             IfNode* iff = use->as_If();
             jint int_con = t->is_int()->get_con();
             ProjNode* proj = iff->proj_out(1 - int_con);
+            if (con == nullptr) {
+              con = makecon(t);
+              _phase->set_ctrl(con, C->root());
+            }
+            Node* opaq = new Opaque4Node(C, iff->in(1), con);
+            _phase->register_new_node(opaq, iff->in(0));
+            replace_input_of(iff, 1, opaq);
+            --i/*, --imax*/;
             if (proj->is_uncommon_trap_proj(Deoptimization::Reason_predicate) == nullptr &&
                 proj->is_uncommon_trap_proj(Deoptimization::Reason_profile_predicate) == nullptr) {
-              if (con == nullptr) {
-                con = makecon(t);
-                _phase->set_ctrl(con, C->root());
-              }
-              Node* opaq = new Opaque4Node(C, iff->in(1), con);
-              _phase->register_new_node(opaq, iff->in(0));
-              replace_input_of(iff, 1, opaq);
-              --i/*, --imax*/;
               Node* ctrl_use = proj->unique_ctrl_out();
               replace_input_of(ctrl_use, ctrl_use->find_edge(proj), C->top());
               create_halt_node(proj);

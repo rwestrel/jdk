@@ -29,6 +29,7 @@
 #include "opto/connode.hpp"
 #include "opto/matcher.hpp"
 #include "opto/phaseX.hpp"
+#include "opto/rootnode.hpp"
 #include "opto/subnode.hpp"
 #include "opto/type.hpp"
 #include "castnode.hpp"
@@ -98,6 +99,20 @@ const Type* ConstraintCastNode::Value(PhaseGVN* phase) const {
 // Return a node which is more "ideal" than the current node.  Strip out
 // control copies
 Node *ConstraintCastNode::Ideal(PhaseGVN *phase, bool can_reshape) {
+  Node* c = in(0);
+  if (can_reshape && c != nullptr && phase->type(c) != Type::TOP && Value(phase) == Type::TOP) {
+    Node* c_use = c->unique_ctrl_out_or_null();
+    if (c_use != nullptr) {
+      PhaseIterGVN* igvn = phase->is_IterGVN();
+      igvn->rehash_node_delayed(c_use);
+      c_use->replace_edge(c, igvn->C->top());
+      Node* frame = igvn->transform(new ParmNode(igvn->C->start(), TypeFunc::FramePtr));
+      Node* halt = igvn->transform(new HaltNode(c, frame, "dead path discovered by IGVN"));
+      igvn->add_input_to(igvn->C->root(), halt);
+      return igvn->C->top();
+    }
+  }
+
   return (in(0) && remove_dead_region(phase, can_reshape)) ? this : nullptr;
 }
 

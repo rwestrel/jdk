@@ -31,6 +31,7 @@
 #include "opto/cfgnode.hpp"
 #include "opto/connode.hpp"
 #include "opto/loopnode.hpp"
+#include "opto/opaquenode.hpp"
 #include "opto/phaseX.hpp"
 #include "opto/predicates.hpp"
 #include "opto/runtime.hpp"
@@ -1470,6 +1471,21 @@ Node* IfNode::dominated_by(Node* prev_dom, PhaseIterGVN* igvn, bool pin_array_ac
   }
 #endif
 
+//  if (!igvn->C->post_loop_opts_phase() && in(1)->is_Bool() && in(1)->in(1) != nullptr &&
+//      (in(1)->in(1)->Opcode() == Op_CmpU || in(1)->in(1)->Opcode() == Op_CmpUL)) {
+//    ProjNode* prev_proj = prev_dom->as_Proj();
+//    ProjNode* proj = proj_out(prev_proj->_con);
+//    bool proj_is_predicate = (proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+//                              proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr);
+//    bool prev_proj_is_predicate = (prev_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+//                                   prev_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr);
+//    if (proj_is_predicate && !prev_proj_is_predicate) {
+//      Node* opaq = igvn->transform(new Opaque4Node(igvn->C, in(1), igvn->intcon(prev_proj->_con)));
+//      igvn->replace_input_of(this, 1, opaq);
+//      return this;
+//    }
+//  }
+
   igvn->hash_delete(this);      // Remove self to prevent spurious V-N
   Node *idom = in(0);
   // Need opcode to decide which way 'this' test goes
@@ -1553,15 +1569,6 @@ Node* IfNode::search_identical(int dist, PhaseIterGVN* igvn) {
     return nullptr;
   }
 
-  if (prev_dom != nullptr) {
-    ProjNode* proj = proj_out(prev_dom->as_Proj()->_con);
-    if (in(1)->is_Bool() && in(1)->in(1) != nullptr &&
-        (in(1)->in(1)->Opcode() == Op_CmpU || in(1)->in(1)->Opcode() == Op_CmpUL) &&
-        (proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
-         proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr)) {
-      return nullptr;
-    }
-  }
 #ifndef PRODUCT
   if (dist > 2) { // Add to count of null checks elided
     explicit_null_checks_elided++;
@@ -1678,10 +1685,10 @@ Node* IfNode::simple_subsuming(PhaseIterGVN* igvn) {
   // Replace condition with constant True(1)/False(0).
   bool is_always_true = br == tb;
   ProjNode* always_taken_proj = proj_out(is_always_true);
-  if (always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
-      always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr) {
-    return nullptr;
-  }
+//  if (always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+//      always_taken_proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr) {
+//    return nullptr;
+//  }
 
   set_req(1, igvn->intcon(is_always_true ? 1 : 0));
 

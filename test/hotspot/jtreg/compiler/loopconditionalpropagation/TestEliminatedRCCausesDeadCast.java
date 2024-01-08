@@ -25,8 +25,10 @@
  * @test
  * @bug 8275202
  * @summary C2: optimize out more redundant conditions
- * @run main/othervm -XX:-BackgroundCompilation -XX:-UseOnStackReplacement -XX:-TieredCompilation TestEliminatedRCCausesDeadCast
+ * @run main/othervm -XX:-BackgroundCompilation -XX:-UseOnStackReplacement -XX:-TieredCompilation compiler.loopconditionalpropagation.TestEliminatedRCCausesDeadCast
  */
+
+package compiler.loopconditionalpropagation;
 
 public class TestEliminatedRCCausesDeadCast {
     private static int intField = 10;

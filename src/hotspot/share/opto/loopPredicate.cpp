@@ -1229,6 +1229,7 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
     Node* in1 = bol->in(1);
     if (in1->Opcode() == Op_Opaque4) {
       in1 = in1->in(1);
+      ShouldNotReachHere();
     }
     const Node*    cmp    = in1->as_Cmp();
     Node*          idx    = cmp->in(1);
@@ -1265,7 +1266,13 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
     // If predicate expressions may overflow in the integer range, longs are used.
     bool overflow = false;
     // Test the lower bound
-    BoolNode* lower_bound_bol = rc_predicate(loop, ctrl, scale, offset, init, limit, stride, rng, false, overflow);
+    Node* lower_bound_bol = rc_predicate(loop, ctrl, scale, offset, init, limit, stride, rng, false, overflow);
+    if (iff->in(1)->Opcode() == Op_Opaque4) {
+      Node* one = _igvn.intcon(1);
+      set_ctrl(one, C->root());
+      lower_bound_bol = new Opaque4Node(C, lower_bound_bol, one);
+      register_new_node(lower_bound_bol, ctrl);
+    }
 
     const int if_opcode = iff->Opcode();
     IfProjNode* lower_bound_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, overflow ? Op_If : if_opcode);
@@ -1275,8 +1282,15 @@ bool PhaseIdealLoop::loop_predication_impl_helper(IdealLoopTree* loop, IfProjNod
     if (TraceLoopPredicate) tty->print_cr("lower bound check if: %d", lower_bound_iff->_idx);
 
     // Test the upper bound
-    BoolNode* upper_bound_bol = rc_predicate(loop, lower_bound_proj, scale, offset, init, limit, stride, rng, true,
-                                             overflow);
+    Node* upper_bound_bol = rc_predicate(loop, lower_bound_proj, scale, offset, init, limit, stride, rng, true,
+                                         overflow);
+
+    if (iff->in(1)->Opcode() == Op_Opaque4) {
+      Node* one = _igvn.intcon(1);
+      set_ctrl(one, C->root());
+      upper_bound_bol = new Opaque4Node(C, upper_bound_bol, one);
+      register_new_node(upper_bound_bol, ctrl);
+    }
 
     IfProjNode* upper_bound_proj = create_new_if_for_predicate(parse_predicate_proj, nullptr, reason, overflow ? Op_If : if_opcode);
     assert(upper_bound_proj->in(0)->as_If()->in(0) == lower_bound_proj, "should dominate");

@@ -1824,6 +1824,9 @@ void PhaseCCP::analyze() {
       // not reachable from the bottom. Otherwise, infinite loops would be removed.
       _root_and_safepoints.push(n);
     }
+    if (n->is_ConstraintCast()) {
+      _cast_nodes.push(n);
+    }
     const Type* new_type = n->Value(this);
     if (new_type != type(n)) {
       DEBUG_ONLY(verify_type(n, new_type, type(n));)
@@ -2063,6 +2066,22 @@ Node *PhaseCCP::transform( Node *n ) {
   GrowableArray <Node *> transform_stack(C->live_nodes() >> 1);
   // track all visited nodes, so that we can remove the complement
   Unique_Node_List useful;
+
+  for (uint i = 0; i < _cast_nodes.size(); ++i) {
+    Node* cast = _cast_nodes.at(i);
+    Node* c = cast->in(0);
+    if (type(cast) == Type::TOP && type(c) != Type::TOP) {
+//      tty->print("XXX dead path"); cast->dump();
+      Node* c_use = c->unique_ctrl_out();
+      rehash_node_delayed(c_use);
+      c_use->replace_edge(c, C->top());
+      Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
+      register_new_node_with_optimizer(frame);
+      Node* halt = new HaltNode(c, frame, "dead path discovered by CCP");
+      register_new_node_with_optimizer(halt);
+      add_input_to(C->root(), halt);
+    }
+  }
 
   // Initialize the traversal.
   // This CCP pass may prove that no exit test for a loop ever succeeds (i.e. the loop is infinite). In that case,

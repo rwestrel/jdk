@@ -322,6 +322,20 @@ void PhaseIdealLoop::dominated_by(IfProjNode* prevdom, IfNode* iff, bool flip, b
          iff->Opcode() == Op_ParsePredicate,
         "Check this code when new subtype is added");
 
+//  if (iff->in(1)->is_Bool() && iff->in(1)->in(1) != nullptr &&
+//      (iff->in(1)->in(1)->Opcode() == Op_CmpU || iff->in(1)->in(1)->Opcode() == Op_CmpUL)) {
+//    ProjNode* proj = iff->proj_out(prevdom->_con);
+//    bool proj_is_predicate = (proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+//                              proj->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr);
+//    bool prev_proj_is_predicate = (prevdom->is_uncommon_trap_if_pattern(Deoptimization::Reason_predicate) != nullptr ||
+//                                   prevdom->is_uncommon_trap_if_pattern(Deoptimization::Reason_profile_predicate) != nullptr);
+//    if (proj_is_predicate && !prev_proj_is_predicate) {
+//      Node* opaq = new Opaque4Node(C, iff->in(1), _igvn.intcon(prevdom->_con));
+//      register_new_node(opaq, iff->in(0));
+//      _igvn.replace_input_of(iff, 1, opaq);
+//      return;
+//    }
+//  }
   int pop = prevdom->Opcode();
   assert( pop == Op_IfFalse || pop == Op_IfTrue, "" );
   if (flip) {
