@@ -1353,8 +1353,7 @@ void PhaseIdealLoop::copy_assertion_predicates_to_main_loop_helper(const Predica
       uncommon_proj = iff->proj_out(1 - predicate_proj->as_Proj()->_con);
       if (uncommon_proj->unique_ctrl_out() != rgn)
         break;
-      if (iff->in(1)->Opcode() == Op_Opaque4) {
-        assert(assertion_predicate_has_loop_opaque_node(iff), "unexpected");
+      if (iff->in(1)->Opcode() == Op_Opaque4 && assertion_predicate_has_loop_opaque_node(iff)) {
         // Clone the Assertion Predicate twice and initialize one with the initial
         // value of the loop induction variable. Leave the other predicate
         // to be initialized when increasing the stride during loop unrolling.
@@ -2113,7 +2112,7 @@ void PhaseIdealLoop::initialize_assertion_predicates_for_peeled_loop(const Predi
       break;
     }
     if (iff->in(1)->Opcode() == Op_Opaque4) {
-      assert(assertion_predicate_has_loop_opaque_node(iff), "unexpected");
+       assert(assertion_predicate_has_loop_opaque_node(iff), "unexpected");
       input_proj = clone_assertion_predicate_and_initialize(iff, init, stride, next_regular_predicate_proj, uncommon_proj, control,
                                                             outer_loop, input_proj);
 
