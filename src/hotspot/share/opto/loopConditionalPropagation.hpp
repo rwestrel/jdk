@@ -86,6 +86,13 @@ private:
       return _updates.at(i)._after;
     }
 
+    const Type* prev_type_if_present(Node* n) {
+      int i = find(n);
+      if (i == -1) {
+        return nullptr;
+      }
+      return _updates.at(i)._before;
+    }
 
     void set_type_at(int i, const Type* t) {
       _updates.at(i)._after = t;
@@ -300,6 +307,8 @@ public:
   void create_halt_node(Node* c);
 
   bool has_cast_with_narrowed_type(ProjNode* proj) const;
+
+  void pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const;
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP
