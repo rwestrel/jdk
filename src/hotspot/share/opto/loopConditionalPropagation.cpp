@@ -149,6 +149,9 @@ PhaseConditionalPropagation::UseType PhaseConditionalPropagation::related_use(No
     return Immediate;
   }
   if (is_dominator(c, u_c)) {
+    if (!u->is_CFG()) {
+      return Immediate;
+    }
     return Delayed;
   }
   if (u->is_CFG()) {
@@ -685,7 +688,7 @@ void PhaseConditionalPropagation::propagate_types(Node* c, bool& extra) {
   sync(c);
   while (_wq.size() > 0) {
     Node* n = _wq.pop();
-    assert(_verify || is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
+    assert(_verify || !n->is_CFG() || is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), c), "");
 #ifdef ASSERT
     if (UseNewCode3) {
       tty->print("[%d] Value at %d %s ", _iterations, c->_idx, _phase->find_non_split_ctrl(_phase->ctrl_or_self(n)) == c ? "at_control" : "above_control"); n->dump();
@@ -1482,6 +1485,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
         } else if (is_dominator(c, _phase->ctrl_or_self(use)) &&
                    is_safe_for_replacement(c, node, use) ) {
           if (condition_safe_to_constant_fold(use, t)) {
+            pin_array_access_nodes_if_needed(node, t, use, c);
             progress = true;
             if (con == nullptr) {
               con = makecon(t);
@@ -1511,7 +1515,6 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
 #endif
               _phase->C->set_major_progress();
             }
-            pin_array_access_nodes_if_needed(node, t, use, c);
           } else if (use->is_If() && use->in(1)->Opcode() != Op_Opaque4) {
             IfNode* iff = use->as_If();
             jint int_con = t->is_int()->get_con();
@@ -1547,8 +1550,7 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
   return false;
 }
 
-void PhaseConditionalPropagation::pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use,
-                                                                   Node* c) const {
+void PhaseConditionalPropagation::pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const {
   if (t == Type::TOP) {
     return;
   }
@@ -1557,75 +1559,74 @@ void PhaseConditionalPropagation::pin_array_access_nodes_if_needed(const Node* n
     if (use->is_RangeCheck() && node->in(1)->is_Cmp()) {
       IfNode* iff = use->as_If();
       int con = t->is_int()->get_con();
-      ProjNode* proj = iff->proj_out(con);
-      Node* ctrl = nullptr;
-      for (DUIterator i = proj->outs(); proj->has_out(i); i++) {
-        Node* u = proj->out(i);
-        if (u->depends_only_on_test()) {
-          Node* clone = u->pin_array_access_node();
-          if (clone != nullptr) {
-            CmpNode* cmp =  node->in(1)->as_Cmp();
-            Node* in1 = cmp->in(1);
-            Node* in2 = cmp->in(2);
-            Node* c1 = _phase->get_ctrl(in1);
-            Node* c2 = _phase->get_ctrl(in2);
-
-            const Type* t1 = find_type_between(in1, c, c1);
-            if (t1 == nullptr) {
-              t1 = PhaseValues::type(in1);
-            }
-            const Type* t2 = find_type_between(in2, c, c2);
-            if (t2 == nullptr) {
-              t2 = PhaseValues::type(in2);
-            }
-            assert(t == bol->_test.cc2logical(cmp->sub(t1, t2)), "");
-            Node* early_ctrl = _phase->dom_lca(c1, c2);
-            Node* last = c;
-            while (c != early_ctrl) {
-              TypeUpdate* updates = updates_at(c);
-              if (updates != nullptr) {
-                const Type* prev_t1 = updates->prev_type_if_present(in1);
-                const Type* prev_t2 = updates->prev_type_if_present(in2);
-                if (prev_t1 != nullptr) {
-                  t1 = prev_t1;
-                }
-                if (prev_t2 != nullptr) {
-                  t2 = prev_t2;
-                }
-                if (t != bol->_test.cc2logical(cmp->sub(t1, t2))) {
-                  break;
-                }
-              }
-              c = _phase->idom(c);
-            }
-            clone->set_req(0, c);
-            _phase->register_new_node(clone, _phase->get_ctrl(u));
-            _phase->igvn().replace_node(u, clone);
-            --i;
-          }
+      pin_array_access_nodes(c, iff, con);
+    }
+  } else if (node->is_Cmp()) {
+    if (use->is_Bool()) {
+      BoolNode* bol = use->as_Bool();
+      for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
+        Node* u = use->fast_out(i);
+        if (u->is_RangeCheck()) {
+          pin_array_access_nodes(c, u->as_If(), bol->_test.cc2logical(t)->is_int()->get_con());
         }
       }
     }
-//  } else if (node->is_Cmp() && use->is_Bool()) {
-//    BoolNode* bol = use->as_Bool();
-//    int con = bol->_test.cc2logical(t)->is_int()->get_con();
-//    Node* early_control = nullptr;
-//    for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
-//      Node* u = use->fast_out(i);
-//      if (u->is_RangeCheck()) {
-//        IfNode* iff = u->as_If();
-//        ProjNode* proj = iff->proj_out(con);
-//        for (DUIterator_Fast jmax, j = proj->fast_outs(jmax); j < jmax; j++) {
-//          Node* uu = use->fast_out(j);
-//          if (uu->depends_only_on_test()) {
-//            Node* clone = uu->pin_array_access_node();
-//            if (clone != nullptr) {
-//              uu->dump();
+  }
+}
+
+void PhaseConditionalPropagation::pin_array_access_nodes(Node* c, const IfNode* iff, int con) const {
+  BoolNode* bol = iff->in(1)->as_Bool();
+  CmpNode* cmp = bol->in(1)->as_Cmp();
+  ProjNode* proj = iff->proj_out(con);
+  Node* ctrl = nullptr;
+  for (DUIterator i = proj->outs(); proj->has_out(i); i++) {
+    Node* u = proj->out(i);
+    if (u->depends_only_on_test()) {
+      Node* clone = u->pin_array_access_node();
+      if (clone != nullptr) {
+//        const Type* t = TypeInt::make(con);
+//        Node* in1 = cmp->in(1);
+//        Node* in2 = cmp->in(2);
+//        Node* c1 = _phase->get_ctrl(in1);
+//        Node* c2 = _phase->get_ctrl(in2);
+//
+//        const Type* t1 = find_type_between(in1, c, c1);
+//        if (t1 == nullptr) {
+//          t1 = PhaseValues::type(in1);
+//        }
+//        const Type* t2 = find_type_between(in2, c, c2);
+//        if (t2 == nullptr) {
+//          t2 = PhaseValues::type(in2);
+//        }
+//        assert(t == bol->_test.cc2logical(cmp->sub(t1, t2)), "");
+//        Node* early_ctrl = _phase->dom_lca(c1, c2);
+//        Node* last = c;
+//        while (c != early_ctrl) {
+//          if (!c->is_MultiBranch()) {
+//            assert(c == known_updates(c), "");
+//            TypeUpdate* updates = updates_at(c);
+//            if (updates != nullptr) {
+//              const Type* prev_t1 = updates->prev_type_if_present(in1);
+//              const Type* prev_t2 = updates->prev_type_if_present(in2);
+//              if (prev_t1 != nullptr) {
+//                t1 = prev_t1;
+//              }
+//              if (prev_t2 != nullptr) {
+//                t2 = prev_t2;
+//              }
+//              if (t != bol->_test.cc2logical(cmp->sub(t1, t2))) {
+//                break;
+//              }
 //            }
 //          }
+//          c = _phase->idom(c);
 //        }
-//      }
-//    }
+        clone->set_req(0, c);
+        _phase->register_new_node(clone, _phase->get_ctrl(u));
+        _phase->igvn().replace_node(u, clone);
+        --i;
+      }
+    }
   }
 }
 

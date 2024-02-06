@@ -44,7 +44,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private void test1(int i) {
@@ -57,8 +57,8 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"3"})
-    @Arguments({Argument.NUMBER_42,Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
+    @IR(counts = {IRNode.IF, "3"})
+    @Arguments({Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
     @Warmup(10_000)
     private static void test2(int i, boolean flag) {
         if (flag) {
@@ -82,8 +82,8 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"2"})
-    @Arguments({Argument.NUMBER_42,Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
+    @IR(counts = {IRNode.IF, "2"})
+    @Arguments({Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
     @Warmup(10_000)
     private static void test3(int i, boolean flag) {
         if (flag) {
@@ -103,8 +103,8 @@ public class TestLoopConditionalPropagation {
     static volatile int volatileField;
 
     @Test
-    @IR(counts = {IRNode.IF,"3"})
-    @Arguments({Argument.NUMBER_42,Argument.NUMBER_42})
+    @IR(counts = {IRNode.IF, "3"})
+    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test4(int i, int k) {
         if (i < 42) {
@@ -223,8 +223,8 @@ public class TestLoopConditionalPropagation {
 
 
     @Test
-    @IR(counts = {IRNode.IF,"2"})
-    @IR(failOn = {IRNode.ADD_I,IRNode.MUL_I})
+    @IR(counts = {IRNode.IF, "2"})
+    @IR(failOn = {IRNode.ADD_I, IRNode.MUL_I})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private static int test5(int i) {
@@ -240,8 +240,8 @@ public class TestLoopConditionalPropagation {
 
 
     @Test
-    @IR(counts = {IRNode.IF,"3"})
-    @Arguments({Argument.NUMBER_42,Argument.NUMBER_42,Argument.NUMBER_42})
+    @IR(counts = {IRNode.IF, "3"})
+    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test6(int i, int j, int k) {
         if (i < 42) {
@@ -259,7 +259,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test7(int i) {
@@ -272,7 +272,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test8(int i) {
@@ -286,7 +286,7 @@ public class TestLoopConditionalPropagation {
 
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test9(long i) {
@@ -300,7 +300,7 @@ public class TestLoopConditionalPropagation {
 
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test10(int i) {
@@ -313,7 +313,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"1"})
+    @IR(counts = {IRNode.IF, "1"})
     @Arguments({Argument.BOOLEAN_TOGGLE_FIRST_TRUE, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test11(boolean flag, int i) {
@@ -332,7 +332,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"2"})
+    @IR(counts = {IRNode.IF, "2"})
     @Arguments({Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test12(int i, int j) {
@@ -350,6 +350,7 @@ public class TestLoopConditionalPropagation {
     }
 
     static volatile int barrier;
+
     static class C {
         float field;
     }
@@ -361,7 +362,7 @@ public class TestLoopConditionalPropagation {
         int v = 0;
         int j = 1;
 
-        for (; j < 2; j *= 2);
+        for (; j < 2; j *= 2) ;
 
         test13Helper(j, c);
 
@@ -415,8 +416,8 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"4"})
-    @Arguments({Argument.NUMBER_42,Argument.NUMBER_42,Argument.NUMBER_42})
+    @IR(counts = {IRNode.IF, "4"})
+    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test14(int i, int k, int l) {
         if (i < 42) {
@@ -539,8 +540,8 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(counts = {IRNode.IF,"6"})
-    @Arguments({Argument.NUMBER_42,Argument.NUMBER_42,Argument.NUMBER_42,Argument.RANDOM_EACH})
+    @IR(counts = {IRNode.IF, "6"})
+    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42, Argument.RANDOM_EACH})
     @Warmup(10_000)
     private static void test15(int i, int k, int l, boolean flag) {
         if (i < 42) {
@@ -669,8 +670,8 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP})
-    @IR(applyIf = { "UseLoopPredicate", "false" }, counts = {IRNode.COUNTED_LOOP, "2"}, failOn = {IRNode.COUNTED_LOOP_MAIN})
+    @IR(applyIf = {"UseLoopPredicate", "true"}, failOn = {IRNode.COUNTED_LOOP})
+    @IR(applyIf = {"UseLoopPredicate", "false"}, counts = {IRNode.COUNTED_LOOP, "2"}, failOn = {IRNode.COUNTED_LOOP_MAIN})
     private static float test16(int start, int stop) {
         float[] array = new float[1000];
         if (start < 0) {
@@ -693,21 +694,17 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP})
+    @IR(failOn = {IRNode.COUNTED_LOOP})
     private static float test17(int start, int stop, boolean flag) {
         float[] array = new float[1000];
-        if (start < 0) {
-
-        }
-        if (stop > 1000) {
-
-        }
         float v = 0;
-        for (int i = start; i < stop; i++) {
-            if (flag) {
-                v = array[i];
-            } else {
-                v = array[i];
+        if (start >= 0 && stop <=  1000) {
+            for (int i = start; i < stop; i++) {
+                if (flag) {
+                    v = array[i];
+                } else {
+                    v = array[i];
+                }
             }
         }
         return v;
@@ -721,8 +718,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(applyIf = { "UseLoopPredicate", "true" }, failOn = {IRNode.COUNTED_LOOP, IRNode.LONG_COUNTED_LOOP}, counts = {IRNode.LOOP, "1"})
-    @IR(applyIf = { "UseLoopPredicate", "false" }, counts = {IRNode.COUNTED_LOOP, "1"}, failOn = {IRNode.COUNTED_LOOP_MAIN})
+    @IR(failOn = {IRNode.COUNTED_LOOP, IRNode.LONG_COUNTED_LOOP}, counts = {IRNode.LOOP, "1"})
     private static float test18(long start, long stop) {
         if (start < 0) {
 
@@ -741,5 +737,29 @@ public class TestLoopConditionalPropagation {
     @Warmup(10_000)
     public static void test18Runner() {
         test18(0, 1000);
+    }
+
+    @Test
+    @IR(counts = {IRNode.LOAD_I, "1"})
+    private static int test19(int i) {
+        int[] array = new int[10];
+        if (i < 0) {
+            throw new RuntimeException("never taken");
+        }
+        volatileField = 42;
+        if (i >= 10) {
+            throw new RuntimeException("never taken");
+        }
+        int v = 0;
+        for (int j = 0; j < 100; j++) {
+            v += array[i];
+        }
+        return v;
+    }
+
+    @Run(test = "test19")
+    @Warmup(10_000)
+    public static void test19Runner() {
+        test19(0);
     }
 }
