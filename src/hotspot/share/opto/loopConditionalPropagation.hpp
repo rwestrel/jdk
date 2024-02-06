@@ -67,7 +67,7 @@ private:
     }
 
     Node* node_at(int i) const {
-      return const_cast<Node*>(_updates.at(i)._node);
+      return (Node*)(_updates.at(i)._node);
     }
 
     const Type* prev_type_at(int i) const {
@@ -309,6 +309,8 @@ public:
   bool has_cast_with_narrowed_type(ProjNode* proj) const;
 
   void pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const;
+
+  void pin_array_access_nodes(Node* c, const IfNode* iff, int con) const;
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP
