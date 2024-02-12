@@ -100,17 +100,10 @@ const Type* ConstraintCastNode::Value(PhaseGVN* phase) const {
 // control copies
 Node *ConstraintCastNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   Node* c = in(0);
-  if (can_reshape && c != nullptr && phase->type(c) != Type::TOP && Value(phase) == Type::TOP) {
-    Node* c_use = c->unique_ctrl_out_or_null();
-    if (c_use != nullptr) {
-      PhaseIterGVN* igvn = phase->is_IterGVN();
-      igvn->rehash_node_delayed(c_use);
-      c_use->replace_edge(c, igvn->C->top());
-      Node* frame = igvn->transform(new ParmNode(igvn->C->start(), TypeFunc::FramePtr));
-      Node* halt = igvn->transform(new HaltNode(c, frame, "dead path discovered by IGVN"));
-      igvn->add_input_to(igvn->C->root(), halt);
-      return igvn->C->top();
-    }
+  if (can_reshape && Value(phase) == Type::TOP) {
+    PhaseIterGVN* igvn = phase->is_IterGVN();
+    make_paths_from_here_dead(igvn);
+    return igvn->C->top();
   }
 
   return (in(0) && remove_dead_region(phase, can_reshape)) ? this : nullptr;
@@ -208,6 +201,49 @@ bool ConstraintCastNode::higher_equal_types(const Type* t) const {
     }
   }
   return true;
+}
+
+void ConstraintCastNode::make_paths_from_here_dead(PhaseIterGVN* igvn) {
+  ResourceMark rm;
+  Unique_Node_List wq;
+  wq.push(this);
+  for (uint i = 0; i < wq.size(); ++i) {
+    Node* n = wq.at(i);
+    for (DUIterator_Fast kmax, k = n->fast_outs(kmax); k < kmax; k++) {
+      Node* u = n->fast_out(k);
+      if (u->is_CFG()) {
+//        tty->print("XXX dead at"); u->dump();
+        assert(!u->is_Region(), "");
+        Node* c = u->in(0);
+        if (igvn->type(c) != Type::TOP) {
+          igvn->replace_input_of(u, 0, igvn->C->top());
+          create_halt_path(igvn, c);
+        }
+      } else if (u->is_Phi()) {
+//        tty->print("XXX dead at"); u->dump();
+        for (uint k = 1; k < u->req(); ++k) {
+          if (u->in(k) == n) {
+            Node* r = u->in(0);
+            Node* c = r->in(k);
+            if (igvn->type(c) != Type::TOP) {
+              igvn->replace_input_of(r, k, igvn->C->top());
+              create_halt_path(igvn, c);
+            }
+          }
+        }
+      } else {
+        wq.push(u);
+      }
+    }
+  }
+}
+
+void ConstraintCastNode::create_halt_path(PhaseIterGVN* igvn, Node* c) const {
+  Node* frame = new ParmNode(igvn->C->start(), TypeFunc::FramePtr);
+  igvn->register_new_node_with_optimizer(frame);
+  Node* halt = new HaltNode(c, frame, "dead path discovered by CCP");
+  igvn->register_new_node_with_optimizer(halt);
+  igvn->add_input_to(igvn->C->root(), halt);
 }
 
 #ifndef PRODUCT

@@ -2070,16 +2070,9 @@ Node *PhaseCCP::transform( Node *n ) {
   for (uint i = 0; i < _cast_nodes.size(); ++i) {
     Node* cast = _cast_nodes.at(i);
     Node* c = cast->in(0);
-    if (type(cast) == Type::TOP && type(c) != Type::TOP) {
+    if (type(cast) == Type::TOP) {
 //      tty->print("XXX dead path"); cast->dump();
-      Node* c_use = c->unique_ctrl_out();
-      rehash_node_delayed(c_use);
-      c_use->replace_edge(c, C->top());
-      Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
-      register_new_node_with_optimizer(frame);
-      Node* halt = new HaltNode(c, frame, "dead path discovered by CCP");
-      register_new_node_with_optimizer(halt);
-      add_input_to(C->root(), halt);
+      cast->as_ConstraintCast()->make_paths_from_here_dead(this);
     }
   }
 

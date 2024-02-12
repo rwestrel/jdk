@@ -90,6 +90,10 @@ public:
   const Type* extra_type_at(int i) const {
     return _extra_types->field_at(i);
   }
+
+  void make_paths_from_here_dead(PhaseIterGVN* igvn);
+
+  void create_halt_path(PhaseIterGVN* igvn, Node* c) const;
 };
 
 //------------------------------CastIINode-------------------------------------
