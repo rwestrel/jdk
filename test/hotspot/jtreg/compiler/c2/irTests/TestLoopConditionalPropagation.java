@@ -45,7 +45,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private void test1(int i) {
         if (i < 42) {
@@ -58,7 +58,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "3"})
-    @Arguments({Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
+    @Arguments(values={Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
     @Warmup(10_000)
     private static void test2(int i, boolean flag) {
         if (flag) {
@@ -83,7 +83,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "2"})
-    @Arguments({Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
+    @Arguments(values={Argument.NUMBER_42, Argument.BOOLEAN_TOGGLE_FIRST_TRUE})
     @Warmup(10_000)
     private static void test3(int i, boolean flag) {
         if (flag) {
@@ -104,7 +104,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "3"})
-    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test4(int i, int k) {
         if (i < 42) {
@@ -225,7 +225,7 @@ public class TestLoopConditionalPropagation {
     @Test
     @IR(counts = {IRNode.IF, "2"})
     @IR(failOn = {IRNode.ADD_I, IRNode.MUL_I})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private static int test5(int i) {
         if (i < 42) {
@@ -241,7 +241,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "3"})
-    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test6(int i, int j, int k) {
         if (i < 42) {
@@ -260,7 +260,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test7(int i) {
         if (i < 0 || i >= 43) {
@@ -273,7 +273,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test8(int i) {
         if (i < 0 || i >= 43) {
@@ -287,7 +287,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test9(long i) {
         if (i < 42) {
@@ -301,7 +301,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test10(int i) {
         if (i - 1 <= 0) {
@@ -314,7 +314,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "1"})
-    @Arguments({Argument.BOOLEAN_TOGGLE_FIRST_TRUE, Argument.NUMBER_42})
+    @Arguments(values={Argument.BOOLEAN_TOGGLE_FIRST_TRUE, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test11(boolean flag, int i) {
         if (i - 1 <= 0) {
@@ -333,7 +333,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "2"})
-    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test12(int i, int j) {
         if (i < 42) {
@@ -417,7 +417,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "4"})
-    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
+    @Arguments(values={Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42})
     @Warmup(10_000)
     private static void test14(int i, int k, int l) {
         if (i < 42) {
@@ -541,7 +541,7 @@ public class TestLoopConditionalPropagation {
 
     @Test
     @IR(counts = {IRNode.IF, "6"})
-    @Arguments({Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42, Argument.RANDOM_EACH})
+    @Arguments(values={Argument.NUMBER_42, Argument.NUMBER_42, Argument.NUMBER_42, Argument.RANDOM_EACH})
     @Warmup(10_000)
     private static void test15(int i, int k, int l, boolean flag) {
         if (i < 42) {
