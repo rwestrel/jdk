@@ -4817,9 +4817,9 @@ void PhaseIdealLoop::build_and_optimize() {
     visited.clear();
     int rounds = max_jint;
     conditional_elimination(visited, nstack, worklist, rounds);
-    if (!LoopConditionalPropagationALot) {
-      C->set_run_loop_conditional_propagation(false);
-    }
+    // if (!LoopConditionalPropagationALot) {
+    //   C->set_run_loop_conditional_propagation(false);
+    // }
     conditional_elimination_already_ran = true;
   }
 

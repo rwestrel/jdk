@@ -1546,6 +1546,11 @@ bool PhaseConditionalPropagation::transform_when_constant_seen(Node* c, Node* no
       }
       return progress;
     }
+  } else if (node->is_Type() && c == node->in(0)) {
+    _phase->igvn().rehash_node_delayed(node);
+    node->as_Type()->set_type(t);
+    _phase->igvn().set_type(node, t);
+    _phase->igvn().add_users_to_worklist(node);
   }
   return false;
 }

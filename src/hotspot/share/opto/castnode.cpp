@@ -298,9 +298,9 @@ Node *CastIINode::Ideal(PhaseGVN *phase, bool can_reshape) {
     // makes sure we run ::Value to potentially remove type assertion after loop opts
     phase->C->record_for_post_loop_opts_igvn(this);
   }
-  if (!_range_check_dependency) {
+//  if (!_range_check_dependency) {
     return optimize_integer_cast(phase, T_INT);
-  }
+//  }
   return nullptr;
 }
 
