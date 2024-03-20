@@ -131,7 +131,7 @@ void InterpreterRuntime::set_bcp_and_mdp(address bcp, JavaThread* current) {
   if (ProfileInterpreter) {
     // ProfileTraps uses MDOs independently of ProfileInterpreter.
     // That is why we must check both ProfileInterpreter and mdo != nullptr.
-    MethodData* mdo = last_frame.method()->method_data();
+    MethodData* mdo = last_frame.method()->method_data(current->profile_context());
     if (mdo != nullptr) {
       NEEDS_CLEANUP;
       last_frame.set_mdp(mdo->bci_to_dp(last_frame.bci()));
@@ -293,21 +293,21 @@ JRT_END
 //------------------------------------------------------------------------------------------------------------------------
 // Exceptions
 
-void InterpreterRuntime::note_trap_inner(JavaThread* current, int reason,
-                                         const methodHandle& trap_method, int trap_bci) {
+void InterpreterRuntime::note_trap_inner(JavaThread* current, int reason, const methodHandle &trap_method, int trap_bci,
+                                         jlong profile_context) {
   if (trap_method.not_null()) {
-    MethodData* trap_mdo = trap_method->method_data();
+    MethodData* trap_mdo = trap_method->method_data(profile_context);
     if (trap_mdo == nullptr) {
       ExceptionMark em(current);
       JavaThread* THREAD = current; // For exception macros.
-      Method::build_profiling_method_data(trap_method, THREAD);
+      Method::build_profiling_method_data(trap_method, current->profile_context(), THREAD);
       if (HAS_PENDING_EXCEPTION) {
         // Only metaspace OOM is expected. No Java code executed.
         assert((PENDING_EXCEPTION->is_a(vmClasses::OutOfMemoryError_klass())),
                "we expect only an OOM error here");
         CLEAR_PENDING_EXCEPTION;
       }
-      trap_mdo = trap_method->method_data();
+      trap_mdo = trap_method->method_data(profile_context);
       // and fall through...
     }
     if (trap_mdo != nullptr) {
@@ -320,12 +320,12 @@ void InterpreterRuntime::note_trap_inner(JavaThread* current, int reason,
 
 // Assume the compiler is (or will be) interested in this event.
 // If necessary, create an MDO to hold the information, and record it.
-void InterpreterRuntime::note_trap(JavaThread* current, int reason) {
+void InterpreterRuntime::note_trap(JavaThread* current, int reason, jlong profile_context) {
   assert(ProfileTraps, "call me only if profiling");
   LastFrameAccessor last_frame(current);
   methodHandle trap_method(current, last_frame.method());
   int trap_bci = trap_method->bci_from(last_frame.bcp());
-  note_trap_inner(current, reason, trap_method, trap_bci);
+  note_trap_inner(current, reason, trap_method, trap_bci, profile_context);
 }
 
 static Handle get_preinitialized_exception(Klass* k, TRAPS) {
@@ -379,9 +379,9 @@ JRT_ENTRY(void, InterpreterRuntime::create_exception(JavaThread* current, char* 
   TempNewSymbol s = SymbolTable::new_symbol(name);
   if (ProfileTraps) {
     if (s == vmSymbols::java_lang_ArithmeticException()) {
-      note_trap(current, Deoptimization::Reason_div0_check);
+      note_trap(current, Deoptimization::Reason_div0_check, current->profile_context());
     } else if (s == vmSymbols::java_lang_NullPointerException()) {
-      note_trap(current, Deoptimization::Reason_null_check);
+      note_trap(current, Deoptimization::Reason_null_check, current->profile_context());
     }
   }
   // create exception
@@ -398,9 +398,9 @@ JRT_ENTRY(void, InterpreterRuntime::create_klass_exception(JavaThread* current, 
   TempNewSymbol s = SymbolTable::new_symbol(name);
   if (ProfileTraps) {
     if (s == vmSymbols::java_lang_ArrayStoreException()) {
-      note_trap(current, Deoptimization::Reason_array_check);
+      note_trap(current, Deoptimization::Reason_array_check, current->profile_context());
     } else {
-      note_trap(current, Deoptimization::Reason_class_check);
+      note_trap(current, Deoptimization::Reason_class_check, current->profile_context());
     }
   }
   // create exception, with klass name as detail message
@@ -415,7 +415,7 @@ JRT_ENTRY(void, InterpreterRuntime::throw_ArrayIndexOutOfBoundsException(JavaThr
   ss.print("Index %d out of bounds for length %d", index, a->length());
 
   if (ProfileTraps) {
-    note_trap(current, Deoptimization::Reason_range_check);
+    note_trap(current, Deoptimization::Reason_range_check, current->profile_context());
   }
 
   THROW_MSG(vmSymbols::java_lang_ArrayIndexOutOfBoundsException(), ss.as_string());
@@ -430,7 +430,7 @@ JRT_ENTRY(void, InterpreterRuntime::throw_ClassCastException(
     current, obj->klass());
 
   if (ProfileTraps) {
-    note_trap(current, Deoptimization::Reason_class_check);
+    note_trap(current, Deoptimization::Reason_class_check, current->profile_context());
   }
 
   // create exception
@@ -533,6 +533,7 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
     }
   } while (should_repeat == true);
 
+
   // notify JVMTI of an exception throw; JVMTI will detect if this is a first
   // time throw or a stack unwinding throw and accordingly notify the debugger
   if (JvmtiExport::can_post_on_exceptions()) {
@@ -548,12 +549,12 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
     continuation = Interpreter::remove_activation_entry();
 #ifdef COMPILER2
     // Count this for compilation purposes
-    h_method->interpreter_throwout_increment(THREAD);
+    h_method->interpreter_throwout_increment(THREAD, current->profile_context());
 #endif // COMPILER2
   } else {
     // handler in this method => change bci/bcp to handler bci/bcp and continue there
     handler_pc = h_method->code_base() + handler_bci;
-    h_method->set_exception_handler_entered(handler_bci); // profiling
+    h_method->set_exception_handler_entered(handler_bci, current->profile_context()); // profiling
 #ifndef ZERO
     set_bcp_and_mdp(handler_pc, current);
     continuation = Interpreter::dispatch_table(vtos)[*handler_pc];
@@ -813,7 +814,7 @@ void InterpreterRuntime::resolve_invoke(Bytecodes::Code bytecode, TRAPS) {
         // Preserve the original exception across the call to note_trap()
         PreserveExceptionMark pm(current);
         // Recording the trap will help the compiler to potentially recognize this exception as "hot"
-        note_trap(current, Deoptimization::Reason_null_check);
+        note_trap(current, Deoptimization::Reason_null_check, current->profile_context());
       }
       return;
     }
@@ -1065,7 +1066,7 @@ JRT_ENTRY(nmethod*,
   const int branch_bci = branch_bcp != nullptr ? method->bci_from(branch_bcp) : InvocationEntryBci;
   const int bci = branch_bcp != nullptr ? method->bci_from(last_frame.bcp()) : InvocationEntryBci;
 
-  nmethod* osr_nm = CompilationPolicy::event(method, method, branch_bci, bci, CompLevel_none, nullptr, CHECK_NULL);
+  nmethod* osr_nm = CompilationPolicy::event(method, method, branch_bci, bci, CompLevel_none, nullptr, current->profile_context(), CHECK_NULL);
 
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
   if (osr_nm != nullptr) {
@@ -1079,7 +1080,7 @@ JRT_END
 JRT_LEAF(jint, InterpreterRuntime::bcp_to_di(Method* method, address cur_bcp))
   assert(ProfileInterpreter, "must be profiling interpreter");
   int bci = method->bci_from(cur_bcp);
-  MethodData* mdo = method->method_data();
+  MethodData* mdo = method->method_data(JavaThread::current()->profile_context());
   if (mdo == nullptr)  return 0;
   return mdo->bci_to_di(bci);
 JRT_END
@@ -1088,7 +1089,7 @@ JRT_END
 JRT_LEAF(void, InterpreterRuntime::verify_mdp(Method* method, address bcp, address mdp))
   assert(ProfileInterpreter, "must be profiling interpreter");
 
-  MethodData* mdo = method->method_data();
+  MethodData* mdo = method->method_data(JavaThread::current()->profile_context());
   assert(mdo != nullptr, "must not be null");
 
   int bci = method->bci_from(bcp);
@@ -1118,7 +1119,7 @@ JRT_ENTRY(void, InterpreterRuntime::update_mdp_for_ret(JavaThread* current, int 
   ResourceMark rm(current);
   LastFrameAccessor last_frame(current);
   assert(last_frame.is_interpreted_frame(), "must come from interpreter");
-  MethodData* h_mdo = last_frame.method()->method_data();
+  MethodData* h_mdo = last_frame.method()->method_data(current->profile_context());
 
   // Grab a lock to ensure atomic access to setting the return bci and
   // the displacement.  This can block and GC, invalidating all naked oops.
@@ -1133,10 +1134,13 @@ JRT_ENTRY(void, InterpreterRuntime::update_mdp_for_ret(JavaThread* current, int 
   last_frame.set_mdp(new_mdp);
 JRT_END
 
-JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters(JavaThread* current, Method* m))
-  return Method::build_method_counters(current, m);
+JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters(JavaThread* current, Method* m, jlong profile_context))
+  return Method::build_method_counters(current, m, UseNewCode ? profile_context : 0);
 JRT_END
 
+//JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters_for_profile_context(JavaThread* current, Method* m))
+//  return Method::build_method_counters_for_profile_context(current, m, current->profile_context());
+//JRT_END
 
 JRT_ENTRY(void, InterpreterRuntime::at_safepoint(JavaThread* current))
   // We used to need an explicit preserve_arguments here for invoke bytecodes. However,

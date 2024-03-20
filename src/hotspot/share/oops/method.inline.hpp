@@ -27,6 +27,7 @@
 
 #include "oops/method.hpp"
 
+#include "code/nmethod.hpp"
 #include "classfile/vmIntrinsics.hpp"
 #include "code/nmethod.inline.hpp"
 #include "oops/methodCounters.hpp"
@@ -41,9 +42,13 @@ inline address Method::from_interpreted_entry() const {
   return AtomicAccess::load_acquire(&_from_interpreted_entry);
 }
 
-inline nmethod* Method::code() const {
+inline nmethod* Method::code(jlong profile_context) const {
   assert( check_code(), "" );
-  return AtomicAccess::load_acquire(&_code);
+  nmethod* code = AtomicAccess::load_acquire(&_code);
+  while (code != nullptr && code->as_nmethod()->profile_context() != profile_context) {
+    code = code->as_nmethod()->next();
+  }
+  return code;
 }
 
 // Write (bci, line number) pair to stream
@@ -79,7 +84,7 @@ inline void CompressedLineNumberWriteStream::write_pair(int bci, int line) {
   write_pair_inline(bci, line);
 }
 
-inline bool Method::has_compiled_code() const { return code() != nullptr; }
+inline bool Method::has_compiled_code(jlong profile_context) const { return code(profile_context) != nullptr; }
 
 inline bool Method::is_empty_method() const {
   return  code_size() == 1
@@ -105,7 +110,7 @@ inline bool Method::is_special_native_intrinsic() const {
 
 #if INCLUDE_JVMTI
 inline u2 Method::number_of_breakpoints() const {
-  MethodCounters* mcs = method_counters();
+  MethodCounters2* mcs = method_counters2();
   if (mcs == nullptr) {
     return 0;
   } else {
@@ -114,14 +119,14 @@ inline u2 Method::number_of_breakpoints() const {
 }
 
 inline void Method::incr_number_of_breakpoints(Thread* current) {
-  MethodCounters* mcs = get_method_counters(current);
+  MethodCounters2* mcs = get_method_counters2(current);
   if (mcs != nullptr) {
     mcs->incr_number_of_breakpoints();
   }
 }
 
 inline void Method::decr_number_of_breakpoints(Thread* current) {
-  MethodCounters* mcs = get_method_counters(current);
+  MethodCounters2* mcs = get_method_counters2(current);
   if (mcs != nullptr) {
     mcs->decr_number_of_breakpoints();
   }
@@ -129,7 +134,7 @@ inline void Method::decr_number_of_breakpoints(Thread* current) {
 
 // Initialization only
 inline void Method::clear_number_of_breakpoints() {
-  MethodCounters* mcs = method_counters();
+  MethodCounters2* mcs = method_counters2();
   if (mcs != nullptr) {
     mcs->clear_number_of_breakpoints();
   }
@@ -137,16 +142,16 @@ inline void Method::clear_number_of_breakpoints() {
 #endif // INCLUDE_JVMTI
 
 #ifdef COMPILER2
-inline void Method::interpreter_throwout_increment(Thread* current) {
-  MethodCounters* mcs = get_method_counters(current);
+inline void Method::interpreter_throwout_increment(Thread* current, jlong profile_context) {
+  MethodCounters* mcs = get_method_counters(profile_context, current);
   if (mcs != nullptr) {
     mcs->interpreter_throwout_increment();
   }
 }
 #endif // COMPILER2
 
-inline int Method::interpreter_throwout_count() const        {
-  MethodCounters* mcs = method_counters();
+inline int Method::interpreter_throwout_count(jlong profile_context) const        {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return 0;
   } else {
@@ -154,37 +159,37 @@ inline int Method::interpreter_throwout_count() const        {
   }
 }
 
-inline int Method::prev_event_count() const {
-  MethodCounters* mcs = method_counters();
+inline int Method::prev_event_count(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->prev_event_count();
 }
 
-inline void Method::set_prev_event_count(int count) {
-  MethodCounters* mcs = method_counters();
+inline void Method::set_prev_event_count(int count, jlong profile_context) {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_prev_event_count(count);
   }
 }
 
-inline jlong Method::prev_time() const {
-  MethodCounters* mcs = method_counters();
+inline jlong Method::prev_time(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->prev_time();
 }
 
-inline void Method::set_prev_time(jlong time) {
-  MethodCounters* mcs = method_counters();
+inline void Method::set_prev_time(jlong time, jlong profile_context) {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_prev_time(time);
   }
 }
 
-inline float Method::rate() const {
-  MethodCounters* mcs = method_counters();
+inline float Method::rate(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->rate();
 }
 
-inline void Method::set_rate(float rate) {
-  MethodCounters* mcs = method_counters();
+inline void Method::set_rate(float rate, jlong profile_context) {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_rate(rate);
   }

@@ -153,7 +153,7 @@ void CallInfo::set_common(Klass* resolved_klass,
   DEBUG_ONLY(verify());  // verify before making side effects
 
   if (selected_method.not_null()) {
-    CompilationPolicy::compile_if_required(selected_method, THREAD);
+    CompilationPolicy::compile_if_required(selected_method, THREAD->profile_context(), THREAD);
   }
 }
 

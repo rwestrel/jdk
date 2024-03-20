@@ -10111,3 +10111,19 @@ void MacroAssembler::setcc(Assembler::Condition comparison, Register dst) {
   setb(comparison, dst);
   movzbl(dst, dst);
 }
+
+void MacroAssembler::load_code_for_profile_context(Register method, Register profile_context, Register code,
+                                                   Label &no_code, Label &done) {
+  const Register java_thread = r15_thread;
+  assert_different_registers(profile_context, code, method);
+  Label loop;
+  movq(profile_context, Address(java_thread, JavaThread::profile_context_offset()));
+  movptr(code, Address(method, Method::code_offset()));
+  bind(loop);
+  testptr(code, code);
+  jcc(zero, no_code);
+  cmpq(Address(code, nmethod::profile_context_offset()), profile_context);
+  jcc(equal, done);
+  movptr(code, Address(code, nmethod::next_offset()));
+  jmp(loop);
+}

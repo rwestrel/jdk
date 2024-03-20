@@ -109,7 +109,7 @@ class BytecodePrinter {
     // If the method changed (new method call, return to previous method after call finishes),
     // the signature needs to be re-printed for interpretability.
     if (method_changed) {
-      st->print("[%zu] ", Thread::current()->osthread()->thread_id_for_printing());
+      st->print("[%zu, profile context = " JLONG_FORMAT "] ", Thread::current()->osthread()->thread_id_for_printing(), JavaThread::current()->profile_context());
       method->print_name(st);
       st->cr();
     }
@@ -608,17 +608,17 @@ void BytecodePrinter::print_attributes(int bci, outputStream* st) {
 
 
 void BytecodePrinter::print_method_data_at(int bci, outputStream* st) {
-  MethodData* mdo = method()->method_data();
-  if (mdo != nullptr) {
-
+  MethodData* mdo = method()->method_data_head();
+  while (mdo != nullptr) {
     // Lock to read ProfileData, and ensure lock is not broken by a safepoint
     MutexLocker ml(mdo->extra_data_lock(), Mutex::_no_safepoint_check_flag);
 
     ProfileData* data = mdo->bci_to_data(bci);
     if (data != nullptr) {
-      st->print("  %d ", mdo->dp_to_di(data->dp()));
+      st->print("   %d context:" JLONG_FORMAT " ", mdo->dp_to_di(data->dp()), mdo->profile_context());
       st->fill_to(7);
       data->print_data_on(st, mdo);
     }
+    mdo = mdo->next();
   }
 }

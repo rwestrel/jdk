@@ -955,7 +955,7 @@ bool ciEnv::is_in_vm() {
 void ciEnv::validate_compile_task_dependencies(ciMethod* target) {
   if (failing())  return;  // no need for further checks
 
-  Dependencies::DepType result = dependencies()->validate_dependencies(_task);
+  Dependencies::DepType result = dependencies()->validate_dependencies(_task, profile_context());
   if (result != Dependencies::end_marker) {
     if (result == Dependencies::call_site_target_value) {
       _inc_decompile_count_on_failure = false;
@@ -991,7 +991,7 @@ void ciEnv::register_method(ciMethod* target,
     methodHandle method(THREAD, target->get_Method());
 
     // We require method counters to store some method state (max compilation levels) required by the compilation policy.
-    if (method->get_method_counters(THREAD) == nullptr) {
+    if (method->get_method_counters(profile_context(), THREAD) == nullptr) {
       record_failure("can't create method counters");
       // All buffers in the CodeBuffer are allocated in the CodeCache.
       // If the code buffer is created on each compile attempt
@@ -1044,7 +1044,7 @@ void ciEnv::register_method(ciMethod* target,
 
     if (failing()) {
       // While not a true deoptimization, it is a preemptive decompile.
-      MethodData* mdo = method()->method_data();
+      MethodData* mdo = method()->method_data(profile_context());
       if (mdo != nullptr && _inc_decompile_count_on_failure) {
         mdo->inc_decompile_count();
       }
@@ -1070,7 +1070,7 @@ void ciEnv::register_method(ciMethod* target,
                                frame_words, oop_map_set,
                                handler_table, inc_table,
                                compiler, CompLevel(task()->comp_level()),
-                               nmethod::Flags(has_unsafe_access, has_wide_vectors, has_monitors, has_scoped_access));
+                               nmethod::Flags(has_unsafe_access, has_wide_vectors, has_monitors, has_scoped_access), profile_context());
 
     // Free codeBlobs
     code_buffer->free_blob();
@@ -1081,7 +1081,7 @@ void ciEnv::register_method(ciMethod* target,
       if (entry_bci == InvocationEntryBci) {
         if (TieredCompilation) {
           // If there is an old version we're done with it
-          nmethod* old = method->code();
+          nmethod* old = method->code(profile_context());
           if (TraceMethodReplacement && old != nullptr) {
             ResourceMark rm;
             char *method_name = method->name_and_sig_as_C_string();
@@ -1114,7 +1114,7 @@ void ciEnv::register_method(ciMethod* target,
         }
         MutexLocker ml(NMethodState_lock, Mutex::_no_safepoint_check_flag);
         if (nm->make_in_use()) {
-          method->method_holder()->add_osr_nmethod(nm);
+          method->method_holder()->add_osr_nmethod(nm, profile_context());
         }
       }
     }
@@ -1697,3 +1697,5 @@ void ciEnv::dump_inline_data(int compile_id) {
 void ciEnv::dump_replay_data_version(outputStream* out) {
   out->print_cr("version %d", REPLAY_VERSION);
 }
+
+jlong ciEnv::profile_context() const { return _task->profile_context(); }

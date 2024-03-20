@@ -107,8 +107,8 @@ GrowableArray<Method*>* collected_profiled_methods;
 static int compare_methods(Method** a, Method** b) {
   // compiled_invocation_count() returns int64_t, forcing the entire expression
   // to be evaluated as int64_t. Overflow is not an issue.
-  int64_t diff = (((*b)->invocation_count() + (*b)->compiled_invocation_count())
-                - ((*a)->invocation_count() + (*a)->compiled_invocation_count()));
+  int64_t diff = (((*b)->total_invocation_count() + (*b)->compiled_invocation_count())
+                - ((*a)->total_invocation_count() + (*a)->compiled_invocation_count()));
   return (diff < 0) ? -1 : (diff > 0) ? 1 : 0;
 }
 
@@ -120,7 +120,7 @@ inline CompLevel method_code_comp_level(const Method* m) {
 static void collect_profiled_methods(Method* m) {
   Thread* thread = Thread::current();
   methodHandle mh(thread, m);
-  if ((m->method_data() != nullptr) &&
+  if ((m->method_data_head() != nullptr) &&
       (PrintMethodData || CompilerOracle::should_print(mh, method_code_comp_level(m)))) {
     collected_profiled_methods->push(m);
   }
@@ -147,17 +147,21 @@ static void print_method_profiling_data() {
 
         ss.print_cr("------------------------------------------------------------------------");
         m->print_invocation_count(&ss);
-        ss.print_cr("  mdo size: %d bytes", m->method_data()->size_in_bytes());
-        ss.cr();
-        // Dump data on parameters if any
-        if (m->method_data() != nullptr && m->method_data()->parameters_type_data() != nullptr) {
-          ss.fill_to(2);
-          m->method_data()->parameters_type_data()->print_data_on(&ss);
+        MethodData* md = m->method_data_head();
+        while (md != nullptr) {
+          ss.print_cr("  context: " JLONG_FORMAT " mdo size: %d bytes", md->profile_context(), md->size_in_bytes());
+          ss.cr();
+          // Dump data on parameters if any
+          if (md != nullptr && md->parameters_type_data() != nullptr) {
+            ss.fill_to(2);
+            md->parameters_type_data()->print_data_on(&ss);
+          }
+          total_size += md->size_in_bytes();
+          md = md->next();
         }
         // Buffering to a stringStream, disable internal buffering so it's not done twice.
         m->print_codes_on(&ss, ClassPrinter::PRINT_METHOD_DATA, false);
         tty->print("%s", ss.as_string()); // print all at once
-        total_size += m->method_data()->size_in_bytes();
       }
       tty->print_cr("------------------------------------------------------------------------");
       tty->print_cr("Total MDO size: %d bytes", total_size);
@@ -172,7 +176,7 @@ static void print_method_profiling_data() {
 GrowableArray<Method*>* collected_invoked_methods;
 
 static void collect_invoked_methods(Method* m) {
-  if (m->invocation_count() + m->compiled_invocation_count() >= 1) {
+  if (m->total_invocation_count() + m->compiled_invocation_count() >= 1) {
     collected_invoked_methods->push(m);
   }
 }
@@ -205,7 +209,7 @@ static void print_method_invocation_histogram() {
     // To shift the overflow border by a factor of two, we interpret
     // them here as unsigned long. A counter can't be negative anyway.
     Method* m = collected_invoked_methods->at(index);
-    uint64_t iic = (uint64_t)m->invocation_count();
+    uint64_t iic = (uint64_t) m->total_invocation_count();
     uint64_t cic = (uint64_t)m->compiled_invocation_count();
     if ((iic + cic) >= (uint64_t)MethodHistogramCutoff) m->print_invocation_count(tty);
     int_total  += iic;

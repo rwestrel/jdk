@@ -835,7 +835,7 @@ address SharedRuntime::compute_compiled_exc_handler(nmethod* nm, address ret_pc,
   }
 
   if (handler_bci != -1) { // did we find a handler in this method?
-    sd->method()->set_exception_handler_entered(handler_bci); // profile
+    sd->method()->set_exception_handler_entered(handler_bci, nm->profile_context()); // profile
   }
   return nm->code_begin() + t->pco();
 }
@@ -1341,6 +1341,8 @@ methodHandle SharedRuntime::resolve_helper(bool is_virtual, bool is_optimized, T
   CodeBlob* caller_cb = caller_frame.cb();
   guarantee(caller_cb != nullptr && caller_cb->is_nmethod(), "must be called from compiled method");
   nmethod* caller_nm = caller_cb->as_nmethod();
+  assert(caller_nm->profile_context() == current->profile_context(), "");
+  jlong profile_context = caller_nm->profile_context();
 
   // determine call info & receiver
   // note: a) receiver is null for static calls
@@ -1375,7 +1377,7 @@ methodHandle SharedRuntime::resolve_helper(bool is_virtual, bool is_optimized, T
                Bytecodes::name(invoke_code));
     callee_method->print_short_name(tty);
     tty->print_cr(" at pc: " INTPTR_FORMAT " to code: " INTPTR_FORMAT,
-                  p2i(caller_frame.pc()), p2i(callee_method->code()));
+                  p2i(caller_frame.pc()), p2i(callee_method->code(profile_context)));
   }
 #endif
 
@@ -1411,11 +1413,11 @@ methodHandle SharedRuntime::resolve_helper(bool is_virtual, bool is_optimized, T
   CompiledICLocker ml(caller_nm);
   if (is_virtual && !is_optimized) {
     CompiledIC* inline_cache = CompiledIC_before(caller_nm, caller_frame.pc());
-    inline_cache->update(&call_info, receiver->klass());
+    inline_cache->update(&call_info, receiver->klass(), profile_context);
   } else {
     // Callsite is a direct call - set it to the destination method
     CompiledDirectCall* callsite = CompiledDirectCall::before(caller_frame.pc());
-    callsite->set(callee_method);
+    callsite->set(callee_method, profile_context);
   }
 
   return callee_method;
@@ -1599,7 +1601,7 @@ methodHandle SharedRuntime::handle_ic_miss_helper(TRAPS) {
     ResourceMark rm(current);
     tty->print("IC miss (%s) call to", Bytecodes::name(bc));
     callee_method->print_short_name(tty);
-    tty->print_cr(" code: " INTPTR_FORMAT, p2i(callee_method->code()));
+    tty->print_cr(" code: " INTPTR_FORMAT, p2i(callee_method->code(current->profile_context())));
   }
 
   if (ICMissHistogram) {
@@ -1632,7 +1634,7 @@ methodHandle SharedRuntime::handle_ic_miss_helper(TRAPS) {
 
   CompiledICLocker ml(caller_nm);
   CompiledIC* inline_cache = CompiledIC_before(caller_nm, caller_frame.pc());
-  inline_cache->update(&call_info, receiver()->klass());
+  inline_cache->update(&call_info, receiver()->klass(), current->profile_context());
 
   return callee_method;
 }
@@ -1665,6 +1667,7 @@ methodHandle SharedRuntime::reresolve_call_site(TRAPS) {
 
     nmethod* caller_nm = CodeCache::find_nmethod(pc);
     assert(caller_nm != nullptr, "did not find caller nmethod");
+    assert(caller_nm->profile_context() == current->profile_context(), "");
 
     // Default call_addr is the location of the "basic" call.
     // Determine the address of the call we a reresolving. With
@@ -1724,7 +1727,7 @@ methodHandle SharedRuntime::reresolve_call_site(TRAPS) {
     ResourceMark rm(current);
     tty->print("handle_wrong_method reresolving call to");
     callee_method->print_short_name(tty);
-    tty->print_cr(" code: " INTPTR_FORMAT, p2i(callee_method->code()));
+    tty->print_cr(" code: " INTPTR_FORMAT, p2i(callee_method->code(current->profile_context())));
   }
 #endif
 
@@ -1792,7 +1795,7 @@ JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
   // Result from nmethod::is_unloading is not stable across safepoints.
   NoSafepointVerifier nsv;
 
-  nmethod* callee = method->code();
+  nmethod* callee = method->code(JavaThread::current()->profile_context());
   if (callee == nullptr) {
     return;
   }
@@ -3084,7 +3087,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     // Perform the work while holding the lock, but perform any printing outside the lock
     MutexLocker mu(AdapterHandlerLibrary_lock);
     // See if somebody beat us to it
-    if (method->code() != nullptr) {
+    if (method->code(0) != nullptr) { // FIXME
       return;
     }
 

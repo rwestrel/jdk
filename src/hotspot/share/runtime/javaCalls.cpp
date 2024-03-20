@@ -343,7 +343,7 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
   }
 #endif
 
-  CompilationPolicy::compile_if_required(method, CHECK);
+  CompilationPolicy::compile_if_required(method, thread->profile_context(), CHECK);
 
   // Figure out if the result value is an oop or not (Note: This is a different value
   // than result_type. result_type will be T_INT of oops. (it is about size)

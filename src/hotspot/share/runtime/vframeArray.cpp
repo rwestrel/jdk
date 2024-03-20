@@ -352,7 +352,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   }
   iframe()->interpreter_frame_set_bcp(bcp);
   if (ProfileInterpreter) {
-    MethodData* mdo = method()->method_data();
+    MethodData* mdo = method()->method_data(thread->profile_context());
     if (mdo != nullptr && exec_mode != Deoptimization::Unpack_exception) {
       int bci = iframe()->interpreter_frame_bci();
       if (!reexecute) ++bci;

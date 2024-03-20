@@ -110,7 +110,9 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name) {
   set_access_flags(access_flags);
   set_intrinsic_id(vmIntrinsics::_none);
   clear_method_data();
+//  clear_method_data_for_profile_contexts();
   clear_method_counters();
+//  clear_method_counters_for_profile_contexts();
   set_vtable_index(Method::garbage_vtable_index);
 
   // Fix and bury in Method*
@@ -133,21 +135,35 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name) {
 void Method::deallocate_contents(ClassLoaderData* loader_data) {
   MetadataFactory::free_metadata(loader_data, constMethod());
   set_constMethod(nullptr);
-  MetadataFactory::free_metadata(loader_data, method_data());
+  MethodData* method_data = _method_data;
+  while (method_data != nullptr) {
+    MethodData* next = method_data->next();
+    MetadataFactory::free_metadata(loader_data, method_data);
+    method_data = next;
+  }
   clear_method_data();
-  MetadataFactory::free_metadata(loader_data, method_counters());
+  MethodCounters* method_counters = _method_counters;
+  while (method_counters != nullptr) {
+    MethodCounters* next = method_counters->next();
+    MetadataFactory::free_metadata(loader_data, method_counters);
+    method_counters = next;
+  }
+  MetadataFactory::free_metadata(loader_data, _method_counters2);
   clear_method_counters();
   set_adapter_entry(nullptr);
   // The nmethod will be gone when we get here.
-  if (code() != nullptr) _code = nullptr;
+  if (_code != nullptr) _code = nullptr;
 }
 
 void Method::release_C_heap_structures() {
-  if (method_data()) {
-    method_data()->release_C_heap_structures();
+  MethodData* method_data = _method_data;
+  while (method_data != nullptr) {
+    MethodData* next = method_data->next();
+    method_data->release_C_heap_structures();
 
     // Destroy MethodData embedded lock
-    method_data()->~MethodData();
+    method_data->~MethodData();
+    method_data = next;
   }
 }
 
@@ -417,6 +433,7 @@ void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_adapter);
   it->push(&_method_data);
   it->push(&_method_counters);
+//  assert(_method_counters_for_profile_contexts == nullptr, "");
   NOT_PRODUCT(it->push(&_name);)
 }
 
@@ -548,7 +565,7 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   }
 
   if (entry != nullptr) {
-    method->set_native_function(entry, native_bind_event_is_interesting);
+    method->set_native_function(entry, native_bind_event_is_interesting, 0); //FIXME
   } else {
     method->clear_native_function();
   }
@@ -561,26 +578,26 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   return true;
 }
 
-bool Method::was_executed_more_than(int n) {
+bool Method::was_executed_more_than(int n, jlong profile_context) {
   // Invocation counter is reset when the Method* is compiled.
   // If the method has compiled code we therefore assume it has
   // be executed more than n times.
-  if (is_accessor() || is_empty_method() || (code() != nullptr)) {
+  if (is_accessor() || is_empty_method() || (code(profile_context) != nullptr)) {
     // interpreter doesn't bump invocation counter of trivial methods
     // compiler does not bump invocation counter of compiled methods
     return true;
   }
-  else if ((method_counters() != nullptr &&
-            method_counters()->invocation_counter()->carry()) ||
-           (method_data() != nullptr &&
-            method_data()->invocation_counter()->carry())) {
+  else if ((method_counters(profile_context) != nullptr &&
+            method_counters(profile_context)->invocation_counter()->carry()) ||
+           (method_data(profile_context) != nullptr &&
+            method_data(profile_context)->invocation_counter()->carry())) {
     // The carry bit is set when the counter overflows and causes
     // a compilation to occur.  We don't know how many times
     // the counter has been reset, so we simply assume it has
     // been executed more than n times.
     return true;
   } else {
-    return invocation_count() > n;
+    return invocation_count(profile_context) > n;
   }
 }
 
@@ -605,12 +622,19 @@ void Method::print_invocation_count(outputStream* st) {
   // consideration here, however, are limited in range by counting
   // logic. See InvocationCounter:count_limit for example.
   // No "overflow precautions" need to be implemented here.
-  st->print_cr ("  interpreter_invocation_count: " INT32_FORMAT_W(11), interpreter_invocation_count());
-  st->print_cr ("  invocation_counter:           " INT32_FORMAT_W(11), invocation_count());
-  st->print_cr ("  backedge_counter:             " INT32_FORMAT_W(11), backedge_count());
 
-  if (method_data() != nullptr) {
-    st->print_cr ("  decompile_count:              " UINT32_FORMAT_W(11), method_data()->decompile_count());
+  MethodCounters* method_counters = _method_counters;
+  while (method_counters != nullptr) {
+    jlong profile_context = method_counters->profile_context();
+    st->print_cr (" profile_context: " JLONG_FORMAT, profile_context);
+    st->print_cr ("  interpreter_invocation_count: " INT32_FORMAT_W(11), interpreter_invocation_count(profile_context));
+    st->print_cr ("  invocation_counter:           " INT32_FORMAT_W(11), invocation_count(profile_context));
+    st->print_cr ("  backedge_counter:             " INT32_FORMAT_W(11), backedge_count(profile_context));
+
+    if (method_data(profile_context) != nullptr) {
+      st->print_cr ("  decompile_count:              " UINT32_FORMAT_W(11), method_data(profile_context)->decompile_count());
+    }
+    method_counters = method_counters->next();
   }
 
 #ifndef PRODUCT
@@ -653,7 +677,7 @@ bool Method::install_training_method_data(const methodHandle& method) {
 
 // Build a MethodData* object to hold profiling information collected on this
 // method when requested.
-void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
+void Method::build_profiling_method_data(const methodHandle& method, jlong profile_context, TRAPS) {
   if (install_training_method_data(method)) {
     return;
   }
@@ -665,7 +689,7 @@ void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
   }
 
   ClassLoaderData* loader_data = method->method_holder()->class_loader_data();
-  MethodData* method_data = MethodData::allocate(loader_data, method, THREAD);
+  MethodData* method_data = MethodData::allocate(loader_data, method, profile_context, THREAD);
   if (HAS_PENDING_EXCEPTION) {
     CompileBroker::log_metaspace_failure();
     ClassLoaderDataGraph::set_metaspace_oom(true);
@@ -677,6 +701,20 @@ void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
     return;
   }
 
+#ifdef ASSERT
+  {
+    int cnt = 0;
+    MethodData* md = method->_method_data;
+    while (md != nullptr) {
+      if (md->profile_context() == profile_context) {
+        cnt++;
+      }
+      md = md->next();
+    }
+    assert(cnt == 1, "");
+  }
+#endif
+
   if (PrintMethodData && (Verbose || WizardMode)) {
     ResourceMark rm(THREAD);
     tty->print("build_profiling_method_data for ");
@@ -686,7 +724,7 @@ void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
   }
 }
 
-MethodCounters* Method::build_method_counters(Thread* current, Method* m) {
+MethodCounters* Method::build_method_counters(Thread* current, Method* m, jlong profile_context) {
   // Do not profile the method if metaspace has hit an OOM previously
   if (ClassLoaderDataGraph::has_metaspace_oom()) {
     return nullptr;
@@ -698,14 +736,14 @@ MethodCounters* Method::build_method_counters(Thread* current, Method* m) {
     JavaThread* THREAD = JavaThread::cast(current); // For exception macros.
     // Use the TRAPS version for a JavaThread so it will adjust the GC threshold
     // if needed.
-    counters = MethodCounters::allocate_with_exception(mh, THREAD);
+    counters = MethodCounters::allocate_with_exception(mh, profile_context, THREAD);
     if (HAS_PENDING_EXCEPTION) {
       CLEAR_PENDING_EXCEPTION;
     }
   } else {
     // Call metaspace allocation that doesn't throw exception if the
     // current thread isn't a JavaThread, ie. the VMThread.
-    counters = MethodCounters::allocate_no_exception(mh);
+    counters = MethodCounters::allocate_no_exception(mh, profile_context);
   }
 
   if (counters == nullptr) {
@@ -718,17 +756,137 @@ MethodCounters* Method::build_method_counters(Thread* current, Method* m) {
     MetadataFactory::free_metadata(mh->method_holder()->class_loader_data(), counters);
   }
 
-  return mh->method_counters();
+#ifdef ASSERT
+  {
+    int cnt = 0;
+    MethodCounters* method_counters = mh->_method_counters;
+    while (method_counters != nullptr) {
+      if (method_counters->profile_context() == profile_context) {
+        cnt++;
+      }
+      method_counters = method_counters->next();
+    }
+    assert(cnt == 1, "");
+  }
+#endif
+
+  return mh->method_counters(profile_context);
 }
+
+MethodCounters2* Method::build_method_counters2(Thread* current, Method* m) {
+  // Do not profile the method if metaspace has hit an OOM previously
+  if (ClassLoaderDataGraph::has_metaspace_oom()) {
+    return nullptr;
+  }
+
+  methodHandle mh(current, m);
+  MethodCounters2* counters;
+  if (current->is_Java_thread()) {
+    JavaThread* THREAD = JavaThread::cast(current); // For exception macros.
+    // Use the TRAPS version for a JavaThread so it will adjust the GC threshold
+    // if needed.
+    counters = MethodCounters2::allocate_with_exception(mh, THREAD);
+    if (HAS_PENDING_EXCEPTION) {
+      CLEAR_PENDING_EXCEPTION;
+    }
+  } else {
+    // Call metaspace allocation that doesn't throw exception if the
+    // current thread isn't a JavaThread, ie. the VMThread.
+    counters = MethodCounters2::allocate_no_exception(mh);
+  }
+
+  if (counters == nullptr) {
+    CompileBroker::log_metaspace_failure();
+    ClassLoaderDataGraph::set_metaspace_oom(true);
+    return nullptr;
+  }
+
+  if (!mh->init_method_counters2(counters)) {
+    MetadataFactory::free_metadata(mh->method_holder()->class_loader_data(), counters);
+  }
+
+  return mh->method_counters2();
+}
+
+//MethodCounters* Method::build_method_counters_for_profile_context(Thread* current, Method* m, int profile_context) {
+//  // Do not profile the method if metaspace has hit an OOM previously
+//  if (ClassLoaderDataGraph::has_metaspace_oom()) {
+//    return nullptr;
+//  }
+//
+//  methodHandle mh(current, m);
+//  Array<MethodCounters*>* array_of_counters;
+//  if (current->is_Java_thread()) {
+//    JavaThread* THREAD = JavaThread::cast(current); // For exception macros.
+//    // Use the TRAPS version for a JavaThread so it will adjust the GC threshold
+//    // if needed.
+//    array_of_counters = MetadataFactory::new_array<MethodCounters*>(mh->method_holder()->class_loader_data(), 10, THREAD);
+//    if (HAS_PENDING_EXCEPTION) {
+//      CLEAR_PENDING_EXCEPTION;
+//    }
+//  } else {
+//    ShouldNotReachHere();
+//    // Call metaspace allocation that doesn't throw exception if the
+//    // current thread isn't a JavaThread, ie. the VMThread.
+////    counters = MethodCounters::allocate_no_exception(mh);
+//  }
+//
+//  if (counters == nullptr) {
+//    CompileBroker::log_metaspace_failure();
+//    ClassLoaderDataGraph::set_metaspace_oom(true);
+//    return nullptr;
+//  }
+//
+//  if (!mh->init_method_counters(counters)) {
+//    MetadataFactory::free_metadata(mh->method_holder()->class_loader_data(), counters);
+//  }
+//
+//  return mh->method_counters();
+//}
 
 bool Method::init_method_counters(MethodCounters* counters) {
   // Try to install a pointer to MethodCounters, return true on success.
-  return AtomicAccess::replace_if_null(&_method_counters, counters);
+  MethodCounters* current_method_counters;
+  do {
+    current_method_counters = _method_counters;
+    MethodCounters* method_counters = current_method_counters;
+    while (method_counters != nullptr && method_counters->profile_context() != counters->profile_context()) {
+      method_counters = method_counters->next();
+    }
+    if (method_counters != nullptr) {
+      return false;
+    }
+    counters->set_next(current_method_counters);
+  } while (Atomic::cmpxchg(&_method_counters, current_method_counters, counters) != current_method_counters);
+  return true;
 }
 
-void Method::set_exception_handler_entered(int handler_bci) {
+bool Method::init_method_counters2(MethodCounters2* counters) {
+  // Try to install a pointer to MethodCounters, return true on success.
+  return Atomic::replace_if_null(&_method_counters2, counters);
+}
+
+bool Method::init_method_data(MethodData* md) {
+  // Try to install a pointer to MethodCounters, return true on success.
+  MethodData* current_md;
+  do {
+    current_md = _method_data;
+    MethodData* method_data = current_md;
+    while (method_data != nullptr && method_data->profile_context() != md->profile_context()) {
+      method_data = method_data->next();
+    }
+    if (method_data != nullptr) {
+      return false;
+    }
+    md->set_next(current_md);
+  } while (Atomic::cmpxchg(&_method_data, current_md, md) != current_md);
+  return true;
+//  return Atomic::replace_if_null(&_method_counters, counters);
+}
+
+void Method::set_exception_handler_entered(int handler_bci, jlong profile_context) {
   if (ProfileExceptionHandlers) {
-    MethodData* mdo = method_data();
+    MethodData* mdo = method_data(profile_context);
     if (mdo != nullptr) {
       BitData handler_data = mdo->exception_handler_bci_to_data(handler_bci);
       handler_data.set_exception_handler_entered();
@@ -1021,7 +1179,7 @@ bool Method::is_klass_loaded(int refinfo_index, Bytecodes::Code bc, bool must_be
 }
 
 
-void Method::set_native_function(address function, bool post_event_flag) {
+void Method::set_native_function(address function, bool post_event_flag, jlong profile_context) {
   assert(function != nullptr, "use clear_native_function to unregister natives");
   assert(!is_special_native_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
   address* native_function = native_function_addr();
@@ -1045,7 +1203,7 @@ void Method::set_native_function(address function, bool post_event_flag) {
   // This function can be called more than once. We must make sure that we always
   // use the latest registered method -> check if a stub already has been generated.
   // If so, we have to make it not_entrant.
-  nmethod* nm = code(); // Put it into local variable to guard against concurrent updates
+  nmethod* nm = code(profile_context); // Put it into local variable to guard against concurrent updates
   if (nm != nullptr) {
     nm->make_not_entrant(nmethod::InvalidationReason::SET_NATIVE_FUNCTION);
   }
@@ -1063,8 +1221,8 @@ bool Method::has_native_function() const {
 void Method::clear_native_function() {
   // Note: is_method_handle_intrinsic() is allowed here.
   set_native_function(
-    SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
-    !native_bind_event_is_interesting);
+          SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
+          !native_bind_event_is_interesting, 0); // FIXME
   this->unlink_code();
 }
 
@@ -1075,7 +1233,8 @@ void Method::set_signature_handler(address handler) {
 }
 
 
-void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason) {
+void
+Method::print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, jlong profile_context) {
   assert(reason != nullptr, "must provide a reason");
   if (PrintCompilation && report) {
     ttyLocker ttyl;
@@ -1102,7 +1261,7 @@ void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report,
     if (reason != nullptr) {
       xtty->print(" reason=\'%s\'", reason);
     }
-    xtty->method(this);
+    xtty->method(this, profile_context);
     xtty->stamp();
     xtty->end_elem();
   }
@@ -1139,7 +1298,7 @@ void Method::set_not_compilable(const char* reason, int comp_level, bool report)
     // Don't mark a method which should be always compilable
     return;
   }
-  print_made_not_compilable(comp_level, /*is_osr*/ false, report, reason);
+  print_made_not_compilable(comp_level, /*is_osr*/ false, report, reason, 0); // FIXME
   if (comp_level == CompLevel_all) {
     set_is_not_c1_compilable();
     set_is_not_c2_compilable();
@@ -1165,7 +1324,7 @@ bool Method::is_not_osr_compilable(int comp_level) const {
 }
 
 void Method::set_not_osr_compilable(const char* reason, int comp_level, bool report) {
-  print_made_not_compilable(comp_level, /*is_osr*/ true, report, reason);
+  print_made_not_compilable(comp_level, /*is_osr*/ true, report, reason, 0); // FIXME
   if (comp_level == CompLevel_all) {
     set_is_not_c1_osr_compilable();
     set_is_not_c2_osr_compilable();
@@ -1198,9 +1357,26 @@ void Method::unlink_code(nmethod *compare) {
   // We need to check if either the _code or _from_compiled_code_entry_point
   // refer to this nmethod because there is a race in setting these two fields
   // in Method* as seen in bugid 4947125.
-  if (code() == compare ||
-      from_compiled_entry() == compare->verified_entry_point()) {
-    clear_code();
+  if (UseNewCode) {
+    nmethod* code = _code;
+    nmethod* prev = nullptr;
+    while (code != nullptr) {
+      if (code == compare) {
+        if (code == _code) {
+          _code = _code->as_nmethod()->next();
+        } else {
+          prev->as_nmethod()->set_next(code->as_nmethod()->next());
+        }
+        break;
+      }
+      prev = code;
+      code = code->as_nmethod()->next();
+    }
+  } else {
+    if (_code == compare ||
+        from_compiled_entry() == compare->verified_entry_point()) {
+      clear_code();
+    }
   }
 }
 
@@ -1218,6 +1394,7 @@ void Method::unlink_method() {
     _adapter = nullptr;
   }
   _i2i_entry = nullptr;
+  _i2c_entry = nullptr;
   _from_compiled_entry = nullptr;
   _from_interpreted_entry = nullptr;
 
@@ -1228,6 +1405,7 @@ void Method::unlink_method() {
   NOT_PRODUCT(set_compiled_invocation_count(0);)
 
   clear_method_data();
+//  clear_method_data_for_profile_contexts();
   clear_method_counters();
   clear_is_not_c1_compilable();
   clear_is_not_c1_osr_compilable();
@@ -1283,8 +1461,8 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // Don't overwrite already registered native entries.
   if (is_native() && !has_native_function()) {
     set_native_function(
-      SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
-      !native_bind_event_is_interesting);
+            SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
+            !native_bind_event_is_interesting, 0); // FIXME
   }
 
   // Setup compiler entrypoint.  This is made eagerly, so we do not need
@@ -1311,10 +1489,11 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
     _from_interpreted_entry = nullptr;
     _from_compiled_entry = nullptr;
     _i2i_entry = nullptr;
+    _i2c_entry = nullptr;
     if (Continuations::enabled()) {
       assert(!Threads::is_vm_complete(), "should only be called during vm init");
       AdapterHandlerLibrary::create_native_wrapper(h_method);
-      if (!h_method->has_compiled_code()) {
+      if (!h_method->has_compiled_code(0)) { // FIXME
         THROW_MSG(vmSymbols::java_lang_OutOfMemoryError(), "Initial size of CodeCache is too small");
       }
       assert(_from_interpreted_entry == get_i2c_entry(), "invariant");
@@ -1375,9 +1554,20 @@ void Method::set_code(const methodHandle& mh, nmethod *code) {
 
   guarantee(mh->adapter() != nullptr, "Adapter blob must already exist!");
 
+#ifdef ASSERT
+  nmethod* cm = mh->_code;
+  while (cm != nullptr) {
+    assert(cm->as_nmethod()->profile_context() != code->as_nmethod()->profile_context(), "");
+    cm = cm->as_nmethod()->next();
+  }
+#endif
+
   // These writes must happen in this order, because the interpreter will
   // directly jump to from_interpreted_entry which jumps to an i2c adapter
   // which jumps to _from_compiled_entry.
+  if (mh->_code != nullptr) {
+    code->as_nmethod()->set_next(mh->_code->as_nmethod());
+  }
   mh->_code = code;             // Assign before allowing compiled code to exec
 
   int comp_level = code->comp_level();
@@ -2018,9 +2208,8 @@ void Method::clear_all_breakpoints() {
 }
 
 #endif // INCLUDE_JVMTI
-
 int Method::highest_osr_comp_level() const {
-  const MethodCounters* mcs = method_counters();
+  const MethodCounters2* mcs = method_counters2();
   if (mcs != nullptr) {
     return mcs->highest_osr_comp_level();
   } else {
@@ -2029,14 +2218,14 @@ int Method::highest_osr_comp_level() const {
 }
 
 void Method::set_highest_comp_level(int level) {
-  MethodCounters* mcs = method_counters();
+  MethodCounters2* mcs = method_counters2();
   if (mcs != nullptr) {
     mcs->set_highest_comp_level(level);
   }
 }
 
 void Method::set_highest_osr_comp_level(int level) {
-  MethodCounters* mcs = method_counters();
+  MethodCounters2* mcs = method_counters2();
   if (mcs != nullptr) {
     mcs->set_highest_osr_comp_level(level);
   }
@@ -2220,8 +2409,8 @@ void Method::print_on(outputStream* st) const {
   st->print_cr(" - method size:       %d",   method_size());
   if (intrinsic_id() != vmIntrinsics::_none)
     st->print_cr(" - intrinsic id:      %d %s", vmIntrinsics::as_int(intrinsic_id()), vmIntrinsics::name_at(intrinsic_id()));
-  if (highest_comp_level() != CompLevel_none)
-    st->print_cr(" - highest level:     %d", highest_comp_level());
+  MethodCounters2* method_counters = _method_counters2;
+  st->print_cr(" - highest level:     %d ", method_counters->highest_comp_level());
   st->print_cr(" - vtable index:      %d",   _vtable_index);
   st->print_cr(" - i2i entry:         " PTR_FORMAT, p2i(interpreter_entry()));
   st->print(   " - adapters:          ");
@@ -2236,8 +2425,10 @@ void Method::print_on(outputStream* st) const {
     st->print_cr(" - code start:        " PTR_FORMAT, p2i(code_base()));
     st->print_cr(" - code end (excl):   " PTR_FORMAT, p2i(code_base() + code_size()));
   }
-  if (method_data() != nullptr) {
-    st->print_cr(" - method data:       " PTR_FORMAT, p2i(method_data()));
+  MethodData* method_data = _method_data;
+  while (method_data != nullptr) {
+    st->print_cr(" - method data:       " PTR_FORMAT " (" JLONG_FORMAT ")", p2i(method_data), method_data->profile_context());
+    method_data = method_data->next();
   }
   st->print_cr(" - checked ex length: %d",   checked_exceptions_length());
   if (checked_exceptions_length() > 0) {
@@ -2274,9 +2465,11 @@ void Method::print_on(outputStream* st) const {
       }
     }
   }
-  if (code() != nullptr) {
-    st->print   (" - compiled code: ");
-    code()->print_value_on(st);
+  nmethod* code = _code;
+  while (code != nullptr) {
+    st->print   (" - compiled code: (profile context = " JLONG_FORMAT ")", code->as_nmethod()->profile_context());
+    code->print_value_on(st);
+    code = code->as_nmethod()->next();
   }
   if (is_native()) {
     st->print_cr(" - native function:   " PTR_FORMAT, p2i(native_function()));
@@ -2323,7 +2516,13 @@ void Method::print_value_on(outputStream* st) const {
   method_holder()->print_value_on(st);
   if (WizardMode) st->print("#%d", _vtable_index);
   if (WizardMode) st->print("[%d,%d]", size_of_parameters(), max_locals());
-  if (WizardMode && code() != nullptr) st->print(" ((nmethod*)%p)", code());
+  if (WizardMode) {
+    nmethod* code = _code;
+    while (code != nullptr) {
+      st->print(" ((nmethod*)%p)", code);
+      code = code->as_nmethod()->next();
+    }
+  }
 }
 
 // Verification
@@ -2331,7 +2530,89 @@ void Method::print_value_on(outputStream* st) const {
 void Method::verify_on(outputStream* st) {
   guarantee(is_method(), "object must be method");
   guarantee(constants()->is_constantPool(), "should be constant pool");
-  MethodData* md = method_data();
-  guarantee(md == nullptr ||
-      md->is_methodData(), "should be method data");
+  MethodData* md = _method_data;
+  while (md != nullptr) {
+    guarantee(md->is_methodData(), "should be method data");
+    md = md->next();
+  }
+}
+
+void Method::clean_method_data(bool always_clean) {
+  MethodData* md = _method_data;
+  while (md != nullptr) {
+    md->clean_method_data(always_clean);
+    md = md->next();
+  }
+}
+
+void Method::clean_weak_method_links() {
+  MethodData* md = _method_data;
+  while (md != nullptr) {
+    md->clean_weak_method_links();
+    md = md->next();
+  }
+}
+
+uint Method::decompile_count() const {
+  uint count = 0;
+  MethodData* md = _method_data;
+  while (md != nullptr) {
+    count += md->decompile_count();
+    md = md->next();
+  }
+  return count;
+}
+
+uint Method::trap_count(char* reason_str) const {
+  uint count;
+  bool overflow = false;
+  MethodData* md = _method_data;
+  while (md != nullptr) {
+    uint cnt = 0;
+    for (uint reason = 0; reason < md->trap_reason_limit(); reason++) {
+      if (reason_str != nullptr && !strcmp(reason_str, Deoptimization::trap_reason_name(reason))) {
+        cnt = md->trap_count(reason);
+        // Count in the overflow trap count on overflow
+        if (cnt == (uint) -1) {
+          cnt = md->trap_count_limit() + md->overflow_trap_count();
+        }
+        break;
+      } else if (reason_str == nullptr) {
+        uint c = md->trap_count(reason);
+        if (c == (uint) -1) {
+          c = md->trap_count_limit();
+          if (!overflow) {
+            // Count overflow trap count just once
+            overflow = true;
+            c += md->overflow_trap_count();
+          }
+        }
+        cnt += c;
+      }
+    }
+    count += cnt;
+  }
+  return count;
+}
+
+
+MethodCounters* Method::method_counters(jlong profile_context) const {
+  MethodCounters* method_counters = _method_counters;
+  while (method_counters != nullptr && method_counters->profile_context() != profile_context) {
+    method_counters = method_counters->next();
+  }
+  return method_counters;
+}
+
+MethodCounters2* Method::method_counters2() const {
+  MethodCounters2* method_counters2 = _method_counters2;
+  return method_counters2;
+}
+
+MethodData* Method::method_data(jlong profile_context) const {
+  MethodData* method_data = _method_data;
+  while (method_data != nullptr && method_data->profile_context() != profile_context) {
+    method_data = method_data->next();
+  }
+  return method_data;
 }

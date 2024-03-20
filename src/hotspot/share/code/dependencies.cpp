@@ -389,11 +389,11 @@ void Dependencies::check_valid_dependency_type(DepType dept) {
   guarantee(FIRST_TYPE <= dept && dept < TYPE_LIMIT, "invalid dependency type: %d", (int) dept);
 }
 
-Dependencies::DepType Dependencies::validate_dependencies(CompileTask* task, char** failure_detail) {
+Dependencies::DepType Dependencies::validate_dependencies(CompileTask* task, jlong profile_context, char** failure_detail) {
   int klass_violations = 0;
   DepType result = end_marker;
   for (Dependencies::DepStream deps(this); deps.next(); ) {
-    Klass* witness = deps.check_dependency();
+    Klass* witness = deps.check_dependency(profile_context);
     if (witness != nullptr) {
       if (klass_violations == 0) {
         result = deps.type();
@@ -1292,7 +1292,7 @@ bool Dependencies::has_finalizable_subclass(ciInstanceKlass* k) {
 // Any use of the contents (bytecodes) of a method must be
 // marked by an "evol_method" dependency, if those contents
 // can change.  (Note: A method is always dependent on itself.)
-Klass* Dependencies::check_evol_method(Method* m) {
+Klass* Dependencies::check_evol_method(Method* m, jlong profile_context) {
   assert(must_be_in_vm(), "raw oops here");
   // Did somebody do a JVMTI RedefineClasses while our backs were turned?
   // Or is there a now a breakpoint?
@@ -1499,14 +1499,14 @@ void Dependencies::DepStream::trace_and_log_witness(Klass* witness) {
   }
 }
 
-Klass* Dependencies::DepStream::check_new_klass_dependency(NewKlassDepChange* changes) {
+Klass* Dependencies::DepStream::check_new_klass_dependency(NewKlassDepChange* changes, jlong profile_context) {
   assert_locked_or_safepoint(Compile_lock);
   Dependencies::check_valid_dependency_type(type());
 
   Klass* witness = nullptr;
   switch (type()) {
   case evol_method:
-    witness = check_evol_method(method_argument(0));
+    witness = check_evol_method(method_argument(0), profile_context);
     break;
   case leaf_type:
     witness = check_leaf_type(context_type());
@@ -1544,7 +1544,7 @@ Klass* Dependencies::DepStream::check_klass_init_dependency(KlassInitDepChange* 
   return nullptr;
 }
 
-Klass* Dependencies::DepStream::check_klass_dependency(KlassDepChange* changes) {
+Klass* Dependencies::DepStream::check_klass_dependency(KlassDepChange* changes, jlong profile_context) {
   assert_locked_or_safepoint(Compile_lock);
   Dependencies::check_valid_dependency_type(type());
 
@@ -1552,10 +1552,10 @@ Klass* Dependencies::DepStream::check_klass_dependency(KlassDepChange* changes) 
     if (changes->is_klass_init_change()) {
       return check_klass_init_dependency(changes->as_klass_init_change());
     } else {
-      return check_new_klass_dependency(changes->as_new_klass_change());
+      return check_new_klass_dependency(changes->as_new_klass_change(), profile_context);
     }
   } else {
-    Klass* witness = check_new_klass_dependency(nullptr);
+    Klass* witness = check_new_klass_dependency(nullptr, profile_context);
     // check_klass_init_dependency duplicates check_new_klass_dependency checks when class hierarchy change info is absent.
     assert(witness != nullptr || check_klass_init_dependency(nullptr) == nullptr, "missed dependency");
     return witness;
@@ -1580,10 +1580,10 @@ Klass* Dependencies::DepStream::check_call_site_dependency(CallSiteDepChange* ch
 }
 
 
-Klass* Dependencies::DepStream::spot_check_dependency_at(DepChange& changes) {
+Klass* Dependencies::DepStream::spot_check_dependency_at(DepChange &changes, jlong profile_context) {
   // Handle klass dependency
   if (changes.is_klass_change() && changes.as_klass_change()->involves_context(context_type()))
-    return check_klass_dependency(changes.as_klass_change());
+    return check_klass_dependency(changes.as_klass_change(), profile_context);
 
   // Handle CallSite dependency
   if (changes.is_call_site_change())

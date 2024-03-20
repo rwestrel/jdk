@@ -714,12 +714,12 @@ void SpeculativeTrapData::print_data_on(outputStream* st, const char* extra) con
 // A MethodData* holds information which has been collected about
 // a method.
 
-MethodData* MethodData::allocate(ClassLoaderData* loader_data, const methodHandle& method, TRAPS) {
+MethodData* MethodData::allocate(ClassLoaderData* loader_data, const methodHandle& method, jlong profile_context, TRAPS) {
   assert(!THREAD->owns_locks(), "Should not own any locks");
   int size = MethodData::compute_allocation_size_in_words(method);
 
   return new (loader_data, size, MetaspaceObj::MethodDataType, THREAD)
-    MethodData(method);
+    MethodData(method, profile_context);
 }
 
 int MethodData::bytecode_cell_count(Bytecodes::Code code) {
@@ -1166,9 +1166,11 @@ void MethodData::post_initialize(BytecodeStream* stream) {
 }
 
 // Initialize the MethodData* corresponding to a given method.
-MethodData::MethodData(const methodHandle& method)
+MethodData::MethodData(const methodHandle& method, jlong profile_context)
   : _method(method()),
     // Holds Compile_lock
+    _profile_context(profile_context),
+    _next(nullptr),
     _compiler_counters(),
     _parameters_type_data_di(parameters_uninitialized) {
     _extra_data_lock = nullptr;
@@ -1292,7 +1294,7 @@ void MethodData::init() {
 }
 
 bool MethodData::is_mature() const {
-  return CompilationPolicy::is_mature(const_cast<MethodData*>(this));
+  return CompilationPolicy::is_mature(const_cast<MethodData*>(this), profile_context());
 }
 
 // Translate a bci to its corresponding data index (di).

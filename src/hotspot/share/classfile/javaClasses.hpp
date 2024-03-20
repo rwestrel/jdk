@@ -34,6 +34,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/utf8.hpp"
 #include "utilities/vmEnums.hpp"
+#include "javaAssertions.hpp"
 
 class JvmtiThreadState;
 class RecordComponent;
@@ -672,7 +673,7 @@ class java_lang_Throwable: AllStatic {
 
   static oop cause(oop throwable);
 
-  static void print_stack_element(outputStream *st, Method* method, int bci);
+  static void print_stack_element(outputStream *st, Method* method, int bci, long profile_context);
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;

@@ -377,6 +377,8 @@ JavaThread::JavaThread(MemTag mem_tag) :
   DEBUG_ONLY(_interp_at_preemptable_vmcall_cnt(0) COMMA)
   DEBUG_ONLY(_interp_redoing_vm_call(false) COMMA)
 
+  _profile_context(0),
+
   _handshake(this),
   _suspend_resume_manager(this, &_handshake._lock),
 
@@ -1617,7 +1619,7 @@ void JavaThread::print_jni_stack() {
 void JavaThread::print_stack_on(outputStream* st) {
   if (!has_last_Java_frame()) return;
 
-  Thread* current_thread = Thread::current();
+  JavaThread* current_thread = JavaThread::current();
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
 
@@ -1630,7 +1632,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   for (vframe* f = start_vf; f != nullptr; f = f->sender()) {
     if (f->is_java_frame()) {
       javaVFrame* jvf = javaVFrame::cast(f);
-      java_lang_Throwable::print_stack_element(st, jvf->method(), jvf->bci());
+      java_lang_Throwable::print_stack_element(st, jvf->method(), jvf->bci(), current_thread->profile_context());
 
       // Print out lock information
       if (JavaMonitorsInStackTrace) {
@@ -1650,7 +1652,7 @@ void JavaThread::print_vthread_stack_on(outputStream* st) {
   assert(is_vthread_mounted(), "Caller should have checked this");
   assert(has_last_Java_frame(), "must be");
 
-  Thread* current_thread = Thread::current();
+  JavaThread* current_thread = JavaThread::current();
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
 
@@ -1672,7 +1674,7 @@ void JavaThread::print_vthread_stack_on(outputStream* st) {
     }
     if (f->is_java_frame()) {
       javaVFrame* jvf = javaVFrame::cast(f);
-      java_lang_Throwable::print_stack_element(st, jvf->method(), jvf->bci());
+      java_lang_Throwable::print_stack_element(st, jvf->method(), jvf->bci(), current_thread->profile_context());
 
       // Print out lock information
       if (JavaMonitorsInStackTrace) {

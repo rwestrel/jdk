@@ -2017,7 +2017,7 @@ Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
     // linkToNative doesn't have interpreter-specific implementation, so always has to go through compiled version.
     AdapterHandlerLibrary::create_native_wrapper(m);
     // Check if have the compiled code.
-    throw_error = (!m->has_compiled_code());
+    throw_error = (!m->has_compiled_code(0)); // FIXME
   }
 
   {
@@ -2029,8 +2029,8 @@ Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
       ml.notify_all();
     } else {
       signature->make_permanent(); // The signature is never unloaded.
-      assert(Arguments::is_interpreter_only() || (m->has_compiled_code() &&
-             m->code()->entry_point() == m->from_compiled_entry()),
+      assert(Arguments::is_interpreter_only() || (m->has_compiled_code(0) && // FIXME
+             m->code(0)->entry_point() == m->from_compiled_entry()), // FIXME
              "MH intrinsic invariant");
       *met = m(); // insert the element
       ml.notify_all();

@@ -60,6 +60,7 @@ class AdapterHandlerEntry;
 class MethodData;
 class MethodCounters;
 class MethodTrainingData;
+class MethodCounters2;
 class ConstMethod;
 class InlineTableSizes;
 class nmethod;
@@ -74,6 +75,10 @@ class Method : public Metadata {
   ConstMethod*      _constMethod;                // Method read-only data.
   MethodData*       _method_data;
   MethodCounters*   _method_counters;
+  MethodCounters2*   _method_counters2;
+//  Array<MethodData*>* _method_data_for_profile_contexts;
+//  Array<MethodCounters*>* _method_counters_for_profile_contexts;
+
   AdapterHandlerEntry* _adapter;
   int               _vtable_index;               // vtable index of this method (see VtableIndexFlag)
   AccessFlags       _access_flags;               // Access flags
@@ -88,8 +93,24 @@ class Method : public Metadata {
 
   Symbol* _name;
 #endif
+//  class EntryPoint {
+//  private:
+//    EntryPoint* _next;
+//    volatile address _entry;
+//    jlong _profile_context;
+//
+//  public:
+//    EntryPoint() : _next(nullptr), _entry(nullptr), _profile_context(0) {
+//    }
+//
+//    address entry(jlong profile_context) {
+//
+//    }
+//  };
+
   // Entry point for calling both from and to the interpreter.
   address _i2i_entry;           // All-args-on-stack calling convention
+  address _i2c_entry;
   // Entry point for calling from compiled code, to compiled code if it exists
   // or else the interpreter.
   volatile address _from_compiled_entry;     // Cache of: _code ? _code->entry_point() : _adapter->c2i_entry()
@@ -262,10 +283,10 @@ class Method : public Metadata {
 
 #ifdef COMPILER2
   // Count of times method was exited via exception while interpreting
-  inline void interpreter_throwout_increment(Thread* current);
+  inline void interpreter_throwout_increment(Thread* current, jlong profile_context);
 #endif // COMPILER2
 
-  inline int interpreter_throwout_count() const;
+  inline int interpreter_throwout_count(jlong profile_context) const;
 
   u2 size_of_parameters() const { return constMethod()->size_of_parameters(); }
 
@@ -310,45 +331,61 @@ class Method : public Metadata {
                               TRAPS);
 
   // method data access
-  MethodData* method_data() const {
-    return _method_data;
-  }
+<<<<<<< HEAD
+  MethodData* method_data(jlong profile_context) const;
+  MethodData* method_data_head() const { return _method_data; }
   void set_method_data(MethodData* data);
 
   MethodTrainingData* training_data_or_null() const;
   bool init_training_data(MethodTrainingData* td);
 
   // mark an exception handler as entered (used to prune dead catch blocks in C2)
-  void set_exception_handler_entered(int handler_bci);
+  void set_exception_handler_entered(int handler_bci, jlong profile_context);
 
-  MethodCounters* method_counters() const {
-    return _method_counters;
-  }
+  MethodCounters* method_counters(jlong profile_context) const;
+  MethodCounters* method_counters_head() const { return _method_counters; }
+  MethodCounters2* method_counters2() const;
 
   void clear_method_counters() {
     _method_counters = nullptr;
+    _method_counters2 = nullptr;
   }
 
+//  MethodCounters* method_counters_for_profile_context(long context) const {
+//    if (_method_data_for_profile_contexts == nullptr) {
+//      return nullptr;
+//    }
+//    return _method_counters_for_profile_contexts->at(context);
+//  }
+//
+//  void clear_method_counters_for_profile_contexts() {
+//    _method_counters_for_profile_contexts = nullptr;
+//  }
+
   bool init_method_counters(MethodCounters* counters);
+  bool init_method_counters2(MethodCounters2* counters);
+  bool init_method_data(MethodData* md);
 
-  inline int prev_event_count() const;
-  inline void set_prev_event_count(int count);
-  inline jlong prev_time() const;
-  inline void set_prev_time(jlong time);
-  inline float rate() const;
-  inline void set_rate(float rate);
+  inline int prev_event_count(jlong profile_context) const;
+  inline void set_prev_event_count(int count, jlong profile_context);
+  inline jlong prev_time(jlong profile_context) const;
+  inline void set_prev_time(jlong time, jlong profile_context);
+  inline float rate(jlong profile_context) const;
+  inline void set_rate(float rate, jlong profile_context);
 
-  inline int invocation_count() const;
-  inline int backedge_count() const;
+  inline int invocation_count(jlong profile_context) const;
+  inline int backedge_count(jlong profile_context) const;
+  int total_invocation_count() const;
 
-  bool was_executed_more_than(int n);
-  bool was_never_executed()                     { return !was_executed_more_than(0);  }
+  bool was_executed_more_than(int n, jlong profile_context);
+  bool was_never_executed(jlong profile_context) { return !was_executed_more_than(0, profile_context);  }
 
-  static void build_profiling_method_data(const methodHandle& method, TRAPS);
+  static void build_profiling_method_data(const methodHandle& method, jlong profile_context, TRAPS);
   static bool install_training_method_data(const methodHandle& method);
-  static MethodCounters* build_method_counters(Thread* current, Method* m);
+  static MethodCounters* build_method_counters(Thread* current, Method* m, jlong profile_context);
+  static MethodCounters2* build_method_counters2(Thread* current, Method* m);
 
-  inline int interpreter_invocation_count() const;
+  int interpreter_invocation_count(jlong profile_context) { return invocation_count(profile_context);          }
 
 #ifndef PRODUCT
   int64_t  compiled_invocation_count() const    { return _compiled_invocation_count;}
@@ -361,7 +398,7 @@ class Method : public Metadata {
   // nmethod/verified compiler entry
   address verified_code_entry();
   bool check_code() const;      // Not inline to avoid circular ref
-  nmethod* code() const;
+  nmethod* code(jlong profile_context) const;
 
   // Locks NMethodState_lock if not held.
   void unlink_code(nmethod *compare);
@@ -375,6 +412,10 @@ private:
   void clear_method_data() {
     _method_data = nullptr;
   }
+
+//  void clear_method_data_for_profile_contexts() {
+//    _method_data_for_profile_contexts = nullptr;
+//  }
 
 public:
   static void set_code(const methodHandle& mh, nmethod* code);
@@ -442,7 +483,7 @@ public:
 
   // Must specify a real function (not null).
   // Use clear_native_function() to unregister.
-  void set_native_function(address function, bool post_event_flag);
+  void set_native_function(address function, bool post_event_flag, jlong profile_context);
   bool has_native_function() const;
   void clear_native_function();
 
@@ -596,7 +637,7 @@ public:
   // compiled code support
   // NOTE: code() is inherently racy as deopt can be clearing code
   // simultaneously. Use with caution.
-  bool has_compiled_code() const;
+  bool has_compiled_code(jlong profile_context) const;
 
   bool needs_clinit_barrier() const;
 
@@ -618,17 +659,22 @@ public:
   static ByteSize method_counters_offset()       {
     return byte_offset_of(Method, _method_counters);
   }
+//  static ByteSize method_counters_for_profile_contexts_offset()       {
+//    return byte_offset_of(Method, _method_counters_for_profile_contexts);
+//  }
 #ifndef PRODUCT
   static ByteSize compiled_invocation_counter_offset() { return byte_offset_of(Method, _compiled_invocation_count); }
 #endif // not PRODUCT
   static ByteSize native_function_offset()       { return in_ByteSize(sizeof(Method));                 }
   static ByteSize from_interpreted_offset()      { return byte_offset_of(Method, _from_interpreted_entry ); }
   static ByteSize interpreter_entry_offset()     { return byte_offset_of(Method, _i2i_entry ); }
+  static ByteSize compiler_entry_offset()        { return byte_offset_of(Method, _i2c_entry ); }
   static ByteSize signature_handler_offset()     { return in_ByteSize(sizeof(Method) + wordSize);      }
   static ByteSize itable_index_offset()          { return byte_offset_of(Method, _vtable_index ); }
 
   // for code generation
   static ByteSize method_data_offset()  { return byte_offset_of(Method, _method_data); }
+//  static ByteSize method_data_for_profile_contexts_offset()  { return byte_offset_of(Method, _method_data_for_profile_contexts); }
   static ByteSize intrinsic_id_offset() { return byte_offset_of(Method, _intrinsic_id); }
   static int intrinsic_id_size_in_bytes()        { return sizeof(u2); }
 
@@ -801,14 +847,21 @@ public:
   bool is_always_compilable() const;
 
  private:
-  void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason);
+  void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, jlong profile_context);
 
  public:
-  MethodCounters* get_method_counters(Thread* current) {
+  MethodCounters* get_method_counters(jlong profile_context, Thread* current) {
     if (_method_counters == nullptr) {
-      build_method_counters(current, this);
+      build_method_counters(current, this, profile_context);
     }
     return _method_counters;
+  }
+
+  MethodCounters2* get_method_counters2(Thread* current) {
+    if (_method_counters2 == nullptr) {
+      build_method_counters2(current, this);
+    }
+    return _method_counters2;
   }
 
   void clear_is_not_c1_compilable()           { set_is_not_c1_compilable(false); }
@@ -870,6 +923,11 @@ public:
   // Verify
   void verify() { verify_on(tty); }
   void verify_on(outputStream* st);
+
+  void clean_method_data(bool always_clean);
+  void clean_weak_method_links();
+  uint decompile_count() const;
+  uint trap_count(char* reason_str) const;
 
  private:
 

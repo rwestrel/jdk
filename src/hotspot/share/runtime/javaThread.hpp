@@ -458,6 +458,8 @@ class JavaThread: public Thread {
   };
 #endif // ASSERT
 
+  jlong _profile_context;
+
 private:
   friend class VMThread;
   friend class ThreadWaitTransition;
@@ -624,6 +626,9 @@ private:
   void clear_unlocked_inflated_monitor() {
     _unlocked_inflated_monitor = nullptr;
   }
+
+  jlong profile_context() const { return _profile_context; }
+  void set_profile_context(jlong context) { _profile_context = context; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
@@ -835,6 +840,8 @@ public:
   DEBUG_ONLY(static ByteSize interp_at_preemptable_vmcall_cnt_offset() { return byte_offset_of(JavaThread, _interp_at_preemptable_vmcall_cnt); })
   static ByteSize unlocked_inflated_monitor_offset() { return byte_offset_of(JavaThread, _unlocked_inflated_monitor); }
   static ByteSize is_in_vthread_transition_offset()     { return byte_offset_of(JavaThread, _is_in_vthread_transition); }
+
+  static ByteSize profile_context_offset() { return byte_offset_of(JavaThread, _profile_context); }
 
 #if INCLUDE_JVMTI
   static ByteSize is_disable_suspend_offset()        { return byte_offset_of(JavaThread, _is_disable_suspend); }

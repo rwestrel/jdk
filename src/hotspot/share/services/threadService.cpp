@@ -626,15 +626,15 @@ void StackFrameInfo::metadata_do(void f(Metadata*)) {
   f(_method);
 }
 
-void StackFrameInfo::print_on(outputStream* st) const {
-  ResourceMark rm;
-  java_lang_Throwable::print_stack_element(st, method(), bci());
-  int len = (_locked_monitors != nullptr ? _locked_monitors->length() : 0);
-  for (int i = 0; i < len; i++) {
-    oop o = _locked_monitors->at(i).resolve();
-    st->print_cr("\t- locked <" INTPTR_FORMAT "> (a %s)", p2i(o), o->klass()->external_name());
-  }
-}
+//void StackFrameInfo::print_on(outputStream* st) const {
+//  ResourceMark rm;
+//  java_lang_Throwable::print_stack_element(st, method(), bci(), profile_context);
+//  int len = (_locked_monitors != nullptr ? _locked_monitors->length() : 0);
+//  for (int i = 0; i < len; i++) {
+//    oop o = _locked_monitors->at(i).resolve();
+//    st->print_cr("\t- locked <" INTPTR_FORMAT "> (a %s)", p2i(o), o->klass()->external_name());
+//  }
+//}
 
 // Iterate through monitor cache to find JNI locked monitors
 class InflatedMonitorsClosure: public MonitorClosure {

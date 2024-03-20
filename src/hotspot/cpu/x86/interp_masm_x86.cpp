@@ -31,6 +31,7 @@
 #include "oops/markWord.hpp"
 #include "oops/methodData.hpp"
 #include "oops/method.hpp"
+#include "oops/methodCounters.hpp"
 #include "oops/resolvedFieldEntry.hpp"
 #include "oops/resolvedIndyEntry.hpp"
 #include "oops/resolvedMethodEntry.hpp"
@@ -708,7 +709,7 @@ void InterpreterMacroAssembler::prepare_to_jump_from_interpreted() {
 
 // Jump to from_interpreted entry of a call unless single stepping is possible
 // in this thread in which case we must call the i2i entry
-void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register temp) {
+void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register temp, Register temp2) {
   prepare_to_jump_from_interpreted();
 
   if (JvmtiExport::can_post_interpreter_events()) {
@@ -724,7 +725,20 @@ void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register 
     bind(run_compiled_code);
   }
 
-  jmp(Address(method, Method::from_interpreted_offset()));
+  if (UseNewCode) {
+    Label no_code, done;
+    const Register profile_context = temp2;
+    const Register code = temp;
+    load_code_for_profile_context(method, profile_context, code, no_code, done);
+    bind(done);
+
+    jmp(Address(method, Method::compiler_entry_offset()));
+
+    bind(no_code);
+    jmp(Address(method, Method::interpreter_entry_offset()));
+  } else {
+    jmp(Address(method, Method::from_interpreted_offset()));
+  }
 }
 
 // The following two routines provide a hook so that an implementation
@@ -1073,19 +1087,70 @@ void InterpreterMacroAssembler::leave_jfr_critical_section() {
 #endif // INCLUDE_JFR
 
 void InterpreterMacroAssembler::get_method_counters(Register method,
-                                                    Register mcs, Label& skip) {
+                                                    Register mcs, Register profile_context, Label& skip) {
+//  if (UseNewCode) {
+//    Label not_found;
+//    Label found;
+//    load_method_counters(method, mcs, profile_context);
+//
+//    bind(not_found);
+//    call_VM(noreg, CAST_FROM_FN_PTR(address,
+//                                    InterpreterRuntime::build_method_counters), method, profile_context);
+//    mov(mcs, rax);
+//    testptr(mcs, mcs);
+//    jcc(Assembler::zero, skip); // No MethodCounters allocated, OutOfMemory
+//    bind(found);
+//    return;
+//  }
+
   Label has_counters;
-  movptr(mcs, Address(method, Method::method_counters_offset()));
+//  movptr(mcs, Address(method, Method::method_counters_offset()));
+  load_method_counters<MethodCounters>(method, mcs, profile_context);
   testptr(mcs, mcs);
   jcc(Assembler::notZero, has_counters);
   call_VM(noreg, CAST_FROM_FN_PTR(address,
-          InterpreterRuntime::build_method_counters), method);
-  movptr(mcs, Address(method,Method::method_counters_offset()));
+          InterpreterRuntime::build_method_counters), method, profile_context);
+  load_method_counters<MethodCounters>(method, mcs, profile_context);
   testptr(mcs, mcs);
   jcc(Assembler::zero, skip); // No MethodCounters allocated, OutOfMemory
   bind(has_counters);
 }
 
+template <class CounterClass>  void InterpreterMacroAssembler::load_method_counters(Register method, Register mcs, Register profile_context) {
+  if (UseNewCode) {
+    block_comment("load_method_counters { ");
+    Label loop, done;
+    const Register java_thread = r15_thread;
+    assert_different_registers(profile_context, mcs);
+    movq(profile_context, Address(java_thread, JavaThread::profile_context_offset()));
+    movptr(mcs, Address(method, CounterClass::offset_in_method()));
+    bind(loop);
+    testptr(mcs, mcs);
+    jcc(zero, done);
+    cmpq(Address(mcs, CounterClass::profile_context_offset()), profile_context);
+    jcc(equal, done);
+    movptr(mcs, Address(mcs, CounterClass::next_offset()));
+    jmp(loop);
+    bind(done);
+    block_comment("load_method_counters } ");
+  } else {
+    movptr(mcs, Address(method, CounterClass::offset_in_method()));
+  }
+}
+
+//void InterpreterMacroAssembler::get_method_counters_for_profile_context(Register method, Register mcs,
+//                                                                        Register profile_context, Label &skip) {
+//  Label has_counters;
+//  movptr(mcs, Address(method, Method::method_counters_for_profile_contexts_offset()));
+//  testptr(mcs, mcs);
+//  jcc(Assembler::notZero, has_counters);
+//  call_VM(noreg, CAST_FROM_FN_PTR(address,
+//                                  InterpreterRuntime::build_method_counters_for_profile_context), method);
+//  movptr(mcs, Address(method,Method::method_counters_for_profile_contexts_offset()));
+//  testptr(mcs, mcs);
+//  jcc(Assembler::zero, skip); // No MethodCounters allocated, OutOfMemory
+//  bind(has_counters);
+//}
 
 // Lock object
 //
@@ -1176,10 +1241,12 @@ void InterpreterMacroAssembler::set_method_data_pointer_for_bcp() {
   Label set_mdp;
   push(rax);
   push(rbx);
+  push(rcx);
 
   get_method(rbx);
   // Test MDO to avoid the call if it is null.
-  movptr(rax, Address(rbx, in_bytes(Method::method_data_offset())));
+  load_method_counters<MethodData>(rbx, rax, rcx);
+//  movptr(rax, Address(rbx, in_bytes(Method::method_data_offset())));
   testptr(rax, rax);
   jcc(Assembler::zero, set_mdp);
   // rbx: method
@@ -1187,11 +1254,13 @@ void InterpreterMacroAssembler::set_method_data_pointer_for_bcp() {
   call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::bcp_to_di), rbx, _bcp_register);
   // rax: mdi
   // mdo is guaranteed to be non-zero here, we checked for it before the call.
-  movptr(rbx, Address(rbx, in_bytes(Method::method_data_offset())));
+//  movptr(rbx, Address(rbx, in_bytes(Method::method_data_offset())));
+  load_method_counters<MethodData>(rbx, rax, rcx);
   addptr(rbx, in_bytes(MethodData::data_offset()));
   addptr(rax, rbx);
   bind(set_mdp);
   movptr(Address(rbp, frame::interpreter_frame_mdp_offset * wordSize), rax);
+  pop(rcx);
   pop(rbx);
   pop(rax);
 }

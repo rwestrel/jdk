@@ -251,7 +251,7 @@ class CompilationPolicy : AllStatic {
   static TrainingReplayQueue _training_replay_queue;
 
   // Set carry flags in the counters (in Method* and MDO).
-  inline static void handle_counter_overflow(const methodHandle& method);
+  inline static void handle_counter_overflow(const methodHandle& method, jlong profile_context);
 #ifdef ASSERT
   // Verify that a level is consistent with the compilation mode
   static bool verify_level(CompLevel level);
@@ -260,7 +260,7 @@ class CompilationPolicy : AllStatic {
   inline static CompLevel limit_level(CompLevel level);
   // Common transition function. Given a predicate determines if a method should transition to another level.
   template<typename Predicate>
-  static CompLevel common(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD, bool disable_feedback = false);
+  static CompLevel common(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD, jlong profile_context, bool disable_feedback = false);
 
   template<typename Predicate>
   static CompLevel transition_from_none(const methodHandle& method, CompLevel cur_level, bool disable_feedback);
@@ -280,62 +280,64 @@ class CompilationPolicy : AllStatic {
   // Transition functions.
   // call_event determines if a method should be compiled at a different
   // level with a regular invocation entry.
-  static CompLevel call_event(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD);
+  static CompLevel call_event(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD);
   // loop_event checks if a method should be OSR compiled at a different
   // level.
-  static CompLevel loop_event(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD);
-  static void print_counters_on(outputStream* st, const char* prefix, Method* m);
+  static CompLevel loop_event(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD);
+  static void print_counters_on(outputStream* st, const char* prefix, Method* m, jlong profile_context);
   static void print_training_data_on(outputStream* st, const char* prefix, Method* method, CompLevel cur_level);
   // Has a method been long around?
   // We don't remove old methods from the compile queue even if they have
   // very low activity (see select_task()).
-  inline static bool is_old(const methodHandle& method);
+  inline static bool is_old(const methodHandle &method, jlong profile_context);
   // Was a given method inactive for a given number of milliseconds.
   // If it is, we would remove it from the queue (see select_task()).
-  inline static bool is_stale(int64_t t, int64_t timeout, const methodHandle& method);
+  inline static bool is_stale(int64_t t, int64_t timeout, const methodHandle& method, jlong profile_context);
   // Compute the weight of the method for the compilation scheduling
-  inline static double weight(Method* method);
+  inline static double weight(Method* method, jlong profile_context);
   // Apply heuristics and return true if x should be compiled before y
-  inline static bool compare_methods(Method* x, Method* y);
+  inline static bool compare_methods(Method* x, Method* y, jlong profile_context);
   // Compute event rate for a given method. The rate is the number of event (invocations + backedges)
   // per millisecond.
-  inline static void update_rate(int64_t t, const methodHandle& method);
+  inline static void update_rate(int64_t t, const methodHandle& method, jlong profile_context);
   // Compute threshold scaling coefficient
   inline static double threshold_scale(CompLevel level, int feedback_k);
   // If a method is old enough and is still in the interpreter we would want to
   // start profiling without waiting for the compiled method to arrive. This function
   // determines whether we should do that.
-  inline static bool should_create_mdo(const methodHandle& method, CompLevel cur_level);
+  inline static bool should_create_mdo(const methodHandle &method, CompLevel cur_level, jlong profile_context);
   // Create MDO if necessary.
-  static void create_mdo(const methodHandle& mh, JavaThread* THREAD);
+  static void create_mdo(const methodHandle &mh, jlong profile_context, JavaThread* THREAD);
   // Is method profiled enough?
-  static bool is_method_profiled(const methodHandle& method);
+  static bool is_method_profiled(const methodHandle &method, jlong profile_context);
 
   static void set_c1_count(int x) { _c1_count = x;    }
   static void set_c2_count(int x) { _c2_count = x;    }
 
   enum EventType { CALL, LOOP, COMPILE, FORCE_COMPILE, FORCE_RECOMPILE, REMOVE_FROM_QUEUE, UPDATE_IN_QUEUE, REPROFILE, MAKE_NOT_ENTRANT };
   static void print_event_on(outputStream *st, EventType type, Method* m, Method* im, int bci, CompLevel level);
-  static void print_event(EventType type, Method* m, Method* im, int bci, CompLevel level);
+  static void print_event(EventType type, Method* m, Method* im, int bci, CompLevel level,
+                          jlong profile_context);
   // Check if the method can be compiled, change level if necessary
-  static void compile(const methodHandle& mh, int bci, CompLevel level, TRAPS);
+  static void compile(const methodHandle &mh, int bci, CompLevel level, jlong profile_context,
+                      TRAPS);
   // Simple methods are as good being compiled with C1 as C2.
   // This function tells if it's such a function.
   inline static bool is_trivial(const methodHandle& method);
 
   // Get a compilation level for a given method.
-  static CompLevel comp_level(Method* method);
+  static CompLevel comp_level(Method* method, jlong profile_context);
   static void method_invocation_event(const methodHandle& method, const methodHandle& inlinee,
-                                      CompLevel level, nmethod* nm, TRAPS);
+                                      CompLevel level, nmethod* nm, jlong profile_context, TRAPS);
   static void method_back_branch_event(const methodHandle& method, const methodHandle& inlinee,
-                                      int bci, CompLevel level, nmethod* nm, TRAPS);
+                                      int bci, CompLevel level, nmethod* nm, jlong profile_context, TRAPS);
 
   static void set_increase_threshold_at_ratio() { _increase_threshold_at_ratio = 100 / (100 - (double)IncreaseFirstTierCompileThresholdAt); }
   static void set_start_time(int64_t t) { _start_time = t;    }
   static int64_t start_time()           { return _start_time; }
 
   // m must be compiled before executing it
-  static bool must_be_compiled(const methodHandle& m, int comp_level = CompLevel_any);
+  static bool must_be_compiled(const methodHandle& m, jlong profile_context, int comp_level = CompLevel_any);
   static void maybe_compile_early(const methodHandle& m, TRAPS);
   static void replay_training_at_init_impl(InstanceKlass* klass, JavaThread* current);
  public:
@@ -345,7 +347,7 @@ class CompilationPolicy : AllStatic {
   static int compiler_count(CompLevel comp_level);
   // If m must_be_compiled then request a compilation from the CompileBroker.
   // This supports the -Xcomp option.
-  static void compile_if_required(const methodHandle& m, TRAPS);
+  static void compile_if_required(const methodHandle &m, jlong profile_context, TRAPS);
 
   static void replay_training_at_init(InstanceKlass* klass, JavaThread* current);
   static void replay_training_at_init_loop(JavaThread* current);
@@ -357,13 +359,13 @@ class CompilationPolicy : AllStatic {
   static bool is_compilation_enabled();
 
   // Return initial compile level to use with Xcomp (depends on compilation mode).
-  static void reprofile(ScopeDesc* trap_scope, bool is_osr);
+  static void reprofile(ScopeDesc* trap_scope, bool is_osr, jlong profile_context);
   static nmethod* event(const methodHandle& method, const methodHandle& inlinee,
-                        int branch_bci, int bci, CompLevel comp_level, nmethod* nm, TRAPS);
+                        int branch_bci, int bci, CompLevel comp_level, nmethod* nm, jlong profile_context, TRAPS);
   // Select task is called by CompileBroker. We should return a task or nullptr.
   static CompileTask* select_task(CompileQueue* compile_queue, JavaThread* THREAD);
   // Tell the runtime if we think a given method is adequately profiled.
-  static bool is_mature(MethodData* mdo);
+  static bool is_mature(MethodData* mdo, jlong profile_context);
   // Initialize: set compiler thread count
   static void initialize();
   static bool should_not_inline(ciEnv* env, ciMethod* callee);

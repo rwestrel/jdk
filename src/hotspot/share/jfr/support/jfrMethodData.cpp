@@ -40,12 +40,12 @@ static inline BitData* get_bit_data(MethodData* mdo, int bci) {
 
 static inline MethodData* build_mdo(Method* method, JavaThread* jt) {
   methodHandle method_handle(jt, method);
-  Method::build_profiling_method_data(method_handle, jt);
-  return method->method_data();
+  Method::build_profiling_method_data(method_handle, jt->profile_context(), jt);
+  return method->method_data(jt->profile_context());
 }
 
 static inline MethodData* get_mdo(Method* method, JavaThread* jt) {
-  MethodData* mdo = method->method_data();
+  MethodData* mdo = method->method_data(jt->profile_context());
   return mdo != nullptr ? mdo : build_mdo(method, jt);
 }
 

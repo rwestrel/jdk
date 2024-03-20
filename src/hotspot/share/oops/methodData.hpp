@@ -1955,11 +1955,14 @@ class MethodData : public Metadata {
 
   Mutex* volatile _extra_data_lock;
 
-  MethodData(const methodHandle& method);
+  jlong _profile_context;
+  MethodData* _next;
+
+  MethodData(const methodHandle& method, jlong profile_context);
 public:
   MethodData();
 
-  static MethodData* allocate(ClassLoaderData* loader_data, const methodHandle& method, TRAPS);
+  static MethodData* allocate(ClassLoaderData* loader_data, const methodHandle& method, jlong profile_context, TRAPS);
 
   virtual bool is_methodData() const { return true; }
   void initialize();
@@ -2292,6 +2295,9 @@ public:
 
   // Accessors
   Method* method() const { return _method; }
+  jlong profile_context() const { return _profile_context; }
+  MethodData* next() const { return _next; }
+  void set_next(MethodData* next) { _next = next; }
 
   // Get the data at an arbitrary (sort of) data index.
   ProfileData* data_at(int data_index) const;
@@ -2447,6 +2453,18 @@ public:
 
   static ByteSize parameters_type_data_di_offset() {
     return byte_offset_of(MethodData, _parameters_type_data_di);
+  }
+
+  static ByteSize profile_context_offset() {
+    return byte_offset_of(MethodData, _profile_context);
+  }
+
+  static ByteSize next_offset() {
+    return byte_offset_of(MethodData, _next);
+  }
+
+  static ByteSize offset_in_method() {
+    return Method::method_data_offset();
   }
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);

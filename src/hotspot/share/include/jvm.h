@@ -1135,6 +1135,12 @@ JVM_GetClassFileVersion(JNIEnv *env, jclass current);
 JNIEXPORT jboolean JNICALL
 JVM_PrintWarningAtDynamicAgentLoad(void);
 
+JNIEXPORT void JNICALL
+JVM_SetProfileContext(JNIEnv *env, jclass ignored, jlong context);
+
+JNIEXPORT jlong JNICALL
+JVM_GetProfileContext(JNIEnv *env, jclass ignored);
+
 /*
  * This structure is used by the launcher to get the default thread
  * stack size from the VM using JNI_GetDefaultJavaVMInitArgs() with a

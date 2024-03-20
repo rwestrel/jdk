@@ -32,16 +32,15 @@
 #include "oops/trainingData.hpp"
 #include "runtime/handles.inline.hpp"
 
-MethodCounters::MethodCounters(const methodHandle& mh) :
+MethodCounters::MethodCounters(const methodHandle& mh, jlong profile_context) :
   _method(mh()),
   _method_training_data(method_training_data_sentinel()),
   _prev_time(0),
   _rate(0),
-  _highest_comp_level(0),
-  _highest_osr_comp_level(0)
+  _profile_context(profile_context),
+  _next(nullptr)
 {
   set_interpreter_throwout_count(0);
-  JVMTI_ONLY(clear_number_of_breakpoints());
   invocation_counter()->init();
   backedge_counter()->init();
 
@@ -60,14 +59,14 @@ MethodCounters::MethodCounters() {
 }
 #endif
 
-MethodCounters* MethodCounters::allocate_no_exception(const methodHandle& mh) {
+MethodCounters* MethodCounters::allocate_no_exception(const methodHandle& mh, jlong profile_context) {
   ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
-  return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType) MethodCounters(mh);
+  return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType) MethodCounters(mh, profile_context);
 }
 
-MethodCounters* MethodCounters::allocate_with_exception(const methodHandle& mh, TRAPS) {
+MethodCounters* MethodCounters::allocate_with_exception(const methodHandle& mh, jlong profile_context, TRAPS) {
   ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
-  return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType, THREAD) MethodCounters(mh);
+  return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType, THREAD) MethodCounters(mh, profile_context);
 }
 
 void MethodCounters::clear_counters() {
@@ -77,8 +76,6 @@ void MethodCounters::clear_counters() {
   set_prev_time(0);
   set_prev_event_count(0);
   set_rate(0);
-  set_highest_comp_level(0);
-  set_highest_osr_comp_level(0);
 }
 
 void MethodCounters::metaspace_pointers_do(MetaspaceClosure* it) {
@@ -127,3 +124,30 @@ void MethodCounters::print_value_on(outputStream* st) const {
 }
 
 
+MethodCounters2::MethodCounters2(const methodHandle& mh) :
+  _highest_comp_level(0),
+  _highest_osr_comp_level(0)
+{
+  JVMTI_ONLY(clear_number_of_breakpoints());
+}
+
+MethodCounters2* MethodCounters2::allocate_no_exception(const methodHandle& mh) {
+  ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
+  return new(loader_data, method_counters2_size(), MetaspaceObj::MethodCountersType) MethodCounters2(mh);
+}
+
+MethodCounters2* MethodCounters2::allocate_with_exception(const methodHandle& mh, TRAPS) {
+  ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
+  return new(loader_data, method_counters2_size(), MetaspaceObj::MethodCountersType, THREAD) MethodCounters2(mh);
+}
+
+void MethodCounters2::clear_counters() {
+  set_highest_comp_level(0);
+  set_highest_osr_comp_level(0);
+}
+
+void MethodCounters2::print_value_on(outputStream* st) const {
+  assert(is_methodCounters2(), "must be methodCounters");
+  st->print("method counters 2");
+  print_address_on(st);
+}

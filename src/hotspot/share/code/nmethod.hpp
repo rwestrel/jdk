@@ -189,6 +189,7 @@ class nmethod : public CodeBlob {
       ByteSize _native_basic_lock_sp_offset;
     };
   };
+  nmethod* _next;
 
   // nmethod's read-only data
   address _immutable_data;
@@ -242,6 +243,7 @@ class nmethod : public CodeBlob {
   int          _compile_id;            // which compilation made this nmethod
   CompLevel    _comp_level;            // compilation level (s1)
   CompilerType _compiler_type;         // which compiler made this nmethod (u1)
+  jlong _profile_context;
 
   // Local state used to keep track of whether unloading is happening or not
   volatile uint8_t _is_unloading_state;
@@ -346,7 +348,8 @@ private:
           ImplicitExceptionTable* nul_chk_table,
           AbstractCompiler* compiler,
           CompLevel comp_level,
-          Flags flags);
+          Flags flags,
+          jlong profile_context);
 
   nmethod(const nmethod &nm);
 
@@ -567,13 +570,8 @@ public:
                               ImplicitExceptionTable* nul_chk_table,
                               AbstractCompiler* compiler,
                               CompLevel comp_level,
-                              Flags flags);
-
-  // Relocate the nmethod to the code heap identified by code_blob_type.
-  // Returns nullptr if the code heap does not have enough space, the
-  // nmethod is unrelocatable, or the nmethod is invalidated during relocation,
-  // otherwise the relocated nmethod. The original nmethod will be marked not entrant.
-  nmethod* relocate(CodeBlobType code_blob_type);
+                              Flags flags,
+                              jlong profile_context);
 
   static nmethod* new_native_nmethod(const methodHandle& method,
                                      int compile_id,
@@ -746,6 +744,7 @@ public:
   }
 
   int   comp_level() const                        { return _comp_level; }
+  jlong profile_context() const                   { return _profile_context; }
 
   // Support for oops in scopes and relocs:
   // Note: index 0 is reserved for null.
@@ -857,6 +856,8 @@ public:
   int num_stack_arg_slots(bool rounded = true) const {
     return rounded ? align_up(_num_stack_arg_slots, 2) : _num_stack_arg_slots;
   }
+  nmethod* next() const                           { return _next; }
+  void set_next(nmethod* next)                { _next = next; }
 
   // Verify calls to dead methods have been cleaned.
   void verify_clean_inline_caches();
@@ -1040,6 +1041,8 @@ public:
   // support for code generation
   static ByteSize osr_entry_point_offset() { return byte_offset_of(nmethod, _osr_entry_point); }
   static ByteSize state_offset()           { return byte_offset_of(nmethod, _state); }
+  static ByteSize next_offset()                 { return byte_offset_of(nmethod, _next); }
+  static ByteSize profile_context_offset()      { return byte_offset_of(nmethod, _profile_context); }
 
   void metadata_do(MetadataClosure* f);
 

@@ -1067,6 +1067,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
                                         int hot_count,
                                         CompileTask::CompileReason compile_reason,
                                         bool blocking,
+                                        jlong profile_context,
                                         Thread* thread) {
   guarantee(!method->is_abstract(), "cannot compile abstract methods");
   assert(method->method_holder()->is_instance_klass(),
@@ -1091,7 +1092,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
   // A request has been made for compilation.  Before we do any
   // real work, check to see if the method has been compiled
   // in the meantime with a definitive result.
-  if (compilation_is_complete(method, osr_bci, comp_level)) {
+  if (compilation_is_complete(method, osr_bci, comp_level, profile_context)) {
     return;
   }
 
@@ -1120,7 +1121,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
 
   // Tiered policy requires MethodCounters to exist before adding a method to
   // the queue. Create if we don't have them yet.
-  method->get_method_counters(thread);
+  method->get_method_counters(profile_context, thread);
 
   // Outputs from the following MutexLocker block:
   CompileTask* task     = nullptr;
@@ -1140,7 +1141,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
     // We need to check again to see if the compilation has
     // completed.  A previous compilation may have registered
     // some result.
-    if (compilation_is_complete(method, osr_bci, comp_level)) {
+    if (compilation_is_complete(method, osr_bci, comp_level, profile_context)) {
       return;
     }
 
@@ -1195,7 +1196,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
                                compile_id, method,
                                osr_bci, comp_level,
                                hot_count, compile_reason,
-                               blocking);
+                               blocking, profile_context);
   }
 
   if (blocking) {
@@ -1206,7 +1207,7 @@ void CompileBroker::compile_method_base(const methodHandle& method,
 nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
                                        int comp_level,
                                        int hot_count,
-                                       CompileTask::CompileReason compile_reason,
+                                       CompileTask::CompileReason compile_reason, jlong profile_context,
                                        TRAPS) {
   // Do nothing if compilebroker is not initialized or compiles are submitted on level none
   if (!_initialized || comp_level == CompLevel_none) {
@@ -1218,7 +1219,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 
   CompilerDirectiveMatcher matcher(method, comp_level);
   // CompileBroker::compile_method can trap and can have pending async exception.
-  nmethod* nm = CompileBroker::compile_method(method, osr_bci, comp_level, hot_count, compile_reason, matcher.directive_set(), THREAD);
+  nmethod* nm = CompileBroker::compile_method(method, osr_bci, comp_level, hot_count, compile_reason, matcher.directive_set(), profile_context, THREAD);
   return nm;
 }
 
@@ -1227,7 +1228,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
                                          int hot_count,
                                          CompileTask::CompileReason compile_reason,
                                          DirectiveSet* directive,
-                                         TRAPS) {
+                                         jlong profile_context, TRAPS) {
 
   // make sure arguments make sense
   assert(method->method_holder()->is_instance_klass(), "not an instance method");
@@ -1245,9 +1246,9 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 
   if (osr_bci == InvocationEntryBci) {
     // standard compilation
-    nmethod* method_code = method->code();
+    nmethod* method_code = method->code(profile_context);
     if (method_code != nullptr) {
-      if (compilation_is_complete(method, osr_bci, comp_level)) {
+      if (compilation_is_complete(method, osr_bci, comp_level, profile_context)) {
         return method_code;
       }
     }
@@ -1320,13 +1321,13 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
       return nullptr;
     }
     bool is_blocking = !directive->BackgroundCompilationOption || ReplayCompiles;
-    compile_method_base(method, osr_bci, comp_level, hot_count, compile_reason, is_blocking, THREAD);
+    compile_method_base(method, osr_bci, comp_level, hot_count, compile_reason, is_blocking, profile_context, THREAD);
   }
 
   // return requested nmethod
   // We accept a higher level osr method
   if (osr_bci == InvocationEntryBci) {
-    return method->code();
+    return method->code(profile_context);
   }
   return method->lookup_osr_nmethod_for(osr_bci, comp_level, false);
 }
@@ -1336,9 +1337,8 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 // CompileBroker::compilation_is_complete
 //
 // See if compilation of this method is already complete.
-bool CompileBroker::compilation_is_complete(const methodHandle& method,
-                                            int                 osr_bci,
-                                            int                 comp_level) {
+bool
+CompileBroker::compilation_is_complete(const methodHandle &method, int osr_bci, int comp_level, jlong profile_context) {
   bool is_osr = (osr_bci != standard_entry_bci);
   if (is_osr) {
     if (method->is_not_osr_compilable(comp_level)) {
@@ -1351,7 +1351,7 @@ bool CompileBroker::compilation_is_complete(const methodHandle& method,
     if (method->is_not_compilable(comp_level)) {
       return true;
     } else {
-      nmethod* result = method->code();
+      nmethod* result = method->code(profile_context);
       if (result == nullptr) return false;
       return comp_level == result->comp_level();
     }
@@ -1469,9 +1469,10 @@ CompileTask* CompileBroker::create_compile_task(CompileQueue*       queue,
                                                 int                 comp_level,
                                                 int                 hot_count,
                                                 CompileTask::CompileReason compile_reason,
-                                                bool                blocking) {
+                                                bool                blocking,
+                                                jlong profile_context) {
   CompileTask* new_task = new CompileTask(compile_id, method, osr_bci, comp_level,
-                                          hot_count, compile_reason, blocking);
+                                          hot_count, compile_reason, blocking, profile_context);
   queue->add(new_task);
   return new_task;
 }

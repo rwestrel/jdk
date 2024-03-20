@@ -320,7 +320,7 @@ class StackFrameInfo : public CHeapObj<mtInternal> {
   int       num_locked_monitors()       { return (_locked_monitors != nullptr ? _locked_monitors->length() : 0); }
   GrowableArray<OopHandle>* locked_monitors() { return _locked_monitors; }
 
-  void      print_on(outputStream* st) const;
+//  void      print_on(outputStream* st) const;
 };
 
 class ThreadConcurrentLocks : public CHeapObj<mtInternal> {

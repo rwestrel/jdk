@@ -323,7 +323,8 @@ void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
   Label no_mdo;
   if (ProfileInterpreter) {
     // Are we profiling?
-    __ movptr(rax, Address(rbx, Method::method_data_offset()));
+//    __ movptr(rax, Address(rbx, Method::method_data_offset()));
+    __ load_method_counters<MethodData>(rbx, rax, rcx);
     __ testptr(rax, rax);
     __ jccb(Assembler::zero, no_mdo);
     // Increment counter in the MDO
@@ -338,9 +339,14 @@ void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
   const Address invocation_counter(rax,
       MethodCounters::invocation_counter_offset() +
       InvocationCounter::counter_offset());
-  __ get_method_counters(rbx, rax, done);
+
+  const Register java_thread = r15_thread;
+  __ movq(rcx, Address(java_thread, JavaThread::profile_context_offset()));
+
+  __ get_method_counters(rbx, rax, rcx, done);
   const Address mask(rax, in_bytes(MethodCounters::invoke_mask_offset()));
   __ increment_mask_and_jump(invocation_counter, mask, rcx, overflow);
+
   __ bind(done);
 }
 
@@ -558,7 +564,8 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
 
   if (ProfileInterpreter) {
     Label method_data_continue;
-    __ movptr(rdx, Address(rbx, in_bytes(Method::method_data_offset())));
+//    __ movptr(rdx, Address(rbx, in_bytes(Method::method_data_offset())));
+    __ load_method_counters<MethodData>(rbx, rdx, rax);
     __ testptr(rdx, rdx);
     __ jccb(Assembler::zero, method_data_continue);
     __ addptr(rdx, in_bytes(MethodData::data_offset()));

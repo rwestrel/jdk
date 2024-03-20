@@ -2085,6 +2085,8 @@ public:
 
   void fast_lock(Register basic_lock, Register obj, Register reg_rax, Register tmp, Label& slow);
   void fast_unlock(Register obj, Register reg_rax, Register tmp, Label& slow);
+  void load_code_for_profile_context(Register method, Register profile_context, Register code,
+                                     Label &no_code, Label &done);
 
   void save_legacy_gprs();
   void restore_legacy_gprs();

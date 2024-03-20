@@ -500,7 +500,7 @@ static nmethod* counter_overflow_helper(JavaThread* current, int branch_bci, Met
     }
     bci = branch_bci + offset;
   }
-  osr_nm = CompilationPolicy::event(enclosing_method, method, branch_bci, bci, level, nm, current);
+  osr_nm = CompilationPolicy::event(enclosing_method, method, branch_bci, bci, level, nm, current->profile_context(), current);
   return osr_nm;
 }
 
@@ -808,7 +808,8 @@ JRT_ENTRY(void, Runtime1::deoptimize(JavaThread* current, jint trap_request))
   if (action == Deoptimization::Action_make_not_entrant) {
     if (nm->make_not_entrant(nmethod::InvalidationReason::C1_DEOPTIMIZE)) {
       if (reason == Deoptimization::Reason_tenured) {
-        MethodData* trap_mdo = Deoptimization::get_method_data(current, method, true /*create_if_missing*/);
+        MethodData* trap_mdo = Deoptimization::get_method_data(current, method, true /*create_if_missing*/,
+                                                               current->profile_context());
         if (trap_mdo != nullptr) {
           trap_mdo->inc_tenure_traps();
         }
@@ -1457,18 +1458,18 @@ JRT_ENTRY(void, Runtime1::predicate_failed_trap(JavaThread* current))
   nm->make_not_entrant(nmethod::InvalidationReason::C1_PREDICATE_FAILED_TRAP);
 
   methodHandle m(current, nm->method());
-  MethodData* mdo = m->method_data();
+  MethodData* mdo = m->method_data(current->profile_context());
 
   if (mdo == nullptr && !HAS_PENDING_EXCEPTION) {
     // Build an MDO.  Ignore errors like OutOfMemory;
     // that simply means we won't have an MDO to update.
-    Method::build_profiling_method_data(m, THREAD);
+    Method::build_profiling_method_data(m, current->profile_context(), THREAD);
     if (HAS_PENDING_EXCEPTION) {
       // Only metaspace OOM is expected. No Java code executed.
       assert((PENDING_EXCEPTION->is_a(vmClasses::OutOfMemoryError_klass())), "we expect only an OOM error here");
       CLEAR_PENDING_EXCEPTION;
     }
-    mdo = m->method_data();
+    mdo = m->method_data(current->profile_context());
   }
 
   if (mdo != nullptr) {

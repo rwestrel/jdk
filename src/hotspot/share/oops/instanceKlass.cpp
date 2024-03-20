@@ -2641,10 +2641,11 @@ void InstanceKlass::clean_implementors_list() {
 
 void InstanceKlass::clean_method_data() {
   for (int m = 0; m < methods()->length(); m++) {
-    MethodData* mdo = methods()->at(m)->method_data();
-    if (mdo != nullptr) {
-      mdo->clean_method_data(/*always_clean*/false);
-    }
+    methods()->at(m)->clean_method_data(/*always_clean*/false);
+    //    MethodData* mdo = methods()->at(m)->method_data(profile_context);
+//    if (mdo != nullptr) {
+//      mdo->clean_method_data(/*always_clean*/false);
+//    }
   }
 }
 
@@ -3563,7 +3564,7 @@ void InstanceKlass::adjust_default_methods(bool* trace_name_printed) {
 #endif // INCLUDE_JVMTI
 
 // On-stack replacement stuff
-void InstanceKlass::add_osr_nmethod(nmethod* n) {
+void InstanceKlass::add_osr_nmethod(nmethod* n, jlong profile_context) {
   assert_lock_strong(NMethodState_lock);
 #ifndef PRODUCT
   nmethod* prev = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), n->comp_level(), true);

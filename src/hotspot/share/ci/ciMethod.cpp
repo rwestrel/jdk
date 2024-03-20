@@ -112,7 +112,7 @@ ciMethod::ciMethod(const methodHandle& h_m, ciInstanceKlass* holder) :
     // 6328518 check hotswap conditions under the right lock.
     bool should_take_Compile_lock = !Compile_lock->owned_by_self();
     ConditionalMutexLocker locker(Compile_lock, should_take_Compile_lock, Mutex::_safepoint_check_flag);
-    if (Dependencies::check_evol_method(h_m()) != nullptr) {
+    if (Dependencies::check_evol_method(h_m(), env->profile_context()) != nullptr) {
       _is_c1_compilable = false;
       _is_c2_compilable = false;
       _can_be_parsed = false;
@@ -146,10 +146,10 @@ ciMethod::ciMethod(const methodHandle& h_m, ciInstanceKlass* holder) :
   _method_data = nullptr;
   // Take a snapshot of these values, so they will be commensurate with the MDO.
   if (ProfileInterpreter || CompilerConfig::is_c1_profiling()) {
-    int invcnt = h_m->interpreter_invocation_count();
+    int invcnt = h_m->interpreter_invocation_count(env->profile_context());
     // if the value overflowed report it as max int
     _interpreter_invocation_count = invcnt < 0 ? max_jint : invcnt ;
-    _interpreter_throwout_count   = h_m->interpreter_throwout_count();
+    _interpreter_throwout_count   = h_m->interpreter_throwout_count(env->profile_context());
   } else {
     _interpreter_invocation_count = 0;
     _interpreter_throwout_count = 0;
@@ -203,7 +203,8 @@ void ciMethod::load_code() {
   assert(is_loaded(), "only loaded methods have code");
 
   Method* me = get_Method();
-  Arena* arena = CURRENT_THREAD_ENV->arena();
+  ciEnv* env = CURRENT_THREAD_ENV;
+  Arena* arena = env->arena();
 
   // Load the bytecodes.
   _code = (address)arena->Amalloc(code_size());
@@ -1009,17 +1010,18 @@ bool ciMethod::ensure_method_data(const methodHandle& h_m) {
   if (is_native() || is_abstract() || h_m()->is_accessor()) {
     return true;
   }
-  if (h_m()->method_data() == nullptr) {
-    Method::build_profiling_method_data(h_m, THREAD);
+  ciEnv* env = CURRENT_ENV;
+  if (h_m()->method_data(env->profile_context()) == nullptr) {
+    Method::build_profiling_method_data(h_m, env->profile_context(), THREAD);
     if (HAS_PENDING_EXCEPTION) {
       CLEAR_PENDING_EXCEPTION;
     }
   }
-  if (h_m()->method_data() != nullptr) {
-    _method_data = CURRENT_ENV->get_method_data(h_m()->method_data());
+  if (h_m()->method_data(env->profile_context()) != nullptr) {
+    _method_data = env->get_method_data(h_m()->method_data(env->profile_context()));
     return _method_data->load_data();
   } else {
-    _method_data = CURRENT_ENV->get_empty_methodData();
+    _method_data = env->get_empty_methodData();
     return false;
   }
 }
@@ -1049,11 +1051,11 @@ ciMethodData* ciMethod::method_data() {
   Thread* my_thread = JavaThread::current();
   methodHandle h_m(my_thread, get_Method());
 
-  if (h_m()->method_data() != nullptr) {
-    _method_data = CURRENT_ENV->get_method_data(h_m()->method_data());
+  if (h_m()->method_data(env->profile_context()) != nullptr) {
+    _method_data = env->get_method_data(h_m()->method_data(env->profile_context()));
     _method_data->load_data();
   } else {
-    _method_data = CURRENT_ENV->get_empty_methodData();
+    _method_data = env->get_empty_methodData();
   }
   return _method_data;
 
@@ -1078,7 +1080,7 @@ MethodCounters* ciMethod::ensure_method_counters() {
   check_is_loaded();
   VM_ENTRY_MARK;
   methodHandle mh(THREAD, get_Method());
-  MethodCounters* method_counters = mh->get_method_counters(CHECK_NULL);
+  MethodCounters* method_counters = mh->get_method_counters(CURRENT_ENV->profile_context(), CHECK_NULL);
   return method_counters;
 }
 
@@ -1123,6 +1125,7 @@ bool ciMethod::has_compiled_code() {
 int ciMethod::highest_osr_comp_level() {
   check_is_loaded();
   VM_ENTRY_MARK;
+  ciEnv* env = CURRENT_ENV;
   return get_Method()->highest_osr_comp_level();
 }
 
@@ -1174,7 +1177,7 @@ int ciMethod::inline_instructions_size() {
   }
   if (_inline_instructions_size == -1) {
     GUARDED_VM_ENTRY(
-      nmethod* code = get_Method()->code();
+      nmethod* code = get_Method()->code(CURRENT_ENV->profile_context());
       if (code != nullptr && (code->comp_level() == CompLevel_full_optimization)) {
         int isize = code->insts_end() - code->verified_entry_point() - code->skipped_instructions_size();
         _inline_instructions_size = isize > 0 ? isize : 0;
@@ -1198,7 +1201,7 @@ int ciMethod::inline_instructions_size() {
 // ciMethod::log_nmethod_identity
 void ciMethod::log_nmethod_identity(xmlStream* log) {
   GUARDED_VM_ENTRY(
-    nmethod* code = get_Method()->code();
+    nmethod* code = get_Method()->code(CURRENT_ENV->profile_context());
     if (code != nullptr) {
       code->log_identity(log);
     }
@@ -1218,7 +1221,8 @@ bool ciMethod::is_not_reached(int bci) {
 // ciMethod::was_never_executed
 bool ciMethod::was_executed_more_than(int times) {
   VM_ENTRY_MARK;
-  return get_Method()->was_executed_more_than(times);
+  ciEnv* env = CURRENT_ENV;
+  return get_Method()->was_executed_more_than(times, env->profile_context());
 }
 
 // ------------------------------------------------------------------
@@ -1369,7 +1373,8 @@ void ciMethod::dump_replay_data(outputStream* st) {
     // ignore for now
     return;
   }
-  MethodCounters* mcs = method->method_counters();
+  ciEnv* env = CURRENT_ENV;
+  MethodCounters* mcs = method->method_counters(env->profile_context());
   st->print("ciMethod ");
   dump_name_as_ascii(st);
   st->print_cr(" %d %d %d %d %d",

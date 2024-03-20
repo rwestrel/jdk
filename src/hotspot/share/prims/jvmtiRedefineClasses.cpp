@@ -3729,9 +3729,7 @@ void VM_RedefineClasses::AdjustAndCleanMetadata::do_klass(Klass* k) {
     Array<Method*>* methods = ik->methods();
     int num_methods = methods->length();
     for (int index = 0; index < num_methods; ++index) {
-      if (methods->at(index)->method_data() != nullptr) {
-        methods->at(index)->method_data()->clean_weak_method_links();
-      }
+      methods->at(index)->clean_weak_method_links();
     }
 
     // Adjust all vtables, default methods and itables, to clean out old methods.
@@ -4061,7 +4059,7 @@ class TransferNativeFunctionRegistration {
           // Redefine does not send events (except CFLH), certainly not this
           // behind the scenes re-registration.
           new_method->set_native_function(old_method->native_function(),
-                              !Method::native_bind_event_is_interesting);
+                                          !Method::native_bind_event_is_interesting, 0); //FIXME
         }
       }
     }

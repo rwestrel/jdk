@@ -261,14 +261,10 @@ class CompileBroker: AllStatic {
   static void possibly_add_compiler_threads(JavaThread* THREAD);
   static bool compilation_is_prohibited(const methodHandle& method, int osr_bci, int comp_level, bool excluded);
 
-  static CompileTask* create_compile_task(CompileQueue*       queue,
-                                          int                 compile_id,
-                                          const methodHandle& method,
-                                          int                 osr_bci,
-                                          int                 comp_level,
-                                          int                 hot_count,
-                                          CompileTask::CompileReason compile_reason,
-                                          bool                blocking);
+  static CompileTask* create_compile_task(CompileQueue* queue, int compile_id, const methodHandle &method, int osr_bci,
+                                          int comp_level, const methodHandle &hot_method, int hot_count,
+                                          CompileTask::CompileReason compile_reason, bool blocking,
+                                          jlong profile_context);
   static void wait_for_completion(CompileTask* task);
   static void free_buffer_blob_if_allocated(CompilerThread* thread);
 
@@ -285,6 +281,7 @@ class CompileBroker: AllStatic {
                                   int hot_count,
                                   CompileTask::CompileReason compile_reason,
                                   bool blocking,
+                                  jlong profile_context,
                                   Thread* thread);
 
   static CompileQueue* compile_queue(int comp_level);
@@ -303,7 +300,7 @@ public:
     return nullptr;
   }
 
-  static bool compilation_is_complete(const methodHandle& method, int osr_bci, int comp_level);
+  static bool compilation_is_complete(const methodHandle &method, int osr_bci, int comp_level, jlong profile_context);
   static bool compilation_is_in_queue(const methodHandle& method);
   static void print_compile_queues(outputStream* st);
   static int queue_size(int comp_level) {
@@ -317,6 +314,7 @@ public:
                                  int comp_level,
                                  int hot_count,
                                  CompileTask::CompileReason compile_reason,
+                                 jlong profile_context,
                                  TRAPS);
   static CompileQueue* c1_compile_queue();
   static CompileQueue* c2_compile_queue();
@@ -328,6 +326,7 @@ private:
                                    int hot_count,
                                    CompileTask::CompileReason compile_reason,
                                    DirectiveSet* directive,
+                                   jlong profile_context,
                                    TRAPS);
 
 public:

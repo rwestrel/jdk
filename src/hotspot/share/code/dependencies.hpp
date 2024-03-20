@@ -304,7 +304,7 @@ class Dependencies: public ResourceObj {
   // dependency on it must fail.
 
   // Checking old assertions at run-time (in the VM only):
-  static Klass* check_evol_method(Method* m);
+  static Klass* check_evol_method(Method* m, jlong profile_context);
   static Klass* check_leaf_type(InstanceKlass* ctxk);
   static Klass* check_abstract_with_unique_concrete_subtype(InstanceKlass* ctxk, Klass* conck, NewKlassDepChange* changes = nullptr);
   static Klass* check_unique_implementor(InstanceKlass* ctxk, Klass* uniqk, NewKlassDepChange* changes = nullptr);
@@ -353,7 +353,7 @@ class Dependencies: public ResourceObj {
 
   static bool _verify_in_progress;  // turn off logging dependencies
 
-  DepType validate_dependencies(CompileTask* task, char** failure_detail = nullptr);
+  DepType validate_dependencies(CompileTask* task, jlong profile_context, char** failure_detail = nullptr);
 
   void log_all_dependencies();
 
@@ -464,8 +464,8 @@ class Dependencies: public ResourceObj {
     inline Metadata* recorded_metadata_at(int i);
     inline oop recorded_oop_at(int i);
 
-    Klass* check_klass_dependency(KlassDepChange* changes);
-    Klass* check_new_klass_dependency(NewKlassDepChange* changes);
+    Klass* check_klass_dependency(KlassDepChange* changes, jlong profile_context);
+    Klass* check_new_klass_dependency(NewKlassDepChange* changes, jlong profile_context);
     Klass* check_klass_init_dependency(KlassInitDepChange* changes);
     Klass* check_call_site_dependency(CallSiteDepChange* changes);
 
@@ -514,15 +514,15 @@ class Dependencies: public ResourceObj {
     }
 
     // The point of the whole exercise:  Is this dep still OK?
-    Klass* check_dependency() {
-      Klass* result = check_klass_dependency(nullptr);
+    Klass* check_dependency(jlong profile_context) {
+      Klass* result = check_klass_dependency(nullptr, profile_context);
       if (result != nullptr)  return result;
       return check_call_site_dependency(nullptr);
     }
 
     // A lighter version:  Checks only around recent changes in a class
     // hierarchy.  (See Universe::flush_dependents_on.)
-    Klass* spot_check_dependency_at(DepChange& changes);
+    Klass* spot_check_dependency_at(DepChange &changes, jlong profile_context);
 
     // Log the current dependency to xtty or compilation log.
     void log_dependency(Klass* witness = nullptr);

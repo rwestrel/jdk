@@ -833,8 +833,8 @@ WB_ENTRY(jint, WB_DeoptimizeMethod(JNIEnv* env, jobject o, jobject method, jbool
       result += mh->method_holder()->mark_osr_nmethods(&deopt_scope, mh());
     } else {
       MutexLocker ml(NMethodState_lock, Mutex::_no_safepoint_check_flag);
-      if (mh->code() != nullptr) {
-        deopt_scope.mark(mh->code());
+      if (mh->code(0) != nullptr) { // FIXME
+        deopt_scope.mark(mh->code(0)); //FIXME
         ++result;
       }
     }
@@ -851,7 +851,7 @@ WB_ENTRY(jboolean, WB_IsMethodCompiled(JNIEnv* env, jobject o, jobject method, j
   CHECK_JNI_EXCEPTION_(env, JNI_FALSE);
   MutexLocker mu(Compile_lock);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code();
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0);  // FIXME
   if (code == nullptr) {
     return JNI_FALSE;
   }
@@ -955,7 +955,7 @@ WB_ENTRY(jint, WB_GetMethodCompilationLevel(JNIEnv* env, jobject o, jobject meth
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, CompLevel_none);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code();
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0);  // FIXME
   return (code != nullptr ? code->comp_level() : CompLevel_none);
 WB_END
 
@@ -974,11 +974,7 @@ WB_ENTRY(jint, WB_GetMethodDecompileCount(JNIEnv* env, jobject o, jobject method
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, 0);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  uint cnt = 0;
-  MethodData* mdo = mh->method_data();
-  if (mdo != nullptr) {
-    cnt = mdo->decompile_count();
-  }
+  uint cnt = mh->decompile_count();
   return cnt;
 WB_END
 
@@ -991,36 +987,10 @@ WB_ENTRY(jint, WB_GetMethodTrapCount(JNIEnv* env, jobject o, jobject method, jst
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, 0);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  uint cnt = 0;
-  MethodData* mdo = mh->method_data();
-  if (mdo != nullptr) {
-    ResourceMark rm(THREAD);
-    char* reason_str = (reason_obj == nullptr) ?
-      nullptr : java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(reason_obj));
-    bool overflow = false;
-    for (uint reason = 0; reason < mdo->trap_reason_limit(); reason++) {
-      if (reason_str != nullptr && !strcmp(reason_str, Deoptimization::trap_reason_name(reason))) {
-        cnt = mdo->trap_count(reason);
-        // Count in the overflow trap count on overflow
-        if (cnt == (uint)-1) {
-          cnt = mdo->trap_count_limit() + mdo->overflow_trap_count();
-        }
-        break;
-      } else if (reason_str == nullptr) {
-        uint c = mdo->trap_count(reason);
-        if (c == (uint)-1) {
-          c = mdo->trap_count_limit();
-          if (!overflow) {
-            // Count overflow trap count just once
-            overflow = true;
-            c += mdo->overflow_trap_count();
-          }
-        }
-        cnt += c;
-      }
-    }
-  }
-  return cnt;
+  ResourceMark rm(THREAD);
+  char* reason_str = (reason_obj == nullptr) ?
+                     nullptr : java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(reason_obj));
+  return mh->trap_count(reason_str);
 WB_END
 
 WB_ENTRY(jint, WB_GetDeoptCount(JNIEnv* env, jobject o, jstring reason_obj, jstring action_obj))
@@ -1126,7 +1096,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
   bool is_blocking = !matcher.directive_set()->BackgroundCompilationOption;
 
   // Compile method and check result
-  nmethod* nm = CompileBroker::compile_method(mh, bci, comp_level, mh->invocation_count(), CompileTask::Reason_Whitebox, CHECK_false);
+  nmethod* nm = CompileBroker::compile_method(mh, bci, comp_level, mh->invocation_count(), CompileTask::Reason_Whitebox, 0, CHECK_false);
   MutexLocker mu(THREAD, Compile_lock);
   bool is_queued = mh->queued_for_compilation();
   if ((!is_blocking && is_queued) || nm != nullptr) {
@@ -1134,7 +1104,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
   }
   // Check code again because compilation may be finished before Compile_lock is acquired.
   if (bci == InvocationEntryBci) {
-    nmethod* code = mh->code();
+    nmethod* code = mh->code(0); // FIXME
     if (code != nullptr) {
       return true;
     }
@@ -1238,10 +1208,10 @@ WB_ENTRY(void, WB_MarkMethodProfiled(JNIEnv* env, jobject o, jobject method))
   CHECK_JNI_EXCEPTION(env);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
 
-  MethodData* mdo = mh->method_data();
+  MethodData* mdo = mh->method_data(0);
   if (mdo == nullptr) {
-    Method::build_profiling_method_data(mh, CHECK_AND_CLEAR);
-    mdo = mh->method_data();
+    Method::build_profiling_method_data(mh, 0, CHECK_AND_CLEAR);
+    mdo = mh->method_data(0);
   }
   mdo->init();
   InvocationCounter* icnt = mdo->invocation_counter();
@@ -1256,10 +1226,11 @@ WB_ENTRY(void, WB_ClearMethodState(JNIEnv* env, jobject o, jobject method))
   CHECK_JNI_EXCEPTION(env);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
   MutexLocker mu(THREAD, Compile_lock);
-  MethodData* mdo = mh->method_data();
-  MethodCounters* mcs = mh->method_counters();
+  MethodData* mdo = mh->method_data_head();
+  MethodCounters* mcs = mh->method_counters_head();
+  MethodCounters2* mcs2 = mh->method_counters2();
 
-  if (mdo != nullptr) {
+  while (mdo != nullptr) {
     mdo->init();
     ResourceMark rm(THREAD);
     int arg_size = mdo->method()->size_of_parameters();
@@ -1267,15 +1238,18 @@ WB_ENTRY(void, WB_ClearMethodState(JNIEnv* env, jobject o, jobject method))
       mdo->set_arg_modified(i, 0);
     }
     mdo->clean_method_data(/*always_clean*/true);
+    mdo = mdo->next();
   }
 
   mh->clear_is_not_c1_compilable();
   mh->clear_is_not_c2_compilable();
   mh->clear_is_not_c2_osr_compilable();
   NOT_PRODUCT(mh->set_compiled_invocation_count(0));
-  if (mcs != nullptr) {
+  while (mcs != nullptr) {
     mcs->clear_counters();
+    mcs = mcs->next();
   }
+  mcs2->clear_counters();
 WB_END
 
 template <typename T, int type_enum>
@@ -1599,7 +1573,7 @@ WB_ENTRY(jobjectArray, WB_GetNMethod(JNIEnv* env, jobject o, jobject method, jbo
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, nullptr);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code();
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0); // FIXME
   jobjectArray result = nullptr;
   if (code == nullptr) {
     return result;
@@ -1767,7 +1741,7 @@ WB_ENTRY(jlong, WB_GetMethodData(JNIEnv* env, jobject wv, jobject method))
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, 0);
   methodHandle mh(thread, Method::checked_resolve_jmethod_id(jmid));
-  return (jlong) mh->method_data();
+  return (jlong) mh->method_data(0);
 WB_END
 
 WB_ENTRY(jlong, WB_GetThreadStackSize(JNIEnv* env, jobject o))

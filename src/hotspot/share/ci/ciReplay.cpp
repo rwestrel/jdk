@@ -136,6 +136,7 @@ class CompileReplay : public StackObj {
   Method*  _imethod;
   int      _entry_bci;
   int      _comp_level;
+  jlong _profile_context;
 
  public:
   CompileReplay(const char* filename, TRAPS) {
@@ -178,6 +179,8 @@ class CompileReplay : public StackObj {
     assert(parse_intptr_t("test") == 9, "what");
     assert(strcmp(parse_quoted_string(), "this is it") == 0, "what");
   }
+
+  jlong profile_context() const { return _profile_context; }
 
   bool had_error() {
     return _error_message != nullptr || _thread->has_pending_exception();
@@ -800,13 +803,13 @@ class CompileReplay : public StackObj {
       }
     }
     // Make sure the existence of a prior compile doesn't stop this one
-    nmethod* nm = (entry_bci != InvocationEntryBci) ? method->lookup_osr_nmethod_for(entry_bci, comp_level, true) : method->code();
+    nmethod* nm = (entry_bci != InvocationEntryBci) ? method->lookup_osr_nmethod_for(entry_bci, comp_level, true) : method->code(profile_context());
     if (nm != nullptr) {
       nm->make_not_entrant(nmethod::InvalidationReason::CI_REPLAY);
     }
     replay_state = this;
     CompileBroker::compile_method(methodHandle(THREAD, method), entry_bci, comp_level,
-                                  0, CompileTask::Reason_Replay, THREAD);
+                                  0, CompileTask::Reason_Replay, profile_context(), THREAD);
     replay_state = nullptr;
   }
 
@@ -831,8 +834,8 @@ class CompileReplay : public StackObj {
     // To be properly initialized, some profiling in the MDO needs the
     // method to be rewritten (number of arguments at a call for instance)
     method->method_holder()->link_class(CHECK);
-    assert(method->method_data() == nullptr, "Should only be initialized once");
-    method->build_profiling_method_data(methodHandle(THREAD, method), CHECK);
+    assert(method->method_data(_profile_context) == nullptr, "Should only be initialized once");
+    method->build_profiling_method_data(methodHandle(THREAD, method), _profile_context, CHECK);
 
     // collect and record all the needed information for later
     ciMethodDataRecord* rec = new_ciMethodData(method);
@@ -1529,7 +1532,7 @@ void ciReplay::initialize(ciMethod* m) {
     m->_inline_instructions_size = -1;
     m->_interpreter_invocation_count = rec->_interpreter_invocation_count;
     m->_interpreter_throwout_count = rec->_interpreter_throwout_count;
-    MethodCounters* mcs = method->get_method_counters(CHECK_AND_CLEAR);
+    MethodCounters* mcs = method->get_method_counters(replay_state->profile_context(), CHECK_AND_CLEAR);
     guarantee(mcs != nullptr, "method counters allocation failed");
     mcs->invocation_counter()->_counter = rec->_invocation_counter;
     mcs->backedge_counter()->_counter = rec->_backedge_counter;

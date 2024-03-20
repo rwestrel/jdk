@@ -880,9 +880,18 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   const Register saved_sp = rax;
   __ movptr(saved_sp, r11);
 
-  // Will jump to the compiled code just as if compiled code was doing it.
-  // Pre-load the register-jump target early, to schedule it better.
-  __ movptr(r11, Address(rbx, in_bytes(Method::from_compiled_offset())));
+  if (UseNewCode) {
+    Label found, not_found;
+    __ load_code_for_profile_context(rbx, r13, r11, not_found, found);
+    __ bind(not_found);
+    __ stop("compiled code for profile context not found");
+    __ bind(found);
+    __ movptr(r11, Address(r11, nmethod::verified_entry_point_offset()));
+  } else {
+    // Will jump to the compiled code just as if compiled code was doing it.
+    // Pre-load the register-jump target early, to schedule it better.
+    __ movptr(r11, Address(rbx, in_bytes(Method::from_compiled_offset())));
+  }
 
   // Now generate the shuffle code.  Pick up all register args and move the
   // rest through the floating point stack top.

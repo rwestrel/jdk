@@ -1747,7 +1747,8 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
 
     // check if MethodCounters exists
     Label has_counters;
-    __ movptr(rax, Address(rcx, Method::method_counters_offset()));
+    __ load_method_counters<MethodCounters>(rcx, rax, rbx);
+//    __ movptr(rax, Address(rcx, Method::method_counters_offset()));
     __ testptr(rax, rax);
     __ jcc(Assembler::notZero, has_counters);
     __ push(rdx);
@@ -1756,7 +1757,8 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
                rcx);
     __ pop(rcx);
     __ pop(rdx);
-    __ movptr(rax, Address(rcx, Method::method_counters_offset()));
+//    __ movptr(rax, Address(rcx, Method::method_counters_offset()));
+    __ load_method_counters<MethodCounters>(rcx, rax, rbx);
     __ testptr(rax, rax);
     __ jcc(Assembler::zero, dispatch);
     __ bind(has_counters);
@@ -1764,7 +1766,8 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
     Label no_mdo;
     if (ProfileInterpreter) {
       // Are we profiling?
-      __ movptr(rbx, Address(rcx, in_bytes(Method::method_data_offset())));
+//      __ movptr(rbx, Address(rcx, in_bytes(Method::method_data_offset())));
+      __ load_method_counters<MethodData>(rcx, rbx, rax);
       __ testptr(rbx, rbx);
       __ jccb(Assembler::zero, no_mdo);
       // Increment the MDO backedge counter
@@ -1777,7 +1780,8 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
     }
     __ bind(no_mdo);
     // Increment backedge counter in MethodCounters*
-    __ movptr(rcx, Address(rcx, Method::method_counters_offset()));
+//    __ movptr(rcx, Address(rcx, Method::method_counters_offset()));
+    __ load_method_counters<MethodCounters>(rcx, rcx, rax);
     const Address mask(rcx, in_bytes(MethodCounters::backedge_mask_offset()));
     __ increment_mask_and_jump(Address(rcx, be_offset), mask, rax,
         UseOnStackReplacement ? &backedge_counter_overflow : nullptr);
@@ -3259,7 +3263,7 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ profile_final_call(rax);
   __ profile_arguments_type(rax, method, rbcp, true);
 
-  __ jump_from_interpreted(method, rax);
+  __ jump_from_interpreted(method, rax, rbcp);
 
   __ bind(notFinal);
 
@@ -3272,7 +3276,7 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ lookup_virtual_method(rax, index, method);
 
   __ profile_arguments_type(rdx, method, rbcp, true);
-  __ jump_from_interpreted(method, rdx);
+  __ jump_from_interpreted(method, rdx, rbcp);
 }
 
 void TemplateTable::invokevirtual(int byte_no) {
@@ -3308,7 +3312,7 @@ void TemplateTable::invokespecial(int byte_no) {
   // do the call
   __ profile_call(rax);
   __ profile_arguments_type(rax, rbx, rbcp, false);
-  __ jump_from_interpreted(rbx, rax);
+  __ jump_from_interpreted(rbx, rax, rbcp);
 }
 
 void TemplateTable::invokestatic(int byte_no) {
@@ -3324,7 +3328,7 @@ void TemplateTable::invokestatic(int byte_no) {
   // do the call
   __ profile_call(rax);
   __ profile_arguments_type(rax, rbx, rbcp, false);
-  __ jump_from_interpreted(rbx, rax);
+  __ jump_from_interpreted(rbx, rax, rbcp);
 }
 
 
@@ -3385,7 +3389,7 @@ void TemplateTable::invokeinterface(int byte_no) {
   __ profile_final_call(rdx);
   __ profile_arguments_type(rdx, rbx, rbcp, true);
 
-  __ jump_from_interpreted(rbx, rdx);
+  __ jump_from_interpreted(rbx, rdx, rbcp);
   // no return from above
   __ bind(notVFinal);
 
@@ -3438,7 +3442,7 @@ void TemplateTable::invokeinterface(int byte_no) {
   // do the call
   // rcx: receiver
   // rbx,: Method*
-  __ jump_from_interpreted(rbx, rdx);
+  __ jump_from_interpreted(rbx, rdx, rbcp);
   __ should_not_reach_here();
 
   // exception handling code follows...
@@ -3499,7 +3503,7 @@ void TemplateTable::invokehandle(int byte_no) {
   __ profile_final_call(rax);
   __ profile_arguments_type(rdx, rbx_method, rbcp, true);
 
-  __ jump_from_interpreted(rbx_method, rdx);
+  __ jump_from_interpreted(rbx_method, rdx, rbcp);
 }
 
 void TemplateTable::invokedynamic(int byte_no) {
@@ -3522,7 +3526,7 @@ void TemplateTable::invokedynamic(int byte_no) {
 
   __ verify_oop(rax_callsite);
 
-  __ jump_from_interpreted(rbx_method, rdx);
+  __ jump_from_interpreted(rbx_method, rdx, rbcp);
 }
 
 //-----------------------------------------------------------------------------

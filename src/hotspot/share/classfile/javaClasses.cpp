@@ -2571,7 +2571,7 @@ class BacktraceIterator : public StackObj {
 // Print stack trace element to the specified output stream.
 // The output is formatted into a stringStream and written to the outputStream in one step.
 static void print_stack_element_to_stream(outputStream* st, Handle mirror, int method_id,
-                                          int version, int bci, Symbol* name) {
+                                          int version, int bci, Symbol* name, jlong profile_context) {
   ResourceMark rm;
   stringStream ss;
 
@@ -2617,7 +2617,7 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
         // Neither sourcename nor linenumber
         ss.print("Unknown Source)");
       }
-      nmethod* nm = method->code();
+      nmethod* nm = method->code(profile_context);
       if (WizardMode && nm != nullptr) {
         ss.print("(nmethod " INTPTR_FORMAT ")", p2i(nm));
       }
@@ -2628,11 +2628,11 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
   st->print_raw(ss.freeze(), ss.size());
 }
 
-void java_lang_Throwable::print_stack_element(outputStream *st, Method* method, int bci) {
+void java_lang_Throwable::print_stack_element(outputStream* st, Method* method, int bci, jlong profile_context) {
   Handle mirror (Thread::current(),  method->method_holder()->java_mirror());
   int method_id = method->orig_method_idnum();
   int version = method->constants()->version();
-  print_stack_element_to_stream(st, mirror, method_id, version, bci, method->name());
+  print_stack_element_to_stream(st, mirror, method_id, version, bci, method->name(), profile_context);
 }
 
 /**
@@ -2656,7 +2656,8 @@ void java_lang_Throwable::print_stack_trace(Handle throwable, outputStream* st) 
 
     while (iter.repeat()) {
       BacktraceElement bte = iter.next(THREAD);
-      print_stack_element_to_stream(st, bte._mirror, bte._method_id, bte._version, bte._bci, bte._name);
+      print_stack_element_to_stream(st, bte._mirror, bte._method_id, bte._version, bte._bci, bte._name,
+                                    THREAD->profile_context());
     }
     if (THREAD->can_call_java()) {
       // Call getCause() which doesn't necessarily return the _cause field.

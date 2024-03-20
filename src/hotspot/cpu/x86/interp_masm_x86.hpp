@@ -192,7 +192,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
   // jump to an invoked target
   void prepare_to_jump_from_interpreted();
-  void jump_from_interpreted(Register method, Register temp);
+  void jump_from_interpreted(Register method, Register temp, Register temp2);
 
   // narrow int return value
   void narrow(Register result);
@@ -213,7 +213,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
                          bool throw_monitor_exception = true,
                          bool install_monitor_exception = true,
                          bool notify_jvmdi = true);
-  void get_method_counters(Register method, Register mcs, Label& skip);
+  void get_method_counters(Register method, Register mcs, Register profile_context, Label& skip);
+//  void get_method_counters_for_profile_context(Register method, Register mcs,
+//                                               Register profile_context, Label &skip);
 
   // Object locking
   void lock_object  (Register lock_reg);
@@ -280,6 +282,9 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void load_resolved_indy_entry(Register cache, Register index);
   void load_field_entry(Register cache, Register index, int bcp_offset = 1);
   void load_method_entry(Register cache, Register index, int bcp_offset = 1);
+
+  template <class CounterClass> void load_method_counters(Register method, Register mcs, Register profile_context);
+
 };
 
 #endif // CPU_X86_INTERP_MASM_X86_HPP

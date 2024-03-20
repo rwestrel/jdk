@@ -107,6 +107,7 @@ class CompileTask : public CHeapObj<mtCompiler> {
   bool                 _failure_reason_on_C_heap;
   CompileTrainingData* _training_data;
   size_t               _arena_bytes;  // peak size of temporary memory during compilation (e.g. node arenas)
+  jlong _profile_context;
 
  public:
   CompileTask(int compile_id, const methodHandle& method, int osr_bci, int comp_level,
@@ -150,6 +151,7 @@ class CompileTask : public CHeapObj<mtCompiler> {
   void         set_comp_level(int comp_level)    { _comp_level = comp_level;}
 
   CompileReason compile_reason()                 { return _compile_reason; }
+  jlong profile_context() const { return _profile_context; }
 
   AbstractCompiler* compiler() const;
   CompileTask*      select_for_compilation();
@@ -174,7 +176,7 @@ class CompileTask : public CHeapObj<mtCompiler> {
   size_t       arena_bytes() const               { return _arena_bytes; }
 
 private:
-  static void  print_impl(outputStream* st, Method* method, int compile_id, int comp_level,
+  static void  print_impl(outputStream* st, Method* method, int compile_id, int comp_level, jlong profile_context,
                                       bool is_osr_method = false, int osr_bci = -1, bool is_blocking = false,
                                       const char* compiler_name = nullptr,
                                       const char* msg = nullptr, bool short_form = false, bool cr = true,
@@ -187,7 +189,7 @@ public:
   void         print(outputStream* st = tty, const char* msg = nullptr, bool short_form = false, bool cr = true);
   void         print_ul(const char* msg = nullptr);
   static void  print(outputStream* st, const nmethod* nm, const char* msg = nullptr, bool short_form = false, bool cr = true) {
-    print_impl(st, nm->method(), nm->compile_id(), nm->comp_level(),
+    print_impl(st, nm->method(), nm->compile_id(), nm->comp_level(), nm->profile_context(),
                nm->is_osr_method(), nm->is_osr_method() ? nm->osr_entry_bci() : -1, /*is_blocking*/ false,
                nm->compiler_name(), msg, short_form, cr);
   }

@@ -177,7 +177,7 @@ void CompileTask::print_post(outputStream* st) {
 
 // ------------------------------------------------------------------
 // CompileTask::print_impl
-void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, int comp_level,
+void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, int comp_level, jlong profile_context,
                              bool is_osr_method, int osr_bci, bool is_blocking,
                              const char* compiler_name,
                              const char* msg, bool short_form, bool cr, bool after_compile_details,
@@ -277,6 +277,8 @@ void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, i
     sst.print(" (size %d/%d)", nm_total_size, nm_insts_size);
   }
 
+  st->print(" profile context:" JLONG_FORMAT, profile_context);
+
   if (msg != nullptr) {
     sst.print("   %s", msg);
   }
@@ -290,7 +292,7 @@ void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, i
 // CompileTask::print_compilation
 void CompileTask::print(outputStream* st, const char* msg, bool short_form, bool cr) {
   bool is_osr_method = osr_bci() != InvocationEntryBci;
-  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(),
+  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(), profile_context,
              is_osr_method, osr_bci(), is_blocking(),
              compiler()->name(), msg, short_form, cr);
 }
@@ -307,7 +309,7 @@ void CompileTask::log_task(xmlStream* log) {
   if (_osr_bci != CompileBroker::standard_entry_bci) {
     log->print(" compile_kind='osr'");  // same as nmethod::compile_kind
   } // else compile_kind='c2c'
-  if (!method.is_null())  log->method(method());
+  if (!method.is_null())  log->method(method(), profile_context());
   if (_osr_bci != CompileBroker::standard_entry_bci) {
     log->print(" osr_bci='%d'", _osr_bci);
   }
@@ -367,8 +369,8 @@ void CompileTask::log_task_done(CompileLog* log) {
   // <task_done ... stamp='1.234'>  </task>
   log->begin_elem("task_done success='%d' nmsize='%d' count='%d'",
                   _is_success, _nm_content_size,
-                  method->invocation_count());
-  int bec = method->backedge_count();
+                  method->invocation_count(_profile_context));
+  int bec = method->backedge_count(_profile_context);
   if (bec != 0)  log->print(" backedge_count='%d'", bec);
   // Note:  "_is_complete" is about to be set, but is not.
   if (_num_inlined_bytecodes != 0) {
@@ -483,7 +485,7 @@ void CompileTask::print_ul(const nmethod* nm, const char* msg) {
   if (lt.is_enabled()) {
     LogStream ls(lt);
     print_impl(&ls, nm->method(), nm->compile_id(),
-               nm->comp_level(), nm->is_osr_method(),
+               nm->comp_level(), nm->profile_context(), nm->is_osr_method(),
                nm->is_osr_method() ? nm->osr_entry_bci() : -1,
                /*is_blocking*/ false,
                nm->compiler_name(),

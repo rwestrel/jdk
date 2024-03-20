@@ -767,7 +767,7 @@ static void clean_if_nmethod_is_unloaded(CallsiteT* callsite, bool clean_all) {
     return;
   }
   nmethod* nm = cb->as_nmethod();
-  if (clean_all || !nm->is_in_use() || nm->is_unloading() || nm->method()->code() != nm) {
+  if (clean_all || !nm->is_in_use() || nm->is_unloading() || nm->method()->code(nm->profile_context()) != nm) {
     callsite->set_to_clean();
   }
 }
@@ -986,6 +986,7 @@ const char* nmethod::compiler_name() const {
   return compilertype2name(_compiler_type);
 }
 
+
 #ifdef ASSERT
 class CheckForOopsClosure : public OopClosure {
   bool _found_oop = false;
@@ -1089,7 +1090,8 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
   ImplicitExceptionTable* nul_chk_table,
   AbstractCompiler* compiler,
   CompLevel comp_level,
-  Flags flags)
+  Flags flags,
+  jlong profile_context)
 {
   assert(debug_info->oop_recorder() == code_buffer->oop_recorder(), "shared OR");
   code_buffer->finalize_oop_references(method);
@@ -1124,7 +1126,7 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
     nmethod(method(), compiler->type(), nmethod_size, immutable_data_size, mutable_data_size,
             compile_id, entry_bci, immutable_data, offsets, orig_pc_offset,
             debug_info, dependencies, code_buffer, frame_size, oop_maps,
-            handler_table, nul_chk_table, compiler, comp_level, flags);
+            handler_table, nul_chk_table, compiler, comp_level, flags, profile_context);
 
     if (nm != nullptr) {
       // To make dependency checking during class loading fast, record
@@ -1236,6 +1238,7 @@ nmethod::nmethod(
     assert_locked_or_safepoint(CodeCache_lock);
 
     init_defaults(code_buffer, offsets);
+    _profile_context         = 0;
 
     _osr_entry_point         = nullptr;
     _pc_desc_container       = nullptr;
@@ -1284,7 +1287,7 @@ nmethod::nmethod(
     // be sure to tag this tty output with the compile ID.
     if (xtty != nullptr) {
       xtty->begin_head("print_native_nmethod");
-      xtty->method(_method);
+      xtty->method(_method, _profile_context);
       xtty->stamp();
       xtty->end_head(" address='" INTPTR_FORMAT "'", (intptr_t) this);
     }
@@ -1605,7 +1608,8 @@ nmethod::nmethod(
   ImplicitExceptionTable* nul_chk_table,
   AbstractCompiler* compiler,
   CompLevel comp_level,
-  Flags flags)
+  Flags flags,
+  jlong profile_context)
   : CodeBlob("nmethod", CodeBlobKind::Nmethod, code_buffer, nmethod_size, sizeof(nmethod),
              offsets->value(CodeOffsets::Frame_Complete), frame_size, oop_maps, false, mutable_data_size),
   _deoptimization_generation(0),
@@ -1620,6 +1624,7 @@ nmethod::nmethod(
     assert_locked_or_safepoint(CodeCache_lock);
 
     init_defaults(code_buffer, offsets);
+    _profile_context= profile_context;
 
     _osr_entry_point = code_begin() + offsets->value(CodeOffsets::OSR_Entry);
     _entry_bci       = entry_bci;
@@ -1747,7 +1752,7 @@ void nmethod::log_new_nmethod() const {
     LOG_OFFSET(xtty, oops);
     LOG_OFFSET(xtty, metadata);
 
-    xtty->method(method());
+    xtty->method(method(), _profile_context);
     xtty->stamp();
     xtty->end_elem();
   }
@@ -2093,7 +2098,7 @@ void nmethod::verify_clean_inline_caches() {
         nmethod* nm = cb->as_nmethod_or_null();
         if (nm != nullptr) {
           // Verify that inline caches pointing to bad nmethods are clean
-          if (!nm->is_in_use() || nm->is_unloading() || nm->method()->code() != nm) {
+          if (!nm->is_in_use() || nm->is_unloading() || nm->method()->code(nm->profile_context()) != nm) {
             assert(cdc->is_clean(), "IC should be clean");
           }
         }
@@ -2123,7 +2128,7 @@ void nmethod::inc_decompile_count() {
   // Could be gated by ProfileTraps, but do not bother...
   Method* m = method();
   if (m == nullptr)  return;
-  MethodData* mdo = m->method_data();
+  MethodData* mdo = m->method_data(_profile_context);
   if (mdo == nullptr)  return;
   // There is a benign race here.  See comments in methodData.hpp.
   mdo->inc_decompile_count();
@@ -3068,7 +3073,7 @@ bool nmethod::check_dependency_on(DepChange& changes) {
   bool found_check = false;  // set true if we are upset
   for (Dependencies::DepStream deps(this); deps.next(); ) {
     // Evaluate only relevant dependencies.
-    if (deps.spot_check_dependency_at(changes) != nullptr) {
+    if (deps.spot_check_dependency_at(changes, _profile_context) != nullptr) {
       found_check = true;
       NOT_DEBUG(break);
     }

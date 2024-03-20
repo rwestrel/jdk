@@ -1483,7 +1483,7 @@ void Deoptimization::deoptimize_single_frame(JavaThread* thread, frame fr, Deopt
     xtty->end_head();
     for (ScopeDesc* sd = nm->scope_desc_at(fr.pc()); ; sd = sd->sender()) {
       xtty->begin_elem("jvms bci='%d'", sd->bci());
-      xtty->method(sd->method());
+      xtty->method(sd->method(), nm->profile_context());
       xtty->end_elem();
       if (sd->is_top())  break;
     }
@@ -1528,7 +1528,6 @@ address Deoptimization::deoptimize_for_missing_exception_handler(nmethod* nm, bo
   assert(caller_frame.cb()->as_nmethod_or_null() == nm, "expect top frame compiled method");
 
   Deoptimization::deoptimize(thread, caller_frame, Deoptimization::Reason_not_compiled_exception_handler);
-
   return SharedRuntime::deopt_blob()->unpack_with_exception_in_tls();
 }
 
@@ -1573,20 +1572,20 @@ JRT_LEAF(void, Deoptimization::popframe_preserve_args(JavaThread* thread, int by
 JRT_END
 
 MethodData*
-Deoptimization::get_method_data(JavaThread* thread, const methodHandle& m,
-                                bool create_if_missing) {
+Deoptimization::get_method_data(JavaThread* thread, const methodHandle &m, bool create_if_missing,
+                                jlong profile_context) {
   JavaThread* THREAD = thread; // For exception macros.
-  MethodData* mdo = m()->method_data();
+  MethodData* mdo = m()->method_data(profile_context);
   if (mdo == nullptr && create_if_missing && !HAS_PENDING_EXCEPTION) {
     // Build an MDO.  Ignore errors like OutOfMemory;
     // that simply means we won't have an MDO to update.
-    Method::build_profiling_method_data(m, THREAD);
+    Method::build_profiling_method_data(m, profile_context, THREAD);
     if (HAS_PENDING_EXCEPTION) {
       // Only metaspace OOM is expected. No Java code executed.
       assert((PENDING_EXCEPTION->is_a(vmClasses::OutOfMemoryError_klass())), "we expect only an OOM error here");
       CLEAR_PENDING_EXCEPTION;
     }
-    mdo = m()->method_data();
+    mdo = m()->method_data(profile_context);
   }
   return mdo;
 }
@@ -1765,7 +1764,7 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
     profiled_method = trap_method;
 
     MethodData* trap_mdo =
-      get_method_data(current, profiled_method, create_if_missing);
+            get_method_data(current, profiled_method, create_if_missing, nm->as_nmethod()->profile_context());
 
     Symbol* class_name = nullptr;
     bool unresolved = false;
@@ -1882,7 +1881,7 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
         // Log the precise location of the trap.
         for (ScopeDesc* sd = trap_scope; ; sd = sd->sender()) {
           xtty->begin_elem("jvms bci='%d'", sd->bci());
-          xtty->method(sd->method());
+          xtty->method(sd->method(), nm->as_nmethod()->profile_context());
           xtty->end_elem();
           if (sd->is_top())  break;
         }
@@ -2013,7 +2012,7 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
                               Mutex::_no_safepoint_check_flag);
     ProfileData* pdata = nullptr;
     if (ProfileTraps && CompilerConfig::is_c2_enabled() && update_trap_state && trap_mdo != nullptr) {
-      assert(trap_mdo == get_method_data(current, profiled_method, false), "sanity");
+      assert(trap_mdo == get_method_data(current, profiled_method, false, nm->as_nmethod()->profile_context()), "sanity");
       uint this_trap_count = 0;
       bool maybe_prior_trap = false;
       bool maybe_prior_recompile = false;
@@ -2120,7 +2119,7 @@ JRT_ENTRY(void, Deoptimization::uncommon_trap_inner(JavaThread* current, jint tr
 
     // Reprofile
     if (reprofile) {
-      CompilationPolicy::reprofile(trap_scope, nm->is_osr_method());
+      CompilationPolicy::reprofile(trap_scope, nm->is_osr_method(), nm->as_nmethod()->profile_context());
     }
 
     // Give up compiling

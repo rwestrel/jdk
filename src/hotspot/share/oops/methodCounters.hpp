@@ -62,14 +62,17 @@ class MethodCounters : public Metadata {
   u1                _highest_comp_level;          // Highest compile level this method has ever seen.
   u1                _highest_osr_comp_level;      // Same for OSR level
 
-  MethodCounters(const methodHandle& mh);
+  jlong _profile_context;
+  MethodCounters* _next;
+
+  MethodCounters(const methodHandle& mh, jlong profile_context);
   MethodCounters();
 
  public:
   virtual bool is_methodCounters() const { return true; }
   Method* method() const { return _method; }
-  static MethodCounters* allocate_no_exception(const methodHandle& mh);
-  static MethodCounters* allocate_with_exception(const methodHandle& mh, TRAPS);
+  static MethodCounters* allocate_no_exception(const methodHandle& mh, jlong profile_context);
+  static MethodCounters* allocate_with_exception(const methodHandle& mh, jlong profile_context, TRAPS);
 
   void deallocate_contents(ClassLoaderData* loader_data) {}
 
@@ -106,13 +109,6 @@ class MethodCounters : public Metadata {
   }
 #endif // COMPILER2
 
-#if INCLUDE_JVMTI
-  u2   number_of_breakpoints() const   { return _number_of_breakpoints; }
-  void incr_number_of_breakpoints()    { ++_number_of_breakpoints; }
-  void decr_number_of_breakpoints()    { --_number_of_breakpoints; }
-  void clear_number_of_breakpoints()   { _number_of_breakpoints = 0; }
-#endif
-
   int prev_event_count() const                   { return _prev_event_count;  }
   void set_prev_event_count(int count)           { _prev_event_count = count; }
   jlong prev_time() const                        { return _prev_time; }
@@ -120,14 +116,14 @@ class MethodCounters : public Metadata {
   float rate() const                             { return _rate; }
   void set_rate(float rate)                      { _rate = rate; }
 
-  int highest_comp_level() const                 { return _highest_comp_level;  }
-  void set_highest_comp_level(int level)         { _highest_comp_level = (u1)level; }
-  int highest_osr_comp_level() const             { return _highest_osr_comp_level;  }
-  void set_highest_osr_comp_level(int level)     { _highest_osr_comp_level = (u1)level; }
-
   // invocation counter
   InvocationCounter* invocation_counter() { return &_invocation_counter; }
   InvocationCounter* backedge_counter()   { return &_backedge_counter; }
+
+  MethodCounters* next() const { return _next; }
+  void set_next(MethodCounters* next) { _next = next; }
+
+  jlong profile_context() const { return _profile_context; }
 
   static ByteSize invocation_counter_offset()    {
     return byte_offset_of(MethodCounters, _invocation_counter);
@@ -143,6 +139,18 @@ class MethodCounters : public Metadata {
 
   static ByteSize backedge_mask_offset() {
     return byte_offset_of(MethodCounters, _backedge_mask);
+  }
+
+  static ByteSize next_offset() {
+    return byte_offset_of(MethodCounters, _next);
+  }
+
+  static ByteSize profile_context_offset() {
+    return byte_offset_of(MethodCounters, _profile_context);
+  }
+
+  static ByteSize offset_in_method() {
+    return Method::method_counters_offset();
   }
 
   virtual const char* internal_name() const { return "{method counters}"; }
@@ -173,5 +181,50 @@ class MethodCounters : public Metadata {
   void print_on      (outputStream* st) const;
   void print_value_on(outputStream* st) const;
   void print_data_on(outputStream* st) const;
+};
+
+class MethodCounters2 : public Metadata {
+  friend class VMStructs;
+  friend class JVMCIVMStructs;
+
+ private:
+#if INCLUDE_JVMTI
+  u2                _number_of_breakpoints;      // fullspeed debugging support
+#endif
+  u1                _highest_comp_level;          // Highest compile level this method has ever seen.
+  u1                _highest_osr_comp_level;      // Same for OSR level
+
+  static int method_counters2_size() {
+    return align_up((int)sizeof(MethodCounters2), wordSize) / wordSize;
+  }
+  MethodCounters2(const methodHandle& mh);
+public:
+  virtual bool is_methodCounters2() const { return true; }
+
+  static MethodCounters2* allocate_no_exception(const methodHandle& mh);
+  static MethodCounters2* allocate_with_exception(const methodHandle& mh, TRAPS);
+
+  void deallocate_contents(ClassLoaderData* loader_data) {}
+
+#if INCLUDE_JVMTI
+  u2   number_of_breakpoints() const   { return _number_of_breakpoints; }
+  void incr_number_of_breakpoints()    { ++_number_of_breakpoints; }
+  void decr_number_of_breakpoints()    { --_number_of_breakpoints; }
+  void clear_number_of_breakpoints()   { _number_of_breakpoints = 0; }
+#endif
+
+  int highest_comp_level() const                 { return _highest_comp_level;  }
+  void set_highest_comp_level(int level)         { _highest_comp_level = (u1)level; }
+  int highest_osr_comp_level() const             { return _highest_osr_comp_level;  }
+  void set_highest_osr_comp_level(int level)     { _highest_osr_comp_level = (u1)level; }
+
+  void clear_counters();
+  virtual const char* internal_name() const { return "{method counters 2}"; }
+  virtual void print_value_on(outputStream* st) const;
+  MetaspaceObj::Type type() const { return MethodCountersType; }
+
+  virtual int size() const {
+    return method_counters2_size();
+  }
 };
 #endif // SHARE_OOPS_METHODCOUNTERS_HPP

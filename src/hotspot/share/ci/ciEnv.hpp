@@ -471,6 +471,8 @@ public:
   // RedefineClasses support
   void metadata_do(MetadataClosure* f) { _factory->metadata_do(f); }
 
+  jlong profile_context() const;
+
   // Replay support
 private:
   static int klass_compare(const InstanceKlass* const &ik1, const InstanceKlass* const &ik2) {

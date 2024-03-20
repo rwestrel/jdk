@@ -192,10 +192,10 @@ void CompiledIC::set_to_clean() {
   _call->set_destination_mt_safe(SharedRuntime::get_resolve_virtual_call_stub());
 }
 
-void CompiledIC::set_to_monomorphic() {
+void CompiledIC::set_to_monomorphic(jlong profile_context) {
   assert(data()->is_initialized(), "must be initialized");
   Method* method = data()->speculated_method();
-  nmethod* code = method->code();
+  nmethod* code = method->code(profile_context);
   address entry;
   bool to_compiled = code != nullptr && code->is_in_use() && !code->is_unloading();
 
@@ -254,7 +254,7 @@ void CompiledIC::set_to_megamorphic(CallInfo* call_info) {
   assert(is_megamorphic(), "sanity check");
 }
 
-void CompiledIC::update(CallInfo* call_info, Klass* receiver_klass) {
+void CompiledIC::update(CallInfo* call_info, Klass* receiver_klass, jlong profile_context) {
   // If this is the first time we fix the inline cache, we ensure it's initialized
   ensure_initialized(call_info, receiver_klass);
 
@@ -266,7 +266,7 @@ void CompiledIC::update(CallInfo* call_info, Klass* receiver_klass) {
   if (is_speculated_klass(receiver_klass)) {
     // If the speculated class matches the receiver klass, we can speculate that will
     // continue to be the case with a monomorphic inline cache
-    set_to_monomorphic();
+    set_to_monomorphic(profile_context);
   } else {
     // If the dynamic type speculation fails, we try to transform to a megamorphic state
     // for the inline cache using stubs to dispatch in tables
@@ -335,8 +335,8 @@ void CompiledDirectCall::set_to_clean() {
   log_debug(inlinecache)("DC@" INTPTR_FORMAT ": set to clean", p2i(_call->instruction_address()));
 }
 
-void CompiledDirectCall::set(const methodHandle& callee_method) {
-  nmethod* code = callee_method->code();
+void CompiledDirectCall::set(const methodHandle& callee_method, jlong profile_context) {
+  nmethod* code = callee_method->code(profile_context);
   nmethod* caller = CodeCache::find_nmethod(instruction_address());
   assert(caller != nullptr, "did not find caller nmethod");
 

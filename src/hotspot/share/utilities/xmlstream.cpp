@@ -385,19 +385,19 @@ void xmlStream::stamp() {
 // ------------------------------------------------------------------
 // Output a method attribute, in the form " method='pkg/cls name sig'".
 // This is used only when there is no ciMethod available.
-void xmlStream::method(Method* method) {
+void xmlStream::method(Method* method, jlong profile_context) {
   assert_if_no_error(inside_attrs(), "printing attributes");
   if (method == nullptr)  return;
   print_raw(" method='");
   method_text(method);
   print("' bytes='%d'", method->code_size());
-  print(" count='%d'", method->invocation_count());
-  int bec = method->backedge_count();
+  print(" count='%d'", method->invocation_count(profile_context));
+  int bec = method->backedge_count(profile_context);
   if (bec != 0)  print(" backedge_count='%d'", bec);
-  print(" iicount='%d'", method->interpreter_invocation_count());
-  int throwouts = method->interpreter_throwout_count();
+  print(" iicount='%d'", method->interpreter_invocation_count(profile_context));
+  int throwouts = method->interpreter_throwout_count(profile_context);
   if (throwouts != 0)  print(" throwouts='%d'", throwouts);
-  MethodData* mdo = method->method_data();
+  MethodData* mdo = method->method_data(profile_context);
   if (mdo != nullptr) {
     uint cnt;
     cnt = mdo->decompile_count();

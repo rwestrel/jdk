@@ -43,9 +43,9 @@ class InterpreterRuntime: AllStatic {
  private:
 
   static void      set_bcp_and_mdp(address bcp, JavaThread* current);
-  static void      note_trap_inner(JavaThread* current, int reason,
-                                   const methodHandle& trap_method, int trap_bci);
-  static void      note_trap(JavaThread* current, int reason);
+  static void note_trap_inner(JavaThread* current, int reason, const methodHandle &trap_method, int trap_bci,
+                              jlong profile_context);
+  static void note_trap(JavaThread* current, int reason, jlong profile_context);
 
   // Inner work method for Interpreter's frequency counter overflow.
   static nmethod* frequency_counter_overflow_inner(JavaThread* current, address branch_bcp);
@@ -169,7 +169,7 @@ private:
 #ifdef ASSERT
   static void    verify_mdp(Method* method, address bcp, address mdp);
 #endif // ASSERT
-  static MethodCounters* build_method_counters(JavaThread* current, Method* m);
+  static MethodCounters* build_method_counters(JavaThread* current, Method* m, long profile_context);
 
   // Virtual Thread Preemption
   DEBUG_ONLY(static bool is_preemptable_call(address entry_point);)

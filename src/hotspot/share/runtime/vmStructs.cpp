@@ -236,7 +236,7 @@
   nonstatic_field(MethodCounters,              _invoke_mask,                                  int)                                   \
   nonstatic_field(MethodCounters,              _backedge_mask,                                int)                                   \
   COMPILER2_PRESENT(nonstatic_field(MethodCounters, _interpreter_throwout_count,              u2))                                   \
-  JVMTI_ONLY(nonstatic_field(MethodCounters,   _number_of_breakpoints,                        u2))                                   \
+  JVMTI_ONLY(nonstatic_field(MethodCounters2,   _number_of_breakpoints,                        u2))                                   \
   nonstatic_field(MethodCounters,              _invocation_counter,                           InvocationCounter)                     \
   nonstatic_field(MethodCounters,              _backedge_counter,                             InvocationCounter)                     \
   nonstatic_field(Method,                      _constMethod,                                  ConstMethod*)                          \
@@ -940,6 +940,7 @@
     declare_type(MethodData, Metadata)                                    \
     declare_type(Method, Metadata)                                        \
     declare_type(MethodCounters, MetaspaceObj)                            \
+    declare_type(MethodCounters2, MetaspaceObj)                            \
     declare_type(ConstMethod, MetaspaceObj)                               \
     declare_type(Annotations, MetaspaceObj)                               \
                                                                           \
