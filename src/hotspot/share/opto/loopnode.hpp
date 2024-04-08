@@ -85,6 +85,7 @@ protected:
          MultiversionSlowLoop         = 2<<17,
          MultiversionDelayedSlowLoop  = 3<<17,
          MultiversionFlagsMask        = 3<<17,
+         PeelAddParsePredicates= 1 << 19,
        };
   char _unswitch_count;
   enum { _unswitch_max=3 };
@@ -108,6 +109,7 @@ public:
   bool is_subword_loop() const { return _loop_flags & SubwordLoop; }
   bool is_loop_nest_inner_loop() const { return _loop_flags & LoopNestInnerLoop; }
   bool is_loop_nest_outer_loop() const { return _loop_flags & LoopNestLongOuterLoop; }
+  bool is_peel_add_parse_predicates() const { return _loop_flags & PeelAddParsePredicates; }
 
   void mark_partial_peel_failed() { _loop_flags |= PartialPeelFailed; }
   void mark_was_slp() { _loop_flags |= WasSlpAnalyzed; }
@@ -121,6 +123,8 @@ public:
   void mark_subword_loop() { _loop_flags |= SubwordLoop; }
   void mark_loop_nest_inner_loop() { _loop_flags |= LoopNestInnerLoop; }
   void mark_loop_nest_outer_loop() { _loop_flags |= LoopNestLongOuterLoop; }
+  void mark_peel_add_parse_predicates() { _loop_flags |= PeelAddParsePredicates; }
+  void clear_peel_add_parse_predicates() { _loop_flags &= ~PeelAddParsePredicates; }
 
   int unswitch_max() { return _unswitch_max; }
   int unswitch_count() { return _unswitch_count; }

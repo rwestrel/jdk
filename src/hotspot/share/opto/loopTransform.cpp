@@ -3633,6 +3633,30 @@ bool IdealLoopTree::iteration_split(PhaseIdealLoop* phase, Node_List &old_new) {
 
   // Unrolling, RCE and peeling efforts, iff innermost loop.
   if (_allow_optimizations && is_innermost()) {
+    if (_head->as_Loop()->is_peel_add_parse_predicates()) {
+      LoopNode* head = _head->as_Loop();
+      head->clear_peel_add_parse_predicates();
+      if ((UseLoopPredicate && !phase->C->too_many_traps(Deoptimization::Reason_predicate)) ||
+          (UseProfiledLoopPredicate && !phase->C->too_many_traps(Deoptimization::Reason_profile_predicate)) ||
+          !phase->C->too_many_traps(Deoptimization::Reason_loop_limit_check)) {
+        Node* back_control = head->in(LoopNode::LoopBackControl);
+        SafePointNode* safepoint = phase->find_safepoint(back_control, head, this);
+        if (safepoint != nullptr) {
+          old_new.clear();
+          phase->do_peeling(this, old_new);
+          SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
+
+          if (UseLoopPredicate) {
+            phase->add_parse_predicate(Deoptimization::Reason_predicate, head, _parent, cloned_sfpt);
+          }
+          if (UseProfiledLoopPredicate) {
+            phase->add_parse_predicate(Deoptimization::Reason_profile_predicate, head, _parent, cloned_sfpt);
+          }
+          phase->add_parse_predicate(Deoptimization::Reason_loop_limit_check, head, _parent, cloned_sfpt);
+        }
+        return true;
+      }
+    }
     if (!_has_call) {
       if (!iteration_split_impl(phase, old_new)) {
         return false;

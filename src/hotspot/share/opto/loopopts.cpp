@@ -4505,6 +4505,8 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
 
   C->print_method(PHASE_AFTER_DUPLICATE_LOOP_BACKEDGE, 4, outer_head);
 
+  head->mark_peel_add_parse_predicates();
+
   return true;
 }
 
