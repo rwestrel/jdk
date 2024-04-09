@@ -4295,6 +4295,10 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     }
 
     inner = 1;
+    Node* back_control = loop_exit_control(head, loop);
+    if (back_control != nullptr) {
+      exit_test = back_control->in(0)->as_If();
+    }
   } else
 #endif //ASSERT
   {
@@ -4486,6 +4490,7 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       exit_test->_fcnt = cnt * f;
       old_new[exit_test->_idx]->as_If()->_fcnt = cnt * (1 - f);
     }
+    head->mark_peel_add_parse_predicates();
   }
 
 #ifdef ASSERT
@@ -4504,9 +4509,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
   C->set_major_progress();
 
   C->print_method(PHASE_AFTER_DUPLICATE_LOOP_BACKEDGE, 4, outer_head);
-
-  head->mark_peel_add_parse_predicates();
-
   return true;
 }
 

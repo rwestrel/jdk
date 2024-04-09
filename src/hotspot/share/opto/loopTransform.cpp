@@ -3640,6 +3640,9 @@ bool IdealLoopTree::iteration_split(PhaseIdealLoop* phase, Node_List &old_new) {
           (UseProfiledLoopPredicate && !phase->C->too_many_traps(Deoptimization::Reason_profile_predicate)) ||
           !phase->C->too_many_traps(Deoptimization::Reason_loop_limit_check)) {
         Node* back_control = head->in(LoopNode::LoopBackControl);
+        if (back_control->Opcode() == Op_SafePoint) {
+          back_control = back_control->in(0);
+        }
         SafePointNode* safepoint = phase->find_safepoint(back_control, head, this);
         if (safepoint != nullptr) {
           old_new.clear();
