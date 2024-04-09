@@ -4294,11 +4294,27 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       return false;
     }
 
-    inner = 1;
-    Node* back_control = loop_exit_control(head, loop);
-    if (back_control != nullptr) {
-      exit_test = back_control->in(0)->as_If();
+    Node* dom = idom(region);
+    if (dom->is_If()) {
+      IfNode* iff = dom->as_If();
+      if (iff->in(1)->is_Bool() && iff->in(1)->in(1)->is_Cmp()) {
+        CmpNode* cmp = iff->in(1)->in(1)->as_Cmp();
+        if (cmp->in(1)->is_Load()) {
+          LoadNode* load = cmp->in(1)->as_Load();
+          if (load->in(2)->is_AddP() && load->in(2)->in(2)->Opcode() == Op_ThreadLocal) {
+            return false;
+          }
+        }
+      }
     }
+
+    inner = 1;
+//    Node* back_control = loop_exit_control(head, loop);
+//    if (back_control != nullptr) {
+//      exit_test = back_control->in(0)->as_If();
+//      PathFrequency pf(head, this);
+//      f = pf.to(region->in(inner));
+//    }
   } else
 #endif //ASSERT
   {
@@ -4490,8 +4506,8 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       exit_test->_fcnt = cnt * f;
       old_new[exit_test->_idx]->as_If()->_fcnt = cnt * (1 - f);
     }
-    head->mark_peel_add_parse_predicates();
   }
+  head->mark_peel_add_parse_predicates();
 
 #ifdef ASSERT
   if (StressDuplicateBackedge && head->is_CountedLoop()) {

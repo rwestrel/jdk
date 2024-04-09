@@ -701,6 +701,10 @@ static bool no_side_effect_since_safepoint(Compile* C, Node* x, Node* mem, Merge
 }
 
 SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, IdealLoopTree* loop) {
+  if (!back_control->in(0)->is_If()) {
+    assert(StressDuplicateBackedge, "");
+    return nullptr;
+  }
   IfNode* exit_test = back_control->in(0)->as_If();
   SafePointNode* safepoint = nullptr;
   if (exit_test->in(0)->is_SafePoint() && exit_test->in(0)->outcnt() == 1) {

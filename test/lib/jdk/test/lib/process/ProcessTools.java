@@ -638,6 +638,10 @@ public final class ProcessTools {
         return executeProcess(pb);
     }
 
+    public static OutputAnalyzer executeTestJvm(String... command) throws Exception {
+        return executeTestJava(command);
+    }
+
     /**
      * Executes a process using the java launcher from the jdk to
      * be tested, waits for it to finish and returns
