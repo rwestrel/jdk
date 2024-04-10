@@ -3633,7 +3633,7 @@ bool IdealLoopTree::iteration_split(PhaseIdealLoop* phase, Node_List &old_new) {
 
   // Unrolling, RCE and peeling efforts, iff innermost loop.
   if (_allow_optimizations && is_innermost()) {
-    if (_head->as_Loop()->is_peel_add_parse_predicates()) {
+    if (_head->is_Loop() && _head->as_Loop()->is_peel_add_parse_predicates()) {
       LoopNode* head = _head->as_Loop();
       head->clear_peel_add_parse_predicates();
       if ((UseLoopPredicate && !phase->C->too_many_traps(Deoptimization::Reason_predicate)) ||
