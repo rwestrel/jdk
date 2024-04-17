@@ -4507,7 +4507,7 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       old_new[exit_test->_idx]->as_If()->_fcnt = cnt * (1 - f);
     }
   }
-  head->mark_peel_add_parse_predicates();
+  head->mark_loop_backedge_duplicate();
 
 #ifdef ASSERT
   if (StressDuplicateBackedge && head->is_CountedLoop()) {
