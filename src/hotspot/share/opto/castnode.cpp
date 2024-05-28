@@ -218,8 +218,11 @@ const Type* CastIINode::Value(PhaseGVN* phase) const {
   return res;
 }
 
-static Node* find_or_make_integer_cast(PhaseIterGVN* igvn, Node* parent, Node* control, const TypeInteger* type, ConstraintCastNode::DependencyType dependency, BasicType bt) {
-  Node* n = ConstraintCastNode::make_cast_for_basic_type(control, parent, type, dependency, bt);
+Node* ConstraintCastNode::find_or_make_integer_cast(PhaseIterGVN* igvn, Node* parent, Node* control, const TypeInteger* type) const {
+  Node* n = clone();
+  n->set_req(0, control);
+  n->set_req(1, parent);
+  n->as_ConstraintCast()->set_type(type);
   Node* existing = igvn->hash_find_insert(n);
   if (existing != nullptr) {
     n->destruct(igvn);
@@ -476,8 +479,8 @@ Node* ConstraintCastNode::optimize_integer_cast(PhaseGVN* phase, BasicType bt) {
     Node* x = z->in(1);
     Node* y = z->in(2);
 
-    Node* cx = find_or_make_integer_cast(igvn, x, in(0), rx, _dependency, bt);
-    Node* cy = find_or_make_integer_cast(igvn, y, in(0), ry, _dependency, bt);
+    Node* cx = find_or_make_integer_cast(igvn, x, in(0), rx);
+    Node* cy = find_or_make_integer_cast(igvn, y, in(0), ry);
     if (op == Op_Add(bt)) {
       return AddNode::make(cx, cy, bt);
     } else {
