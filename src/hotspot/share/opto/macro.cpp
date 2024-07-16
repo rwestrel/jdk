@@ -1280,7 +1280,12 @@ void PhaseMacroExpand::expand_allocate_common(
   if (!allocation_has_use) {
     InitializeNode* init = alloc->initialization();
     if (init != nullptr) {
-      init->remove(&_igvn);
+//      init->remove(&_igvn);
+      MemBarCPUOrderNode* membar = new MemBarCPUOrderNode(C, C->get_alias_index(init->adr_type()), nullptr);
+      membar->init_req(TypeFunc::Control, init->in(TypeFunc::Control));
+      membar->init_req(TypeFunc::Memory, init->in(TypeFunc::Memory));
+      transform_later(membar);
+      _igvn.replace_node(init, membar);
     }
     if (expand_fast_path && (initial_slow_test == nullptr)) {
       // Remove allocation node and return.
