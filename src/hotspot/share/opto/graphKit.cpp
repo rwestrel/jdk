@@ -4085,6 +4085,7 @@ void GraphKit::add_parse_predicates(int nargs) {
     add_parse_predicate(Deoptimization::Reason_profile_predicate, nargs);
   }
   // Loop Limit Check Predicate should be near the loop.
+  add_parse_predicate(Deoptimization::Reason_short_running_loop, nargs);
   add_parse_predicate(Deoptimization::Reason_loop_limit_check, nargs);
 }
 

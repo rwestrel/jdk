@@ -477,6 +477,7 @@ class PredicateBlock : public StackObj {
 class Predicates : public StackObj {
   Node* _loop_entry;
   PredicateBlock _loop_limit_check_predicate_block;
+  PredicateBlock _short_running_loop_predicate_block;
   PredicateBlock _profiled_loop_predicate_block;
   PredicateBlock _loop_predicate_block;
   Node* _entry;
@@ -485,7 +486,9 @@ class Predicates : public StackObj {
   Predicates(Node* loop_entry)
       : _loop_entry(loop_entry),
         _loop_limit_check_predicate_block(loop_entry, Deoptimization::Reason_loop_limit_check),
-        _profiled_loop_predicate_block(_loop_limit_check_predicate_block.entry(),
+        _short_running_loop_predicate_block(_loop_limit_check_predicate_block.entry(),
+                                            Deoptimization::Reason_short_running_loop),
+        _profiled_loop_predicate_block(_short_running_loop_predicate_block.entry(),
                                        Deoptimization::Reason_profile_predicate),
         _loop_predicate_block(_profiled_loop_predicate_block.entry(),
                               Deoptimization::Reason_predicate),
@@ -507,6 +510,10 @@ class Predicates : public StackObj {
 
   const PredicateBlock* loop_limit_check_predicate_block() const {
     return &_loop_limit_check_predicate_block;
+  }
+
+  const PredicateBlock* short_running_loop_predicate_block() const {
+    return &_short_running_loop_predicate_block;
   }
 
   bool has_any() const {

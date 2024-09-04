@@ -396,6 +396,11 @@ void PhaseIdealLoop::clone_parse_and_assertion_predicates_to_unswitched_loop(Ide
                                                        Deoptimization::Reason_predicate, iffast_pred, ifslow_pred);
   clone_loop_predication_predicates_to_unswitched_loop(loop, old_new, predicates.profiled_loop_predicate_block(),
                                                        Deoptimization::Reason_profile_predicate, iffast_pred, ifslow_pred);
+  const PredicateBlock* short_running_loop_predicate_block = predicates.short_running_loop_predicate_block();
+  if (short_running_loop_predicate_block->has_parse_predicate() && !head->is_CountedLoop()) {
+    clone_parse_predicate_to_unswitched_loops(short_running_loop_predicate_block, Deoptimization::Reason_short_running_loop,
+                                              iffast_pred, ifslow_pred);
+  }
 
   const PredicateBlock* loop_limit_check_predicate_block = predicates.loop_limit_check_predicate_block();
   if (loop_limit_check_predicate_block->has_parse_predicate() && !head->is_CountedLoop()) {

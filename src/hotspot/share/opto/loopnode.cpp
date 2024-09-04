@@ -846,7 +846,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
 
   // Take what we know about the number of iterations of the long counted loop into account when computing the limit of
   // the inner loop.
-  const Node* init = head->init_trip();
+  Node* init = head->init_trip();
   const TypeInteger* lo = _igvn.type(init)->is_integer(bt);
   const TypeInteger* hi = _igvn.type(limit)->is_integer(bt);
   if (stride_con < 0) {
@@ -878,6 +878,55 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     }
   }
 
+  const int short_loop_iters = 1000;
+  loop->compute_profile_trip_cnt(this);
+  bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters;
+
+  Node* entry_control = head->in(LoopNode::EntryControl);
+
+  if (short_running_loop && bt == T_LONG) {
+    tty->print_cr("XXX short running %f", head->profile_trip_cnt());
+    const Predicates predicates(entry_control);
+    const PredicateBlock* short_running_loop_predicate_block = predicates.short_running_loop_predicate_block();
+    if (short_running_loop_predicate_block->has_parse_predicate()) {
+      tty->print_cr("predicate found");
+
+      ParsePredicateNode* short_running_loop_parse_predicate = short_running_loop_predicate_block->parse_predicate();
+      Node* sub;
+
+      if (stride_con > 0) {
+        sub = SubNode::make(limit, init, bt);
+      } else {
+        sub = SubNode::make(init, limit, bt);
+      }
+
+      Node* cmp_limit = CmpNode::make(sub, _igvn.integercon(short_loop_iters * ABS(stride_con), bt), bt);
+      Node* bol = new BoolNode(cmp_limit, BoolTest::le);
+      ParsePredicateSuccessProj* short_running_loop_predicate_proj = short_running_loop_predicate_block->parse_predicate_success_proj();
+      assert(short_running_loop_predicate_proj->in(0)->is_ParsePredicate(), "must be parse predicate");
+      Node* new_predicate_proj = create_new_if_for_predicate(short_running_loop_predicate_proj,
+                                                             nullptr,
+                                                             Deoptimization::Reason_short_running_loop,
+                                                             Op_If);
+      Node* iff = new_predicate_proj->in(0);
+      _igvn.replace_input_of(iff, 1, bol);
+      register_new_node(sub, iff->in(0));
+      register_new_node(cmp_limit, iff->in(0));
+      register_new_node(bol, iff->in(0));
+      iters_limit = MIN2(iters_limit, short_loop_iters * ABS(stride_con)); // overflow
+
+#ifndef PRODUCT
+      // report that the loop predication has been actually performed
+      // for this loop
+      if (TraceLoopLimitCheck) {
+        tty->print_cr("Short Loop Check generated:");
+        debug_only( bol->dump(2); )
+      }
+#endif
+    }
+  }
+
+
   julong orig_iters = (julong)hi->hi_as_long() - lo->lo_as_long();
   iters_limit = checked_cast<int>(MIN2((julong)iters_limit, orig_iters));
 
@@ -895,11 +944,17 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   }
 
   Node* exit_branch = exit_test->proj_out(false);
-  Node* entry_control = head->in(LoopNode::EntryControl);
 
   // Clone the control flow of the loop to build an outer loop
   Node* outer_back_branch = back_control->clone();
-  Node* outer_exit_test = new IfNode(exit_test->in(0), exit_test->in(1), exit_test->_prob, exit_test->_fcnt);
+  Node* outer_exit_bol;
+  if (short_running_loop) {
+    outer_exit_bol = _igvn.intcon(0);
+    set_ctrl(outer_exit_bol, C->root());
+  } else {
+    outer_exit_bol = exit_test->in(0);
+  }
+  Node* outer_exit_test = new IfNode(exit_test->in(0), outer_exit_bol, exit_test->_prob, exit_test->_fcnt);
   Node* inner_exit_branch = exit_branch->clone();
 
   LoopNode* outer_head = new LoopNode(entry_control, outer_back_branch);
@@ -1068,14 +1123,14 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   // of the peeled iteration to insert Parse Predicates. If no well
   // positioned safepoint peel to guarantee a safepoint in the outer
   // loop.
-  if (safepoint != nullptr || !loop->_has_call) {
+  if (!short_running_loop && (safepoint != nullptr || !loop->_has_call)) {
     old_new.clear();
     do_peeling(loop, old_new);
   } else {
     C->set_major_progress();
   }
 
-  if (safepoint != nullptr) {
+  if (!short_running_loop && safepoint != nullptr) {
     SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
 
     if (UseLoopPredicate) {
@@ -1084,6 +1139,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     if (UseProfiledLoopPredicate) {
       add_parse_predicate(Deoptimization::Reason_profile_predicate, inner_head, outer_ilt, cloned_sfpt);
     }
+    add_parse_predicate(Deoptimization::Reason_short_running_loop, inner_head, outer_ilt, cloned_sfpt);
     add_parse_predicate(Deoptimization::Reason_loop_limit_check, inner_head, outer_ilt, cloned_sfpt);
   }
 
@@ -4186,6 +4242,9 @@ void IdealLoopTree::dump_head() {
   const Predicates predicates(entry);
   if (predicates.loop_limit_check_predicate_block()->is_non_empty()) {
     tty->print(" limit_check");
+  }
+  if (predicates.short_running_loop_predicate_block()->is_non_empty()) {
+    tty->print(" short_running");
   }
   if (UseProfiledLoopPredicate && predicates.profiled_loop_predicate_block()->is_non_empty()) {
     tty->print(" profile_predicated");

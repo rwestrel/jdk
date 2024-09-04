@@ -94,6 +94,7 @@ bool RegularPredicateWithUCT::is_predicate(Node* maybe_success_proj) {
     IfProjNode* success_proj = maybe_success_proj->as_IfProj();
     const Deoptimization::DeoptReason deopt_reason = uncommon_trap_reason(success_proj);
     return (deopt_reason == Deoptimization::Reason_loop_limit_check ||
+            deopt_reason == Deoptimization::Reason_short_running_loop ||
             deopt_reason == Deoptimization::Reason_predicate ||
             deopt_reason == Deoptimization::Reason_profile_predicate);
   } else {
@@ -130,6 +131,10 @@ ParsePredicateIterator::ParsePredicateIterator(const Predicates& predicates) : _
   const PredicateBlock* loop_limit_check_predicate_block = predicates.loop_limit_check_predicate_block();
   if (loop_limit_check_predicate_block->has_parse_predicate()) {
     _parse_predicates.push(loop_limit_check_predicate_block->parse_predicate());
+  }
+  const PredicateBlock* short_running_loop_predicate_block = predicates.short_running_loop_predicate_block();
+  if (short_running_loop_predicate_block->has_parse_predicate()) {
+    _parse_predicates.push(short_running_loop_predicate_block->parse_predicate());
   }
   if (UseProfiledLoopPredicate) {
     const PredicateBlock* profiled_loop_predicate_block = predicates.profiled_loop_predicate_block();
