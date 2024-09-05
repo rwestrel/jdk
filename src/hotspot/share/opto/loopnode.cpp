@@ -884,6 +884,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
 
   Node* entry_control = head->in(LoopNode::EntryControl);
 
+  Node* cast_ctrl = nullptr;
   if (short_running_loop && bt == T_LONG) {
     tty->print_cr("XXX short running %f", head->profile_trip_cnt());
     const Predicates predicates(entry_control);
@@ -914,7 +915,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
       register_new_node(cmp_limit, iff->in(0));
       register_new_node(bol, iff->in(0));
       iters_limit = MIN2(iters_limit, short_loop_iters * ABS(stride_con)); // overflow
-
+      cast_ctrl = new_predicate_proj;
 #ifndef PRODUCT
       // report that the loop predication has been actually performed
       // for this loop
@@ -1008,7 +1009,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     // a negative stride). We add a CastII here to guarantee that, when the counted loop is created in a subsequent loop
     // opts pass, an accurate range of values for the limits is found.
     const TypeInt* inner_iters_actual_int_range = TypeInt::make(0, iters_limit, Type::WidenMin);
-    inner_iters_actual_int = new CastIINode(outer_head, inner_iters_actual_int, inner_iters_actual_int_range, ConstraintCastNode::UnconditionalDependency);
+    inner_iters_actual_int = new CastIINode(cast_ctrl == nullptr ? outer_head : cast_ctrl, inner_iters_actual_int, inner_iters_actual_int_range, ConstraintCastNode::UnconditionalDependency);
     _igvn.register_new_node_with_optimizer(inner_iters_actual_int);
   } else {
     inner_iters_actual_int = inner_iters_actual;
