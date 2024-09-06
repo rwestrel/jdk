@@ -899,7 +899,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
 
   // Clone the control flow of the loop to build an outer loop
   Node* outer_back_branch = back_control->clone();
-  Node* outer_exit_bol = exit_test->in(0);
+  Node* outer_exit_bol = exit_test->in(1);
 
   Node* outer_exit_test = new IfNode(exit_test->in(0), outer_exit_bol, exit_test->_prob, exit_test->_fcnt);
   Node* inner_exit_branch = exit_branch->clone();
@@ -934,9 +934,10 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
 
   const int short_loop_iters = 1000;
   loop->compute_profile_trip_cnt(this);
-  bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters;
+  bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters && UseNewCode;
 
   Node* transformed_rc_ctrl = nullptr;
+  Node* inner_iters_actual;
   if (short_running_loop && bt == T_LONG) {
     outer_exit_bol = _igvn.intcon(0);
     set_ctrl(outer_exit_bol, C->root());
@@ -990,6 +991,8 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
       iters_limit = MIN2(iters_limit, short_loop_iters * ABS(stride_con)); // overflow
       transformed_rc_ctrl = short_running_loop_predicate_proj->in(0);
 
+      inner_iters_actual = sub;
+
 #ifndef PRODUCT
       // report that the loop predication has been actually performed
       // for this loop
@@ -1000,21 +1003,21 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
 #endif
     }
   }
+  if (inner_iters_actual == nullptr) {
+    Node* inner_iters_max = nullptr;
+    if (stride_con > 0) {
+      inner_iters_max = MaxNode::max_diff_with_zero(limit, outer_phi, TypeInteger::bottom(bt), _igvn);
+    } else {
+      inner_iters_max = MaxNode::max_diff_with_zero(outer_phi, limit, TypeInteger::bottom(bt), _igvn);
+    }
 
-  Node* inner_iters_max = nullptr;
-  if (stride_con > 0) {
-    inner_iters_max = MaxNode::max_diff_with_zero(limit, outer_phi, TypeInteger::bottom(bt), _igvn);
-  } else {
-    inner_iters_max = MaxNode::max_diff_with_zero(outer_phi, limit, TypeInteger::bottom(bt), _igvn);
+    Node* inner_iters_limit = _igvn.integercon(iters_limit, bt);
+    // inner_iters_max may not fit in a signed integer (iterating from
+    // Long.MIN_VALUE to Long.MAX_VALUE for instance). Use an unsigned
+    // min.
+    const TypeInteger* inner_iters_actual_range = TypeInteger::make(0, iters_limit, Type::WidenMin, bt);
+    inner_iters_actual = MaxNode::unsigned_min(inner_iters_max, inner_iters_limit, inner_iters_actual_range, _igvn);
   }
-
-  Node* inner_iters_limit = _igvn.integercon(iters_limit, bt);
-  // inner_iters_max may not fit in a signed integer (iterating from
-  // Long.MIN_VALUE to Long.MAX_VALUE for instance). Use an unsigned
-  // min.
-  const TypeInteger* inner_iters_actual_range = TypeInteger::make(0, iters_limit, Type::WidenMin, bt);
-  Node* inner_iters_actual = MaxNode::unsigned_min(inner_iters_max, inner_iters_limit, inner_iters_actual_range, _igvn);
-
   Node* inner_iters_actual_int;
   if (bt == T_LONG) {
     inner_iters_actual_int = new ConvL2INode(inner_iters_actual);
@@ -1447,9 +1450,13 @@ void PhaseIdealLoop::transform_long_range_checks(int stride_con, const Node_List
     register_new_node(Q_min_cmp, entry_control);
     Node* Q_min_bool = new BoolNode(Q_min_cmp, BoolTest::lt);
     register_new_node(Q_min_bool, entry_control);
-    // Node* L_clamp = new CMoveLNode(Q_min_bool, Q_min, long_zero, TypeLong::LONG);
-    // register_new_node(L_clamp, entry_control);
-    Node* L_clamp = Q_min;
+    Node* L_clamp;
+    if (UseNewCode3) {
+      L_clamp = Q_min;
+    } else {
+      L_clamp = new CMoveLNode(Q_min_bool, Q_min, long_zero, TypeLong::LONG);
+      register_new_node(L_clamp, entry_control);
+    }
     // (This could also be coded bitwise as L_clamp = Q_min & ~(Q_min>>63).)
 
     Node* Q_max_plus_one = new AddLNode(Q_max, long_one);
@@ -1463,9 +1470,14 @@ void PhaseIdealLoop::transform_long_range_checks(int stride_con, const Node_List
     register_new_node(Q_max_cmp, entry_control);
     Node* Q_max_bool = new BoolNode(Q_max_cmp, BoolTest::lt);
     register_new_node(Q_max_bool, entry_control);
-    // Node* H_clamp = new CMoveLNode(Q_max_bool, Q_max_plus_one, max_jlong_long, TypeLong::LONG);
-    // register_new_node(H_clamp, entry_control);
-    Node* H_clamp = Q_max_plus_one;
+    Node* H_clamp;
+    if (UseNewCode3) {
+      H_clamp = Q_max_plus_one;
+    } else {
+      H_clamp = new CMoveLNode(Q_max_bool, Q_max_plus_one, max_jlong_long, TypeLong::LONG);
+      register_new_node(H_clamp, entry_control);
+    }
+    // Node* H_clamp = Q_max_plus_one;
     // (This could also be coded bitwise as H_clamp = ((Q_max+1)<<1 | M)>>>1 where M = (Q_max+1)>>63 & ~Q_min>>63.)
 
     // R_2 = clamp(R, L_clamp, H_clamp) - L_clamp
@@ -1473,49 +1485,55 @@ void PhaseIdealLoop::transform_long_range_checks(int stride_con, const Node_List
     // or else:  R_2 = clamp(R, L_clamp,   H_clamp) - Q_min    if Q_min >= 0
     // and also: R_2 = clamp(R, L_clamp,   Q_max+1) - L_clamp  if Q_min < Q_max+1 (no overflow)
     // or else:  R_2 = clamp(R, L_clamp, *no limit*)- L_clamp  if Q_max+1 < Q_min (overflow)
-    // Node* R_2 = clamp(R, L_clamp, H_clamp);
-    CmpLNode* clamp_hi_cmp = new CmpLNode(R, H_clamp);
-    register_new_node(clamp_hi_cmp, entry_control);
-    BoolNode* clamp_hi_bol = new BoolNode(clamp_hi_cmp, BoolTest::ge);
-    register_new_node(clamp_hi_bol, entry_control);
-    IfNode* clamp_hi_if = new IfNode(entry_control, clamp_hi_bol, PROB_STATIC_FREQUENT, COUNT_UNKNOWN);
-    register_control(clamp_hi_if, loop, entry_control);
-    IfTrueNode* clamp_hi_ift = new IfTrueNode(clamp_hi_if);
-    register_control(clamp_hi_ift, loop, clamp_hi_if);
-    IfFalseNode* clamp_hi_iff = new IfFalseNode(clamp_hi_if);
-    register_control(clamp_hi_iff, loop, clamp_hi_if);
-    CmpLNode* clamp_lo_cmp = new CmpLNode(R, L_clamp);
-    register_new_node(clamp_lo_cmp, clamp_hi_iff);
-    BoolNode* clamp_lo_bol = new BoolNode(clamp_lo_cmp, BoolTest::ge);
-    register_new_node(clamp_lo_bol, clamp_hi_iff);
-    IfNode* clamp_lo_if = new IfNode(clamp_hi_iff, clamp_lo_bol, PROB_STATIC_FREQUENT, COUNT_UNKNOWN);
-    register_control(clamp_lo_if, loop, clamp_hi_iff);
-    IfTrueNode* clamp_lo_ift = new IfTrueNode(clamp_lo_if);
-    register_control(clamp_lo_ift, loop, clamp_lo_if);
-    IfFalseNode* clamp_lo_iff = new IfFalseNode(clamp_lo_if);
-    register_control(clamp_lo_iff, loop, clamp_lo_if);
-    RegionNode* clamp_region = new RegionNode(4);
-    register_control(clamp_region, loop, clamp_hi_if);
-    clamp_region->init_req(1, clamp_hi_ift);
-    clamp_region->init_req(2, clamp_lo_ift);
-    clamp_region->init_req(3, clamp_lo_iff);
-    PhiNode* clamp_phi = new PhiNode(clamp_region, TypeLong::LONG);
-    clamp_phi->init_req(1, H_clamp);
-    clamp_phi->init_req(2, R);
-    clamp_phi->init_req(3, L_clamp);
+    Node* R_2;
+    if (UseNewCode2) {
+      R_2 = clamp(R, L_clamp, H_clamp);
+      CmpLNode* clamp_hi_cmp = new CmpLNode(R, H_clamp);
+      register_new_node(clamp_hi_cmp, entry_control);
+      BoolNode* clamp_hi_bol = new BoolNode(clamp_hi_cmp, BoolTest::ge);
+      register_new_node(clamp_hi_bol, entry_control);
+      IfNode* clamp_hi_if = new IfNode(entry_control, clamp_hi_bol, PROB_STATIC_FREQUENT, COUNT_UNKNOWN);
+      register_control(clamp_hi_if, loop, entry_control);
+      IfTrueNode* clamp_hi_ift = new IfTrueNode(clamp_hi_if);
+      register_control(clamp_hi_ift, loop, clamp_hi_if);
+      IfFalseNode* clamp_hi_iff = new IfFalseNode(clamp_hi_if);
+      register_control(clamp_hi_iff, loop, clamp_hi_if);
+      CmpLNode* clamp_lo_cmp = new CmpLNode(R, L_clamp);
+      register_new_node(clamp_lo_cmp, clamp_hi_iff);
+      BoolNode* clamp_lo_bol = new BoolNode(clamp_lo_cmp, BoolTest::ge);
+      register_new_node(clamp_lo_bol, clamp_hi_iff);
+      IfNode* clamp_lo_if = new IfNode(clamp_hi_iff, clamp_lo_bol, PROB_STATIC_FREQUENT, COUNT_UNKNOWN);
+      register_control(clamp_lo_if, loop, clamp_hi_iff);
+      IfTrueNode* clamp_lo_ift = new IfTrueNode(clamp_lo_if);
+      register_control(clamp_lo_ift, loop, clamp_lo_if);
+      IfFalseNode* clamp_lo_iff = new IfFalseNode(clamp_lo_if);
+      register_control(clamp_lo_iff, loop, clamp_lo_if);
+      RegionNode* clamp_region = new RegionNode(4);
+      register_control(clamp_region, loop, clamp_hi_if);
+      clamp_region->init_req(1, clamp_hi_ift);
+      clamp_region->init_req(2, clamp_lo_ift);
+      clamp_region->init_req(3, clamp_lo_iff);
+      PhiNode* clamp_phi = new PhiNode(clamp_region, TypeLong::LONG);
+      clamp_phi->init_req(1, H_clamp);
+      clamp_phi->init_req(2, R);
+      clamp_phi->init_req(3, L_clamp);
 
-    register_new_node(clamp_phi, clamp_region);
-    if (ctrl->is_Loop()) {
-      _igvn.replace_input_of(ctrl, LoopNode::EntryControl, clamp_region);
+      register_new_node(clamp_phi, clamp_region);
+      if (ctrl->is_Loop()) {
+        _igvn.replace_input_of(ctrl, LoopNode::EntryControl, clamp_region);
+      } else {
+        _igvn.replace_input_of(ctrl, 0, clamp_region);
+      }
+      set_idom(ctrl, clamp_region, dom_depth(ctrl));
+      entry_control = clamp_region;
+
+      R_2 = clamp_phi;
+    } else if (UseNewCode3) {
+      R_2 = R;
     } else {
-      _igvn.replace_input_of(ctrl, 0, clamp_region);
+      R_2 = clamp(R, L_clamp, H_clamp);
     }
-    set_idom(ctrl, clamp_region, dom_depth(ctrl));
-    entry_control = clamp_region;
 
-    Node* R_2 = clamp_phi;
-
-    // Node* R_2 = R;
     R_2 = new SubLNode(R_2, L_clamp);
     register_new_node(R_2, entry_control);
     R_2 = new ConvL2INode(R_2, TypeInt::POS);
