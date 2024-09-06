@@ -837,6 +837,9 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   Node_List range_checks;
   iters_limit = extract_long_range_checks(loop, stride_con, iters_limit, phi, range_checks);
 
+//  range_checks.clear();
+
+
   if (bt == T_INT) {
     // The only purpose of creating a loop nest is to handle long range checks. If there are none, do not proceed further.
     if (range_checks.size() == 0) {
@@ -937,7 +940,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters && UseNewCode;
 
   Node* transformed_rc_ctrl = nullptr;
-  Node* inner_iters_actual;
+  Node* inner_iters_actual = nullptr;
   if (short_running_loop && bt == T_LONG) {
     outer_exit_bol = _igvn.intcon(0);
     set_ctrl(outer_exit_bol, C->root());
