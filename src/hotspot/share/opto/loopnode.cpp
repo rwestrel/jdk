@@ -1487,7 +1487,7 @@ void PhaseIdealLoop::transform_long_range_checks(int stride_con, const Node_List
     // or else:  R_2 = clamp(R, L_clamp, *no limit*)- L_clamp  if Q_max+1 < Q_min (overflow)
     Node* R_2;
     if (UseNewCode2) {
-      R_2 = clamp(R, L_clamp, H_clamp);
+//      R_2 = clamp(R, L_clamp, H_clamp);
       CmpLNode* clamp_hi_cmp = new CmpLNode(R, H_clamp);
       register_new_node(clamp_hi_cmp, entry_control);
       BoolNode* clamp_hi_bol = new BoolNode(clamp_hi_cmp, BoolTest::ge);
