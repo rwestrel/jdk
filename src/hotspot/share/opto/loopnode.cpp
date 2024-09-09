@@ -884,6 +884,10 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   julong orig_iters = (julong)hi->hi_as_long() - lo->lo_as_long();
   iters_limit = checked_cast<int>(MIN2((julong)iters_limit, orig_iters));
 
+  if (short_running_loop(loop, old_new, stride_con, range_checks)) {
+    return true;
+  }
+
   // We need a safepoint to insert Parse Predicates for the inner loop.
   SafePointNode* safepoint;
   if (bt == T_INT && head->as_CountedLoop()->is_strip_mined()) {
@@ -935,92 +939,21 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   outer_phi->set_req(0, outer_head);
   register_new_node(outer_phi, outer_head);
 
-  const int short_loop_iters = 1000;
-  loop->compute_profile_trip_cnt(this);
-  bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters && UseNewCode;
-
-  Node* transformed_rc_ctrl = nullptr;
-  Node* inner_iters_actual = nullptr;
-  if (short_running_loop && bt == T_LONG) {
-    outer_exit_bol = _igvn.intcon(0);
-    set_ctrl(outer_exit_bol, C->root());
-    _igvn.replace_input_of(outer_exit_test, 1, outer_exit_bol);
-
-    tty->print_cr("XXX short running %f", head->profile_trip_cnt());
-    const Predicates predicates(entry_control);
-    const PredicateBlock* short_running_loop_predicate_block = predicates.short_running_loop_predicate_block();
-    if (short_running_loop_predicate_block->has_parse_predicate()) {
-      tty->print_cr("predicate found");
-
-      const PredicateBlock* predicate_block = predicates.loop_predicate_block();
-      ParsePredicateSuccessProj* parse_predicate_proj = short_running_loop_predicate_block->parse_predicate_success_proj();
-      Node* ctrl = outer_head;
-      ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_short_running_loop, true);
-      Node* short_running_loop_ctrl = ctrl;
-      if (predicate_block->has_parse_predicate()) {
-        parse_predicate_proj = predicate_block->parse_predicate_success_proj();
-        ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_predicate, true);
-      }
-      const PredicateBlock* profiled_predicate_block = predicates.profiled_loop_predicate_block();
-      if (profiled_predicate_block->has_parse_predicate()) {
-        parse_predicate_proj = profiled_predicate_block->parse_predicate_success_proj();
-        ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_profile_predicate, true);
-      }
-      assert(ctrl != outer_head, "");
-      _igvn.replace_input_of(x, LoopNode::EntryControl, ctrl);
-      set_idom(x, ctrl, dom_depth(x));
-
-      Node* sub;
-      if (stride_con > 0) {
-        sub = SubNode::make(limit, init, bt);
-      } else {
-        sub = SubNode::make(init, limit, bt);
-      }
-
-      Node* cmp_limit = CmpNode::make(sub, _igvn.integercon(short_loop_iters * ABS(stride_con), bt), bt);
-      Node* bol = new BoolNode(cmp_limit, BoolTest::le);
-      PredicateBlock inner_short_running_loop_predicate_block(short_running_loop_ctrl, Deoptimization::Reason_short_running_loop);
-      ParsePredicateSuccessProj* short_running_loop_predicate_proj = inner_short_running_loop_predicate_block.parse_predicate_success_proj();
-      assert(short_running_loop_predicate_proj->in(0)->is_ParsePredicate(), "must be parse predicate");
-      Node* new_predicate_proj = create_new_if_for_predicate(short_running_loop_predicate_proj,
-                                                             nullptr,
-                                                             Deoptimization::Reason_short_running_loop,
-                                                             Op_If);
-      Node* iff = new_predicate_proj->in(0);
-      _igvn.replace_input_of(iff, 1, bol);
-      register_new_node(sub, iff->in(0));
-      register_new_node(cmp_limit, iff->in(0));
-      register_new_node(bol, iff->in(0));
-      iters_limit = MIN2(iters_limit, short_loop_iters * ABS(stride_con)); // overflow
-      transformed_rc_ctrl = short_running_loop_predicate_proj->in(0);
-
-      inner_iters_actual = sub;
-
-#ifndef PRODUCT
-      // report that the loop predication has been actually performed
-      // for this loop
-      if (TraceLoopLimitCheck) {
-        tty->print_cr("Short Loop Check generated:");
-        debug_only( bol->dump(2); )
-      }
-#endif
-    }
+  Node* inner_iters_actual;
+  Node* inner_iters_max = nullptr;
+  if (stride_con > 0) {
+    inner_iters_max = MaxNode::max_diff_with_zero(limit, outer_phi, TypeInteger::bottom(bt), _igvn);
+  } else {
+    inner_iters_max = MaxNode::max_diff_with_zero(outer_phi, limit, TypeInteger::bottom(bt), _igvn);
   }
-  if (inner_iters_actual == nullptr) {
-    Node* inner_iters_max = nullptr;
-    if (stride_con > 0) {
-      inner_iters_max = MaxNode::max_diff_with_zero(limit, outer_phi, TypeInteger::bottom(bt), _igvn);
-    } else {
-      inner_iters_max = MaxNode::max_diff_with_zero(outer_phi, limit, TypeInteger::bottom(bt), _igvn);
-    }
 
-    Node* inner_iters_limit = _igvn.integercon(iters_limit, bt);
-    // inner_iters_max may not fit in a signed integer (iterating from
-    // Long.MIN_VALUE to Long.MAX_VALUE for instance). Use an unsigned
-    // min.
-    const TypeInteger* inner_iters_actual_range = TypeInteger::make(0, iters_limit, Type::WidenMin, bt);
-    inner_iters_actual = MaxNode::unsigned_min(inner_iters_max, inner_iters_limit, inner_iters_actual_range, _igvn);
-  }
+  Node* inner_iters_limit = _igvn.integercon(iters_limit, bt);
+  // inner_iters_max may not fit in a signed integer (iterating from
+  // Long.MIN_VALUE to Long.MAX_VALUE for instance). Use an unsigned
+  // min.
+  const TypeInteger* inner_iters_actual_range = TypeInteger::make(0, iters_limit, Type::WidenMin, bt);
+  inner_iters_actual = MaxNode::unsigned_min(inner_iters_max, inner_iters_limit, inner_iters_actual_range, _igvn);
+
   Node* inner_iters_actual_int;
   if (bt == T_LONG) {
     inner_iters_actual_int = new ConvL2INode(inner_iters_actual);
@@ -1139,24 +1072,20 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     register_new_node(outer_phi, outer_head);
   }
 
-  if (transformed_rc_ctrl == nullptr) {
-    transformed_rc_ctrl = inner_head;
-  }
-
   transform_long_range_checks(stride_con, range_checks, outer_phi, inner_iters_actual_int,
-                              inner_phi, iv_add, transformed_rc_ctrl);
+                              inner_phi, iv_add, inner_head);
   // Peel one iteration of the loop and use the safepoint at the end
   // of the peeled iteration to insert Parse Predicates. If no well
   // positioned safepoint peel to guarantee a safepoint in the outer
   // loop.
-  if (!short_running_loop && (safepoint != nullptr || !loop->_has_call)) {
+  if (safepoint != nullptr || !loop->_has_call) {
     old_new.clear();
     do_peeling(loop, old_new);
   } else {
     C->set_major_progress();
   }
 
-  if (!short_running_loop && safepoint != nullptr) {
+  if (safepoint != nullptr) {
     SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
 
     add_parse_predicate(Deoptimization::Reason_short_running_loop, inner_head, outer_ilt, cloned_sfpt);
@@ -1179,6 +1108,124 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   outer_head->mark_loop_nest_outer_loop();
 
   return true;
+}
+
+bool PhaseIdealLoop::short_running_loop(IdealLoopTree* loop, Node_List& old_new, jint stride_con, const Node_List& range_checks) {
+  Node* x = loop->_head;
+  BaseCountedLoopNode* head = x->as_BaseCountedLoop();
+  BasicType bt = x->as_BaseCountedLoop()->bt();
+  Node* entry_control = head->in(LoopNode::EntryControl);
+
+  const int short_loop_iters = 1000;
+  loop->compute_profile_trip_cnt(this);
+  bool short_running_loop = !head->is_profile_trip_failed() && head->profile_trip_cnt() < short_loop_iters && UseNewCode;
+
+  if (short_running_loop && bt == T_LONG) {
+    tty->print_cr("XXX short running %f", head->profile_trip_cnt());
+    const Predicates predicates(entry_control);
+    const PredicateBlock* short_running_loop_predicate_block = predicates.short_running_loop_predicate_block();
+    if (short_running_loop_predicate_block->has_parse_predicate()) {
+      tty->print_cr("predicate found");
+
+      const PredicateBlock* predicate_block = predicates.loop_predicate_block();
+      ParsePredicateSuccessProj* parse_predicate_proj = short_running_loop_predicate_block->parse_predicate_success_proj();
+      Node* ctrl = entry_control;
+      ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_short_running_loop, true);
+      Node* short_running_loop_ctrl = ctrl;
+      if (predicate_block->has_parse_predicate()) {
+        parse_predicate_proj = predicate_block->parse_predicate_success_proj();
+        ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_predicate, true);
+      }
+      const PredicateBlock* profiled_predicate_block = predicates.profiled_loop_predicate_block();
+      if (profiled_predicate_block->has_parse_predicate()) {
+        parse_predicate_proj = profiled_predicate_block->parse_predicate_success_proj();
+        ctrl = clone_parse_predicate_to_unswitched_loop(parse_predicate_proj, ctrl, Deoptimization::Reason_profile_predicate, true);
+      }
+      assert(ctrl != entry_control, "");
+      _igvn.replace_input_of(x, LoopNode::EntryControl, ctrl);
+      set_idom(x, ctrl, dom_depth(x));
+      Node* limit = head->limit();
+      Node* init = head->init_trip();
+
+      Node* sub;
+      if (stride_con > 0) {
+        sub = SubNode::make(limit, init, bt);
+      } else {
+        sub = SubNode::make(init, limit, bt);
+      }
+
+      jlong limit_long = short_loop_iters * ABS(stride_con);
+      Node* cmp_limit = CmpNode::make(sub, _igvn.integercon(limit_long, bt), bt);
+      Node* bol = new BoolNode(cmp_limit, BoolTest::le);
+      PredicateBlock inner_short_running_loop_predicate_block(short_running_loop_ctrl, Deoptimization::Reason_short_running_loop);
+      ParsePredicateSuccessProj* short_running_loop_predicate_proj = inner_short_running_loop_predicate_block.parse_predicate_success_proj();
+      assert(short_running_loop_predicate_proj->in(0)->is_ParsePredicate(), "must be parse predicate");
+      Node* new_predicate_proj = create_new_if_for_predicate(short_running_loop_predicate_proj,
+                                                             nullptr,
+                                                             Deoptimization::Reason_short_running_loop,
+                                                             Op_If);
+      Node* iff = new_predicate_proj->in(0);
+      _igvn.replace_input_of(iff, 1, bol);
+      register_new_node(sub, iff->in(0));
+      register_new_node(cmp_limit, iff->in(0));
+      register_new_node(bol, iff->in(0));
+      Node* new_limit = new CastLLNode(new_predicate_proj, sub, TypeLong::make(0, limit_long, Type::WidenMin));
+      register_new_node(new_limit, new_predicate_proj);
+
+#ifndef PRODUCT
+      // report that the loop predication has been actually performed
+      // for this loop
+      if (TraceLoopLimitCheck) {
+        tty->print_cr("Short Loop Check generated:");
+        debug_only( bol->dump(2); )
+      }
+#endif
+      entry_control = head->in(LoopNode::EntryControl);
+      IfNode* exit_test = head->loopexit();
+      PhiNode* phi = head->phi()->as_Phi();
+
+      new_limit = new ConvL2INode(new_limit);
+      register_new_node(new_limit, entry_control);
+
+      Node* int_zero = _igvn.intcon(0);
+      set_ctrl(int_zero, C->root());
+      if (stride_con < 0) {
+        new_limit = new SubINode(int_zero, new_limit);
+        register_new_node(new_limit, entry_control);
+      }
+
+      // Clone the iv data nodes as an integer iv
+      Node* int_stride = _igvn.intcon(stride_con);
+      set_ctrl(int_stride, C->root());
+      Node* inner_phi = new PhiNode(x->in(0), TypeInt::INT);
+      Node* inner_incr = new AddINode(inner_phi, int_stride);
+      Node* inner_cmp = nullptr;
+      inner_cmp = new CmpINode(inner_incr, new_limit);
+      Node* inner_bol = new BoolNode(inner_cmp, exit_test->in(1)->as_Bool()->_test._test);
+      inner_phi->set_req(LoopNode::EntryControl, int_zero);
+      inner_phi->set_req(LoopNode::LoopBackControl, inner_incr);
+      register_new_node(inner_phi, x);
+      register_new_node(inner_incr, x);
+      register_new_node(inner_cmp, x);
+      register_new_node(inner_bol, x);
+
+      _igvn.replace_input_of(exit_test, 1, inner_bol);
+
+
+      // Replace inner loop long iv phi as inner loop int iv phi + outer
+      // loop iv phi
+      Node* iv_add = loop_nest_replace_iv(phi, inner_phi, init, head, bt);
+
+      LoopNode* inner_head = create_inner_head(loop, head, exit_test);
+
+      transform_long_range_checks(stride_con, range_checks, init, new_limit,
+                                  inner_phi, iv_add, inner_head);
+
+      return true;
+    }
+  }
+
+  return false;
 }
 
 int PhaseIdealLoop::extract_long_range_checks(const IdealLoopTree* loop, jint stride_con, int iters_limit, PhiNode* phi,

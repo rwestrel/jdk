@@ -1784,6 +1784,8 @@ public:
   bool can_move_to_inner_loop(Node* n, LoopNode* n_loop, Node* x);
 
   void pin_array_access_nodes_dependent_on(Node* ctrl);
+
+  bool short_running_loop(IdealLoopTree* loop, Node_List& old_new, jint stride_con, const Node_List& range_checks);
 };
 
 
