@@ -1159,13 +1159,13 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
   if (!short_running_loop && safepoint != nullptr) {
     SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
 
+    add_parse_predicate(Deoptimization::Reason_short_running_loop, inner_head, outer_ilt, cloned_sfpt);
     if (UseLoopPredicate) {
       add_parse_predicate(Deoptimization::Reason_predicate, inner_head, outer_ilt, cloned_sfpt);
     }
     if (UseProfiledLoopPredicate) {
       add_parse_predicate(Deoptimization::Reason_profile_predicate, inner_head, outer_ilt, cloned_sfpt);
     }
-    add_parse_predicate(Deoptimization::Reason_short_running_loop, inner_head, outer_ilt, cloned_sfpt);
     add_parse_predicate(Deoptimization::Reason_loop_limit_check, inner_head, outer_ilt, cloned_sfpt);
   }
 
