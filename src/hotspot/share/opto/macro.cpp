@@ -2432,7 +2432,8 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
                n->is_OpaqueInitializedAssertionPredicate() ||
                n->Opcode() == Op_MaxL      ||
                n->Opcode() == Op_MinL      ||
-               BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n),
+               BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n) ||
+               (n->Opcode() == Op_CallLeafNoFP && n->as_CallLeafNoFP()->entry_point() == StubRoutines::unsafe_setmemory() && UseNewCode),
                "unknown node type in macro list");
       }
       assert(success == (C->macro_count() < old_macro_count), "elimination reduces macro count");
@@ -2474,6 +2475,66 @@ bool PhaseMacroExpand::expand_macro_nodes() {
         success = true;
       } else if (n->Opcode() == Op_CallStaticJava) {
         // Remove it from macro list and put on IGVN worklist to optimize.
+        C->remove_macro_node(n);
+        _igvn._worklist.push(n);
+        success = true;
+      } else if (n->Opcode() == Op_CallLeafNoFP) {
+        assert(UseNewCode, "");
+        // Remove it from macro list and put on IGVN worklist to optimize.
+        CallLeafNoFPNode* call = n->as_CallLeafNoFP();
+        assert(call->entry_point() == StubRoutines::unsafe_setmemory(), "");
+        if (UseNewCode2) {
+          Node* addr = call->in(TypeFunc::Parms);
+          Node* cast = new CastP2XNode(nullptr, addr);
+          _igvn.transform(cast);
+          Node* test = new AndLNode(cast, longcon(1));
+          _igvn.transform(test);
+          Node* cmp = new CmpLNode(test, longcon(0));
+          _igvn.transform(cmp);
+          Node* bol = new BoolNode(cmp, BoolTest::eq);
+          _igvn.transform(bol);
+          IfNode* iff = new IfNode(call->in(0), bol, PROB_MIN, COUNT_UNKNOWN);
+          _igvn.transform(iff);
+          Node* iftrue = new IfTrueNode(iff);
+          _igvn.transform(iftrue);
+          Node* iffalse = new IfFalseNode(iff);
+          _igvn.transform(iffalse);
+          _igvn.replace_input_of(call, 0, iffalse);
+
+          int trap_request = Deoptimization::make_trap_request(Deoptimization::Reason_unstable_if, Deoptimization::Action_maybe_recompile);
+          address call_addr = OptoRuntime::uncommon_trap_blob()->entry_point();
+          const TypePtr* no_memory_effects = nullptr;
+
+          JVMState* jvms = call->jvms();
+
+          CallNode* unc = new CallStaticJavaNode(OptoRuntime::uncommon_trap_Type(), call_addr, "uncommon_trap",
+                                                 no_memory_effects);
+          _igvn.transform(unc);
+
+          Node* frame = new ParmNode(C->start(), TypeFunc::FramePtr);
+          _igvn.transform(frame);
+          Node* ret = new ParmNode(C->start(), TypeFunc::ReturnAdr);
+          _igvn.transform(ret);
+
+          unc->init_req(TypeFunc::Control, iftrue);
+          unc->init_req(TypeFunc::I_O, call->in(TypeFunc::I_O));
+          unc->init_req(TypeFunc::Memory, call->in(TypeFunc::Memory)); // may gc ptrs
+          unc->init_req(TypeFunc::FramePtr, frame);
+          unc->init_req(TypeFunc::ReturnAdr, ret);
+          unc->init_req(TypeFunc::Parms+0, _igvn.intcon(trap_request));
+          unc->set_cnt(PROB_UNLIKELY_MAG(4));
+          unc->copy_call_debug_info(&_igvn, call);
+
+          Node* ctrl = new ProjNode(unc, TypeFunc::Control);
+          _igvn.transform(ctrl);
+          Node* halt = new HaltNode(ctrl, frame, "uncommon trap returned which should never happen" PRODUCT_ONLY(COMMA /*reachable*/false));
+          _igvn.transform(halt);
+          _igvn.add_input_to(C->root(), halt);
+        }
+        for (uint i = call->req() - 1; i >= call->tf()->domain()->cnt(); i--) {
+          call->del_req(i);
+        }
+        call->clear_jvms();
         C->remove_macro_node(n);
         _igvn._worklist.push(n);
         success = true;

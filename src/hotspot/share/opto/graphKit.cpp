@@ -2498,16 +2498,16 @@ Node* GraphKit::opt_iff(Node* region, Node* iff) {
 }
 
 //-----------------------------make_runtime_call-------------------------------
-Node* GraphKit::make_runtime_call(int flags,
-                                  const TypeFunc* call_type, address call_addr,
-                                  const char* call_name,
-                                  const TypePtr* adr_type,
-                                  // The following parms are all optional.
-                                  // The first null ends the list.
-                                  Node* parm0, Node* parm1,
-                                  Node* parm2, Node* parm3,
-                                  Node* parm4, Node* parm5,
-                                  Node* parm6, Node* parm7) {
+CallNode* GraphKit::make_runtime_call(int flags,
+                                      const TypeFunc* call_type, address call_addr,
+                                      const char* call_name,
+                                      const TypePtr* adr_type,
+                                      // The following parms are all optional.
+                                      // The first null ends the list.
+                                      Node* parm0, Node* parm1,
+                                      Node* parm2, Node* parm3,
+                                      Node* parm4, Node* parm5,
+                                      Node* parm6, Node* parm7) {
   assert(call_addr != nullptr, "must not call null targets");
 
   // Slow-path call

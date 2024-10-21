@@ -5113,7 +5113,6 @@ bool LibraryCallKit::inline_unsafe_copyMemory() {
 }
 
 // unsafe_setmemory(void *base, ulong offset, size_t length, char fill_value);
-// Fill 'length' bytes starting from 'base[offset]' with 'fill_value'
 bool LibraryCallKit::inline_unsafe_setMemory() {
   if (callee()->is_static())  return false;  // caller must have the capability!
   null_check_receiver();  // null-check receiver
@@ -5151,17 +5150,25 @@ bool LibraryCallKit::inline_unsafe_setMemory() {
   }
 
   // Call it.  Note that the length argument is not scaled.
-  make_runtime_call(flags,
-                    OptoRuntime::make_setmemory_Type(),
-                    StubRoutines::unsafe_setmemory(),
-                    "unsafe_setmemory",
-                    dst_type,
-                    dst_addr, size XTOP, byte);
+  CallNode* call = make_runtime_call(flags,
+                                     OptoRuntime::make_setmemory_Type(),
+                                     StubRoutines::unsafe_setmemory(),
+                                     "unsafe_setmemory",
+                                     dst_type,
+                                     dst_addr, size XTOP, byte);
+
+  if (UseNewCode) {
+    inc_sp(callee()->arg_size());
+    add_safepoint_edges(call);
+    dec_sp(callee()->arg_size());
+  }
 
   store_to_memory(control(), doing_unsafe_access_addr, intcon(0), doing_unsafe_access_bt, Compile::AliasIdxRaw, MemNode::unordered);
 
   return true;
 }
+
+// Fill 'length' bytes starting from 'base[offset]' with 'fill_value'
 
 #undef XTOP
 

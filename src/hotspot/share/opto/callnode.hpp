@@ -32,6 +32,7 @@
 #include "opto/phaseX.hpp"
 #include "opto/replacednodes.hpp"
 #include "opto/type.hpp"
+#include "runtime/stubRoutines.hpp"
 #include "utilities/growableArray.hpp"
 
 // Portions of code courtesy of Clifford Click
@@ -926,7 +927,16 @@ public:
     : CallLeafNode(tf, addr, name, adr_type)
   {
     init_class_id(Class_CallLeafNoFP);
+    if (UseNewCode && addr == StubRoutines::unsafe_setmemory()) {
+      init_flags(Flag_is_macro);
+      Compile::current()->add_macro_node(this);
+    }
   }
+  void clear_jvms() {
+    assert(UseNewCode && entry_point() == StubRoutines::unsafe_setmemory(), "");
+    *(JVMState**)&_jvms = nullptr;  // override const attribute in the accessor
+  }
+
   virtual int   Opcode() const;
 };
 
