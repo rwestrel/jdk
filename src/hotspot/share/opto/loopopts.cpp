@@ -4406,8 +4406,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     assert(!is_strict_dominator(c, region), "shouldn't go above region");
   }
 
-  Node* region_dom = idom(region);
-
   // Can't do the transformation if this would cause a membar pair to
   // be split
   for (uint i = 0; i < wq.size(); i++) {
@@ -4420,6 +4418,11 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     }
   }
   C->print_method(PHASE_BEFORE_DUPLICATE_LOOP_BACKEDGE, 4, head);
+
+  Unique_Node_List body_copy;
+  for (uint i = 0; i < loop->_body.size(); ++i) {
+    body_copy.push(loop->_body.at(i));
+  }
 
   // Collect data nodes that need to be clones as well
   int dd = dom_depth(head);
@@ -4507,7 +4510,12 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       old_new[exit_test->_idx]->as_If()->_fcnt = cnt * (1 - f);
     }
   }
-  head->mark_loop_backedge_duplicate();
+  // head->mark_loop_backedge_duplicate();
+
+  assert(body_copy.size() == loop->_body.size(), "");
+  for (uint i = 0; i < loop->_body.size(); ++i) {
+    assert(body_copy.member(loop->_body.at(i)), "");
+  }
 
 #ifdef ASSERT
   if (StressDuplicateBackedge && head->is_CountedLoop()) {

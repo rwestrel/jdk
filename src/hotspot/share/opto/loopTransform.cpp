@@ -3666,6 +3666,7 @@ bool IdealLoopTree::peel_for_predicates(PhaseIdealLoop* phase, Node_List& old_ne
   if (head->is_peeled_for_predicates()) {
     return false;
   }
+  ShouldNotReachHere();
   if ((!UseLoopPredicate || phase->C->too_many_traps(Deoptimization::Reason_predicate)) &&
       (!UseProfiledLoopPredicate || phase->C->too_many_traps(Deoptimization::Reason_profile_predicate)) &&
       phase->C->too_many_traps(Deoptimization::Reason_loop_limit_check)) {
