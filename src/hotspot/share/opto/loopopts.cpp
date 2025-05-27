@@ -4197,7 +4197,7 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
   if (!DuplicateBackedge) {
     return false;
   }
-  assert(!loop->_head->is_CountedLoop() || StressDuplicateBackedge, "Non-counted loop only");
+//  assert(!loop->_head->is_CountedLoop() || StressDuplicateBackedge, "Non-counted loop only");
   if (!loop->_head->is_Loop()) {
     return false;
   }
@@ -4231,6 +4231,71 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     }
 
     inner = 1;
+  } else if (head->is_CountedLoop() && UseNewCode2) {
+    int input = -1;
+    for (DUIterator_Fast imax, i = head->fast_outs(imax); i < imax; i++) {
+      Node* u = head->fast_out(i);
+      if (u->is_Phi() && u->bottom_type() == Type::MEMORY) {
+        Node* backedge_in = u->in(LoopNode::LoopBackControl);
+        if (backedge_in->is_MergeMem()) {
+          for (uint j = 0; j < backedge_in->req() && region != NodeSentinel; ++j) {
+            Node* in = backedge_in->in(j);
+            if (in != nullptr && !in->is_top()) {
+              if (in->is_Phi()) {
+                if (region == nullptr) {
+                  assert(input == -1, "");
+                  for (uint k = 1; k < in->req(); k++) {
+                    if (in->in(k) == u) {
+                      input = k;
+                      break;
+                    }
+                  }
+                  if (input != -1) {
+                    region = in->in(0);
+                  } else {
+                    region = NodeSentinel;
+                  }
+                } else {
+                  assert(input != -1, "");
+                  if (region != in->in(0) || in->in(input) != u) {
+                    region = NodeSentinel;
+                  }
+                }
+              }
+            }
+          }
+        } else if (backedge_in->is_Phi()) {
+          if (region == nullptr) {
+            assert(input == -1, "");
+            for (uint j = 1; j < backedge_in->req(); j++) {
+              if (backedge_in->in(j) == u) {
+                input = j;
+                break;
+              }
+            }
+            if (input != -1) {
+              region = backedge_in->in(0);
+            } else {
+              region = NodeSentinel;
+            }
+          } else {
+            assert(input != -1, "");
+            if (region != backedge_in->in(0) || backedge_in->in(input) != u) {
+              region = NodeSentinel;
+            }
+          }
+        } else {
+          region = NodeSentinel;
+        }
+      }
+    }
+    if (region != nullptr && region != NodeSentinel && is_dominator(region, head->in(LoopNode::LoopBackControl))) {
+      // tty->print("XXX %d ", C->compile_id());
+      // region->dump();
+      inner = input;
+    } else {
+      return false;
+    }
   } else {
     // Is the shape of the loop that of a counted loop...
     Node* back_control = loop_exit_control(head, loop);

@@ -2373,6 +2373,9 @@ ciTypeFlow::Block* ciTypeFlow::clone_loop_head(Loop* lp, StateVector* temp_vecto
         if (total_count == 0 || count > (total_count * .9)) {
           done = true;
         }
+        if (UseNewCode) {
+          done = true;
+        }
       }
     }
   }
