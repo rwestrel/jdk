@@ -185,7 +185,7 @@ private:
     };
 
     // The c -> [(n1, t1), (n2, t2)...] mapping is kept in a hash table indexed by c
-    using NodeTypesListTable = ResizeableResourceHashtable<Node*, NodeTypesList*, AnyObj::RESOURCE_AREA, mtInternal>;
+    using NodeTypesListTable = ResizeableHashTable<Node*, NodeTypesList*, AnyObj::RESOURCE_AREA, mtInternal>;
     NodeTypesListTable* _node_types_list_table;
 
     NodeTypesList* node_types_list_at(Node* c) const {
@@ -270,7 +270,7 @@ private:
   class WorkQueue : public ResourceObj {
   private:
     // A mapping from some control to a list of nodes that need processing
-    using WorkQueues = ResizeableResourceHashtable<Node*, GrowableArray<Node*>*, AnyObj::RESOURCE_AREA, mtInternal>;
+    using WorkQueues = ResizeableHashTable<Node*, GrowableArray<Node*>*, AnyObj::RESOURCE_AREA, mtInternal>;
     WorkQueues* _work_queues;
     // A cheap way to check if a node was already enqueued
     VectorSet _enqueued;
@@ -465,7 +465,7 @@ private:
     Node_List _intermediate_results;
     PhaseIdealLoop* _phase;
     PhaseConditionalPropagation& _conditional_propagation;
-    using NodeToCtrl = ResizeableResourceHashtable<Node*, Node*, AnyObj::RESOURCE_AREA, mtInternal>;
+    using NodeToCtrl = ResizeableHashTable<Node*, Node*, AnyObj::RESOURCE_AREA, mtInternal>;
     NodeToCtrl* _node_to_ctrl_table;
 
     Node* known_early_ctrl(Node* n) const;
@@ -525,7 +525,7 @@ private:
       }
     };
     // Node to tree node hash table
-    using DomTreeTable = ResizeableResourceHashtable<Node*, DomTreeNode*, AnyObj::RESOURCE_AREA, mtInternal>;
+    using DomTreeTable = ResizeableHashTable<Node*, DomTreeNode*, AnyObj::RESOURCE_AREA, mtInternal>;
     DomTreeTable* _nodes;
   public:
     DominatorTree(const Node_List& rpo_list, PhaseIdealLoop* phase);
