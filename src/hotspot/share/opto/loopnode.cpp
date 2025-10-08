@@ -5297,7 +5297,7 @@ void PhaseIdealLoop::build_and_optimize() {
         C->set_run_loop_conditional_propagation(false);
 #ifndef PRODUCT
         if (C->major_progress()) {
-          Atomic::inc(&PhaseIdealLoop::_loop_conditional_progress);
+          AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_progress);
         }
 #endif
       }

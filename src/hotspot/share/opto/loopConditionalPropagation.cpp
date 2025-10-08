@@ -1369,10 +1369,10 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
             _phase->igvn().replace_input_of(iff, 0, _phase->C->top());
           } else {
 #ifndef PRODUCT
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
+            AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_constants);
 #endif
 #ifndef PRODUCT
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+            AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
             Node* con = _phase->igvn().makecon(new_bol_t);
             _phase->set_ctrl(con, _phase->C->root());
@@ -1428,7 +1428,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
               }
               _phase->igvn().replace_input_of(use, j, con);
 #ifndef PRODUCT
-              Atomic::inc(&PhaseIdealLoop::_loop_conditional_constants);
+              AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_constants);
 #endif
 
               nb_deleted++;
@@ -1462,7 +1462,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           int nb = use->replace_edge(node, con, &_phase->igvn());
           --i;
 #ifndef PRODUCT
-          Atomic::add(&PhaseIdealLoop::_loop_conditional_constants, nb);
+          AtomicAccess::add(&PhaseIdealLoop::_loop_conditional_constants, nb);
 #endif
 #ifdef ASSERT
           if (PrintLoopConditionalPropagation) {
@@ -1477,7 +1477,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
 #endif
           if (use->is_If()) {
 #ifndef PRODUCT
-            Atomic::inc(&PhaseIdealLoop::_loop_conditional_test);
+            AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
             _phase->C->set_major_progress();
           }
