@@ -308,9 +308,9 @@ void PhaseConditionalPropagation::WriteableTypeTable::set_current_control(Node* 
     _node_types_list_table->maybe_grow(load_factor);
     return;
   }
-  // On a previous iteration, we recorded some types at this control. Make a copy. The algorithm then works on that copy
-  // and possibly makes some updates. Figuring whether progress happened is then done by comparing the types from the
-  // previous iteration with the possibly updated copy.
+  // On a previous iteration, we recorded some types at this control. Make a copy. The algorithm then possibly makes
+  // some updates. Figuring whether progress happened is then done by comparing the types from previous iteration (the
+  // copy) with the possibly updated types.
   _prev_node_types_list = _current_node_types_list->copy();
   if ((_dom_node_types_list != nullptr && _dom_node_types_list->iterations() > _current_node_types_list->iterations()) || verify) {
     if (_dom_node_types_list != nullptr && _dom_node_types_list->iterations() > _current_node_types_list->iterations()) {
@@ -997,7 +997,7 @@ void PhaseConditionalPropagation::Analyzer::analyze_if(const Node* cmp, Node* n)
     }
     if (n->Opcode() == Op_ConvL2I) {
       Node* in = n->in(1);
-      const Type* in_t = PhaseValues::type(in);
+      const Type* in_t = type_at_current_ctrl(in);
 
       if (in_t->isa_long() && in_t->is_long()->_lo >= min_jint && in_t->is_long()->_hi <= max_jint) {
         const Type* t_as_long = t->isa_int()
@@ -1323,6 +1323,20 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement(Node* c, 
   return true;
 }
 
+bool PhaseConditionalPropagation::Transformer::should_make_path_dead(Node* node) {
+  if (node->is_Type()) {
+    return true;
+  }
+  int opcode = node->Opcode();
+  if (opcode == Op_DivI || opcode == Op_ModI ||
+      opcode == Op_DivL || opcode == Op_ModL ||
+      opcode == Op_UDivI || opcode == Op_UModI ||
+      opcode == Op_UDivL || opcode == Op_UModL) {
+    return true;
+  }
+  return false;
+}
+
 /*
  With the following code snippet:
  if (i - 1) > 0) {
@@ -1392,8 +1406,8 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
           }
 #endif
         }
-      } else if (node->is_Type() && related_node(node, c)) {
-        node->as_Type()->make_paths_from_here_dead(&_phase->igvn(), _phase, "conditional propagation");
+      } else if (should_make_path_dead(node) && related_node(node, c)) {
+        node->make_paths_from_here_dead(&_phase->igvn(), _phase, "conditional propagation");
         _phase->C->set_major_progress();
       }
     }
