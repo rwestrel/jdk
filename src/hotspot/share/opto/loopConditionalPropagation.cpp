@@ -330,6 +330,7 @@ bool PhaseConditionalPropagation::WriteableTypeTable::record_type(Node* c, Node*
     _node_types_list_table->put(c, _current_node_types_list);
     _node_types_list_table->maybe_grow(load_factor);
   }
+  assert(_current_node_types_list->control() == c, "");
   int i = _current_node_types_list->find(n);
   if (i == -1) {
     _current_node_types_list->push_node(n, prev_t, new_t);
@@ -804,13 +805,40 @@ bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_varia
 
   propagate_types(extra_loop_variable);
 
-  if (VerifyLoopConditionalPropagation) {
+  if (_current_ctrl->is_IfProj() && _type_table->has_types_at_control(_current_ctrl)) {
+    sync_global_types_with_types_at_control(_current_ctrl);
+    // assert(_current_types_ctrl == _current_ctrl, "");
+    const Type* current_ctrl_t = PhaseValues::type(_current_ctrl);
+    if (current_ctrl_t != Type::TOP) {
+      auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
+        return !node->is_CFG() && t == Type::TOP && _conditional_propagation.related_node(node, _current_ctrl);
+      };
+      Node* top_node = _type_table->find_at_control(_current_ctrl, look_for_top);
+      if (top_node != nullptr) {
+        set_type(_current_ctrl, Type::TOP, current_ctrl_t);
+        enqueue_uses(_current_ctrl);
+        propagate_types(extra_loop_variable);
+      }
+    }
+  }
+  if (do_verify) {
     verify(extra_type_init);
   }
-  return _type_table->types_improved(_current_ctrl, _iterations, _verify);
+
+  // if (!_reordering_traps) {
+  //   reorder_traps();
+  // }
+
+  bool progress = _type_table->types_improved(_current_ctrl, _iterations, _verify);
+  Node* ctrl_out = _current_ctrl->unique_ctrl_out();
+  if (progress && ctrl_out->is_Region() && !ctrl_out->is_Root()) {
+  // if (_type_table->iterations_at(_current_ctrl) == _iterations && ctrl_out->is_Region() && !ctrl_out->is_Root()) {
+    enqueue_use(ctrl_out, ctrl_out);
+  }
+  return progress;
 }
 
-void PhaseConditionalPropagation::Analyzer::propagate_types(bool &extra_type_init) {
+void PhaseConditionalPropagation::Analyzer::propagate_types(bool &extra_loop_variable) {
   if (_work_queue->is_empty(_current_ctrl)) {
     return;
   }
@@ -835,7 +863,7 @@ void PhaseConditionalPropagation::Analyzer::propagate_types(bool &extra_type_ini
         }
       }
       if (_current_ctrl->is_Loop() && t != prev_type) {
-        extra_type_init = true;
+        extra_loop_variable = true;
       }
     }
     t = current_type->filter(t);
@@ -862,6 +890,14 @@ void PhaseConditionalPropagation::Analyzer::handle_ifproj() {
       bol = bol->in(1);
     }
     if (bol->is_Bool()) {
+      sync_global_types_with_types_at_control(iff);
+      const Type* current_bol_t = type_at_current_ctrl(bol);
+      const Type* new_bol_t = _current_ctrl->is_IfTrue() ? TypeInt::ONE : TypeInt::ZERO;
+      new_bol_t = new_bol_t->filter(current_bol_t);
+
+      if (current_bol_t != new_bol_t && (_type_table->record_type(_current_ctrl, bol, current_bol_t, new_bol_t, _iterations) || _verify)) {
+        enqueue_uses(bol);
+      }
       Node* cmp = bol->in(1);
       if (cmp->Opcode() == Op_CmpI || cmp->Opcode() == Op_CmpU ||
           cmp->Opcode() == Op_CmpL || cmp->Opcode() == Op_CmpUL) {
@@ -889,17 +925,34 @@ void PhaseConditionalPropagation::Analyzer::handle_ifproj() {
 }
 
 void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra_loop_variable) {
+  if (_type_table->type_if_present(dom, dom) == Type::TOP && _type_table->type_at_current_ctrl(_current_ctrl) != Type::TOP) {
+    if (_type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations) || _verify) {
+      enqueue_uses(_current_ctrl);
+    }
+    return;
+  }
   // Look for nodes whose types are narrowed between this region and the dominator control on all region's inputs
   // First find the region's input that has the smallest number of type updates to keep work as low as possible
-  uint in_idx = 1;
+  uint in_idx = 0;
   int num_types = max_jint;
   for (uint i = 1; i < _current_ctrl->req(); ++i) {
     Node* in = _current_ctrl->in(i);
+    if (_type_table->type_if_present(in, in) == Type::TOP) {
+      // tty->print_cr("XXX at %d, iteration %d, input %d is top", _current_ctrl->_idx, _iterations, i);
+      continue;
+    }
     int cnt = _type_table->count_updates_between_controls(in, dom);
     if (cnt < num_types) {
       in_idx = i;
       num_types = cnt;
     }
+  }
+  if (in_idx == 0) {
+    if ((_type_table->type_at_current_ctrl(_current_ctrl) != Type::TOP &&
+         _type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations)) || _verify) {
+      enqueue_uses(_current_ctrl);
+    }
+    return;
   }
   Node* in = _current_ctrl->in(in_idx);
   auto improve_type = [&](Node* n, Node* ignored_c, const Type* ignored_t, const Type* ignored_prev_t) {
@@ -911,6 +964,9 @@ void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra
           continue;
         }
         Node* other_in = _current_ctrl->in(k);
+        if (_type_table->type_if_present(other_in, other_in) == Type::TOP) {
+          continue;
+        }
         const Type* type_at_in = _type_table->find_type_between(n, other_in, dom);
         if (type_at_in == nullptr) {
           break;
@@ -1195,33 +1251,100 @@ ProjNode* PhaseConditionalPropagation::Transformer::always_taken_if_proj(IfNode*
   return nullptr;
 }
 
+bool PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(IfNode* iff, ProjNode* proj) {
+  if (_type_table->type_if_present(proj, proj) == Type::TOP) {
+    Node* bol = iff->in(1);
+    const Type* bol_t = bol->bottom_type();
+    if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
+      bol_t = TypeInt::ONE;
+    }
+    const Type* new_bol_t = TypeInt::make(1 - proj->_con);
+    if (bol_t != new_bol_t) {
+      assert(_conditional_propagation.condition_recorded(proj),
+             "only for conditions that saw some type narrowing");
+      jint new_bol_con = new_bol_t->is_int()->get_con();
+      if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
+        // We already constant folded the condition to the opposite constant: this path is dead
+        create_halt_node(iff->in(0));
+        _phase->igvn().replace_input_of(iff, 0, _phase->C->top());
+      } else {
+#ifndef PRODUCT
+        AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_constants);
+#endif
+#ifndef PRODUCT
+        AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
+#endif
+        Node* con = _phase->igvn().makecon(new_bol_t);
+        _phase->set_ctrl(con, _phase->C->root());
+        _phase->igvn().rehash_node_delayed(iff);
+        iff->set_req_X(1, con, &_phase->igvn());
+        _phase->C->set_major_progress();
+      }
+#ifdef ASSERT
+      if (PrintLoopConditionalPropagation) {
+        tty->print_cr("killing path");
+        bol_t->dump();
+        tty->cr();
+        new_bol_t->dump();
+        tty->cr();
+        proj->dump();
+      }
+#endif
+      return true;
+    }
+  }
+  return false;
+}
+
 // Transform the graph: constant fold subgraphs that were found constant by the Analyzer
 void PhaseConditionalPropagation::Transformer::do_transform() {
   _controls.push(_phase->C->root());
   for (uint i = 0; i < _controls.size(); i++) {
     Node* c = _controls.at(i);
 
-    if (c->is_CatchProj() && c->in(0)->in(0)->in(0)->is_AllocateArray()) {
-      const Type* t = _type_table->find_type_between(c, c, _phase->C->root());
-      if (t == Type::TOP) {
-        _phase->igvn().replace_node(c, _phase->C->top());
+    while (c->in(0) == nullptr) {
+      c = _phase->get_ctrl_no_update(c);
+    }
+
+    if (c->is_CatchProj() && c->in(0)->in(0)->in(0)->is_AllocateArray() && c->as_CatchProj()->_con == CatchProjNode::fall_through_index) {
+      AllocateArrayNode* allocate = c->in(0)->in(0)->in(0)->as_AllocateArray();
+      Node* valid_length_test = allocate->in(AllocateNode::ValidLengthTest);
+#ifdef ASSERT
+      const Type* control_t = _type_table->find_type_between(c, c, _phase->C->root());
+#endif
+      if (valid_length_test->find_int_con(-1) == 0) {
+        assert(control_t == Type::TOP, "dead path, control should be dead");
         _phase->C->set_major_progress();
         continue;
       }
+      assert(control_t != Type::TOP, "live path, control should not be dead");
     }
 
     assert(c->_idx >= _unique || _type_table->find_type_between(c, c, _phase->C->root()) != Type::TOP,
            "for If we don't follow dead projections");
     if (!c->is_MultiBranch()) {
-      transform_helper(c);
+      c = transform_helper(c);
     }
 
     if (c->is_If()) {
       IfNode* iff = c->as_If();
+      // Node* always_taken_proj = always_taken_if_proj(iff);
+      // if (always_taken_proj != nullptr) {
+      //   assert(always_taken_proj != NodeSentinel, "");
+      //   assert(_type_table->type(always_taken_proj, always_taken_proj) != Type::TOP, "should not be dead");
+      //   _controls.push(always_taken_proj);
+      //   continue;
+      // }
+      ProjNode* false_proj = iff->proj_out(0);
+      ProjNode* true_proj = iff->proj_out(1);
+      bool progress = maybe_constant_fold_condition(iff, false_proj);
+      progress = maybe_constant_fold_condition(iff, true_proj) || progress;
       Node* always_taken_proj = always_taken_if_proj(iff);
       if (always_taken_proj != nullptr) {
-        assert(_type_table->type(always_taken_proj, always_taken_proj) != Type::TOP, "should not be dead");
-        _controls.push(always_taken_proj);
+        if (always_taken_proj != NodeSentinel) {
+          assert(_type_table->type(always_taken_proj, always_taken_proj) != Type::TOP, "should not be dead");
+          _controls.push(always_taken_proj);
+        }
         continue;
       }
     } else if (c->is_IfProj()) {
@@ -1230,6 +1353,7 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
         continue;
       }
       Node* always_taken_proj = always_taken_if_proj(iff);
+      assert(always_taken_proj != NodeSentinel, "");
       if (always_taken_proj != nullptr && always_taken_proj != c) {
         continue;
       }
@@ -1375,6 +1499,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
         }
         const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
         if (bol_t != new_bol_t) {
+          ShouldNotReachHere();
           assert((c->is_IfProj() && _conditional_propagation.condition_recorded(c)), "only for conditions that saw some type narrowing");
           jint new_bol_con = new_bol_t->is_int()->get_con();
           if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
@@ -1609,14 +1734,59 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement_at_phi(No
   return cmp_type != nullptr && cmp_type->singleton();
 }
 
-void PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
+Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
+  if (_type_table->type_if_present(c, c) == Type::TOP && 0) {
+    if (c->is_IfProj()) {
+      IfNode* iff = c->in(0)->as_If();
+      if (iff->in(0)->is_top()) {
+        return c;
+      }
+      Node* bol = iff->in(1);
+      const Type* bol_t = bol->bottom_type();
+      if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
+        bol_t = TypeInt::ONE;
+      }
+      const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
+      if (bol_t != new_bol_t) {
+        assert((c->is_IfProj() && _conditional_propagation.condition_recorded(c)), "only for conditions that saw some type narrowing");
+        jint new_bol_con = new_bol_t->is_int()->get_con();
+        if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
+          // We already constant folded the condition to the opposite constant: this path is dead
+          create_halt_node(iff->in(0));
+          _phase->igvn().replace_input_of(iff, 0, _phase->C->top());
+        } else {
+#ifndef PRODUCT
+          AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_constants);
+#endif
+#ifndef PRODUCT
+          AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
+#endif
+          Node* con = _phase->igvn().makecon(new_bol_t);
+          _phase->set_ctrl(con, _phase->C->root());
+          _phase->igvn().rehash_node_delayed(iff);
+          iff->set_req_X(1, con, &_phase->igvn());
+          _phase->C->set_major_progress();
+        }
+#ifdef ASSERT
+        if (PrintLoopConditionalPropagation) {
+          tty->print_cr("killing path");
+          bol_t->dump();
+          tty->cr();
+          new_bol_t->dump();
+          tty->cr();
+          c->dump();
+        }
+#endif
+      }
+    }
+  }
   auto transform_top = [&](Node* node, const Type* t, const Type* prev_t) {
     transform_when_top_seen(c, node, t);
   };
   _type_table->apply_at_control(c, transform_top);
   if (c->unique_ctrl_out()->Opcode() == Op_Halt) {
     // dead end
-    return;
+    return c;
   }
   auto transform_constant = [&](Node* node, const Type* t, const Type* prev_t) {
     transform_when_constant_seen(c, node, t, prev_t);
