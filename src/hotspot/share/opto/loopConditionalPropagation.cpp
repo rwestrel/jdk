@@ -1361,14 +1361,48 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
 
     for (DUIterator i = c->outs(); c->has_out(i); i++) {
       Node* u = c->out(i);
-      if (u->is_CFG()) {
+      if (u->is_CFG() && u->_idx < _unique) {
         _controls.push(u);
       }
+      // if (u->is_Proj() && u->as_Proj()->is_uncommon_trap_if_pattern(Deoptimization::Reason_none)) {
+      //   _uncommon_if_projs->push(u->as_IfProj());
+      // }
     }
   }
+
+  if (UseNewCode2) {
+    _node_to_node = new NodeToNode(8, _phase->C->live_nodes());
+    for (uint i = 0; i < _reorder_list.size(); ++i) {
+      // reorder1(_reorder_list.at(_reorder_list.size() - i - 1 ));
+      reorder1(_reorder_list.at(i));
+      reorder2(_reorder_list.at(i));
+    }
+    // for (uint i = 0; i < _reorder_list.size(); ++i) {
+    //   reorder2(_reorder_list.at(i));
+    // }
+#ifdef ASSERT
+    for (uint i = 0; i < _reorder_list.size(); ++i) {
+      TrapsReorderingInfo** info_ptr = _conditional_propagation._traps_reordering_info_table->get(_reorder_list.at(i));
+      assert(info_ptr != nullptr, "");
+      Node* dom_common_proj = _reorder_list.at(i);
+      for (;;) {
+        TrapsReorderingInfo** dom_info_ptr = _conditional_propagation._traps_reordering_info_table->get(dom_common_proj);
+        if (dom_info_ptr == nullptr) {
+          break;
+        }
+        info_ptr = dom_info_ptr;
+        dom_common_proj = (*info_ptr)->proj();
+      }
+
+      assert((*info_ptr)->proj()->in(0) == (*info_ptr)->dom_if(), "");
+    }
+#endif
+  }
+
+  // return _uncommon_if_projs;
 }
 
-bool PhaseConditionalPropagation::Transformer::related_node(Node* n, Node* c) {
+bool PhaseConditionalPropagation::related_node(Node* n, Node* c) {
   assert(_wq.size() == 0, "need to start from an empty work list");
   _wq.push(n);
   for (uint i = 0; i < _wq.size(); i++) {
@@ -1380,14 +1414,14 @@ bool PhaseConditionalPropagation::Transformer::related_node(Node* n, Node* c) {
         continue;
       }
       if (u->is_CFG()) {
-        if (_conditional_propagation.is_dominator(u, c) || _conditional_propagation.is_dominator(c, u)) {
+        if (is_dominator(u, c) || is_dominator(c, u)) {
           _wq.clear();
           return true;
         }
       } else if (u->is_Phi()) {
         for (uint k = 1; k < u->req(); k++) {
           if (u->in(k) == node && !u->in(0)->in(k)->is_top() &&
-              (_conditional_propagation.is_dominator(u->in(0)->in(k), c) || _conditional_propagation.is_dominator(c, u->in(0)->in(k)))) {
+              (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
             _wq.clear();
             return true;
           }
@@ -1485,7 +1519,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
 #endif
       if (c->is_IfProj()) {
         // make sure the node has some use that dominates or are dominated by the current control
-        if (!related_node(node, c)) {
+        if (!_conditional_propagation.related_node(node, c)) {
           return;
         }
         IfNode* iff = c->in(0)->as_If();
@@ -1531,7 +1565,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
           }
 #endif
         }
-      } else if (should_make_path_dead(node) && related_node(node, c)) {
+      } else if (should_make_path_dead(node) && _conditional_propagation.related_node(node, c)) {
         node->make_paths_from_here_dead(&_phase->igvn(), _phase, "conditional propagation");
         _phase->C->set_major_progress();
       }
