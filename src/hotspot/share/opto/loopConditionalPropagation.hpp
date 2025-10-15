@@ -220,6 +220,16 @@ private:
     template <class Callback> void apply_at_control(Node* c, Callback callback) const;
     template <class Callback> void apply_at_control_with_updates(Node* c, Callback callback) const;
     bool has_types_at_control(Node* c) const;
+    template <class Callback> Node* find_at_control(Node* c, Callback callback) const;
+
+    const Type* type_if_present(Node* c, Node* n) const {
+      NodeTypesList* node_types_list = node_types_list_at(c);
+      if (node_types_list == nullptr) {
+        return nullptr;
+      }
+      return node_types_list->type_if_present(n);
+    }
+
   };
 
   // A TypeTable that can be updated. First phase of the transformation analyzes the graph and collects new types. It
@@ -436,7 +446,7 @@ private:
 
     void transform_when_top_seen(Node* c, Node* node, const Type* t);
     void transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t);
-    void transform_helper(Node* c);
+    Node* transform_helper(Node* c);
     bool is_safe_for_replacement(Node* c, Node* node, Node* use) const;
 
     static bool should_make_path_dead(Node* node);
@@ -445,7 +455,6 @@ private:
     void pin_array_access_nodes(Node* c, const IfNode* iff, int con) const;
     void pin_uses_if_needed(const Type* t, Node* use, Node* c);
     void pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const;
-    bool related_node(Node* n, Node* c);
     void create_halt_node(Node* c) const;
 
   public:
@@ -456,7 +465,9 @@ private:
               _unique(_conditional_propagation._phase->C->unique()) {
     }
 
-    ProjNode* always_taken_if_proj(IfNode* iff);
+    Node* always_taken_if_proj(IfNode* iff);
+
+    bool maybe_constant_fold_condition(IfNode* iff, ProjNode* proj);
 
     void do_transform();
   };
@@ -489,6 +500,9 @@ private:
   PhaseIdealLoop* _phase;
   VectorSet& _visited;
   Node_List &_rpo_list;
+
+  Unique_Node_List _wq;
+  bool related_node(Node* n, Node* c);
 
 #ifdef ASSERT
   VectorSet _conditions;
