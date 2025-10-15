@@ -716,7 +716,7 @@ public class TestLoopConditionalPropagation {
     }
 
     @Test
-    @IR(failOn = {IRNode.COUNTED_LOOP, IRNode.LONG_COUNTED_LOOP}, counts = {IRNode.LOOP, "1"})
+    @IR(failOn = {IRNode.COUNTED_LOOP, IRNode.LONG_COUNTED_LOOP, IRNode.LOOP})
     private static float test18(long start, long stop) {
         if (start < 0) {
             throw new RuntimeException("never taken");
@@ -759,5 +759,29 @@ public class TestLoopConditionalPropagation {
     @Warmup(10_000)
     public static void test19Runner() {
         test19(0);
+    }
+
+    @Test
+    @IR(counts = {IRNode.IF, "3"})
+    private static void testNonConstantFoldableCheck1(boolean flag, int x, int y) {
+        if (flag) {
+            if (x != y) {
+                throw new RuntimeException("never taken");
+            }
+        } else {
+            if (x != y) {
+                throw new RuntimeException("never taken");
+            }
+        }
+        if (x != y) {
+            throw new RuntimeException("never taken");
+        }
+    }
+
+    @Run(test = "testNonConstantFoldableCheck1")
+    @Warmup(10_000)
+    public static void testNonConstantFoldableCheck1Runner() {
+        testNonConstantFoldableCheck1(true, 42, 42);
+        testNonConstantFoldableCheck1(false, 42, 42);
     }
 }
