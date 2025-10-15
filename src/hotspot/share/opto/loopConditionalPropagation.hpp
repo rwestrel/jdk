@@ -196,14 +196,6 @@ private:
       return *node_types_list_ptr;
     }
 
-    const Type* type_if_present(Node* c, Node* n) const {
-      NodeTypesList* node_types_list = node_types_list_at(c);
-      if (node_types_list == nullptr) {
-        return nullptr;
-      }
-      return node_types_list->type_if_present(n);
-    }
-
     PhaseConditionalPropagation &_conditional_propagation;
     PhaseIdealLoop* _phase;
 
