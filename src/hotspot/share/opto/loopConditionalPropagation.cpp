@@ -1238,7 +1238,7 @@ const Type* PhaseConditionalPropagation::Analyzer::type_at_current_ctrl(Node* n)
   return n_t;
 }
 
-ProjNode* PhaseConditionalPropagation::Transformer::always_taken_if_proj(IfNode* iff) {
+Node* PhaseConditionalPropagation::Transformer::always_taken_if_proj(IfNode* iff) {
   assert(!iff->in(0)->is_top(), "");
   Node* bol = iff->in(1);
   const TypeInt* bol_t = bol->bottom_type()->is_int();
