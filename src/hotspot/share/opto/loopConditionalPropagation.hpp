@@ -447,7 +447,7 @@ private:
     void pin_array_access_nodes(Node* c, const IfNode* iff, int con) const;
     void pin_uses_if_needed(const Type* t, Node* use, Node* c);
     void pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const;
-    void create_halt_node(Node* c) const;
+    Node* create_halt_node(Node* c) const;
 
   public:
     Transformer(PhaseConditionalPropagation& conditional_propagation, const TypeTable* type_table)
@@ -459,7 +459,7 @@ private:
 
     Node* always_taken_if_proj(IfNode* iff);
 
-    bool maybe_constant_fold_condition(IfNode* iff, ProjNode* proj);
+    Node* maybe_constant_fold_condition(IfNode* iff, ProjNode* proj);
 
     void do_transform();
   };
