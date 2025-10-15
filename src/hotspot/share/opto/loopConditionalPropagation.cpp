@@ -1369,37 +1369,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
       // }
     }
   }
-
-  if (UseNewCode2) {
-    _node_to_node = new NodeToNode(8, _phase->C->live_nodes());
-    for (uint i = 0; i < _reorder_list.size(); ++i) {
-      // reorder1(_reorder_list.at(_reorder_list.size() - i - 1 ));
-      reorder1(_reorder_list.at(i));
-      reorder2(_reorder_list.at(i));
-    }
-    // for (uint i = 0; i < _reorder_list.size(); ++i) {
-    //   reorder2(_reorder_list.at(i));
-    // }
-#ifdef ASSERT
-    for (uint i = 0; i < _reorder_list.size(); ++i) {
-      TrapsReorderingInfo** info_ptr = _conditional_propagation._traps_reordering_info_table->get(_reorder_list.at(i));
-      assert(info_ptr != nullptr, "");
-      Node* dom_common_proj = _reorder_list.at(i);
-      for (;;) {
-        TrapsReorderingInfo** dom_info_ptr = _conditional_propagation._traps_reordering_info_table->get(dom_common_proj);
-        if (dom_info_ptr == nullptr) {
-          break;
-        }
-        info_ptr = dom_info_ptr;
-        dom_common_proj = (*info_ptr)->proj();
-      }
-
-      assert((*info_ptr)->proj()->in(0) == (*info_ptr)->dom_if(), "");
-    }
-#endif
-  }
-
-  // return _uncommon_if_projs;
 }
 
 bool PhaseConditionalPropagation::related_node(Node* n, Node* c) {
