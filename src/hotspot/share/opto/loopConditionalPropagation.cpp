@@ -195,6 +195,21 @@ template <class Callback> void PhaseConditionalPropagation::TypeTable::apply_at_
   }
 }
 
+template <class Callback> Node* PhaseConditionalPropagation::TypeTable::find_at_control(Node* c, Callback callback) const {
+  NodeTypesList* node_types_list = node_types_list_at(c);
+  if (node_types_list != nullptr && node_types_list->control() == c) {
+    for (int i = 0; i < node_types_list->length(); i++) {
+      Node* node = node_types_list->node_at(i);
+      const Type* t = node_types_list->type_at(i);
+      const Type* prev_t = node_types_list->prev_type_at(i);
+      if (callback(node, t, prev_t)) {
+        return node;
+      }
+    }
+  }
+  return nullptr;
+}
+
 template <class Callback> void PhaseConditionalPropagation::TypeTable::apply_at_control_with_updates(Node* c, Callback callback) const {
   NodeTypesList* node_types_list = node_types_list_at(c);
   if (node_types_list != nullptr && node_types_list->control() == c) {
@@ -821,7 +836,7 @@ bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_varia
       }
     }
   }
-  if (do_verify) {
+  if (VerifyLoopConditionalPropagation) {
     verify(extra_type_init);
   }
 
@@ -1795,6 +1810,7 @@ Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
     transform_when_constant_seen(c, node, t, prev_t);
   };
   _type_table->apply_at_control(c, transform_constant);
+  return c;
 }
 
 // Compute and cache early control for data nodes
