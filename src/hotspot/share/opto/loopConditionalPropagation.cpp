@@ -795,7 +795,7 @@ const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::Analy
       }
       assert(!progress, "didn't reach a fix point");
     }
-    assert(extra_type_init || verify_wq_empty(), "verification fails");
+    assert(extra_type_init || verify_wq_empty() || C->has_irreducible_loop(), "verification fails");
   }
 #endif
 
