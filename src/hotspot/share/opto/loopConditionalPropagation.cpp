@@ -340,6 +340,7 @@ void PhaseConditionalPropagation::WriteableTypeTable::set_current_control(Node* 
 
 bool PhaseConditionalPropagation::WriteableTypeTable::record_type(Node* c, Node* n, const Type* prev_t,
                                                                   const Type* new_t, int iterations) {
+  assert(_phase->is_dominator(_phase->ctrl_or_self(n), c) || _phase->is_dominator(c, _phase->ctrl_or_self(n)), "");
   if (_current_node_types_list == _dom_node_types_list) {
     _current_node_types_list = new NodeTypesList(_dom_node_types_list, c, iterations);
     _node_types_list_table->put(c, _current_node_types_list);
@@ -940,7 +941,7 @@ void PhaseConditionalPropagation::Analyzer::handle_ifproj() {
 }
 
 void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra_loop_variable) {
-  if (_type_table->type_if_present(dom, dom) == Type::TOP && _type_table->type_at_current_ctrl(_current_ctrl) != Type::TOP) {
+  if (_type_table->type_if_present(dom, dom) == Type::TOP) {
     if (_type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations) || _verify) {
       enqueue_uses(_current_ctrl);
     }
@@ -973,6 +974,9 @@ void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra
   Node* in = _current_ctrl->in(in_idx);
   auto improve_type = [&](Node* n, Node* ignored_c, const Type* ignored_t, const Type* ignored_prev_t) {
     if (n->is_CFG()) {
+      return;
+    }
+    if (!_conditional_propagation.is_dominator(_phase->get_ctrl(n), _current_ctrl) && !_conditional_propagation.is_dominator(_current_ctrl, _phase->get_ctrl(n))) {
       return;
     }
     const Type* t = _type_table->find_type_between(n, in, dom);
@@ -1632,7 +1636,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
             tty->cr();
           }
 #endif
-          if (use->is_If()) {
+          if (use->is_If() || use->is_CMove()) {
 #ifndef PRODUCT
             AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
 #endif
