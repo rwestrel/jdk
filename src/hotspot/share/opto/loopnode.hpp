@@ -1753,6 +1753,9 @@ private:
     }
   };
 
+
+  void split_thru_phi_yank_old_nodes(Node* n, Node* region);
+
 public:
 
   // Conversion of fill/copy patterns into intrinsic versions
