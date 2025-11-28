@@ -841,16 +841,7 @@ bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_varia
     verify(extra_type_init);
   }
 
-  // if (!_reordering_traps) {
-  //   reorder_traps();
-  // }
-
   bool progress = _type_table->types_improved(_current_ctrl, _iterations, _verify);
-  // Node* ctrl_out = _current_ctrl->unique_ctrl_out();
-  // if (_type_table->iterations_at(_current_ctrl) == _iterations && ctrl_out->is_Region() && !ctrl_out->is_Root()) {
-  // // if (_type_table->iterations_at(_current_ctrl) == _iterations && ctrl_out->is_Region() && !ctrl_out->is_Root()) {
-  //   enqueue_use(ctrl_out, ctrl_out);
-  // }
   return progress;
 }
 
@@ -955,7 +946,6 @@ void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra
     Node* in = _current_ctrl->in(i);
     if (_type_table->type_if_present(in, in) == Type::TOP ||
         (_verify && _type_table->find_type_between(in, in, _phase->C->root()) == Type::TOP)) {
-      // tty->print_cr("XXX at %d, iteration %d, input %d is top", _current_ctrl->_idx, _iterations, i);
       continue;
     }
     int cnt = _type_table->count_updates_between_controls(in, dom);
@@ -1326,10 +1316,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
   for (uint i = 0; i < _controls.size(); i++) {
     Node* c = _controls.at(i);
 
-    // while (c->in(0) == nullptr) {
-    //   c = _phase->get_ctrl_no_update(c);
-    // }
-
     if (c->is_CatchProj() && c->in(0)->in(0)->in(0)->is_AllocateArray() && c->as_CatchProj()->_con == CatchProjNode::fall_through_index) {
       AllocateArrayNode* allocate = c->in(0)->in(0)->in(0)->as_AllocateArray();
       Node* valid_length_test = allocate->in(AllocateNode::ValidLengthTest);
@@ -1350,13 +1336,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
 
     if (c->is_If()) {
       IfNode* iff = c->as_If();
-      // Node* always_taken_proj = always_taken_if_proj(iff);
-      // if (always_taken_proj != nullptr) {
-      //   assert(always_taken_proj != NodeSentinel, "");
-      //   assert(_type_table->type(always_taken_proj, always_taken_proj) != Type::TOP, "should not be dead");
-      //   _controls.push(always_taken_proj);
-      //   continue;
-      // }
       Node* always_taken_proj = always_taken_if_proj(iff);
       if (always_taken_proj != nullptr) {
         if (always_taken_proj != NodeSentinel) {
@@ -1382,9 +1361,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
       if (u->is_CFG() && u->_idx < _unique) {
         _controls.push(u);
       }
-      // if (u->is_Proj() && u->as_Proj()->is_uncommon_trap_if_pattern(Deoptimization::Reason_none)) {
-      //   _uncommon_if_projs->push(u->as_IfProj());
-      // }
     }
   }
 }
@@ -1521,36 +1497,6 @@ void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, 
         const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
         if (bol_t != new_bol_t) {
           ShouldNotReachHere();
-          assert((c->is_IfProj() && _conditional_propagation.condition_recorded(c)), "only for conditions that saw some type narrowing");
-          jint new_bol_con = new_bol_t->is_int()->get_con();
-          if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
-            // We already constant folded the condition to the opposite constant: this path is dead
-            create_halt_node(iff->in(0));
-            _phase->igvn().replace_input_of(iff, 0, _phase->C->top());
-          } else {
-#ifndef PRODUCT
-            AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_constants);
-#endif
-#ifndef PRODUCT
-            AtomicAccess::inc(&PhaseIdealLoop::_loop_conditional_test);
-#endif
-            Node* con = _phase->igvn().makecon(new_bol_t);
-            _phase->set_ctrl(con, _phase->C->root());
-            _phase->igvn().rehash_node_delayed(iff);
-            iff->set_req_X(1, con, &_phase->igvn());
-            _phase->C->set_major_progress();
-          }
-#ifdef ASSERT
-          if (PrintLoopConditionalPropagation) {
-            tty->print_cr("killing path");
-            node->dump();
-            bol_t->dump();
-            tty->cr();
-            new_bol_t->dump();
-            tty->cr();
-            c->dump();
-          }
-#endif
         }
       } else if (should_make_path_dead(node) && _conditional_propagation.related_node(node, c)) {
         node->make_paths_from_here_dead(&_phase->igvn(), _phase, "conditional propagation");
