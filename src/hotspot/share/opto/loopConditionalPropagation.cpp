@@ -1400,15 +1400,18 @@ bool PhaseConditionalPropagation::related_node(Node* n, Node* c) {
 
 bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement(Node* c, Node* node, Node* use) const {
   // if the exit test of a counted loop doesn't constant fold, preserve the shape of the exit test
-  Node* node_c = _phase->get_ctrl(node);
-  IdealLoopTree* loop = _phase->get_loop(node_c);
+  Node* use_c = _phase->ctrl_or_self(use);
+  IdealLoopTree* loop = _phase->get_loop(use_c);
   Node* head = loop->_head;
   if (head->is_BaseCountedLoop()) {
     BaseCountedLoopNode* cl = head->as_BaseCountedLoop();
     if (cl->is_valid_counted_loop(cl->bt())) {
       Node* cmp = cl->loopexit()->cmp_node();
-      if (((node == cl->phi() && use == cl->incr()) ||
-           (node == cl->incr() && use == cmp))) {
+      if ((node == cl->phi() && use == cl->incr()) ||
+          (node == cl->incr() && use == cmp) ||
+          (node == cl->limit() && use == cmp && head->is_CountedLoop() &&
+            head->as_CountedLoop()->is_canonical_loop_entry() != nullptr &&
+            head->as_CountedLoop()->is_canonical_loop_entry()->in(1) == node) ) {
         const Type* cmp_t = _type_table->find_type_between(cmp, cl->loopexit(), _phase->idom(c));
         if (cmp_t == nullptr || !cmp_t->singleton()) {
           return false;
@@ -1744,12 +1747,15 @@ Node* PhaseConditionalPropagation::EarlyCtrls::known_early_ctrl(Node* n) const {
   if (n->is_CFG()) {
     return n;
   }
+  if (n->is_Proj()) {
+    return n->in(0)->as_Multi()->proj_out(TypeFunc::Control);
+  }
   if (n->pinned()) {
     return n->in(0);
   }
   Node** c_ptr = _node_to_ctrl_table->get(n);
   if (c_ptr != nullptr) {
-    assert(*c_ptr == _phase->compute_early_ctrl(n, _phase->ctrl_or_self(n)), "");
+    assert(*c_ptr == _phase->compute_early_ctrl(n, _phase->ctrl_or_self(n)) || ((*c_ptr)->is_Proj() && (*c_ptr)->in(0) == _phase->compute_early_ctrl(n, _phase->get_ctrl(n))), "");
     return *c_ptr;
   }
   return nullptr;
@@ -1764,7 +1770,7 @@ Node* PhaseConditionalPropagation::EarlyCtrls::compute_early_ctrl(Node* u) {
     Node* n = _nstack.node();
     uint idx = _nstack.index();
     if (idx >= n->req()) {
-      assert(early_c == _phase->compute_early_ctrl(n, _phase->get_ctrl(n)), "incorrect result");
+      assert(early_c == _phase->compute_early_ctrl(n, _phase->get_ctrl(n)) || (early_c->is_Proj() && early_c->in(0) == _phase->compute_early_ctrl(n, _phase->get_ctrl(n))), "incorrect result");
       assert(_node_to_ctrl_table->get(n) == nullptr, "shouldn't have been cached already");
       _node_to_ctrl_table->put(n, early_c);
       _node_to_ctrl_table->maybe_grow(load_factor);
@@ -1788,7 +1794,7 @@ Node* PhaseConditionalPropagation::EarlyCtrls::compute_early_ctrl(Node* u) {
       }
     }
   } while (_nstack.is_nonempty());
-  assert(early_c == _phase->compute_early_ctrl(u, _phase->get_ctrl(u)), "incorrect result");
+  assert(early_c == _phase->compute_early_ctrl(u, _phase->get_ctrl(u)) || (early_c->is_Proj() && early_c->in(0) == _phase->compute_early_ctrl(u, _phase->get_ctrl(u))), "incorrect result");
   return early_c;
 }
 
