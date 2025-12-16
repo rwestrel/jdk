@@ -1408,13 +1408,20 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement(Node* c, 
     if (cl->is_valid_counted_loop(cl->bt())) {
       Node* cmp = cl->loopexit()->cmp_node();
       if ((node == cl->phi() && use == cl->incr()) ||
-          (node == cl->incr() && use == cmp) ||
-          (node == cl->limit() && use == cmp && head->is_CountedLoop() &&
-            head->as_CountedLoop()->is_canonical_loop_entry() != nullptr &&
-            head->as_CountedLoop()->is_canonical_loop_entry()->in(1) == node) ) {
+          (node == cl->incr() && use == cmp)) {
         const Type* cmp_t = _type_table->find_type_between(cmp, cl->loopexit(), _phase->idom(c));
         if (cmp_t == nullptr || !cmp_t->singleton()) {
           return false;
+        }
+          }
+      if (node == cl->limit() && use == cmp && head->is_CountedLoop()) {
+        CountedLoopNode* cl = head->as_CountedLoop();
+        Node* opaque = cl->is_canonical_loop_entry();
+        if (opaque != nullptr && opaque->in(1) == node) {
+          const Type* cmp_t = _type_table->find_type_between(cmp, cl->loopexit(), _phase->idom(c));
+          if (cmp_t == nullptr || !cmp_t->singleton()) {
+            return _conditional_propagation.is_dominator(c, _phase->get_ctrl(opaque));
+          }
         }
       }
     }
@@ -1747,7 +1754,7 @@ Node* PhaseConditionalPropagation::EarlyCtrls::known_early_ctrl(Node* n) const {
   if (n->is_CFG()) {
     return n;
   }
-  if (n->is_Proj()) {
+  if (n->is_Proj() && n->in(0)->is_Multi()) {
     return n->in(0)->as_Multi()->proj_out(TypeFunc::Control);
   }
   if (n->pinned()) {
