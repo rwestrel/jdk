@@ -80,11 +80,10 @@ bool LoopNode::is_valid_counted_loop(BasicType bt) const {
     BaseCountedLoopEndNode* le = l->loopexit_or_null();
     if (le != nullptr &&
         !le->in(0)->is_top() &&
-        le->proj_out_or_null(1 /* true */) == l->in(LoopNode::LoopBackControl)) {
+        le->true_proj_or_null() == l->in(LoopNode::LoopBackControl)) {
       Node* phi  = l->phi();
-      Node* exit = le->proj_out_or_null(0 /* false */);
-      if (exit != nullptr && exit->Opcode() == Op_IfFalse &&
-          phi != nullptr && phi->is_Phi() &&
+      IfFalseNode* exit = le->false_proj_or_null();
+      if (exit != nullptr && phi != nullptr && phi->is_Phi() &&
           phi->in(LoopNode::LoopBackControl) == l->incr() &&
           le->loopnode() == l && le->stride_is_con()) {
         return true;
@@ -948,7 +947,7 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     safepoint = find_safepoint(back_control, x, loop);
   }
 
-  Node* exit_branch = exit_test->proj_out(false);
+  IfFalseNode* exit_branch = exit_test->false_proj();
   Node* entry_control = head->in(LoopNode::EntryControl);
 
   // Clone the control flow of the loop to build an outer loop
@@ -3101,7 +3100,7 @@ IfFalseNode* OuterStripMinedLoopNode::outer_loop_exit() const {
   if (le == nullptr) {
     return nullptr;
   }
-  Node* c = le->proj_out_or_null(false);
+  IfFalseNode* c = le->false_proj_or_null();
   if (c == nullptr) {
     return nullptr;
   }
@@ -3421,7 +3420,7 @@ void OuterStripMinedLoopNode::adjust_strip_mined_loop(PhaseIterGVN* igvn) {
     return;
   }
 
-  Node* cle_tail = inner_cle->proj_out(true);
+  IfTrueNode* cle_tail = inner_cle->true_proj();
   ResourceMark rm;
   Node_List old_new;
   if (cle_tail->outcnt() > 1) {
@@ -3563,7 +3562,7 @@ void OuterStripMinedLoopNode::transform_to_counted_loop(PhaseIterGVN* igvn, Phas
     iloop->replace_node_and_forward_ctrl(outer_le, new_end);
   }
   // the backedge of the inner loop must be rewired to the new loop end
-  Node* backedge = cle->proj_out(true);
+  IfTrueNode* backedge = cle->true_proj();
   igvn->replace_input_of(backedge, 0, new_end);
   if (iloop != nullptr) {
     iloop->set_idom(backedge, new_end, iloop->dom_depth(new_end) + 1);
@@ -3644,7 +3643,7 @@ const Type* OuterStripMinedLoopEndNode::Value(PhaseGVN* phase) const {
 bool OuterStripMinedLoopEndNode::is_expanded(PhaseGVN *phase) const {
   // The outer strip mined loop head only has Phi uses after expansion
   if (phase->is_IterGVN()) {
-    Node* backedge = proj_out_or_null(true);
+    IfTrueNode* backedge = true_proj_or_null();
     if (backedge != nullptr) {
       Node* head = backedge->unique_ctrl_out_or_null();
       if (head != nullptr && head->is_OuterStripMinedLoop()) {
