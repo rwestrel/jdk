@@ -438,6 +438,7 @@ private:
 
     void transform_when_top_seen(Node* c, Node* node, const Type* t);
     void transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t);
+    void transform_div_mod_uses(Node* c, Node* node, const Type* t, const Type* prev_t);
     Node* transform_helper(Node* c);
     bool is_safe_for_replacement(Node* c, Node* node, Node* use) const;
 
@@ -555,6 +556,8 @@ private:
   };
   DominatorTree* _dominator_tree;
 
+  VectorSet _divisor_candidates;
+
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
 
@@ -569,6 +572,12 @@ public:
     return (dominator == m || _dominator_tree->is_dominator(dominator, m));
   }
 
+  void record_divisor(const Node* n) {
+    _divisor_candidates.set(n->_idx);
+  }
+  bool divisor_recorded(const Node* n) const {
+    return _divisor_candidates.test(n->_idx);
+  }
 };
 
 #endif // SHARE_OPTO_LOOPCONDITIONALPROPAGATION_HPP

@@ -561,6 +561,9 @@ void PhaseConditionalPropagation::Analyzer::enqueue_uses(const Node* n, bool at_
     if (queue_control == nullptr) {
       continue;
     }
+    if (u->is_div_or_mod() && u->in(2) == n) {
+      _conditional_propagation.record_divisor(n);
+    }
     enqueue_use(u, queue_control);
     if (u->Opcode() == Op_AddI || u->Opcode() == Op_SubI) {
       for (DUIterator_Fast i2max, i2 = u->fast_outs(i2max); i2 < i2max; i2++) {
@@ -1604,6 +1607,27 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
   }
 }
 
+void PhaseConditionalPropagation::Transformer::transform_div_mod_uses(Node* c, Node* node, const Type* t, const Type* prev_t) {
+  if (!_conditional_propagation.divisor_recorded(node)) {
+    return;
+  }
+  if (t == Type::TOP) {
+    return;
+  }
+  const TypeInteger* ti = t->is_integer();
+  if (ti->lo_as_long() <= 0 && ti->hi_as_long() >= 0) {
+    return;
+  }
+  for (DUIterator_Fast imax, i = node->fast_outs(imax); i < imax; i++) {
+    Node* u = node->fast_out(i);
+    if (u->is_div_or_mod() && u->in(0) != nullptr && _phase->is_strict_dominator(c, u->in(0))) {
+      assert(prev_t->is_integer()->lo_as_long() <= 0 && prev_t->is_integer()->hi_as_long() >= 0, "control should have been updated or cleared already");
+      assert(u->is_div_or_mod(ti->bt()), "int/long inconsistency");
+      _phase->igvn().replace_input_of(u, 0, c);
+    }
+  }
+}
+
 // Eliminating a condition that guards an array access: we need to pin the array access otherwise, it could float if it's
 // dependent on a new condition that ends up being replaced by an identical dominating one.
 void PhaseConditionalPropagation::Transformer::pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use,
@@ -1649,7 +1673,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
     if (n->is_CFG() || n->is_Phi() || n->bottom_type() == Type::MEMORY) {
       continue;
     }
-    if (n->is_div_or_mod(T_INT) || n->is_div_or_mod(T_LONG)) {
+    if (n->is_div_or_mod()) {
       if (n->in(0) != nullptr && n->in(0) != c) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
         if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
@@ -1724,6 +1748,7 @@ Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
     }
     auto transform_constant = [&](Node* node, const Type* t, const Type* prev_t) {
       transform_when_constant_seen(c, node, t, prev_t);
+      transform_div_mod_uses(c, node, t, prev_t);
     };
     _type_table->apply_at_control(c, transform_constant);
     return c;
