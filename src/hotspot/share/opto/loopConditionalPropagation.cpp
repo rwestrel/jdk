@@ -807,6 +807,63 @@ const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::Analy
   return _type_table;
 }
 
+void PhaseConditionalPropagation::Analyzer::check_for_dead_path(bool &extra_loop_variable) {
+  if (!_type_table->has_types_at_control(_current_ctrl)) {
+    return;
+  }
+  sync_global_types_with_types_at_control(_current_ctrl);
+  // assert(_current_types_ctrl == _current_ctrl, "");
+  const Type* current_ctrl_t = PhaseValues::type(_current_ctrl);
+  if (current_ctrl_t == Type::TOP) {
+    return;
+  }
+
+  Unique_Node_List wq;
+
+  auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
+    if (node->is_CFG()) {
+      return;
+    }
+    if (t != Type::TOP) {
+      return;
+    }
+    auto mark_dead_paths = [&](Node* c) {
+      if (_conditional_propagation.is_dominator(c, _current_ctrl)) {
+        _dead_paths.set(_current_ctrl->_idx);
+      } else if (_conditional_propagation.is_dominator(_current_ctrl, c)) {
+        _dead_paths.set(c->_idx);
+      }
+      return false;
+    };
+    _conditional_propagation.apply_to_cfg_uses(node, mark_dead_paths);
+  };
+
+  _type_table->apply_at_control(_current_ctrl, look_for_top);
+  if (_dead_paths.test(_current_ctrl->_idx)) {
+    tty->print("XXX"); _current_ctrl->dump();
+    set_type(_current_ctrl, Type::TOP, current_ctrl_t);
+    enqueue_uses(_current_ctrl);
+    propagate_types(extra_loop_variable);
+  }
+  // if (_current_ctrl->is_IfProj()) {
+  //   if (top_node != nullptr) {
+  //     set_type(_current_ctrl, Type::TOP, current_ctrl_t);
+  //     enqueue_uses(_current_ctrl);
+  //     propagate_types(extra_loop_variable);
+  //     return;
+  //   }
+  // }
+  // auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
+  //   return !node->is_CFG() && t == Type::TOP &&
+  //          _conditional_propagation.related_node(node, _current_ctrl);
+  // };
+  // Node* top_node = _type_table->find_at_control(_current_ctrl, look_for_top);
+  // if (top_node != nullptr) {
+  //
+  // }
+  // return;
+}
+
 bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_variable, bool &extra_type_init) {
   Node* dom = _phase->idom(_current_ctrl);
 
@@ -824,22 +881,8 @@ bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_varia
 
   propagate_types(extra_loop_variable);
 
-  if (_current_ctrl->is_IfProj() && _type_table->has_types_at_control(_current_ctrl)) {
-    sync_global_types_with_types_at_control(_current_ctrl);
-    // assert(_current_types_ctrl == _current_ctrl, "");
-    const Type* current_ctrl_t = PhaseValues::type(_current_ctrl);
-    if (current_ctrl_t != Type::TOP) {
-      auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
-        return !node->is_CFG() && t == Type::TOP && _conditional_propagation.related_node(node, _current_ctrl);
-      };
-      Node* top_node = _type_table->find_at_control(_current_ctrl, look_for_top);
-      if (top_node != nullptr) {
-        set_type(_current_ctrl, Type::TOP, current_ctrl_t);
-        enqueue_uses(_current_ctrl);
-        propagate_types(extra_loop_variable);
-      }
-    }
-  }
+  check_for_dead_path(extra_loop_variable);
+
   if (VerifyLoopConditionalPropagation) {
     verify(extra_type_init);
   }
@@ -1123,6 +1166,13 @@ const Type* PhaseConditionalPropagation::Analyzer::type(const Node* n, Node* c) 
 
 void PhaseConditionalPropagation::Analyzer::merge_with_dominator_types() {
   _type_table->set_current_control(_current_ctrl, verify(), _iterations);
+
+  if (_dead_paths.test(_current_ctrl->_idx) &&
+      _type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations)) {
+    tty->print("YYY"); _current_ctrl->dump();
+    enqueue_uses(_current_ctrl);
+  }
+
   if (!_verify && (_iterations == 1 || !_type_table->has_types_at_control(_current_ctrl))) {
     return;
   }
@@ -1269,7 +1319,24 @@ Node* PhaseConditionalPropagation::Transformer::always_taken_if_proj(IfNode* iff
 }
 
 Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(IfNode* iff, ProjNode* proj) {
-  if (_type_table->type_if_present(proj, proj) == Type::TOP) {
+  auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
+    if (node->is_CFG()) {
+      return false;
+    }
+    if (t != Type::TOP) {
+      return false;
+    }
+    auto is_dom_path = [&](Node* c) {
+      if (_conditional_propagation.is_dominator(c, iff)) {
+        return true;
+      }
+      return false;
+    };
+    return _conditional_propagation.apply_to_cfg_uses(node, is_dom_path);
+  };
+
+  if (_type_table->type_if_present(proj, proj) == Type::TOP && _type_table->find_at_control(proj, look_for_top) != nullptr) {
+    tty->print("ZZZ"); proj->dump();
     Node* bol = iff->in(1);
     const Type* bol_t = bol->bottom_type();
     if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
@@ -1390,6 +1457,40 @@ bool PhaseConditionalPropagation::related_node(Node* n, Node* c) {
               (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
             _wq.clear();
             return true;
+          }
+        }
+      } else {
+        _wq.push(u);
+      }
+    }
+  }
+  _wq.clear();
+  return false;
+}
+
+template <class Callback> bool PhaseConditionalPropagation::apply_to_cfg_uses(Node* n, Callback callback) {
+  assert(_wq.size() == 0, "need to start from an empty work list");
+  _wq.push(n);
+  for (uint i = 0; i < _wq.size(); i++) {
+    Node* node = _wq.at(i);
+    assert(!node->is_CFG(), "only following data nodes");
+    for (DUIterator_Fast jmax, j = node->fast_outs(jmax); j < jmax; j++) {
+      Node* u = node->fast_out(j);
+      if (!_phase->has_node(u)) {
+        continue;
+      }
+      if (u->is_CFG()) {
+        if (callback(u)) {
+          _wq.clear();
+          return true;
+        }
+      } else if (u->is_Phi()) {
+        for (uint k = 1; k < u->req(); k++) {
+          if (u->in(k) == node && !u->in(0)->in(k)->is_top()) {
+            if (callback(u->in(0)->in(k))) {
+              _wq.clear();
+              return true;
+            }
           }
         }
       } else {
@@ -1738,10 +1839,10 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement_at_phi(No
 
 Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
   if (!c->is_MultiBranch()) {
-    auto transform_top = [&](Node* node, const Type* t, const Type* prev_t) {
-      transform_when_top_seen(c, node, t);
-    };
-    _type_table->apply_at_control(c, transform_top);
+    // auto transform_top = [&](Node* node, const Type* t, const Type* prev_t) {
+    //   transform_when_top_seen(c, node, t);
+    // };
+    // _type_table->apply_at_control(c, transform_top);
     if (c->unique_ctrl_out()->Opcode() == Op_Halt) {
       // dead end
       return c;

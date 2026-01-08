@@ -341,6 +341,7 @@ private:
     Node_List &_rpo_list;
     WriteableTypeTable* _type_table;
     Node* _current_ctrl;
+    VectorSet _dead_paths;
 
     void enqueue_use(Node* n, Node* queue_control);
     Node* compute_queue_control(Node* u) const;
@@ -397,6 +398,8 @@ private:
       _type_table = new WriteableTypeTable(_conditional_propagation);
     }
     const TypeTable* analyze(int rounds);
+
+    void check_for_dead_path(bool &extra_loop_variable);
 
 #ifdef ASSERT
     void maybe_set_progress(Node* n, Node* c) {
@@ -496,6 +499,7 @@ private:
 
   Unique_Node_List _wq;
   bool related_node(Node* n, Node* c);
+  template <class Callback> bool apply_to_cfg_uses(Node* n, Callback callback);
 
 #ifdef ASSERT
   VectorSet _conditions;
@@ -570,6 +574,11 @@ public:
   bool is_dominator(Node* dominator, Node* m) const {
     assert(_phase->is_dominator(dominator, m) == (dominator == m || _dominator_tree->is_dominator(dominator, m)), "");
     return (dominator == m || _dominator_tree->is_dominator(dominator, m));
+  }
+
+  bool is_strict_dominator(Node* dominator, Node* m) const {
+    assert(_phase->is_strict_dominator(dominator, m) == _dominator_tree->is_dominator(dominator, m), "");
+    return _dominator_tree->is_dominator(dominator, m);
   }
 
   void record_divisor(const Node* n) {
