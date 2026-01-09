@@ -840,7 +840,6 @@ void PhaseConditionalPropagation::Analyzer::check_for_dead_path(bool &extra_loop
 
   _type_table->apply_at_control(_current_ctrl, look_for_top);
   if (_dead_paths.test(_current_ctrl->_idx)) {
-    tty->print("XXX"); _current_ctrl->dump();
     set_type(_current_ctrl, Type::TOP, current_ctrl_t);
     enqueue_uses(_current_ctrl);
     propagate_types(extra_loop_variable);
@@ -979,7 +978,7 @@ void PhaseConditionalPropagation::Analyzer::handle_ifproj() {
 
 void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra_loop_variable) {
   if (_type_table->type_if_present(dom, dom) == Type::TOP) {
-    if (_type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations) || _verify) {
+    if (_type_table->record_type(_current_ctrl, _current_ctrl, _current_ctrl->bottom_type(), Type::TOP, _iterations) || _verify) {
       enqueue_uses(_current_ctrl);
     }
     return;
@@ -1002,7 +1001,7 @@ void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra
   }
   if (in_idx == 0) {
     if ((_type_table->type_at_current_ctrl(_current_ctrl) != Type::TOP &&
-         _type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations)) || _verify) {
+         _type_table->record_type(_current_ctrl, _current_ctrl, _current_ctrl->bottom_type(), Type::TOP, _iterations)) || _verify) {
       enqueue_uses(_current_ctrl);
     }
     return;
@@ -1168,8 +1167,7 @@ void PhaseConditionalPropagation::Analyzer::merge_with_dominator_types() {
   _type_table->set_current_control(_current_ctrl, verify(), _iterations);
 
   if (_dead_paths.test(_current_ctrl->_idx) &&
-      _type_table->record_type(_current_ctrl, _current_ctrl, Type::CONTROL, Type::TOP, _iterations)) {
-    tty->print("YYY"); _current_ctrl->dump();
+      _type_table->record_type(_current_ctrl, _current_ctrl, _current_ctrl->bottom_type(), Type::TOP, _iterations)) {
     enqueue_uses(_current_ctrl);
   }
 
@@ -1336,7 +1334,6 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
   };
 
   if (_type_table->type_if_present(proj, proj) == Type::TOP && _type_table->find_at_control(proj, look_for_top) != nullptr) {
-    tty->print("ZZZ"); proj->dump();
     Node* bol = iff->in(1);
     const Type* bol_t = bol->bottom_type();
     if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
@@ -1386,6 +1383,21 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
   for (uint i = 0; i < _controls.size(); i++) {
     Node* c = _controls.at(i);
 
+    if (_type_table->type_if_present(c, c) == Type::TOP) {
+      if (c->is_Proj()) {
+        Node* c_use = c->unique_ctrl_out();
+        create_halt_node(c);
+        _phase->igvn().rehash_node_delayed(c_use);
+        int nb = c_use->replace_edge(c, _phase->C->top());
+        assert(nb == 1, "");
+      } else {
+        create_halt_node(c->in(0));
+       _phase->igvn().replace_input_of(c, 0, _phase->C->top());
+      }
+      _phase->C->set_major_progress();
+      continue;
+    }
+
     if (c->is_CatchProj() && c->in(0)->in(0)->in(0)->is_AllocateArray() && c->as_CatchProj()->_con == CatchProjNode::fall_through_index) {
       AllocateArrayNode* allocate = c->in(0)->in(0)->in(0)->as_AllocateArray();
       Node* valid_length_test = allocate->in(AllocateNode::ValidLengthTest);
@@ -1409,7 +1421,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
       Node* always_taken_proj = always_taken_if_proj(iff);
       if (always_taken_proj != nullptr) {
         if (always_taken_proj != NodeSentinel) {
-          assert(_type_table->type(always_taken_proj, always_taken_proj) != Type::TOP, "should not be dead");
           _controls.push(always_taken_proj);
         }
         continue;
