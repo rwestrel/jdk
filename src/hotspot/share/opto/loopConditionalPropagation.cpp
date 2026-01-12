@@ -1384,7 +1384,7 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
     Node* c = _controls.at(i);
 
     if (_type_table->type_if_present(c, c) == Type::TOP) {
-      if (c->is_Proj()) {
+      if (c->is_Proj() || c->is_Region()) {
         Node* c_use = c->unique_ctrl_out();
         create_halt_node(c);
         _phase->igvn().rehash_node_delayed(c_use);
@@ -1732,7 +1732,7 @@ void PhaseConditionalPropagation::Transformer::transform_div_mod_uses(Node* c, N
   }
   for (DUIterator_Fast imax, i = node->fast_outs(imax); i < imax; i++) {
     Node* u = node->fast_out(i);
-    if (u->is_div_or_mod() && u->in(0) != nullptr && _phase->is_strict_dominator(c, u->in(0))) {
+    if (u->is_div_or_mod() && u->in(2) == node && u->in(0) != nullptr && _phase->is_strict_dominator(c, u->in(0))) {
       assert(prev_t->is_integer()->lo_as_long() <= 0 && prev_t->is_integer()->hi_as_long() >= 0, "control should have been updated or cleared already");
       assert(u->is_div_or_mod(ti->bt()), "int/long inconsistency");
       _phase->igvn().replace_input_of(u, 0, c);
