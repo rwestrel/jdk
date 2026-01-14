@@ -4532,6 +4532,9 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
 
   C->set_major_progress();
 
+  old_new.clear();
+  do_peeling(loop, old_new);
+
   C->print_method(PHASE_AFTER_DUPLICATE_LOOP_BACKEDGE, 4, outer_head);
   return true;
 }
