@@ -1324,13 +1324,14 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
     if (t != Type::TOP) {
       return false;
     }
-    auto is_dom_path = [&](Node* c) {
-      if (_conditional_propagation.is_dominator(c, iff)) {
-        return true;
-      }
-      return false;
-    };
-    return _conditional_propagation.apply_to_cfg_uses(node, is_dom_path);
+    return true;
+    // auto is_dom_path = [&](Node* c) {
+    //   if (_conditional_propagation.is_dominator(c, iff)) {
+    //     return true;
+    //   }
+    //   return false;
+    // };
+    // return _conditional_propagation.apply_to_cfg_uses(node, is_dom_path);
   };
 
   if (_type_table->type_if_present(proj, proj) == Type::TOP && _type_table->find_at_control(proj, look_for_top) != nullptr) {
