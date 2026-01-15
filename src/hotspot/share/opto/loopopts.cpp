@@ -4532,6 +4532,49 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
 
   C->set_major_progress();
 
+  Unique_Node_List not_in_loop_anymore;
+  auto all_control_uses_out_of_loop = [&](Node* in) {
+    if (in == C->top()) {
+      return false;
+    }
+    assert(in->is_CFG(), "");
+    if (!loop->is_member(get_loop(in))) {
+      return false;
+    }
+    for (DUIterator_Fast imax, i = in->fast_outs(imax); i < imax; i++) {
+      Node* u = in->fast_out(i);
+      if (!u->is_CFG()) {
+        continue;
+      }
+      if (loop->is_member(get_loop(u))) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  not_in_loop_anymore.push(region_clone);
+  for (uint i = 0; i < not_in_loop_anymore.size(); ++i) {
+    Node* c = not_in_loop_anymore.at(i);
+    assert(c->is_CFG(), "");
+    assert(!loop->is_member(get_loop(c)), "");
+    if (c->is_Region()) {
+      for (uint j = 1; j < c->req(); j++) {
+        Node* in = c->in(j);
+        if (all_control_uses_out_of_loop(in)) {
+          set_loop(in, loop->_parent);
+          not_in_loop_anymore.push(in);
+        }
+      }
+    } else {
+      Node* in = c->in(0);
+      if (all_control_uses_out_of_loop(in)) {
+        set_loop(in, loop->_parent);
+        not_in_loop_anymore.push(in);
+      }
+    }
+  }
+
   old_new.clear();
   do_peeling(loop, old_new);
 
