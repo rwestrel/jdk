@@ -4384,7 +4384,8 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     exit_test = back_control->in(0)->as_If();
   }
 
-  if (idom(region)->is_Catch()) {
+  Node* region_idom = idom(region);
+  if (region_idom->is_Catch()) {
     return false;
   }
 
@@ -4454,21 +4455,43 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
 
   fix_body_edges(wq, loop, old_new, dd, loop->_parent, true);
 
+  for (DUIterator_Fast imax, i = region->fast_outs(imax); i < imax; i++) {
+    Node* u = region->fast_out(i);
+    if (u->is_Phi()) {
+      _igvn.replace_node(u, u->in(inner));
+      loop->_body.yank(u);
+      --i; --imax;
+    }
+  }
+  replace_node_and_forward_ctrl(region, region->in(inner));
+  loop->_body.yank(region);
+
   // Make one of the shared_stmt copies only reachable from stmt1, the
   // other only from stmt2..stmtn.
+  region_clone->del_req_ordered(inner);
+  for (DUIterator_Fast imax, i = region_clone->fast_outs(imax); i < imax; i++) {
+    Node* u = region_clone->fast_out(i);
+    if (u->is_Phi()) {
+      _igvn.rehash_node_delayed(u);
+      u->del_req_ordered(inner);
+    }
+  }
   Node* dom = nullptr;
-  for (uint i = 1; i < region->req(); ++i) {
-    if (i != inner) {
-      _igvn.replace_input_of(region, i, C->top());
-    }
+  for (uint i = 1; i < region_clone->req(); ++i) {
+    // if (i != inner) {
+      // _igvn.replace_input_of(region, i, C->top());
+    // }
     Node* in = region_clone->in(i);
-    if (in->is_top()) {
-      continue;
-    }
     if (dom == nullptr) {
       dom = in;
     } else {
-      dom = dom_lca(dom, in);
+      // dom = dom_lca(dom, in);
+      Node* next_dom = dom;
+      while (!is_dominator(next_dom, in)) {
+        next_dom = idom(next_dom);
+      }
+      // assert(next_dom == dom_lca(dom, in), "");
+      dom = next_dom;
     }
   }
 
@@ -4493,7 +4516,7 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
   // create control and data nodes for out of loop uses (including region2)
   Node_List worklist;
   uint new_counter = C->unique();
-  fix_ctrl_uses(wq, loop, old_new, ControlAroundStripMined, outer_head, nullptr, worklist);
+  fix_ctrl_uses(wq, loop, old_new, ControlAroundStripMined, region_idom, nullptr, worklist);
 
   Node_List *split_if_set = nullptr;
   Node_List *split_bool_set = nullptr;
@@ -4512,16 +4535,16 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
   }
   // head->mark_loop_backedge_duplicate();
 
-  assert(body_copy.size() == loop->_body.size(), "");
-  for (uint i = 0; i < loop->_body.size(); ++i) {
-    assert(body_copy.member(loop->_body.at(i)), "");
-  }
+  // assert(body_copy.size() == loop->_body.size(), "");
+  // for (uint i = 0; i < loop->_body.size(); ++i) {
+  //   assert(body_copy.member(loop->_body.at(i)), "");
+  // }
 
 #ifdef ASSERT
   if (StressDuplicateBackedge && head->is_CountedLoop()) {
     // The Template Assertion Predicates from the old counted loop are now at the new outer loop - clone them to
     // the inner counted loop and kill the old ones. We only need to do this with debug builds because
-    // StressDuplicateBackedge is a devlop flag and false by default. Without StressDuplicateBackedge 'head' will be a
+    // StressDuplicateBackedge is a develop flag and false by default. Without StressDuplicateBackedge 'head' will be a
     // non-counted loop, and thus we have no Template Assertion Predicates above the old loop to move down.
     PredicateIterator predicate_iterator(outer_head->in(LoopNode::EntryControl));
     NodeInSingleLoopBody node_in_body(this, loop);
@@ -4544,6 +4567,10 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     for (DUIterator_Fast imax, i = in->fast_outs(imax); i < imax; i++) {
       Node* u = in->fast_out(i);
       if (!u->is_CFG()) {
+        continue;
+      }
+      if (u == in) {
+        assert(u->is_Region(), "");
         continue;
       }
       if (loop->is_member(get_loop(u))) {
@@ -4574,9 +4601,31 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       }
     }
   }
+  for (uint i = 0; i < loop->_body.size();) {
+    Node* n = loop->_body.at(i);
+    Node* c = n;
+    if (has_ctrl(n)) {
+      c = get_ctrl(n);
+    }
+    if (!loop->is_member(get_loop(c))) {
+      loop->_body.map(i, loop->_body.pop());
+    } else {
+      i++;
+    }
+  }
 
-  old_new.clear();
-  do_peeling(loop, old_new);
+  Node* back_control = head->in(LoopNode::LoopBackControl);
+  if (back_control->Opcode() == Op_SafePoint) {
+    back_control = back_control->in(0);
+  }
+
+  SafePointNode* safepoint = find_safepoint(back_control, head, loop);
+  if (safepoint != nullptr) {
+    old_new.clear();
+    do_peeling(loop, old_new);
+    SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
+    add_parse_predicates(loop->_parent, head, cloned_sfpt);
+  }
 
   C->print_method(PHASE_AFTER_DUPLICATE_LOOP_BACKEDGE, 4, outer_head);
   return true;
