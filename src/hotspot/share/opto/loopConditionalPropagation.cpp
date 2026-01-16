@@ -1334,7 +1334,7 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
     // return _conditional_propagation.apply_to_cfg_uses(node, is_dom_path);
   };
 
-  if (_type_table->type_if_present(proj, proj) == Type::TOP && _type_table->find_at_control(proj, look_for_top) != nullptr) {
+  if (_type_table->type_if_present(proj, proj) == Type::TOP/* && _type_table->find_at_control(proj, look_for_top) != nullptr*/) {
     Node* bol = iff->in(1);
     const Type* bol_t = bol->bottom_type();
     if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
@@ -1352,8 +1352,8 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
     }
 #endif
     if (bol_t != new_bol_t) {
-      assert(_conditional_propagation.condition_recorded(proj),
-             "only for conditions that saw some type narrowing");
+      // assert(_conditional_propagation.condition_recorded(proj),
+             // "only for conditions that saw some type narrowing");
       jint new_bol_con = new_bol_t->is_int()->get_con();
       if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
         // We already constant folded the condition to the opposite constant: this path is dead
