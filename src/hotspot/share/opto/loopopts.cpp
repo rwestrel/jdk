@@ -4260,27 +4260,155 @@ public:
 class DuplicateLoopBackedge : public StackObj {
 public:
   DuplicateLoopBackedge(IdealLoopTree* loop, PhaseIdealLoop* phase, Node_List &old_new) : _loop(loop), _phase(phase),
-    _old_new(old_new), _region(nullptr), _exit_test(nullptr), _inner(0), _f(PROB_UNKNOWN) {
+    _old_new(old_new), _region(nullptr), _exit_test(nullptr), _inner(0), _f(PROB_UNKNOWN), _region_clone(nullptr),
+    _outer_head(nullptr) {
   }
 
-  bool find_region() {
-    if (!DuplicateBackedge) {
-      return false;
-    }
-    assert(!_loop->_head->is_CountedLoop() || StressDuplicateBackedge, "Non-counted loop only");
-    if (!_loop->_head->is_Loop()) {
+  bool transform() {
+    if (!find_region()) {
       return false;
     }
 
-    uint estimate = _loop->est_loop_clone_sz(1);
-    if (_phase->exceeding_node_budget(estimate)) {
+    collect_control_nodes_to_clone();
+
+    if (!safe_to_perform()) {
       return false;
     }
 
     LoopNode* head = _loop->_head->as_Loop();
+    _phase->C->print_method(PHASE_BEFORE_DUPLICATE_LOOP_BACKEDGE, 4, head);
+
+    collect_data_nodes_to_clone();
+
+    create_outer_loop();
 
 #ifdef ASSERT
-  if (StressDuplicateBackedge) {
+    if (StressDuplicateBackedge && head->is_CountedLoop()) {
+      // The Template Assertion Predicates from the old counted loop are now at the new outer loop - clone them to
+      // the inner counted loop and kill the old ones. We only need to do this with debug builds because
+      // StressDuplicateBackedge is a develop flag and false by default. Without StressDuplicateBackedge 'head' will be a
+      // non-counted loop, and thus we have no Template Assertion Predicates above the old loop to move down.
+      PredicateIterator predicate_iterator(_outer_head->in(LoopNode::EntryControl));
+      NodeInSingleLoopBody node_in_body(_phase, _loop);
+      MoveAssertionPredicatesVisitor move_assertion_predicates_visitor(head, node_in_body, _phase);
+      predicate_iterator.for_each(move_assertion_predicates_visitor);
+    }
+#endif // ASSERT
+
+    _phase->C->set_major_progress();
+
+    Unique_Node_List not_in_loop_anymore;
+    auto all_control_uses_out_of_loop = [&](Node* in) {
+      if (in == _phase->C->top()) {
+        return false;
+      }
+      assert(in->is_CFG(), "");
+      if (!_loop->is_member(_phase->get_loop(in))) {
+        return false;
+      }
+      for (DUIterator_Fast imax, i = in->fast_outs(imax); i < imax; i++) {
+        Node* u = in->fast_out(i);
+        if (!u->is_CFG()) {
+          continue;
+        }
+        if (u == in) {
+          assert(u->is_Region(), "");
+          continue;
+        }
+        if (_loop->is_member(_phase->get_loop(u))) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    not_in_loop_anymore.push(_region_clone);
+    for (uint i = 0; i < not_in_loop_anymore.size(); ++i) {
+      Node* c = not_in_loop_anymore.at(i);
+      assert(c->is_CFG(), "");
+      assert(!_loop->is_member(_phase->get_loop(c)), "");
+      if (c->is_Region()) {
+        for (uint j = 1; j < c->req(); j++) {
+          Node* in = c->in(j);
+          if (all_control_uses_out_of_loop(in)) {
+            _phase->set_loop(in, _loop->_parent);
+            not_in_loop_anymore.push(in);
+          }
+        }
+      } else {
+        Node* in = c->in(0);
+        if (all_control_uses_out_of_loop(in)) {
+          _phase->set_loop(in, _loop->_parent);
+          not_in_loop_anymore.push(in);
+        }
+      }
+    }
+    for (uint i = 0; i < _loop->_body.size();) {
+      Node* n = _loop->_body.at(i);
+      Node* c = n;
+      if (_phase->has_ctrl(n)) {
+        c = _phase->get_ctrl(n);
+      }
+      if (!_loop->is_member(_phase->get_loop(c))) {
+        _loop->_body.map(i, _loop->_body.pop());
+      } else {
+        i++;
+      }
+    }
+
+    for (DUIterator_Fast imax, i = _region->fast_outs(imax); i < imax; i++) {
+      Node* u = _region->fast_out(i);
+      if (u->is_Phi()) {
+        _phase->igvn().replace_node(u, u->in(_inner));
+        _loop->_body.yank(u);
+        --i;
+        --imax;
+      }
+    }
+    _phase->replace_node_and_forward_ctrl(_region, _region->in(_inner));
+    _loop->_body.yank(_region);
+    _region_clone->del_req_ordered(_inner);
+    for (DUIterator_Fast imax, i = _region_clone->fast_outs(imax); i < imax; i++) {
+      Node* u = _region_clone->fast_out(i);
+      if (u->is_Phi()) {
+        _phase->igvn().rehash_node_delayed(u);
+        u->del_req_ordered(_inner);
+      }
+    }
+
+    Node* back_control = head->in(LoopNode::LoopBackControl);
+    if (back_control->Opcode() == Op_SafePoint) {
+      back_control = back_control->in(0);
+    }
+
+    SafePointNode* safepoint = _phase->find_safepoint(back_control, head, _loop);
+    if (safepoint != nullptr) {
+      _old_new.clear();
+      _phase->do_peeling(_loop, _old_new);
+      SafePointNode* cloned_sfpt = _old_new[safepoint->_idx]->as_SafePoint();
+      _phase->add_parse_predicates(_loop->_parent, head, cloned_sfpt);
+    }
+
+    _phase->C->print_method(PHASE_AFTER_DUPLICATE_LOOP_BACKEDGE, 4, _outer_head);
+    return true;
+  }
+
+private:
+  IdealLoopTree* _loop;
+  PhaseIdealLoop* _phase;
+  Node_List& _old_new;
+
+  Node* _region;
+  IfNode* _exit_test;
+  uint _inner;
+  float _f;
+  Unique_Node_List _wq;
+  Node* _region_clone;
+  Node* _outer_head;
+
+  bool find_first_region_from_backedge() {
+    LoopNode* head = _loop->_head->as_Loop();
+
     if (head->is_strip_mined()) {
       return false;
     }
@@ -4312,9 +4440,12 @@ public:
     // }
 
     _inner = 1;
-  } else
-#endif //ASSERT
-  {
+    return true;
+  }
+
+  bool find_region_for_counted_loop() {
+    LoopNode* head = _loop->_head->as_Loop();
+
     // Is the shape of the loop that of a counted loop...
     Node* back_control = _phase->loop_exit_control(head, _loop);
     if (back_control == nullptr) {
@@ -4342,7 +4473,6 @@ public:
     // Go over all paths for the extra phi's region and see if that
     // path is frequent enough and would match the expected iv shape
     // if the extra phi is removed
-    _inner = 0;
     for (uint i = 1; i < incr->req(); ++i) {
       Node* in = incr->in(i);
       Node* trunc1 = nullptr;
@@ -4378,25 +4508,175 @@ public:
     }
 
     _exit_test = back_control->in(0)->as_If();
-  }
-
     return true;
   }
 
-  void transform() {
+  bool find_region() {
+    if (!DuplicateBackedge) {
+      return false;
+    }
+    assert(!_loop->_head->is_CountedLoop() || StressDuplicateBackedge, "Non-counted loop only");
+    if (!_loop->_head->is_Loop()) {
+      return false;
+    }
 
+    uint estimate = _loop->est_loop_clone_sz(1);
+    if (_phase->exceeding_node_budget(estimate)) {
+      return false;
+    }
+
+#ifdef ASSERT
+    if (StressDuplicateBackedge) {
+      return find_first_region_from_backedge();
+    }
+#endif //ASSERT
+    return find_region_for_counted_loop();
   }
 
-private:
-  IdealLoopTree* _loop;
-  PhaseIdealLoop* _phase;
-  Node_List& _old_new;
+  void collect_control_nodes_to_clone() {
+    LoopNode* head = _loop->_head->as_Loop();
+    // Collect all control nodes that need to be cloned (shared_stmt in the diagram)
+    _wq.push(head->in(LoopNode::LoopBackControl));
+    for (uint i = 0; i < _wq.size(); i++) {
+      Node* c = _wq.at(i);
+      assert(_phase->get_loop(c) == _loop, "not in the right loop?");
+      if (c->is_Region()) {
+        if (c != _region) {
+          for (uint j = 1; j < c->req(); ++j) {
+            _wq.push(c->in(j));
+          }
+        }
+      } else {
+        _wq.push(c->in(0));
+      }
+      assert(!_phase->is_strict_dominator(c, _region), "shouldn't go above region");
+    }
+  }
 
-  Node* _region;
-  IfNode* _exit_test;
-  uint _inner;
-  float _f;
-};
+  bool safe_to_perform() const {
+    Node* region_idom = _phase->idom(_region);
+    if (region_idom->is_Catch()) {
+      return false;
+    }
+
+    // Can't do the transformation if this would cause a membar pair to
+    // be split
+    for (uint i = 0; i < _wq.size(); i++) {
+      Node* c = _wq.at(i);
+      if (c->is_MemBar() && (c->as_MemBar()->trailing_store() || c->as_MemBar()->trailing_load_store())) {
+        assert(c->as_MemBar()->leading_membar()->trailing_membar() == c, "bad membar pair");
+        if (!_wq.member(c->as_MemBar()->leading_membar())) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  int collect_data_nodes_to_clone() {
+    LoopNode* head = _loop->_head->as_Loop();
+    int dd = _phase->dom_depth(head);
+    for (uint i = 0; i < _loop->_body.size(); ++i) {
+      Node* n = _loop->_body.at(i);
+      if (_phase->has_ctrl(n)) {
+        Node* c = _phase->get_ctrl(n);
+        if (_wq.member(c)) {
+          _wq.push(n);
+        }
+      } else {
+        _phase->set_idom(n, _phase->idom(n), dd);
+      }
+    }
+    return dd;
+  }
+
+
+  void create_outer_loop() {
+    LoopNode* head = _loop->_head->as_Loop();
+    int dd = _phase->dom_depth(head);
+    // clone shared_stmt
+    _phase->clone_loop_body(_wq, _old_new, nullptr);
+
+    _region_clone = _old_new[_region->_idx];
+    _region_clone->set_req(_inner, _phase->C->top());
+    _phase->set_idom(_region, _region->in(_inner), dd);
+
+    _outer_head = new LoopNode(head->in(LoopNode::EntryControl),
+                              _old_new[head->in(LoopNode::LoopBackControl)->_idx]);
+    _phase->register_control(_outer_head, _loop->_parent, _outer_head->in(LoopNode::EntryControl));
+    _phase->igvn().replace_input_of(head, LoopNode::EntryControl, _outer_head);
+    _phase->set_idom(head, _outer_head, dd);
+
+    _phase->fix_body_edges(_wq, _loop, _old_new, dd, _loop->_parent, true);
+
+    // Make one of the shared_stmt copies only reachable from stmt1, the
+    // other only from stmt2..stmtn.
+    Node* dom = nullptr;
+    for (uint i = 1; i < _region_clone->req(); ++i) {
+      if (i != _inner) {
+        _phase->igvn().replace_input_of(_region, i, _phase->C->top());
+      }
+      Node* in = _region_clone->in(i);
+      if (in->is_top()) {
+        continue;
+      }
+      if (dom == nullptr) {
+        dom = in;
+      } else {
+        // dom = dom_lca(dom, in);
+        Node* next_dom = dom;
+        while (!_phase->is_dominator(next_dom, in)) {
+          next_dom = _phase->idom(next_dom);
+        }
+        // assert(next_dom == dom_lca(dom, in), "");
+        dom = next_dom;
+      }
+    }
+
+    _phase->set_idom(_region_clone, dom, dd);
+
+    // Set up the outer loop
+    for (uint i = 0; i < head->outcnt(); i++) {
+      Node* u = head->raw_out(i);
+      if (u->is_Phi()) {
+        Node* outer_phi = u->clone();
+        outer_phi->set_req(0, _outer_head);
+        Node* backedge = _old_new[u->in(LoopNode::LoopBackControl)->_idx];
+        if (backedge == nullptr) {
+          backedge = u->in(LoopNode::LoopBackControl);
+        }
+        outer_phi->set_req(LoopNode::LoopBackControl, backedge);
+        _phase->register_new_node(outer_phi, _outer_head);
+        _phase->igvn().replace_input_of(u, LoopNode::EntryControl, outer_phi);
+      }
+    }
+
+    // create control and data nodes for out of loop uses (including region2)
+    Node_List worklist;
+    uint new_counter = _phase->C->unique();
+    Node* region_idom = _phase->idom(_region);
+    _phase->fix_ctrl_uses(_wq, _loop, _old_new, PhaseIdealLoop::ControlAroundStripMined, region_idom, nullptr,
+                          worklist);
+
+    Node_List* split_if_set = nullptr;
+    Node_List* split_bool_set = nullptr;
+    Node_List* split_cex_set = nullptr;
+    _phase->fix_data_uses(_wq, _loop, PhaseIdealLoop::ControlAroundStripMined, _loop->skip_strip_mined(), new_counter,
+                          _old_new, worklist,
+                          split_if_set, split_bool_set, split_cex_set);
+
+    _phase->finish_clone_loop(split_if_set, split_bool_set, split_cex_set);
+
+    if (_exit_test != nullptr) {
+      float cnt = _exit_test->_fcnt;
+      if (cnt != COUNT_UNKNOWN) {
+        _exit_test->_fcnt = cnt * _f;
+        _old_new[_exit_test->_idx]->as_If()->_fcnt = cnt * (1 - _f);
+      }
+    }
+  }
+
+  };
 
 bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old_new) {
   if (!DuplicateBackedge) {
