@@ -3633,9 +3633,6 @@ bool IdealLoopTree::iteration_split(PhaseIdealLoop* phase, Node_List &old_new) {
 
   // Unrolling, RCE and peeling efforts, iff innermost loop.
   if (_allow_optimizations && is_innermost()) {
-    if (peel_for_predicates(phase, old_new)) {
-      return true;
-    }
     if (!_has_call) {
       if (!iteration_split_impl(phase, old_new)) {
         return false;
@@ -3652,46 +3649,6 @@ bool IdealLoopTree::iteration_split(PhaseIdealLoop* phase, Node_List &old_new) {
   if (_next && !_next->iteration_split(phase, old_new)) {
     return false;
   }
-  return true;
-}
-
-bool IdealLoopTree::peel_for_predicates(PhaseIdealLoop* phase, Node_List& old_new) {
-  if (!_head->is_Loop()) {
-    return false;
-  }
-  LoopNode* head = _head->as_Loop();
-  if (!head->is_loop_backedge_duplicate()) {
-    return false;
-  }
-  if (head->is_peeled_for_predicates()) {
-    return false;
-  }
-  ShouldNotReachHere();
-  if ((!UseLoopPredicate || phase->C->too_many_traps(Deoptimization::Reason_predicate)) &&
-      (!UseProfiledLoopPredicate || phase->C->too_many_traps(Deoptimization::Reason_profile_predicate)) &&
-      phase->C->too_many_traps(Deoptimization::Reason_loop_limit_check)) {
-    return false;
-  }
-  Node* back_control = head->in(LoopNode::LoopBackControl);
-  if (back_control->Opcode() == Op_SafePoint) {
-    back_control = back_control->in(0);
-  }
-  SafePointNode* safepoint = phase->find_safepoint(back_control, head, this);
-  if (safepoint == nullptr) {
-    return false;
-  }
-  head->mark_peeled_for_predicates();
-  old_new.clear();
-  phase->do_peeling(this, old_new);
-  SafePointNode* cloned_sfpt = old_new[safepoint->_idx]->as_SafePoint();
-
-  if (UseLoopPredicate) {
-    phase->add_parse_predicate(Deoptimization::Reason_predicate, head, _parent, cloned_sfpt);
-  }
-  if (UseProfiledLoopPredicate) {
-    phase->add_parse_predicate(Deoptimization::Reason_profile_predicate, head, _parent, cloned_sfpt);
-  }
-  phase->add_parse_predicate(Deoptimization::Reason_loop_limit_check, head, _parent, cloned_sfpt);
   return true;
 }
 

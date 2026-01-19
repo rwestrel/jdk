@@ -4256,6 +4256,148 @@ public:
 // Conditions for this transformation to trigger:
 // - the path through stmt1 is frequent enough
 // - the inner loop will be turned into a counted loop after transformation
+
+class DuplicateLoopBackedge : public StackObj {
+public:
+  DuplicateLoopBackedge(IdealLoopTree* loop, PhaseIdealLoop* phase, Node_List &old_new) : _loop(loop), _phase(phase),
+    _old_new(old_new), _region(nullptr), _exit_test(nullptr), _inner(0), _f(PROB_UNKNOWN) {
+  }
+
+  bool find_region() {
+    if (!DuplicateBackedge) {
+      return false;
+    }
+    assert(!_loop->_head->is_CountedLoop() || StressDuplicateBackedge, "Non-counted loop only");
+    if (!_loop->_head->is_Loop()) {
+      return false;
+    }
+
+    uint estimate = _loop->est_loop_clone_sz(1);
+    if (_phase->exceeding_node_budget(estimate)) {
+      return false;
+    }
+
+    LoopNode* head = _loop->_head->as_Loop();
+
+#ifdef ASSERT
+  if (StressDuplicateBackedge) {
+    if (head->is_strip_mined()) {
+      return false;
+    }
+    Node* c = head->in(LoopNode::LoopBackControl);
+
+    while (c != head) {
+      if (c->is_Region()) {
+        _region = c;
+      }
+      c = _phase->idom(c);
+    }
+
+    if (_region == nullptr) {
+      return false;
+    }
+
+    // Node* dom = idom(region);
+    // if (dom->is_If()) {
+    //   IfNode* iff = dom->as_If();
+    //   if (iff->in(1)->is_Bool() && iff->in(1)->in(1)->is_Cmp()) {
+    //     CmpNode* cmp = iff->in(1)->in(1)->as_Cmp();
+    //     if (cmp->in(1)->is_Load()) {
+    //       LoadNode* load = cmp->in(1)->as_Load();
+    //       if (load->in(2)->is_AddP() && load->in(2)->in(2)->Opcode() == Op_ThreadLocal) {
+    //         return false;
+    //       }
+    //     }
+    //   }
+    // }
+
+    _inner = 1;
+  } else
+#endif //ASSERT
+  {
+    // Is the shape of the loop that of a counted loop...
+    Node* back_control = _phase->loop_exit_control(head, _loop);
+    if (back_control == nullptr) {
+      return false;
+    }
+
+    BoolTest::mask bt = BoolTest::illegal;
+    float cl_prob = 0;
+    Node* incr = nullptr;
+    Node* limit = nullptr;
+    Node* cmp = _phase->loop_exit_test(back_control, _loop, incr, limit, bt, cl_prob);
+    if (cmp == nullptr || cmp->Opcode() != Op_CmpI) {
+      return false;
+    }
+
+    // With an extra phi for the candidate iv?
+    // Or the region node is the loop head
+    if (!incr->is_Phi() || incr->in(0) == head) {
+      return false;
+    }
+
+    PathFrequency pf(head, _phase);
+    _region = incr->in(0);
+
+    // Go over all paths for the extra phi's region and see if that
+    // path is frequent enough and would match the expected iv shape
+    // if the extra phi is removed
+    _inner = 0;
+    for (uint i = 1; i < incr->req(); ++i) {
+      Node* in = incr->in(i);
+      Node* trunc1 = nullptr;
+      Node* trunc2 = nullptr;
+      const TypeInteger* iv_trunc_t = nullptr;
+      if (!(in = CountedLoopNode::match_incr_with_optional_truncation(in, &trunc1, &trunc2, &iv_trunc_t, T_INT))) {
+        continue;
+      }
+      assert(in->Opcode() == Op_AddI, "wrong increment code");
+      Node* xphi = nullptr;
+      Node* stride = _phase->loop_iv_stride(in, xphi);
+
+      if (stride == nullptr) {
+        continue;
+      }
+
+      PhiNode* phi = _phase->loop_iv_phi(xphi, nullptr, head);
+      if (phi == nullptr ||
+          (trunc1 == nullptr && phi->in(LoopNode::LoopBackControl) != incr) ||
+          (trunc1 != nullptr && phi->in(LoopNode::LoopBackControl) != trunc1)) {
+        return false;
+      }
+
+      _f = pf.to(_region->in(i));
+      if (_f > 0.5) {
+        _inner = i;
+        break;
+      }
+    }
+
+    if (_inner == 0) {
+      return false;
+    }
+
+    _exit_test = back_control->in(0)->as_If();
+  }
+
+    return true;
+  }
+
+  void transform() {
+
+  }
+
+private:
+  IdealLoopTree* _loop;
+  PhaseIdealLoop* _phase;
+  Node_List& _old_new;
+
+  Node* _region;
+  IfNode* _exit_test;
+  uint _inner;
+  float _f;
+};
+
 bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old_new) {
   if (!DuplicateBackedge) {
     return false;
@@ -4294,27 +4436,21 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       return false;
     }
 
-    Node* dom = idom(region);
-    if (dom->is_If()) {
-      IfNode* iff = dom->as_If();
-      if (iff->in(1)->is_Bool() && iff->in(1)->in(1)->is_Cmp()) {
-        CmpNode* cmp = iff->in(1)->in(1)->as_Cmp();
-        if (cmp->in(1)->is_Load()) {
-          LoadNode* load = cmp->in(1)->as_Load();
-          if (load->in(2)->is_AddP() && load->in(2)->in(2)->Opcode() == Op_ThreadLocal) {
-            return false;
-          }
-        }
-      }
-    }
+    // Node* dom = idom(region);
+    // if (dom->is_If()) {
+    //   IfNode* iff = dom->as_If();
+    //   if (iff->in(1)->is_Bool() && iff->in(1)->in(1)->is_Cmp()) {
+    //     CmpNode* cmp = iff->in(1)->in(1)->as_Cmp();
+    //     if (cmp->in(1)->is_Load()) {
+    //       LoadNode* load = cmp->in(1)->as_Load();
+    //       if (load->in(2)->is_AddP() && load->in(2)->in(2)->Opcode() == Op_ThreadLocal) {
+    //         return false;
+    //       }
+    //     }
+    //   }
+    // }
 
     inner = 1;
-//    Node* back_control = loop_exit_control(head, loop);
-//    if (back_control != nullptr) {
-//      exit_test = back_control->in(0)->as_If();
-//      PathFrequency pf(head, this);
-//      f = pf.to(region->in(inner));
-//    }
   } else
 #endif //ASSERT
   {
@@ -4351,7 +4487,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       Node* trunc1 = nullptr;
       Node* trunc2 = nullptr;
       const TypeInteger* iv_trunc_t = nullptr;
-      Node* orig_in = in;
       if (!(in = CountedLoopNode::match_incr_with_optional_truncation(in, &trunc1, &trunc2, &iv_trunc_t, T_INT))) {
         continue;
       }
@@ -4420,11 +4555,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
   }
   C->print_method(PHASE_BEFORE_DUPLICATE_LOOP_BACKEDGE, 4, head);
 
-  Unique_Node_List body_copy;
-  for (uint i = 0; i < loop->_body.size(); ++i) {
-    body_copy.push(loop->_body.at(i));
-  }
-
   // Collect data nodes that need to be clones as well
   int dd = dom_depth(head);
 
@@ -4466,7 +4596,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
     if (in->is_top()) {
       continue;
     }
-
     if (dom == nullptr) {
       dom = in;
     } else {
@@ -4518,12 +4647,6 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       old_new[exit_test->_idx]->as_If()->_fcnt = cnt * (1 - f);
     }
   }
-  // head->mark_loop_backedge_duplicate();
-
-  // assert(body_copy.size() == loop->_body.size(), "");
-  // for (uint i = 0; i < loop->_body.size(); ++i) {
-  //   assert(body_copy.member(loop->_body.at(i)), "");
-  // }
 
 #ifdef ASSERT
   if (StressDuplicateBackedge && head->is_CountedLoop()) {

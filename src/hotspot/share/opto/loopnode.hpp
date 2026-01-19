@@ -85,8 +85,6 @@ protected:
          MultiversionSlowLoop         = 2<<17,
          MultiversionDelayedSlowLoop  = 3<<17,
          MultiversionFlagsMask        = 3<<17,
-         LoopBackEdgeDuplicate = 1<<19,
-         PeeledForPredicates   = 1<<20,
        };
   char _unswitch_count;
   enum { _unswitch_max=3 };
@@ -110,8 +108,6 @@ public:
   bool is_subword_loop() const { return _loop_flags & SubwordLoop; }
   bool is_loop_nest_inner_loop() const { return _loop_flags & LoopNestInnerLoop; }
   bool is_loop_nest_outer_loop() const { return _loop_flags & LoopNestLongOuterLoop; }
-  bool is_loop_backedge_duplicate() const { return _loop_flags & LoopBackEdgeDuplicate; }
-  bool is_peeled_for_predicates() const { return _loop_flags & PeeledForPredicates; }
 
   void mark_partial_peel_failed() { _loop_flags |= PartialPeelFailed; }
   void mark_was_slp() { _loop_flags |= WasSlpAnalyzed; }
@@ -125,8 +121,6 @@ public:
   void mark_subword_loop() { _loop_flags |= SubwordLoop; }
   void mark_loop_nest_inner_loop() { _loop_flags |= LoopNestInnerLoop; }
   void mark_loop_nest_outer_loop() { _loop_flags |= LoopNestLongOuterLoop; }
-  void mark_peeled_for_predicates() { _loop_flags |= PeeledForPredicates; }
-  void mark_loop_backedge_duplicate() { _loop_flags |= LoopBackEdgeDuplicate; }
 
   int unswitch_max() { return _unswitch_max; }
   int unswitch_count() { return _unswitch_count; }
@@ -870,8 +864,6 @@ public:
   bool empty_loop_candidate(PhaseIdealLoop* phase) const;
 
   bool empty_loop_with_extra_nodes_candidate(PhaseIdealLoop* phase) const;
-
-  bool peel_for_predicates(PhaseIdealLoop* phase, Node_List &old_new);
 };
 
 // -----------------------------PhaseIdealLoop---------------------------------
@@ -882,6 +874,7 @@ class PhaseIdealLoop : public PhaseTransform {
   friend class SuperWord;
   friend class ShenandoahBarrierC2Support;
   friend class AutoNodeBudget;
+  friend class DuplicateLoopBackedge;
 
   Arena _arena; // For data whose lifetime is a single pass of loop optimizations
 
