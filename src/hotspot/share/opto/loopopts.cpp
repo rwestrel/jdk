@@ -4455,33 +4455,18 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
 
   fix_body_edges(wq, loop, old_new, dd, loop->_parent, true);
 
-  for (DUIterator_Fast imax, i = region->fast_outs(imax); i < imax; i++) {
-    Node* u = region->fast_out(i);
-    if (u->is_Phi()) {
-      _igvn.replace_node(u, u->in(inner));
-      loop->_body.yank(u);
-      --i; --imax;
-    }
-  }
-  replace_node_and_forward_ctrl(region, region->in(inner));
-  loop->_body.yank(region);
-
   // Make one of the shared_stmt copies only reachable from stmt1, the
   // other only from stmt2..stmtn.
-  region_clone->del_req_ordered(inner);
-  for (DUIterator_Fast imax, i = region_clone->fast_outs(imax); i < imax; i++) {
-    Node* u = region_clone->fast_out(i);
-    if (u->is_Phi()) {
-      _igvn.rehash_node_delayed(u);
-      u->del_req_ordered(inner);
-    }
-  }
   Node* dom = nullptr;
   for (uint i = 1; i < region_clone->req(); ++i) {
-    // if (i != inner) {
-      // _igvn.replace_input_of(region, i, C->top());
-    // }
+    if (i != inner) {
+      _igvn.replace_input_of(region, i, C->top());
+    }
     Node* in = region_clone->in(i);
+    if (in->is_top()) {
+      continue;
+    }
+
     if (dom == nullptr) {
       dom = in;
     } else {
@@ -4611,6 +4596,25 @@ bool PhaseIdealLoop::duplicate_loop_backedge(IdealLoopTree *loop, Node_List &old
       loop->_body.map(i, loop->_body.pop());
     } else {
       i++;
+    }
+  }
+
+  for (DUIterator_Fast imax, i = region->fast_outs(imax); i < imax; i++) {
+    Node* u = region->fast_out(i);
+    if (u->is_Phi()) {
+      _igvn.replace_node(u, u->in(inner));
+      loop->_body.yank(u);
+      --i; --imax;
+    }
+  }
+  replace_node_and_forward_ctrl(region, region->in(inner));
+  loop->_body.yank(region);
+  region_clone->del_req_ordered(inner);
+  for (DUIterator_Fast imax, i = region_clone->fast_outs(imax); i < imax; i++) {
+    Node* u = region_clone->fast_out(i);
+    if (u->is_Phi()) {
+      _igvn.rehash_node_delayed(u);
+      u->del_req_ordered(inner);
     }
   }
 
