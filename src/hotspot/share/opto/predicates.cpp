@@ -196,7 +196,7 @@ TemplateAssertionPredicate TemplateAssertionPredicate::clone(Node* new_control, 
 // Clone this Template Assertion Predicate and use a newly created OpaqueLoopInitNode with 'new_opaque_input' as input.
 TemplateAssertionPredicate TemplateAssertionPredicate::clone_and_replace_opaque_input(Node* new_control,
                                                                                       Node* new_opaque_input,
-                                                                                      LoopNode* new_loop_node,
+                                                                                      CountedLoopNode* new_loop_node,
                                                                                       PhaseIdealLoop* phase) const {
   OpaqueLoopInitNode* new_opaque_init = new OpaqueLoopInitNode(phase->C, new_opaque_input);
   phase->register_new_node(new_opaque_init, new_control);
@@ -207,7 +207,7 @@ TemplateAssertionPredicate TemplateAssertionPredicate::clone_and_replace_opaque_
 // Note: 'new_init' could also have the 'OpaqueLoopInit` as parent node further up.
 TemplateAssertionPredicate TemplateAssertionPredicate::clone_and_replace_init(Node* new_control,
                                                                               Node* new_init,
-                                                                              LoopNode* new_loop_node,
+                                                                              CountedLoopNode* new_loop_node,
                                                                               PhaseIdealLoop* phase) const {
   DEBUG_ONLY(verify();)
   TemplateAssertionExpression template_assertion_expression(opaque_node(), phase);
@@ -508,7 +508,7 @@ class ReplaceInitAndStrideStrategy : public TransformStrategyForOpaqueLoopNodes 
 // OpaqueTemplateAssertionPredicate to and including the OpaqueLoop* nodes). The cloned nodes are rewired to reflect the
 // same graph structure as found for this Template Assertion Expression. The cloned nodes get 'new_control' as control.
 // There is no other update done for the cloned nodes. Return the newly cloned OpaqueTemplateAssertionPredicate.
-OpaqueTemplateAssertionPredicateNode* TemplateAssertionExpression::clone(Node* new_control, LoopNode* new_loop_node) const {
+OpaqueTemplateAssertionPredicateNode* TemplateAssertionExpression::clone(Node* new_control, CountedLoopNode* new_loop_node) const {
   CloneStrategy clone_init_and_stride_strategy(_phase, new_control);
   return clone(clone_init_and_stride_strategy, new_control, new_loop_node);
 }
@@ -516,7 +516,7 @@ OpaqueTemplateAssertionPredicateNode* TemplateAssertionExpression::clone(Node* n
 // Same as clone() but instead of cloning the OpaqueLoopInitNode, we replace it with the provided 'new_init' node.
 OpaqueTemplateAssertionPredicateNode*
 TemplateAssertionExpression::clone_and_replace_init(Node* new_control, Node* new_init,
-                                                    LoopNode* new_loop_node) const {
+                                                    CountedLoopNode* new_loop_node) const {
   ReplaceInitAndCloneStrideStrategy replace_init_and_clone_stride_strategy(new_control, new_init, _phase);
   return clone(replace_init_and_clone_stride_strategy, new_control, new_loop_node);
 }
@@ -609,7 +609,7 @@ class DataNodesOnPathsToTargets : public StackObj {
 // Clones this Template Assertion Expression and applies the given strategy to transform the OpaqueLoop* nodes.
 OpaqueTemplateAssertionPredicateNode*
 TemplateAssertionExpression::clone(const TransformStrategyForOpaqueLoopNodes& transform_strategy, Node* new_control,
-                                   LoopNode* new_loop_node) const {
+                                   CountedLoopNode* new_loop_node) const {
   ResourceMark rm;
   auto is_opaque_loop_node = [](const Node* node) {
     return node->is_Opaque1();
@@ -1241,13 +1241,6 @@ void UpdateStrideForAssertionPredicates::connect_initialized_assertion_predicate
   } else {
     _phase->replace_control(new_control_out, initialized_assertion_predicate_success_proj);
   }
-}
-
-void UpdateAssociatedLoopForAssertionPredicates::visit(const TemplateAssertionPredicate& template_assertion_predicate) {
-  if (template_assertion_predicate.opaque_node()->loop_node() != _old_loop_node) {
-    return;
-  }
-  template_assertion_predicate.update_associated_loop_node(_loop_node);
 }
 
 void UpdateInitForTemplateAssertionPredicates::visit(const TemplateAssertionPredicate& template_assertion_predicate) {

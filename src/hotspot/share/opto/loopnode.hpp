@@ -1009,8 +1009,8 @@ private:
   static void get_opaque_template_assertion_predicate_nodes(ParsePredicateSuccessProj* parse_predicate_proj,
                                                             Unique_Node_List& list);
   void update_main_loop_assertion_predicates(CountedLoopNode* new_main_loop_head, int stride_con_before_unroll);
-  void initialize_assertion_predicates_for_peeled_loop(LoopNode* peeled_loop_head,
-                                                       LoopNode* remaining_loop_head,
+  void initialize_assertion_predicates_for_peeled_loop(CountedLoopNode* peeled_loop_head,
+                                                       CountedLoopNode* remaining_loop_head,
                                                        uint first_node_index_in_cloned_loop_body,
                                                        const Node_List& old_new);
   void initialize_assertion_predicates_for_main_loop(CountedLoopNode* pre_loop_head,
@@ -1021,7 +1021,7 @@ private:
                                                      const Node_List& old_new);
   void initialize_assertion_predicates_for_post_loop(CountedLoopNode* main_loop_head, CountedLoopNode* post_loop_head,
                                                      uint first_node_index_in_cloned_loop_body);
-  void create_assertion_predicates_at_loop(LoopNode* source_loop_head, LoopNode* target_loop_head,
+  void create_assertion_predicates_at_loop(CountedLoopNode* source_loop_head, CountedLoopNode* target_loop_head,
                                            const NodeInLoopBody& _node_in_loop_body, bool kill_old_template);
   void create_assertion_predicates_at_main_or_post_loop(CountedLoopNode* source_loop_head,
                                                         CountedLoopNode* target_loop_head,

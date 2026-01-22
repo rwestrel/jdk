@@ -867,14 +867,12 @@ void PhaseIdealLoop::do_peeling(IdealLoopTree *loop, Node_List &old_new) {
 
   // Step 5: Assertion Predicates initialization
   if (counted_loop) {
-    initialize_assertion_predicates_for_peeled_loop(new_head->as_Loop(), head,
-                                                    first_node_index_in_post_loop_body, old_new);
     CountedLoopNode* cl = head->as_CountedLoop();
     Node* init = cl->init_trip();
     Node* init_ctrl = cl->skip_strip_mined()->in(LoopNode::EntryControl);
+    initialize_assertion_predicates_for_peeled_loop(new_head->as_CountedLoop(), cl,
+                                                    first_node_index_in_post_loop_body, old_new);
     cast_incr_before_loop(init, init_ctrl, cl);
-  } else {
-
   }
 
   // Now force out all loop-invariant dominating tests.  The optimizer
@@ -1833,8 +1831,8 @@ void PhaseIdealLoop::update_main_loop_assertion_predicates(CountedLoopNode* new_
 
 // Source Loop: Cloned   - peeled_loop_head
 // Target Loop: Original - remaining_loop_head
-void PhaseIdealLoop::initialize_assertion_predicates_for_peeled_loop(LoopNode* peeled_loop_head,
-                                                                     LoopNode* remaining_loop_head,
+void PhaseIdealLoop::initialize_assertion_predicates_for_peeled_loop(CountedLoopNode* peeled_loop_head,
+                                                                     CountedLoopNode* remaining_loop_head,
                                                                      const uint first_node_index_in_cloned_loop_body,
                                                                      const Node_List& old_new) {
   const NodeInOriginalLoopBody node_in_original_loop_body(first_node_index_in_cloned_loop_body, old_new);
@@ -1868,11 +1866,11 @@ void PhaseIdealLoop::initialize_assertion_predicates_for_post_loop(CountedLoopNo
   create_assertion_predicates_at_main_or_post_loop(main_loop_head, post_loop_head, node_in_cloned_loop_body, false);
 }
 
-void PhaseIdealLoop::create_assertion_predicates_at_loop(LoopNode* source_loop_head,
-                                                         LoopNode* target_loop_head,
+void PhaseIdealLoop::create_assertion_predicates_at_loop(CountedLoopNode* source_loop_head,
+                                                         CountedLoopNode* target_loop_head,
                                                          const NodeInLoopBody& _node_in_loop_body,
                                                          const bool kill_old_template) {
-  CreateAssertionPredicatesVisitor create_assertion_predicates_visitor(target_loop_head->as_CountedLoop(), this, _node_in_loop_body,
+  CreateAssertionPredicatesVisitor create_assertion_predicates_visitor(target_loop_head, this, _node_in_loop_body,
                                                                        kill_old_template);
   Node* source_loop_entry = source_loop_head->skip_strip_mined()->in(LoopNode::EntryControl);
   PredicateIterator predicate_iterator(source_loop_entry);

@@ -437,9 +437,9 @@ class TemplateAssertionPredicate : public Predicate {
 
   TemplateAssertionPredicate clone(Node* new_control, CountedLoopNode* new_loop_node, PhaseIdealLoop* phase) const;
   TemplateAssertionPredicate clone_and_replace_opaque_input(Node* new_control, Node* new_opaque_input,
-                                                            LoopNode* new_loop_node, PhaseIdealLoop* phase) const;
+                                                            CountedLoopNode* new_loop_node, PhaseIdealLoop* phase) const;
   TemplateAssertionPredicate clone_and_replace_init(Node* new_control, Node* new_input,
-                                                    LoopNode* new_loop_node, PhaseIdealLoop* phase) const;
+                                                    CountedLoopNode* new_loop_node, PhaseIdealLoop* phase) const;
   void replace_opaque_stride_input(Node* new_stride, PhaseIterGVN& igvn) const;
   void replace_opaque_init_node(Node* new_init, PhaseIterGVN& igvn) const;
   InitializedAssertionPredicate initialize(PhaseIdealLoop* phase) const;
@@ -449,7 +449,7 @@ class TemplateAssertionPredicate : public Predicate {
 
   // Should only be called during Loop Unrolling when we only update the OpaqueLoopStride input but don't require a full
   // clone of the Template Assertion Expression.
-  void update_associated_loop_node(LoopNode* loop_node) const {
+  void update_associated_loop_node(CountedLoopNode* loop_node) const {
     opaque_node()->update_loop_node(loop_node);
   }
 
@@ -537,12 +537,12 @@ class TemplateAssertionExpression : public StackObj {
 
  private:
   OpaqueTemplateAssertionPredicateNode* clone(const TransformStrategyForOpaqueLoopNodes& transform_strategy,
-                                              Node* new_control, LoopNode* new_loop_node) const;
+                                              Node* new_control, CountedLoopNode* new_loop_node) const;
 
  public:
-  OpaqueTemplateAssertionPredicateNode* clone(Node* new_control, LoopNode* new_loop_node) const;
+  OpaqueTemplateAssertionPredicateNode* clone(Node* new_control, CountedLoopNode* new_loop_node) const;
   OpaqueTemplateAssertionPredicateNode* clone_and_replace_init(Node* new_control, Node* new_init,
-                                                               LoopNode* new_loop_node) const;
+                                                               CountedLoopNode* new_loop_node) const;
   OpaqueTemplateAssertionPredicateNode* clone_and_replace_init_and_stride(Node* new_control, Node* new_init,
                                                                           Node* new_stride) const;
   OpaqueInitializedAssertionPredicateNode* clone_and_fold_opaque_loop_nodes(Node* new_control) const;
@@ -1152,7 +1152,7 @@ public:
 class CreateAssertionPredicatesVisitor : public PredicateVisitor {
   Node* const _init;
   Node* const _stride;
-  LoopNode* const _target_loop_head;
+  CountedLoopNode* const _target_loop_head;
   Node* const _old_target_loop_entry;
   Node* _current_predicate_chain_head;
   PhaseIdealLoop* const _phase;
@@ -1302,19 +1302,6 @@ class UpdateStrideForAssertionPredicates : public PredicateVisitor {
 
   void visit(const TemplateAssertionPredicate& template_assertion_predicate) override;
   void visit(const InitializedAssertionPredicate& initialized_assertion_predicate) override;
-};
-
-class UpdateAssociatedLoopForAssertionPredicates : public PredicateVisitor {
-  LoopNode* const _loop_node;
-  LoopNode* const _old_loop_node;
-
-public:
-  UpdateAssociatedLoopForAssertionPredicates(LoopNode* loop_node, LoopNode* old_loop_node)
-      : _loop_node(loop_node), _old_loop_node(old_loop_node) {}
-  NONCOPYABLE(UpdateAssociatedLoopForAssertionPredicates);
-
-  using PredicateVisitor::visit;
-  void visit(const TemplateAssertionPredicate& template_assertion_predicate) override;
 };
 
 // This visitor replaces the OpaqueLoopInitNode for an Assertion Predicate with the expression passed as input.

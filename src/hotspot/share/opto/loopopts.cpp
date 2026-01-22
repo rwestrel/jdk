@@ -4188,15 +4188,13 @@ bool PhaseIdealLoop::partial_peel( IdealLoopTree *loop, Node_List &old_new ) {
 // false with product builds. We can therefore guard it with an ifdef. More details can be found at the use-site.
 class MoveAssertionPredicatesVisitor : public PredicateVisitor {
   ClonePredicateToTargetLoop _clone_predicate_to_loop;
-  LoopNode* _outer_loop_head;
   PhaseIdealLoop* const _phase;
 
 public:
-  MoveAssertionPredicatesVisitor(LoopNode* target_loop_head, LoopNode* outer_loop_head,
+  MoveAssertionPredicatesVisitor(LoopNode* target_loop_head,
                                  const NodeInSingleLoopBody &node_in_loop_body,
                                  PhaseIdealLoop* phase)
     : _clone_predicate_to_loop(target_loop_head, node_in_loop_body, phase),
-      _outer_loop_head(outer_loop_head),
       _phase(phase) {
   }
   NONCOPYABLE(MoveAssertionPredicatesVisitor);
@@ -4205,8 +4203,7 @@ public:
 
   void visit(const TemplateAssertionPredicate& template_assertion_predicate) override {
     _clone_predicate_to_loop.clone_template_assertion_predicate(template_assertion_predicate);
-    // template_assertion_predicate.kill(_phase->igvn());
-    template_assertion_predicate.update_associated_loop_node(_outer_loop_head);
+    template_assertion_predicate.kill(_phase->igvn());
   }
 };
 #endif // ASSERT
@@ -4296,7 +4293,7 @@ public:
     create_outer_loop();
 
 #ifdef ASSERT
-    if (StressDuplicateBackedge) {
+    if (StressDuplicateBackedge && head->is_CountedLoop()) {
       // The Template Assertion Predicates from the old counted loop are now at the new outer loop - clone them to
       // the inner counted loop and kill the old ones. We only need to do this with debug builds because
       // StressDuplicateBackedge is a develop flag and false by default. Without StressDuplicateBackedge 'head' will be a
@@ -4308,7 +4305,7 @@ public:
       }
       PredicateIterator predicate_iterator(from);
       NodeInSingleLoopBody node_in_body(_phase, _loop);
-      MoveAssertionPredicatesVisitor move_assertion_predicates_visitor(head, _outer_head, node_in_body, _phase);
+      MoveAssertionPredicatesVisitor move_assertion_predicates_visitor(head, node_in_body, _phase);
       predicate_iterator.for_each(move_assertion_predicates_visitor);
     }
 #endif // ASSERT
