@@ -168,7 +168,7 @@ class OpaqueConstantBoolNode : public Node {
 class OpaqueTemplateAssertionPredicateNode : public Node {
 
   // The counted loop this Template Assertion Predicate is associated with.
-  CountedLoopNode* _loop_node;
+  LoopNode* _loop_node;
 
   // When splitting a loop or when the associated loop dies, the Template Assertion Predicate with this
   // OpaqueTemplateAssertionPredicateNode also needs to be removed. We set this flag and then clean this node up in the
@@ -182,7 +182,7 @@ class OpaqueTemplateAssertionPredicateNode : public Node {
   }
 
  public:
-  OpaqueTemplateAssertionPredicateNode(BoolNode* bol, CountedLoopNode* loop_node);
+  OpaqueTemplateAssertionPredicateNode(BoolNode* bol, LoopNode* loop_node);
 
   virtual int Opcode() const;
   virtual uint size_of() const { return sizeof(*this); }
@@ -190,13 +190,13 @@ class OpaqueTemplateAssertionPredicateNode : public Node {
   virtual const Type* Value(PhaseGVN* phase) const;
   virtual const Type* bottom_type() const { return TypeInt::BOOL; }
 
-  CountedLoopNode* loop_node() const {
+  LoopNode* loop_node() const {
     return _loop_node;
   }
 
   // Should only be called during Loop Unrolling when we only update the OpaqueLoopStride input but don't require a full
   // clone of the Template Assertion Expression.
-  void update_loop_node(CountedLoopNode* loop_node) {
+  void update_loop_node(LoopNode* loop_node) {
     _loop_node = loop_node;
   }
 

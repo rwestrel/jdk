@@ -736,7 +736,7 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
     MergeMemNode* mm = nullptr;
 #ifdef ASSERT
     if (mem->is_MergeMem()) {
-      mm = mem->clone()->as_MergeMem();
+      mm = _igvn.transform(mem)->clone()->as_MergeMem();
       _igvn._worklist.push(mm);
       for (MergeMemStream mms(mem->as_MergeMem()); mms.next_non_empty(); ) {
         // Loop invariant memory state won't be reset by no_side_effect_since_safepoint(). Do it here.
@@ -753,7 +753,7 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
     if (!no_side_effect_since_safepoint(C, x, mem, mm, this)) {
       safepoint = nullptr;
     } else {
-      assert(mm == nullptr|| _igvn.transform(mm) == mem->as_MergeMem()->base_memory(), "all memory state should have been processed");
+      assert(mm == nullptr|| _igvn.transform(mm) == _igvn.transform(mem)->as_MergeMem()->base_memory(), "all memory state should have been processed");
     }
 #ifdef ASSERT
     if (mm != nullptr) {
@@ -2548,6 +2548,10 @@ bool PhaseIdealLoop::is_counted_loop(Node* x, IdealLoopTree*& loop, BasicType iv
   // Now setup a new CountedLoopNode to replace the existing LoopNode
   BaseCountedLoopNode *l = BaseCountedLoopNode::make(entry_control, back_control, iv_bt);
   l->set_unswitch_count(x->as_Loop()->unswitch_count()); // Preserve
+  UpdateAssociatedLoopForAssertionPredicates update_associated_loop_for_assertion_predicates(l, x->as_Loop());
+  PredicateIterator predicate_iterator(init_control);
+  predicate_iterator.for_each(update_associated_loop_for_assertion_predicates);
+
   // The following assert is approximately true, and defines the intention
   // of can_be_counted_loop.  It fails, however, because phase->type
   // is not yet initialized for this loop and its parts.
