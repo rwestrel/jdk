@@ -4496,6 +4496,14 @@ private:
         }
       }
     }
+
+    LoopNode* head = _loop->_head->as_Loop();
+    if (head->is_CountedLoop()) {
+      if (!KillPathsReachableByDeadTypeNode) {
+        return false;
+      }
+    }
+
     return true;
   }
 
