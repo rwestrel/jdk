@@ -723,7 +723,7 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
       return nullptr;
     }
 
-    Node* mem = safepoint->in(TypeFunc::Memory);
+    Node* mem = _igvn.transform(safepoint->in(TypeFunc::Memory));
 
     // We can only use that safepoint if there's no side effect between the backedge and the safepoint.
 
@@ -736,7 +736,7 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
     MergeMemNode* mm = nullptr;
 #ifdef ASSERT
     if (mem->is_MergeMem()) {
-      mm = _igvn.transform(mem)->clone()->as_MergeMem();
+      mm = mem->clone()->as_MergeMem();
       _igvn._worklist.push(mm);
       for (MergeMemStream mms(mem->as_MergeMem()); mms.next_non_empty(); ) {
         // Loop invariant memory state won't be reset by no_side_effect_since_safepoint(). Do it here.
