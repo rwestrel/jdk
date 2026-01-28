@@ -724,7 +724,6 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
     }
 
     Node* mem = _igvn.transform(safepoint->in(TypeFunc::Memory));
-
     // We can only use that safepoint if there's no side effect between the backedge and the safepoint.
 
     // mm is the memory state at the safepoint (when it's a MergeMem)
