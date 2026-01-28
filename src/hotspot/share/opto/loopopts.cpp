@@ -4711,8 +4711,20 @@ private:
   void try_add_predicates() {
     LoopNode* head = _loop->_head->as_Loop();
     Node* back_control = head->in(LoopNode::LoopBackControl);
+    for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
+      Node* u = back_control->fast_out(i);
+      if (u->is_Store()) {
+        return;
+      }
+    }
     if (back_control->Opcode() == Op_SafePoint) {
       back_control = back_control->in(0);
+      for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
+        Node* u = back_control->fast_out(i);
+        if (u->is_Store()) {
+          return;
+        }
+      }
     }
 
     SafePointNode* safepoint = _phase->find_safepoint(back_control, head, _loop);
