@@ -4446,7 +4446,7 @@ private:
       return false;
     }
 
-    uint estimate = _loop->est_loop_clone_sz(1);
+    uint estimate = _loop->est_loop_clone_sz(2);
     if (_phase->exceeding_node_budget(estimate)) {
       return false;
     }
