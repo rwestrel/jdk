@@ -2198,162 +2198,177 @@ void PhaseIdealLoop::clone_loop_handle_data_uses(Node* old, Node_List &old_new,
   for (DUIterator_Fast jmax, j = old->fast_outs(jmax); j < jmax; j++)
     worklist.push(old->fast_out(j));
 
-  while( worklist.size() ) {
-    Node *use = worklist.pop();
-    if (!has_node(use))  continue; // Ignore dead nodes
-    if (use->in(0) == C->top())  continue;
-    IdealLoopTree *use_loop = get_loop( has_ctrl(use) ? get_ctrl(use) : use );
-    // Check for data-use outside of loop - at least one of OLD or USE
-    // must not be a CFG node.
-#ifdef ASSERT
-    if (loop->_head->as_Loop()->is_strip_mined() && outer_loop->is_member(use_loop) && !loop->is_member(use_loop) && old_new[use->_idx] == nullptr) {
-      Node* sfpt = loop->_head->as_CountedLoop()->outer_safepoint();
-      assert(mode != IgnoreStripMined, "incorrect cloning mode");
-      assert((mode == ControlAroundStripMined && use == sfpt) || !use->is_reachable_from_root(), "missed a node");
+  // Node_List phis;
+
+  Node_List new_phis;
+  do {
+    while (new_phis.size() > 0) {
+      Node* n = new_phis.pop();
+      worklist.push(n);
     }
+    while ( worklist.size() ) {
+      Node *use = worklist.pop();
+      if (!has_node(use))  continue; // Ignore dead nodes
+      if (use->in(0) == C->top())  continue;
+      IdealLoopTree *use_loop = get_loop( has_ctrl(use) ? get_ctrl(use) : use );
+      // Check for data-use outside of loop - at least one of OLD or USE
+      // must not be a CFG node.
+#ifdef ASSERT
+      if (loop->_head->as_Loop()->is_strip_mined() && outer_loop->is_member(use_loop) && !loop->is_member(use_loop) && old_new[use->_idx] == nullptr) {
+        Node* sfpt = loop->_head->as_CountedLoop()->outer_safepoint();
+        assert(mode != IgnoreStripMined, "incorrect cloning mode");
+        assert((mode == ControlAroundStripMined && use == sfpt) || !use->is_reachable_from_root(), "missed a node");
+      }
 #endif
-    if (!loop->is_member(use_loop) && !outer_loop->is_member(use_loop) && (!old->is_CFG() || !use->is_CFG())) {
+      if (!loop->is_member(use_loop) && !outer_loop->is_member(use_loop) && (!old->is_CFG() || !use->is_CFG())) {
 
-      // If the Data use is an IF, that means we have an IF outside the
-      // loop that is switching on a condition that is set inside the
-      // loop.  Happens if people set a loop-exit flag; then test the flag
-      // in the loop to break the loop, then test is again outside the
-      // loop to determine which way the loop exited.
-      //
-      // For several uses we need to make sure that there is no phi between,
-      // the use and the Bool/Cmp. We therefore clone the Bool/Cmp down here
-      // to avoid such a phi in between.
-      // For example, it is unexpected that there is a Phi between an
-      // AllocateArray node and its ValidLengthTest input that could cause
-      // split if to break.
-      assert(!use->is_OpaqueTemplateAssertionPredicate(),
-             "should not clone a Template Assertion Predicate which should be removed once it's useless");
-      if (use->is_If() || use->is_CMove() || use->is_OpaqueConstantBool() || use->is_OpaqueInitializedAssertionPredicate() ||
-          (use->Opcode() == Op_AllocateArray && use->in(AllocateNode::ValidLengthTest) == old)) {
-        // Since this code is highly unlikely, we lazily build the worklist
-        // of such Nodes to go split.
-        if (!split_if_set) {
-          split_if_set = new Node_List();
+        // If the Data use is an IF, that means we have an IF outside the
+        // loop that is switching on a condition that is set inside the
+        // loop.  Happens if people set a loop-exit flag; then test the flag
+        // in the loop to break the loop, then test is again outside the
+        // loop to determine which way the loop exited.
+        //
+        // For several uses we need to make sure that there is no phi between,
+        // the use and the Bool/Cmp. We therefore clone the Bool/Cmp down here
+        // to avoid such a phi in between.
+        // For example, it is unexpected that there is a Phi between an
+        // AllocateArray node and its ValidLengthTest input that could cause
+        // split if to break.
+        assert(!use->is_OpaqueTemplateAssertionPredicate(),
+               "should not clone a Template Assertion Predicate which should be removed once it's useless");
+        if (use->is_If() || use->is_CMove() || use->is_OpaqueNotNull() || use->is_OpaqueInitializedAssertionPredicate() ||
+            (use->Opcode() == Op_AllocateArray && use->in(AllocateNode::ValidLengthTest) == old)) {
+          // Since this code is highly unlikely, we lazily build the worklist
+          // of such Nodes to go split.
+          if (!split_if_set) {
+            split_if_set = new Node_List();
+          }
+          split_if_set->push(use);
+            }
+        if (use->is_Bool()) {
+          if (!split_bool_set) {
+            split_bool_set = new Node_List();
+          }
+          split_bool_set->push(use);
         }
-        split_if_set->push(use);
-      }
-      if (use->is_Bool()) {
-        if (!split_bool_set) {
-          split_bool_set = new Node_List();
+        if (use->Opcode() == Op_CreateEx) {
+          if (!split_cex_set) {
+            split_cex_set = new Node_List();
+          }
+          split_cex_set->push(use);
         }
-        split_bool_set->push(use);
-      }
-      if (use->Opcode() == Op_CreateEx) {
-        if (!split_cex_set) {
-          split_cex_set = new Node_List();
-        }
-        split_cex_set->push(use);
-      }
 
 
-      // Get "block" use is in
-      uint idx = 0;
-      while( use->in(idx) != old ) idx++;
-      Node *prev = use->is_CFG() ? use : get_ctrl(use);
-      assert(!loop->is_member(get_loop(prev)) && !outer_loop->is_member(get_loop(prev)), "" );
-      Node* cfg = (prev->_idx >= new_counter && prev->is_Region())
-        ? prev->in(2)
-        : idom(prev);
-      if( use->is_Phi() )     // Phi use is in prior block
-        cfg = prev->in(idx);  // NOT in block of Phi itself
-      if (cfg->is_top()) {    // Use is dead?
-        _igvn.replace_input_of(use, idx, C->top());
-        continue;
-      }
-
-      // If use is referenced through control edge... (idx == 0)
-      if (mode == IgnoreStripMined && idx == 0) {
-        LoopNode *head = loop->_head->as_Loop();
-        if (head->is_strip_mined() && is_dominator(head->outer_loop_exit(), prev)) {
-          // That node is outside the inner loop, leave it outside the
-          // outer loop as well to not confuse verification code.
-          assert(!loop->_parent->is_member(use_loop), "should be out of the outer loop");
-          _igvn.replace_input_of(use, 0, head->outer_loop_exit());
+        // Get "block" use is in
+        uint idx = 0;
+        while( use->in(idx) != old ) idx++;
+        Node *prev = use->is_CFG() ? use : get_ctrl(use);
+        assert(!loop->is_member(get_loop(prev)) && !outer_loop->is_member(get_loop(prev)), "" );
+        Node* cfg = (prev->_idx >= new_counter && prev->is_Region())
+          ? prev->in(2)
+          : idom(prev);
+        if( use->is_Phi() )     // Phi use is in prior block
+          cfg = prev->in(idx);  // NOT in block of Phi itself
+        if (cfg->is_top()) {    // Use is dead?
+          _igvn.replace_input_of(use, idx, C->top());
           continue;
         }
-      }
 
-      while(!outer_loop->is_member(get_loop(cfg))) {
-        prev = cfg;
-        cfg = (cfg->_idx >= new_counter && cfg->is_Region()) ? cfg->in(2) : idom(cfg);
-      }
-      // If the use occurs after merging several exits from the loop, then
-      // old value must have dominated all those exits.  Since the same old
-      // value was used on all those exits we did not need a Phi at this
-      // merge point.  NOW we do need a Phi here.  Each loop exit value
-      // is now merged with the peeled body exit; each exit gets its own
-      // private Phi and those Phis need to be merged here.
-      Node *phi;
-      if( prev->is_Region() ) {
-        if( idx == 0 ) {      // Updating control edge?
-          phi = prev;         // Just use existing control
-        } else {              // Else need a new Phi
-          phi = PhiNode::make( prev, old );
-          // Now recursively fix up the new uses of old!
-          for( uint i = 1; i < prev->req(); i++ ) {
-            worklist.push(phi); // Onto worklist once for each 'old' input
+        // If use is referenced through control edge... (idx == 0)
+        if (mode == IgnoreStripMined && idx == 0) {
+          LoopNode *head = loop->_head->as_Loop();
+          if (head->is_strip_mined() && is_dominator(head->outer_loop_exit(), prev)) {
+            // That node is outside the inner loop, leave it outside the
+            // outer loop as well to not confuse verification code.
+            assert(!loop->_parent->is_member(use_loop), "should be out of the outer loop");
+            _igvn.replace_input_of(use, 0, head->outer_loop_exit());
+            continue;
           }
         }
-      } else {
-        // Get new RegionNode merging old and new loop exits
-        prev = old_new[prev->_idx];
-        assert( prev, "just made this in step 7" );
-        if( idx == 0) {      // Updating control edge?
-          phi = prev;         // Just use existing control
-        } else {              // Else need a new Phi
-          // Make a new Phi merging data values properly
-          phi = PhiNode::make( prev, old );
-          phi->set_req( 1, nnn );
+
+        while(!outer_loop->is_member(get_loop(cfg))) {
+          prev = cfg;
+          cfg = (cfg->_idx >= new_counter && cfg->is_Region()) ? cfg->in(2) : idom(cfg);
         }
-      }
-      // If inserting a new Phi, check for prior hits
-      if( idx != 0 ) {
-        Node *hit = _igvn.hash_find_insert(phi);
-        if( hit == nullptr ) {
-          _igvn.register_new_node_with_optimizer(phi); // Register new phi
-        } else {                                      // or
-          // Remove the new phi from the graph and use the hit
-          _igvn.remove_dead_node(phi);
-          phi = hit;                                  // Use existing phi
+        // If the use occurs after merging several exits from the loop, then
+        // old value must have dominated all those exits.  Since the same old
+        // value was used on all those exits we did not need a Phi at this
+        // merge point.  NOW we do need a Phi here.  Each loop exit value
+        // is now merged with the peeled body exit; each exit gets its own
+        // private Phi and those Phis need to be merged here.
+        Node *phi;
+        if( prev->is_Region() ) {
+          if( idx == 0 ) {      // Updating control edge?
+            phi = prev;         // Just use existing control
+          } else {              // Else need a new Phi
+            phi = PhiNode::make( prev, old );
+            // tty->print("XXX 1"); phi->dump();
+            // Now recursively fix up the new uses of old!
+            for( uint i = 1; i < prev->req(); i++ ) {
+              new_phis.push(phi); // Onto worklist once for each 'old' input
+            }
+          }
+        } else {
+          // Get new RegionNode merging old and new loop exits
+          prev = old_new[prev->_idx];
+          assert( prev, "just made this in step 7" );
+          if( idx == 0) {      // Updating control edge?
+            phi = prev;         // Just use existing control
+          } else {              // Else need a new Phi
+            // Make a new Phi merging data values properly
+            phi = PhiNode::make( prev, old );
+            phi->set_req( 1, nnn );
+            // tty->print("XXX 2"); phi->dump();
+          }
         }
-        set_ctrl(phi, prev);
-      }
-      // Make 'use' use the Phi instead of the old loop body exit value
-      assert(use->in(idx) == old, "old is still input of use");
-      // We notify all uses of old, including use, and the indirect uses,
-      // that may now be optimized because we have replaced old with phi.
-      _igvn.add_users_to_worklist(old);
-      if (idx == 0 &&
-          use->depends_only_on_test()) {
-        Node* pinned_clone = use->pin_array_access_node();
-        if (pinned_clone != nullptr) {
-          // Pin array access nodes: control is updated here to a region. If, after some transformations, only one path
-          // into the region is left, an array load could become dependent on a condition that's not a range check for
-          // that access. If that condition is replaced by an identical dominating one, then an unpinned load would risk
-          // floating above its range check.
-          pinned_clone->set_req(0, phi);
-          register_new_node_with_ctrl_of(pinned_clone, use);
-          _igvn.replace_node(use, pinned_clone);
-          continue;
+        // If inserting a new Phi, check for prior hits
+        if( idx != 0 ) {
+          Node *hit = _igvn.hash_find_insert(phi);
+          if( hit == nullptr ) {
+            // phis.push(phi);
+            _igvn.register_new_node_with_optimizer(phi); // Register new phi
+          } else {                                      // or
+            // Remove the new phi from the graph and use the hit
+            _igvn.remove_dead_node(phi);
+            // phi->destruct(&_igvn);
+            phi = hit;                                  // Use existing phi
+          }
+          set_ctrl(phi, prev);
         }
-      }
-      _igvn.replace_input_of(use, idx, phi);
-      if( use->_idx >= new_counter ) { // If updating new phis
-        // Not needed for correctness, but prevents a weak assert
-        // in AddPNode from tripping (when we end up with different
-        // base & derived Phis that will become the same after
-        // IGVN does CSE).
-        Node *hit = _igvn.hash_find_insert(use);
-        if( hit )             // Go ahead and re-hash for hits.
-          _igvn.replace_node( use, hit );
+        // Make 'use' use the Phi instead of the old loop body exit value
+        assert(use->in(idx) == old, "old is still input of use");
+        // We notify all uses of old, including use, and the indirect uses,
+        // that may now be optimized because we have replaced old with phi.
+        _igvn.add_users_to_worklist(old);
+        if (idx == 0 &&
+            use->depends_only_on_test()) {
+          Node* pinned_clone = use->pin_array_access_node();
+          if (pinned_clone != nullptr) {
+            // Pin array access nodes: control is updated here to a region. If, after some transformations, only one path
+            // into the region is left, an array load could become dependent on a condition that's not a range check for
+            // that access. If that condition is replaced by an identical dominating one, then an unpinned load would risk
+            // floating above its range check.
+            pinned_clone->set_req(0, phi);
+            register_new_node_with_ctrl_of(pinned_clone, use);
+            _igvn.replace_node(use, pinned_clone);
+            continue;
+          }
+            }
+        _igvn.replace_input_of(use, idx, phi);
+        if( use->_idx >= new_counter ) { // If updating new phis
+          // Not needed for correctness, but prevents a weak assert
+          // in AddPNode from tripping (when we end up with different
+          // base & derived Phis that will become the same after
+          // IGVN does CSE).
+          Node *hit = _igvn.hash_find_insert(use);
+          if( hit )             // Go ahead and re-hash for hits.
+            _igvn.replace_node( use, hit );
+        }
       }
     }
-  }
+  } while (new_phis.size() > 0);
+  // tty->print("XXXX"); old->dump();
+  // phis.dump();
 }
 
 static void collect_nodes_in_outer_loop_not_reachable_from_sfpt(Node* n, const IdealLoopTree *loop, const IdealLoopTree* outer_loop,
