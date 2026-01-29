@@ -4697,15 +4697,29 @@ private:
         --imax;
         if (u->bottom_type() == Type::MEMORY && in->is_MergeMem()) {
           assert(u->adr_type() == TypePtr::BOTTOM, "");
-          Node* base = in->as_MergeMem()->base_memory();
+          MergeMemNode* in_mm = in->as_MergeMem();
+          Node* base = in_mm->base_memory();
           assert(!base->is_MergeMem(), "");
           for (DUIterator_Fast jmax, j = in->fast_outs(jmax); j < jmax; j++) {
             Node* uu = in->fast_out(j);
             if (uu->is_MergeMem()) {
-              assert(uu->as_MergeMem()->base_memory() == in, "");
-              uu->as_MergeMem()->set_base_memory(base);
-              --j;
-              --jmax;
+              MergeMemNode* use_mm = uu->as_MergeMem();
+              if (use_mm->base_memory() == in) {
+                use_mm->set_base_memory(base);
+                --j;
+                --jmax;
+              } else {
+                uint cnt = 0;
+                for (MergeMemStream mms(use_mm); mms.next_non_empty(); ) {
+                  if (mms.memory() == in) {
+                    mms.set_memory(in_mm->memory_at(mms.alias_idx()));
+                    cnt++;
+                  }
+                }
+                --j;
+                jmax -= cnt;
+              }
+              assert(uu->find_edge(in) == -1, "");
             }
           }
         }
