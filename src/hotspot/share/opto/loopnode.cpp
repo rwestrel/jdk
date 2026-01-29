@@ -707,7 +707,7 @@ SafePointNode* PhaseIdealLoop::find_safepoint(Node* back_control, Node* x, Ideal
   }
   IfNode* exit_test = back_control->in(0)->as_If();
   SafePointNode* safepoint = nullptr;
-  if (exit_test->in(0)->is_SafePoint() && exit_test->in(0)->outcnt() == 1) {
+  if (exit_test->in(0)->is_SafePoint() && exit_test->in(0)->outcnt() == 1 && 0) {
     safepoint = exit_test->in(0)->as_SafePoint();
   } else {
     Node* c = back_control;

@@ -4690,10 +4690,25 @@ private:
     for (DUIterator_Fast imax, i = _region->fast_outs(imax); i < imax; i++) {
       Node* u = _region->fast_out(i);
       if (u->is_Phi()) {
-        _phase->igvn().replace_node(u, u->in(_inner));
+        Node* in = u->in(_inner);
+        _phase->igvn().replace_node(u, in);
         _loop->_body.yank(u);
         --i;
         --imax;
+        if (u->bottom_type() == Type::MEMORY && in->is_MergeMem()) {
+          assert(u->adr_type() == TypePtr::BOTTOM, "");
+          Node* base = in->as_MergeMem()->base_memory();
+          assert(!base->is_MergeMem(), "");
+          for (DUIterator_Fast jmax, j = in->fast_outs(jmax); j < jmax; j++) {
+            Node* uu = in->fast_out(j);
+            if (uu->is_MergeMem()) {
+              assert(uu->as_MergeMem()->base_memory() == in, "");
+              uu->as_MergeMem()->set_base_memory(base);
+              --j;
+              --jmax;
+            }
+          }
+        }
       }
     }
     _phase->replace_node_and_forward_ctrl(_region, _region->in(_inner));
@@ -4711,10 +4726,12 @@ private:
   void try_add_predicates() {
     LoopNode* head = _loop->_head->as_Loop();
     Node* back_control = head->in(LoopNode::LoopBackControl);
+    bool has_store = false;
     for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
       Node* u = back_control->fast_out(i);
       if (u->is_Store()) {
-        return;
+        // return;
+        has_store = true;
       }
     }
     if (back_control->Opcode() == Op_SafePoint) {
@@ -4722,13 +4739,15 @@ private:
       for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
         Node* u = back_control->fast_out(i);
         if (u->is_Store()) {
-          return;
+          // return;
+          has_store = true;
         }
       }
     }
 
     SafePointNode* safepoint = _phase->find_safepoint(back_control, head, _loop);
     if (safepoint != nullptr) {
+      assert(!has_store, "");
       _old_new.clear();
       _phase->do_peeling(_loop, _old_new);
       SafePointNode* cloned_sfpt = _old_new[safepoint->_idx]->as_SafePoint();
