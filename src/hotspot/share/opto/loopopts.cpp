@@ -4705,6 +4705,14 @@ private:
             if (uu->is_MergeMem()) {
               MergeMemNode* use_mm = uu->as_MergeMem();
               if (use_mm->base_memory() == in) {
+                for (MergeMemStream mms(in_mm); mms.next_non_empty(); ) {
+                  if (mms.alias_idx() == Compile::AliasIdxBot) {
+                    continue;
+                  }
+                  if (use_mm->memory_at(mms.alias_idx()) == in) {
+                    use_mm->set_memory_at(mms.alias_idx(), in_mm->memory_at(mms.alias_idx()));
+                  }
+                }
                 use_mm->set_base_memory(base);
                 --j;
                 --jmax;
