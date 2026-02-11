@@ -4366,20 +4366,6 @@ private:
       return false;
     }
 
-    // Node* dom = idom(region);
-    // if (dom->is_If()) {
-    //   IfNode* iff = dom->as_If();
-    //   if (iff->in(1)->is_Bool() && iff->in(1)->in(1)->is_Cmp()) {
-    //     CmpNode* cmp = iff->in(1)->in(1)->as_Cmp();
-    //     if (cmp->in(1)->is_Load()) {
-    //       LoadNode* load = cmp->in(1)->as_Load();
-    //       if (load->in(2)->is_AddP() && load->in(2)->in(2)->Opcode() == Op_ThreadLocal) {
-    //         return false;
-    //       }
-    //     }
-    //   }
-    // }
-
     _inner = 1;
     return true;
   }
@@ -4752,7 +4738,6 @@ private:
     for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
       Node* u = back_control->fast_out(i);
       if (u->is_Store()) {
-        // return;
         has_store = true;
       }
     }
@@ -4761,7 +4746,6 @@ private:
       for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
         Node* u = back_control->fast_out(i);
         if (u->is_Store()) {
-          // return;
           has_store = true;
         }
       }
