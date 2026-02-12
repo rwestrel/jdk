@@ -1527,7 +1527,15 @@ Node* IfNode::Ideal(PhaseGVN *phase, bool can_reshape) {
     // loop will go away. Mark this loop as no longer strip mined.
     if (is_CountedLoopEnd()) {
       CountedLoopNode* counted_loop_node = as_CountedLoopEnd()->loopnode();
-      if (counted_loop_node != nullptr) {
+      if (counted_loop_node != nullptr && counted_loop_node->is_strip_mined()) {
+        Node* outer_sfpt = counted_loop_node->outer_safepoint();
+        Node* outer_out = counted_loop_node->outer_loop_exit();
+        if (outer_sfpt != nullptr && outer_out != nullptr) {
+          Node* in = outer_sfpt->in(0);
+          igvn->replace_node(outer_out, in);
+          LoopNode* outer = counted_loop_node->outer_loop();
+          igvn->replace_input_of(outer, LoopNode::LoopBackControl, igvn->C->top());
+        }
         counted_loop_node->clear_strip_mined();
       }
     }
