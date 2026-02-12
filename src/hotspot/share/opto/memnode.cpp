@@ -1353,7 +1353,7 @@ Node* LoadNode::convert_to_unsigned_load(PhaseGVN& gvn) {
       return nullptr;
   }
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        raw_adr_type(), rt, bt, _mo, _control_dependency,
+                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
                         false /*require_atomic_access*/, is_unaligned_access(), is_mismatched_access());
 }
 
@@ -1373,7 +1373,7 @@ Node* LoadNode::convert_to_signed_load(PhaseGVN& gvn) {
       return nullptr;
   }
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        raw_adr_type(), rt, bt, _mo, _control_dependency,
+                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
                         false /*require_atomic_access*/, is_unaligned_access(), is_mismatched_access());
 }
 
@@ -1401,7 +1401,7 @@ Node* LoadNode::convert_to_reinterpret_load(PhaseGVN& gvn, const Type* rt) {
   bool require_atomic_access = (op == Op_LoadL && ((LoadLNode*)this)->require_atomic_access()) ||
                                (op == Op_LoadD && ((LoadDNode*)this)->require_atomic_access());
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        raw_adr_type(), rt, bt, _mo, _control_dependency,
+                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
                         require_atomic_access, is_unaligned_access(), is_mismatched);
 }
 
@@ -1424,7 +1424,7 @@ Node* StoreNode::convert_to_reinterpret_store(PhaseGVN& gvn, Node* val, const Ty
   bool require_atomic_access = (op == Op_StoreL && ((StoreLNode*)this)->require_atomic_access()) ||
                                (op == Op_StoreD && ((StoreDNode*)this)->require_atomic_access());
   StoreNode* st = StoreNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                                  raw_adr_type(), val, bt, _mo, require_atomic_access);
+                                  gvn.type(in(MemNode::Address))->is_ptr(), val, bt, _mo, require_atomic_access);
 
   bool is_mismatched = is_mismatched_access();
   const TypeRawPtr* raw_type = gvn.type(in(MemNode::Memory))->isa_rawptr();
