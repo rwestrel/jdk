@@ -1524,7 +1524,7 @@ Node* IfNode::Ideal(PhaseGVN *phase, bool can_reshape) {
 
   if (prev_dom != nullptr) {
     // Dominating CountedLoopEnd (left over from some now dead loop) will become the new loop exit. Outer strip mined
-    // loop will go away. Mark this loop as no longer strip mined.
+    // must be removed.
     if (is_CountedLoopEnd()) {
       CountedLoopNode* counted_loop_node = as_CountedLoopEnd()->loopnode();
       if (counted_loop_node != nullptr && counted_loop_node->is_strip_mined()) {
