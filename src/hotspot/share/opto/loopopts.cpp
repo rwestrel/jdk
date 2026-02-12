@@ -4485,6 +4485,8 @@ private:
 
     LoopNode* head = _loop->_head->as_Loop();
     if (head->is_CountedLoop()) {
+      // If the loop has come assert predicates, then transforming into a loop nest will cause the compiler to loose
+      // track of the predicates.
       if (!KillPathsReachableByDeadTypeNode) {
         return false;
       }
@@ -4600,7 +4602,7 @@ private:
     if (in == _phase->C->top()) {
       return false;
     }
-    assert(in->is_CFG(), "");
+    assert(in->is_CFG(), "expect a CFG");
     if (!_loop->is_member(_phase->get_loop(in))) {
       return false;
     }
@@ -4610,7 +4612,7 @@ private:
         continue;
       }
       if (u == in) {
-        assert(u->is_Region(), "");
+        assert(u->is_Region(), "only a region has itself as use");
         continue;
       }
       if (_loop->is_member(_phase->get_loop(u))) {
@@ -4625,8 +4627,8 @@ private:
     not_in_loop_anymore.push(_region_clone);
     for (uint i = 0; i < not_in_loop_anymore.size(); ++i) {
       Node* c = not_in_loop_anymore.at(i);
-      assert(c->is_CFG(), "");
-      assert(!_loop->is_member(_phase->get_loop(c)), "");
+      assert(c->is_CFG(), "only CFG nodes");
+      assert(!_loop->is_member(_phase->get_loop(c)), "should have been moved already");
       if (c->is_Region()) {
         for (uint j = 1; j < c->req(); j++) {
           Node* in = c->in(j);
@@ -4658,6 +4660,7 @@ private:
   }
 
   void remove_region() {
+    // remove Phis
     for (DUIterator_Fast imax, i = _region->fast_outs(imax); i < imax; i++) {
       Node* u = _region->fast_out(i);
       if (u->is_Phi()) {
@@ -4666,11 +4669,12 @@ private:
         _loop->_body.yank(u);
         --i;
         --imax;
+        // If removing the Phi create a chain of MergeMem nodes, transform the chain
         if (u->bottom_type() == Type::MEMORY && in->is_MergeMem()) {
-          assert(u->adr_type() == TypePtr::BOTTOM, "");
+          assert(u->adr_type() == TypePtr::BOTTOM, "bottom mem only");
           MergeMemNode* in_mm = in->as_MergeMem();
           Node* base = in_mm->base_memory();
-          assert(!base->is_MergeMem(), "");
+          assert(!base->is_MergeMem(), "chain of MergeMem nodes should have been transformed before loop opts");
           for (DUIterator_Fast jmax, j = in->fast_outs(jmax); j < jmax; j++) {
             Node* uu = in->fast_out(j);
             if (uu->is_MergeMem()) {
@@ -4698,7 +4702,7 @@ private:
                 --j;
                 jmax -= cnt;
               }
-              assert(uu->find_edge(in) == -1, "");
+              assert(uu->find_edge(in) == -1, "no more use of the MergeMem");
             }
           }
         }
@@ -4719,6 +4723,7 @@ private:
   void try_add_predicates() {
     LoopNode* head = _loop->_head->as_Loop();
     Node* back_control = head->in(LoopNode::LoopBackControl);
+#ifdef ASSERT
     bool has_store = false;
     for (DUIterator_Fast imax, i = back_control->fast_outs(imax); i < imax; i++) {
       Node* u = back_control->fast_out(i);
@@ -4735,10 +4740,13 @@ private:
         }
       }
     }
+#endif
 
     SafePointNode* safepoint = _phase->find_safepoint(back_control, head, _loop);
     if (safepoint != nullptr) {
-      assert(!has_store, "");
+      // If we find a suitable safepoint that dominates the backedge, peel one iteration and use it as state for new
+      // parse predicates
+      assert(!has_store, "no store on the backedge");
       _old_new.clear();
       _phase->do_peeling(_loop, _old_new);
       SafePointNode* cloned_sfpt = _old_new[safepoint->_idx]->as_SafePoint();
