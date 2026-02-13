@@ -773,7 +773,7 @@ Node* PhaseMacroExpand::generate_arraycopy(ArrayCopyNode *ac, AllocateArrayNode*
     local_mem = generate_slow_arraycopy(ac,
                                         &local_ctrl, local_mem, &local_io,
                                         adr_type,
-                                        src, src_offset, dest, dest_offset,
+                                        src, src_offset, orig_dest, dest_offset,
                                         copy_length, /*dest_uninitialized*/false);
 
     result_region->init_req(slow_call_path, local_ctrl);
