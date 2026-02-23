@@ -1352,8 +1352,12 @@ Node* LoadNode::convert_to_unsigned_load(PhaseGVN& gvn) {
       assert(false, "no unsigned variant: %s", Name());
       return nullptr;
   }
+  const Type* mem_t = gvn.type(in(MemNode::Address));
+  if (mem_t == Type::TOP) {
+    return gvn.C->top();
+  }
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
+                        mem_t->is_ptr(), rt, bt, _mo, _control_dependency,
                         false /*require_atomic_access*/, is_unaligned_access(), is_mismatched_access());
 }
 
@@ -1372,8 +1376,12 @@ Node* LoadNode::convert_to_signed_load(PhaseGVN& gvn) {
       assert(false, "no signed variant: %s", Name());
       return nullptr;
   }
+  const Type* mem_t = gvn.type(in(MemNode::Address));
+  if (mem_t == Type::TOP) {
+    return gvn.C->top();
+  }
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
+                        mem_t->is_ptr(), rt, bt, _mo, _control_dependency,
                         false /*require_atomic_access*/, is_unaligned_access(), is_mismatched_access());
 }
 
@@ -1400,8 +1408,12 @@ Node* LoadNode::convert_to_reinterpret_load(PhaseGVN& gvn, const Type* rt) {
   const int op = Opcode();
   bool require_atomic_access = (op == Op_LoadL && ((LoadLNode*)this)->require_atomic_access()) ||
                                (op == Op_LoadD && ((LoadDNode*)this)->require_atomic_access());
+  const Type* mem_t = gvn.type(in(MemNode::Address));
+  if (mem_t == Type::TOP) {
+    return gvn.C->top();
+  }
   return LoadNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                        gvn.type(in(MemNode::Address))->is_ptr(), rt, bt, _mo, _control_dependency,
+                        mem_t->is_ptr(), rt, bt, _mo, _control_dependency,
                         require_atomic_access, is_unaligned_access(), is_mismatched);
 }
 
@@ -1423,8 +1435,12 @@ Node* StoreNode::convert_to_reinterpret_store(PhaseGVN& gvn, Node* val, const Ty
   const int op = Opcode();
   bool require_atomic_access = (op == Op_StoreL && ((StoreLNode*)this)->require_atomic_access()) ||
                                (op == Op_StoreD && ((StoreDNode*)this)->require_atomic_access());
+  const Type* mem_t = gvn.type(in(MemNode::Address));
+  if (mem_t == Type::TOP) {
+    return gvn.C->top();
+  }
   StoreNode* st = StoreNode::make(gvn, in(MemNode::Control), in(MemNode::Memory), in(MemNode::Address),
-                                  gvn.type(in(MemNode::Address))->is_ptr(), val, bt, _mo, require_atomic_access);
+                                  mem_t->is_ptr(), val, bt, _mo, require_atomic_access);
 
   bool is_mismatched = is_mismatched_access();
   const TypeRawPtr* raw_type = gvn.type(in(MemNode::Memory))->isa_rawptr();
