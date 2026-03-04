@@ -1797,7 +1797,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
       if (n->in(0) != nullptr && n->in(0) != c) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
         if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
-          Node* clone = n->pin_array_access_node();
+          Node* clone = n->pin_node_under_control();
           if (clone != nullptr) {
             clone->set_req(0, c);
             _phase->register_new_node(clone, c);
@@ -1821,7 +1821,7 @@ void PhaseConditionalPropagation::Transformer::pin_array_access_nodes(Node* c, c
   for (DUIterator i = proj->outs(); proj->has_out(i); i++) {
     Node* u = proj->out(i);
     if (u->depends_only_on_test()) {
-      Node* clone = u->pin_array_access_node();
+      Node* clone = u->pin_node_under_control();
       if (clone != nullptr) {
         clone->set_req(0, c);
         _phase->register_new_node(clone, _phase->get_ctrl(u));
