@@ -203,7 +203,7 @@ private:
     template <class Callback> bool apply_between_controls_internal(Node* c, Node* dom, Callback callback) const;
   public:
 
-    const Type* find_type_between(const Node* n, Node* c, Node* dom) const;
+    const Type* find_type_between(const Node* n, Node* c, Node* dom, Node** type_c = nullptr) const;
 
     const Type* find_prev_type_between(const Node* n, Node* c, Node* dom) const;
 
@@ -233,6 +233,9 @@ private:
     NodeTypesList* _current_node_types_list; // the one we're currently updating (at _current_ctrl)
     NodeTypesList* _dom_node_types_list; // The one at the immediate dominator
     NodeTypesList* _prev_node_types_list; // The one from the previous iterations of the main algorithm
+#ifdef ASSERT
+    NodeTypesListTable* _backup;
+#endif
 
   public:
 
@@ -263,6 +266,10 @@ private:
     template <class Callback> void apply_between_controls(Node* c, Node* dom, Callback callback) const;
     int count_updates_between_controls(Node* c, Node* dom) const;
     template <class Callback> void apply_at_prev_iteration(Callback callback) const;
+#ifdef ASSERT
+    void save();
+    void restore();
+#endif
   };
 
   // When the type of a node is narrowed, there is usually an opportunity to narrow the type of other nodes that depend
@@ -438,6 +445,7 @@ private:
     Unique_Node_List _wq;
     const TypeTable* _type_table;
     uint _unique;
+    VectorSet _constant_folded_ifs;
 
     void transform_when_top_seen(Node* c, Node* node, const Type* t);
     void transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t);

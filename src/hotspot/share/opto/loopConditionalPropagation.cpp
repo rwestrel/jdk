@@ -148,12 +148,15 @@ template<class Callback> bool PhaseConditionalPropagation::TypeTable::apply_betw
   return false;
 }
 
-const Type* PhaseConditionalPropagation::TypeTable::find_type_between(const Node* n, Node* c, Node* dom) const {
+const Type* PhaseConditionalPropagation::TypeTable::find_type_between(const Node* n, Node* c, Node* dom, Node** type_c) const {
   const Type* res = nullptr;
   auto find_type = [&](NodeTypesList* node_types_list) {
     int l = node_types_list->find(n);
     if (l != -1) {
       res = node_types_list->type_at(l);
+      if (type_c != nullptr) {
+        *type_c = node_types_list->control();
+      }
       return true;
     }
     return false;
@@ -409,6 +412,21 @@ bool PhaseConditionalPropagation::WriteableTypeTable::types_improved(Node* c, in
   }
   return progress;
 }
+
+#ifdef ASSERT
+void PhaseConditionalPropagation::WriteableTypeTable::save() {
+  _backup = new NodeTypesListTable(MAX2(_node_types_list_table->number_of_entries(), 8), _conditional_propagation._rpo_list.size());
+  auto copy = [&](Node* c, NodeTypesList* list) {
+    _backup->put(c, list->copy());
+  };
+  _node_types_list_table->iterate_all(copy);
+}
+
+void PhaseConditionalPropagation::WriteableTypeTable::restore() {
+  _node_types_list_table = _backup;
+}
+#endif
+
 
 bool PhaseConditionalPropagation::WorkQueue::enqueue_for_delayed_processing(Node* n, Node* c) {
   assert(!n->is_Root(), "Root should never be processed");
@@ -781,6 +799,7 @@ const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::Analy
 
 #ifdef ASSERT
   if (VerifyLoopConditionalPropagation) {
+    _type_table->save();
     _verify = true;
     // Verify we've indeed reached a fixed point
     _iterations++;
@@ -800,6 +819,7 @@ const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::Analy
       assert(!progress, "didn't reach a fix point");
     }
     assert(extra_type_init || verify_wq_empty() || C->has_irreducible_loop(), "verification fails");
+    _type_table->restore();
   }
 #endif
 
@@ -1372,6 +1392,31 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
         _phase->igvn().rehash_node_delayed(iff);
         iff->set_req_X(1, con, &_phase->igvn());
         _phase->C->set_major_progress();
+        IfProjNode* other_if_proj = proj->as_IfProj()->other_if_proj();
+        Node* new_c = nullptr;
+        for (DUIterator i = other_if_proj->outs(); other_if_proj->has_out(i); i++) {
+          Node* u = other_if_proj->out(i);
+          if (u->depends_only_on_test() && (!u->is_Load() || iff->Opcode() == Op_RangeCheck)) {
+            Node* clone = u->pin_node_under_control();
+            if (clone != nullptr) {
+              if (new_c == nullptr) {
+                if (_constant_folded_ifs.test(iff->_idx)) {
+                  const Type* t = _type_table->find_type_between(bol, iff->in(0), _phase->C->root(), &new_c);
+                  assert(t == new_bol_t, "");
+                } else {
+                  Node* c = nullptr;
+                  assert(_type_table->find_type_between(bol, iff->in(0), _phase->C->root(), &c) != new_bol_t, "");
+                  new_c = other_if_proj;
+                }
+              }
+              clone->set_req(0, new_c);
+              _phase->register_new_node(clone, _phase->get_ctrl(u));
+              _phase->igvn().replace_node(u, clone);
+              --i;
+            }
+          }
+        }
+
       }
     }
   }
@@ -1684,7 +1729,35 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           }
         } else if (_conditional_propagation.is_dominator(c, _phase->ctrl_or_self(use)) &&
                    is_safe_for_replacement(c, node, use)) {
-          pin_array_access_nodes_if_needed(node, t, use, c);
+          // pin_array_access_nodes_if_needed(node, t, use, c);
+          if (t != Type::TOP) {
+            if (node->is_Bool()) {
+              if (use->is_If() && node->in(1)->is_Cmp()) {
+                IfNode* iff = use->as_If();
+                int con = t->is_int()->get_con();
+                // pin_array_access_nodes(c, iff, con);
+                ProjNode* proj = iff->proj_out(con);
+                assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
+                _constant_folded_ifs.set(iff->_idx);
+                continue;
+              }
+            } else if (node->is_Cmp()) {
+              if (use->is_Bool()) {
+                BoolNode* bol = use->as_Bool();
+                for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
+                  Node* u = use->fast_out(i);
+                  if (u->is_If()) {
+                    // pin_array_access_nodes(c, u->as_If(), bol->_test.cc2logical(t)->is_int()->get_con());
+                    IfNode* iff = u->as_If();
+                    ProjNode* proj = iff->proj_out(bol->_test.cc2logical(t)->is_int()->get_con());
+                    assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
+                  }
+                }
+              }
+            }
+          }
+          // pin_array_access_nodes_if_needed(node, t, use, c);
+
           pin_uses_if_needed(t, use, c);
           if (con == nullptr) {
             con = _phase->igvn().makecon(t);
@@ -1796,19 +1869,31 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
       if (n->in(0) != nullptr && n->in(0) != c) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
         if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
-          _phase->igvn().replace_input_of(n, 0, c);
-        }
-      }
-    } else if (n->is_Load()) {
-      if (n->in(0) != nullptr && n->in(0) != c && n->depends_only_on_test()) {
-        Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
-        if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
-          Node* clone = n->pin_node_under_control();
-          if (clone != nullptr) {
+          if (n->depends_only_on_test()) {
+            Node* clone = n->pin_node_under_control();
             clone->set_req(0, c);
             _phase->register_new_node(clone, c);
             _phase->igvn().replace_node(n, clone);
+          } else {
+            _phase->igvn().replace_input_of(n, 0, c);
           }
+        }
+      }
+    } else if (n->is_Load()) {
+      const TypePtr* adr_type = n->adr_type();
+      if (n->in(0) != nullptr && n->in(0) != c && adr_type != nullptr && adr_type->isa_aryptr()) {
+        Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
+        if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
+          if (n->depends_only_on_test()) {
+            Node* clone = n->pin_node_under_control();
+            if (clone != nullptr) {
+              clone->set_req(0, c);
+              _phase->register_new_node(clone, c);
+              _phase->igvn().replace_node(n, clone);
+            }
+          }
+        } else {
+          _phase->igvn().replace_input_of(n, 0, c);
         }
       }
     }
@@ -1824,6 +1909,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
 
 void PhaseConditionalPropagation::Transformer::pin_array_access_nodes(Node* c, const IfNode* iff, int con) const {
   ProjNode* proj = iff->proj_out(con);
+  assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
   for (DUIterator i = proj->outs(); proj->has_out(i); i++) {
     Node* u = proj->out(i);
     if (u->depends_only_on_test()) {
@@ -1867,7 +1953,7 @@ Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
     }
     auto transform_constant = [&](Node* node, const Type* t, const Type* prev_t) {
       transform_when_constant_seen(c, node, t, prev_t);
-      transform_div_mod_uses(c, node, t, prev_t);
+      // transform_div_mod_uses(c, node, t, prev_t);
     };
     _type_table->apply_at_control(c, transform_constant);
     return c;
