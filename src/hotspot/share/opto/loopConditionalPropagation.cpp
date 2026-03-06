@@ -1731,12 +1731,18 @@ void PhaseConditionalPropagation::Transformer::transform_div_mod_uses(Node* c, N
   if (ti->lo_as_long() <= 0 && ti->hi_as_long() >= 0) {
     return;
   }
-  for (DUIterator_Fast imax, i = node->fast_outs(imax); i < imax; i++) {
-    Node* u = node->fast_out(i);
+  for (DUIterator i = node->outs(); node->has_out(i); i++) {
+    Node* u = node->out(i);
     if (u->is_div_or_mod() && u->in(2) == node && u->in(0) != nullptr && _phase->is_strict_dominator(c, u->in(0))) {
       assert(prev_t->is_integer()->lo_as_long() <= 0 && prev_t->is_integer()->hi_as_long() >= 0, "control should have been updated or cleared already");
       assert(u->is_div_or_mod(ti->bt()), "int/long inconsistency");
-      _phase->igvn().replace_input_of(u, 0, c);
+      if (u->depends_only_on_test()) {
+        Node* clone = u->pin_node_under_control();
+        clone->set_req(0, c);
+        _phase->register_new_node(clone, c);
+        _phase->igvn().replace_node(u, clone);
+        --i;
+      }
     }
   }
 }
@@ -1794,7 +1800,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
         }
       }
     } else if (n->is_Load()) {
-      if (n->in(0) != nullptr && n->in(0) != c) {
+      if (n->in(0) != nullptr && n->in(0) != c && n->depends_only_on_test()) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
         if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
           Node* clone = n->pin_node_under_control();
