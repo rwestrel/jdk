@@ -25,7 +25,7 @@
  * @test
  * @bug 8275202
  * @summary C2: optimize out more redundant conditions
- * @run main/othervm -XX:-TieredCompilation -XX:-BackgroundCompilation -XX:-UseOnStackReplacement ${test.main.class}
+ * @run main/othervm -XX:-TieredCompilation -XX:-BackgroundCompilation -XX:-UseOnStackReplacement -XX:+LoopConditionalPropagationALot ${test.main.class}
  */
 
 
