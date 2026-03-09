@@ -1732,7 +1732,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           // pin_array_access_nodes_if_needed(node, t, use, c);
           if (t != Type::TOP) {
             if (node->is_Bool()) {
-              if (use->is_If() && node->in(1)->is_Cmp()) {
+              if (use->is_If()) {
                 IfNode* iff = use->as_If();
                 int con = t->is_int()->get_con();
                 // pin_array_access_nodes(c, iff, con);
