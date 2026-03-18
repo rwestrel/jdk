@@ -1804,16 +1804,17 @@ bool PhaseIdealLoop::LoopExitTest::can_speculatively_narrow_limit(PhaseIterGVN& 
   }
 
   // Replace exit test nodes. Need to revert changes if this still doesn't make it a counted loop.
-  _narrowed_incr = _incr->in(1);
-  assert(_narrowed_incr != nullptr, "");
+  Node* old_incr = _incr;
+  _incr = _incr->in(1);
+  assert(_incr != nullptr, "");
 
   // Optimistically transform "(long) i < long_limit" to "i < (int) long_limit".
   _narrowed_limit = igvn.register_new_node_with_optimizer(new ConvL2INode(_limit), _limit);
   _phase->set_early_ctrl(_narrowed_limit, _phase->get_ctrl(_limit));
 
-  _narrowed_cmp = _cmp->in(1) == _incr
-                        ? new CmpINode(_narrowed_incr, _narrowed_limit)
-                        : new CmpINode(_narrowed_limit, _narrowed_incr);
+  _narrowed_cmp = _cmp->in(1) == old_incr
+                        ? new CmpINode(_incr, _narrowed_limit)
+                        : new CmpINode(_narrowed_limit, _incr);
   igvn.register_new_node_with_optimizer(_narrowed_cmp, _cmp);
   _phase->set_early_ctrl(_narrowed_cmp, _phase->get_ctrl(_cmp));
 
@@ -2614,6 +2615,7 @@ IdealLoopTree* CountedLoopConverter::convert() {
 
   PhaseIterGVN* igvn = &_phase->igvn();
   PhaseIdealLoop::LoopExitTest exit_test = _structure.exit_test();
+  exit_test.set_converting();
 
   if (exit_test.should_speculatively_narrow_limit()) {
     Node* guard_bool = exit_test.speculatively_narrow_limit(*igvn);

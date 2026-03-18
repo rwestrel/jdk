@@ -1354,8 +1354,8 @@ public:
     float _cl_prob;
 
     bool _should_speculatively_narrow_limit;
+    bool _converting;
     Node* _narrowed_cmp;
-    Node* _narrowed_incr;
     Node* _narrowed_limit;
 
   public:
@@ -1370,12 +1370,16 @@ public:
       _mask(BoolTest::illegal),
       _cl_prob(0.0f),
       _should_speculatively_narrow_limit(false),
+      _converting(false),
       _narrowed_cmp(nullptr),
-      _narrowed_incr(nullptr),
       _narrowed_limit(nullptr) {}
 
     void build();
     void canonicalize_mask(jlong stride_con);
+
+    void set_converting() {
+      _converting = true;
+    }
 
     bool is_valid_with_bt(BasicType bt) const {
       return _is_valid && cmp() != nullptr && cmp()->Opcode() == Op_Cmp(bt);
@@ -1388,12 +1392,14 @@ public:
     float cl_prob() const { return _cl_prob; }
 
     CmpNode* cmp() const {
+      assert(!_should_speculatively_narrow_limit || _converting, "");
       return _should_speculatively_narrow_limit ? _narrowed_cmp->isa_Cmp() : _cmp->isa_Cmp();
     }
     Node* incr() const {
-      return _should_speculatively_narrow_limit ? _narrowed_incr : _incr;
+      return _incr;
     }
     Node* limit() const {
+      assert(!_should_speculatively_narrow_limit || _converting, "");
       return _should_speculatively_narrow_limit ? _narrowed_limit : _limit;
     }
 
