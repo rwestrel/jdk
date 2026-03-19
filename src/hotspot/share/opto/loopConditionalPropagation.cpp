@@ -864,23 +864,6 @@ void PhaseConditionalPropagation::Analyzer::check_for_dead_path(bool &extra_loop
     enqueue_uses(_current_ctrl);
     propagate_types(extra_loop_variable);
   }
-  // if (_current_ctrl->is_IfProj()) {
-  //   if (top_node != nullptr) {
-  //     set_type(_current_ctrl, Type::TOP, current_ctrl_t);
-  //     enqueue_uses(_current_ctrl);
-  //     propagate_types(extra_loop_variable);
-  //     return;
-  //   }
-  // }
-  // auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
-  //   return !node->is_CFG() && t == Type::TOP &&
-  //          _conditional_propagation.related_node(node, _current_ctrl);
-  // };
-  // Node* top_node = _type_table->find_at_control(_current_ctrl, look_for_top);
-  // if (top_node != nullptr) {
-  //
-  // }
-  // return;
 }
 
 bool PhaseConditionalPropagation::Analyzer::one_iteration(bool &extra_loop_variable, bool &extra_type_init) {
