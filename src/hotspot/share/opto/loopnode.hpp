@@ -1354,7 +1354,6 @@ public:
     float _cl_prob;
 
     bool _should_speculatively_narrow_limit;
-    bool _converting;
     Node* _narrowed_cmp;
     Node* _narrowed_limit;
 
@@ -1370,16 +1369,11 @@ public:
       _mask(BoolTest::illegal),
       _cl_prob(0.0f),
       _should_speculatively_narrow_limit(false),
-      _converting(false),
       _narrowed_cmp(nullptr),
       _narrowed_limit(nullptr) {}
 
     void build();
     void canonicalize_mask(jlong stride_con);
-
-    void set_converting() {
-      _converting = true;
-    }
 
     bool is_valid_with_bt(BasicType bt) const {
       return _is_valid && cmp() != nullptr && cmp()->Opcode() == Op_Cmp(bt);
@@ -1392,19 +1386,22 @@ public:
     float cl_prob() const { return _cl_prob; }
 
     CmpNode* cmp() const {
-      assert(!_should_speculatively_narrow_limit || _converting, "");
+      assert(!_should_speculatively_narrow_limit || _narrowed_cmp != nullptr, "");
       return _should_speculatively_narrow_limit ? _narrowed_cmp->isa_Cmp() : _cmp->isa_Cmp();
     }
     Node* incr() const {
       return _incr;
     }
     Node* limit() const {
-      assert(!_should_speculatively_narrow_limit || _converting, "");
+      assert(!_should_speculatively_narrow_limit || _narrowed_limit != nullptr, "");
       return _should_speculatively_narrow_limit ? _narrowed_limit : _limit;
+    }
+    Node* raw_limit() const {
+      return _limit;
     }
 
     bool can_speculatively_narrow_limit(PhaseIterGVN& igvn);
-    Node* speculatively_narrow_limit(PhaseIterGVN& igvn) const;
+    Node* speculatively_narrow_limit(PhaseIterGVN& igvn);
     bool should_speculatively_narrow_limit() const { return _should_speculatively_narrow_limit; }
   };
 

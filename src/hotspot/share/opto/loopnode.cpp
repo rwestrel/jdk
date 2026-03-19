@@ -1804,26 +1804,24 @@ bool PhaseIdealLoop::LoopExitTest::can_speculatively_narrow_limit(PhaseIterGVN& 
   }
 
   // Replace exit test nodes. Need to revert changes if this still doesn't make it a counted loop.
-  Node* old_incr = _incr;
   _incr = _incr->in(1);
   assert(_incr != nullptr, "");
-
-  // Optimistically transform "(long) i < long_limit" to "i < (int) long_limit".
-  _narrowed_limit = igvn.register_new_node_with_optimizer(new ConvL2INode(_limit), _limit);
-  _phase->set_early_ctrl(_narrowed_limit, _phase->get_ctrl(_limit));
-
-  _narrowed_cmp = _cmp->in(1) == old_incr
-                        ? new CmpINode(_incr, _narrowed_limit)
-                        : new CmpINode(_narrowed_limit, _incr);
-  igvn.register_new_node_with_optimizer(_narrowed_cmp, _cmp);
-  _phase->set_early_ctrl(_narrowed_cmp, _phase->get_ctrl(_cmp));
 
   _should_speculatively_narrow_limit = true;
   return true;
 }
 
-Node* PhaseIdealLoop::LoopExitTest::speculatively_narrow_limit(PhaseIterGVN& igvn) const {
+Node* PhaseIdealLoop::LoopExitTest::speculatively_narrow_limit(PhaseIterGVN& igvn) {
   assert(_should_speculatively_narrow_limit, "must call can_speculatively_narrow_limit() first");
+  // Optimistically transform "(long) i < long_limit" to "i < (int) long_limit".
+  _narrowed_limit = igvn.register_new_node_with_optimizer(new ConvL2INode(_limit), _limit);
+  _phase->set_early_ctrl(_narrowed_limit, _phase->get_ctrl(_limit));
+
+  _narrowed_cmp = _cmp->in(2) == _limit
+                        ? new CmpINode(_incr, _narrowed_limit)
+                        : new CmpINode(_narrowed_limit, _incr);
+  igvn.register_new_node_with_optimizer(_narrowed_cmp, _cmp);
+  _phase->set_early_ctrl(_narrowed_cmp, _phase->get_ctrl(_cmp));
 
   // back_control[0] -> iff[1] -> bool[1] -> cmp
   Node* bol = _back_control->in(0)->in(1);
@@ -2375,7 +2373,12 @@ bool CountedLoopConverter::is_counted_loop() {
   //            there is no overflow of the iv phi after the first iteration. In this case, we don't need to check (ii)
   //            again and can skip the predicate.
 
-  const TypeInteger* limit_t = igvn->type(_structure.limit())->is_integer(_iv_bt);
+  const TypeInteger* limit_t = nullptr;
+  if (!_structure.exit_test().should_speculatively_narrow_limit()) {
+    limit_t = igvn->type(_structure.limit())->is_integer(_iv_bt);
+  } else {
+    limit_t = TypeLong::INT->filter(igvn->type(_structure.exit_test().raw_limit())->is_long())->is_long();
+  }
   StrideOverflowState stride_overflow_state = check_stride_overflow(_structure.final_limit_correction(), limit_t, _iv_bt);
 
   if (stride_overflow_state == Overflow) {
@@ -2397,7 +2400,7 @@ bool CountedLoopConverter::is_counted_loop() {
     }
 
     Node* parse_predicate_entry = parse_predicate->in(0);
-    if (!_phase->is_dominator(_phase->get_ctrl(_structure.limit()), parse_predicate_entry)) {
+    if (!_phase->is_dominator(_phase->get_ctrl(_structure.exit_test().raw_limit()), parse_predicate_entry)) {
       return false;
     }
 
@@ -2487,10 +2490,13 @@ bool CountedLoopConverter::is_iv_overflowing(const TypeInteger* init_t, jlong st
 }
 
 bool CountedLoopConverter::LoopStructure::is_infinite_loop() const {
-  PhaseIterGVN& igvn = _phase->igvn();
-  const TypeInteger* limit_t = igvn.type(limit())->is_integer(_iv_bt);
-
   if (_truncated_increment.outer_trunc() != nullptr) {
+    if (_exit_test.should_speculatively_narrow_limit()) {
+      return true;
+    }
+    PhaseIterGVN& igvn = _phase->igvn();
+    const TypeInteger* limit_t = igvn.type(limit())->is_integer(_iv_bt);
+
     // When there is a truncation, we must be sure that after the truncation
     // the trip counter will end up higher than the limit, otherwise we are looking
     // at an endless loop. Can happen with range checks.
@@ -2614,8 +2620,7 @@ IdealLoopTree* CountedLoopConverter::convert() {
   assert(_checked_for_counted_loop, "must check for counted loop before conversion");
 
   PhaseIterGVN* igvn = &_phase->igvn();
-  PhaseIdealLoop::LoopExitTest exit_test = _structure.exit_test();
-  exit_test.set_converting();
+  PhaseIdealLoop::LoopExitTest& exit_test = _structure.exit_test();
 
   if (exit_test.should_speculatively_narrow_limit()) {
     Node* guard_bool = exit_test.speculatively_narrow_limit(*igvn);
