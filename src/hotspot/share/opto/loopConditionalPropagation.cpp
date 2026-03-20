@@ -123,7 +123,7 @@ PhaseConditionalPropagation::TypeTable::TypeTable(PhaseConditionalPropagation& c
 }
 
 template<class Callback> bool PhaseConditionalPropagation::TypeTable::apply_between_controls_internal(Node* c, Node* dom, Callback callback) const {
-  assert(_conditional_propagation.is_dominator(dom, c), "dom should be the dominator");
+  assert(_phase->is_dominator(dom, c), "dom should be the dominator");
   NodeTypesList* node_types_list = node_types_list_at(c);
   NodeTypesList* dom_node_types_list = node_types_list_at(dom);
   // c inherits types from its dominators so if c has no types, dominator control must have none either unless c is in a
@@ -132,12 +132,12 @@ template<class Callback> bool PhaseConditionalPropagation::TypeTable::apply_betw
   while (true) {
     assert(node_types_list != nullptr || dom_node_types_list == nullptr ||
            c->unique_ctrl_out()->is_Loop() ||
-           _conditional_propagation.is_dominator(c->unique_ctrl_out(), c) ||
+           _phase->is_dominator(c->unique_ctrl_out(), c) ||
            _phase->C->has_irreducible_loop(), "no types expected at dom ctrl if there's no type at current ctrl");
     if (node_types_list == nullptr) {
       return false;
     }
-    if (!node_types_list->below(dom_node_types_list, _conditional_propagation)) {
+    if (!node_types_list->below(dom_node_types_list, _phase)) {
       return false;
     }
     if (callback(node_types_list)) {
@@ -242,7 +242,7 @@ bool PhaseConditionalPropagation::TypeTable::has_types_at_control(Node* c) const
 }
 
 
-const Type* PhaseConditionalPropagation::WriteableTypeTable::type_at_current_ctrl(Node* n) const {
+const Type* PhaseConditionalPropagation::Analyzer::WriteableTypeTable::type_at_current_ctrl(Node* n) const {
   const Type* n_t = nullptr;
   if (_current_node_types_list != nullptr) {
     n_t = _current_node_types_list->type_if_present(n);
@@ -250,21 +250,21 @@ const Type* PhaseConditionalPropagation::WriteableTypeTable::type_at_current_ctr
   return n_t;
 }
 
-const Type* PhaseConditionalPropagation::WriteableTypeTable::prev_iteration_type(Node* n) const {
+const Type* PhaseConditionalPropagation::Analyzer::WriteableTypeTable::prev_iteration_type(Node* n) const {
   if (_prev_node_types_list != nullptr) {
     return _prev_node_types_list->type_if_present(n);
   }
   return nullptr;
 }
 
-const Type* PhaseConditionalPropagation::WriteableTypeTable::prev_iteration_type(Node* n, Node* c) const {
+const Type* PhaseConditionalPropagation::Analyzer::WriteableTypeTable::prev_iteration_type(Node* n, Node* c) const {
   if (_prev_node_types_list != nullptr && _prev_node_types_list->control() == c) {
     return _prev_node_types_list->type_if_present(n);
   }
   return nullptr;
 }
 
-template <class Callback> void PhaseConditionalPropagation::WriteableTypeTable::apply_at_prev_iteration(Callback callback) const {
+template <class Callback> void PhaseConditionalPropagation::Analyzer::WriteableTypeTable::apply_at_prev_iteration(Callback callback) const {
   if (_prev_node_types_list != nullptr) {
     for (int i = 0; i < _prev_node_types_list->length(); ++i) {
       Node* node = _prev_node_types_list->node_at(i);
@@ -275,7 +275,7 @@ template <class Callback> void PhaseConditionalPropagation::WriteableTypeTable::
   }
 }
 
-template <class Callback> void PhaseConditionalPropagation::WriteableTypeTable::apply_between_controls(Node* c, Node* dom, Callback callback) const {
+template <class Callback> void PhaseConditionalPropagation::Analyzer::WriteableTypeTable::apply_between_controls(Node* c, Node* dom, Callback callback) const {
   auto apply_callback = [&](NodeTypesList* node_types_list) {
       for (int i = 0; i < node_types_list->length(); ++i) {
         Node* node = node_types_list->node_at(i);
@@ -288,7 +288,7 @@ template <class Callback> void PhaseConditionalPropagation::WriteableTypeTable::
   apply_between_controls_internal(c, dom, apply_callback);
 }
 
-int PhaseConditionalPropagation::WriteableTypeTable::count_updates_between_controls(Node* c, Node* dom) const {
+int PhaseConditionalPropagation::Analyzer::WriteableTypeTable::count_updates_between_controls(Node* c, Node* dom) const {
   int cnt = 0;
   auto count_updates = [&](NodeTypesList* node_types_list) {
       cnt += node_types_list->length();
@@ -298,7 +298,7 @@ int PhaseConditionalPropagation::WriteableTypeTable::count_updates_between_contr
   return cnt;
 }
 
-void PhaseConditionalPropagation::WriteableTypeTable::set_current_control(Node* c, bool verify, int iterations) {
+void PhaseConditionalPropagation::Analyzer::WriteableTypeTable::set_current_control(Node* c, bool verify, int iterations) {
   Node* dom = _phase->idom(c);
   _current_node_types_list = node_types_list_at(c);
   _dom_node_types_list = node_types_list_at(dom);
@@ -335,13 +335,13 @@ void PhaseConditionalPropagation::WriteableTypeTable::set_current_control(Node* 
       assert(verify || _dom_node_types_list->iterations() == iterations, "dom types should have been updated already");
       _current_node_types_list->set_iterations(_dom_node_types_list->iterations());
     }
-    assert(_dom_node_types_list == nullptr || !_conditional_propagation.is_dominator(_current_node_types_list->control(), _dom_node_types_list->control()),
+    assert(_dom_node_types_list == nullptr || !_analyzer.is_dominator(_current_node_types_list->control(), _dom_node_types_list->control()),
            "control for dominator types shouldn't be below control for current control's types");
     _current_node_types_list->set_prev(_dom_node_types_list);
   }
 }
 
-bool PhaseConditionalPropagation::WriteableTypeTable::record_type(Node* c, Node* n, const Type* prev_t,
+bool PhaseConditionalPropagation::Analyzer::WriteableTypeTable::record_type(Node* c, Node* n, const Type* prev_t,
                                                                   const Type* new_t, int iterations) {
   assert(_phase->is_dominator(_phase->ctrl_or_self(n), c) || _phase->is_dominator(c, _phase->ctrl_or_self(n)), "");
   if (_current_node_types_list == _dom_node_types_list) {
@@ -366,7 +366,7 @@ bool PhaseConditionalPropagation::WriteableTypeTable::record_type(Node* c, Node*
 }
 
 // Have types improved at this control on this iteration?
-bool PhaseConditionalPropagation::WriteableTypeTable::types_improved(Node* c, int iterations, bool verify) const {
+bool PhaseConditionalPropagation::Analyzer::WriteableTypeTable::types_improved(Node* c, int iterations, bool verify) const {
   bool progress = false;
   if (_prev_node_types_list == nullptr) {
     if (_current_node_types_list != nullptr && _current_node_types_list->length() > 0 && _current_node_types_list->control() == c) {
@@ -399,7 +399,7 @@ bool PhaseConditionalPropagation::WriteableTypeTable::types_improved(Node* c, in
         if (current_t != _current_node_types_list->prev_type_at(i)) {
           // When verifying, nodes are enqueued eagerly. It's only progress then if the node whose type is updated is
           // used below the current control
-          if (!verify || _conditional_propagation.is_dominator(_conditional_propagation.get_early_ctrl(n), c)) {
+          if (!verify || _analyzer.is_dominator(_analyzer.get_early_ctrl(n), c)) {
             progress = true;
           }
         }
@@ -414,7 +414,7 @@ bool PhaseConditionalPropagation::WriteableTypeTable::types_improved(Node* c, in
 }
 
 #ifdef ASSERT
-void PhaseConditionalPropagation::WriteableTypeTable::save() {
+void PhaseConditionalPropagation::Analyzer::WriteableTypeTable::save() {
   _backup = new NodeTypesListTable(MAX2(_node_types_list_table->number_of_entries(), 8), _conditional_propagation._rpo_list.size());
   auto copy = [&](Node* c, NodeTypesList* list) {
     _backup->put(c, list->copy());
@@ -422,13 +422,13 @@ void PhaseConditionalPropagation::WriteableTypeTable::save() {
   _node_types_list_table->iterate_all(copy);
 }
 
-void PhaseConditionalPropagation::WriteableTypeTable::restore() {
+void PhaseConditionalPropagation::Analyzer::WriteableTypeTable::restore() {
   _node_types_list_table = _backup;
 }
 #endif
 
 
-bool PhaseConditionalPropagation::WorkQueue::enqueue_for_delayed_processing(Node* n, Node* c) {
+bool PhaseConditionalPropagation::Analyzer::WorkQueue::enqueue_for_delayed_processing(Node* n, Node* c) {
   assert(!n->is_Root(), "Root should never be processed");
   if (_enqueued.test_set(n->_idx)) {
     assert((*_work_queues->get(c))->contains(n), "should already be enqueued");
@@ -450,7 +450,7 @@ bool PhaseConditionalPropagation::WorkQueue::enqueue_for_delayed_processing(Node
 }
 
 // Keep track of control of the main algorithm
-void PhaseConditionalPropagation::WorkQueue::set_current_control(Node* c) {
+void PhaseConditionalPropagation::Analyzer::WorkQueue::set_current_control(Node* c) {
   _current_ctrl = c;
   GrowableArray<Node*>* work_queue = work_queue_at(c);
   if (work_queue != nullptr) {
@@ -464,7 +464,7 @@ void PhaseConditionalPropagation::WorkQueue::set_current_control(Node* c) {
   }
 }
 
-bool PhaseConditionalPropagation::WorkQueue::enqueue(Node* n, Node* c) {
+bool PhaseConditionalPropagation::Analyzer::WorkQueue::enqueue(Node* n, Node* c) {
   if (c == _current_ctrl) {
     _wq.push(n);
     return false;
@@ -473,7 +473,7 @@ bool PhaseConditionalPropagation::WorkQueue::enqueue(Node* n, Node* c) {
 }
 
 #ifdef ASSERT
-void PhaseConditionalPropagation::WorkQueue::dump() const {
+void PhaseConditionalPropagation::Analyzer::WorkQueue::dump() const {
   auto dump_entries = [&](Node* c, GrowableArray<Node*>* queue) {
     c->dump();
     for (int i = 0; i < queue->length(); i++) {
@@ -489,7 +489,7 @@ void PhaseConditionalPropagation::WorkQueue::dump() const {
 
 // Some node had its type narrowed at control c and u is a candidate for processing. At what control should it be
 // enqueued?
-Node* PhaseConditionalPropagation::Analyzer::compute_queue_control(Node* u) const {
+Node* PhaseConditionalPropagation::Analyzer::compute_queue_control(Node* u) {
   if (!_phase->has_node(u) || u->is_Root()) {
     return nullptr;
   }
@@ -504,22 +504,22 @@ Node* PhaseConditionalPropagation::Analyzer::compute_queue_control(Node* u) cons
   }
   // A change of type at c cannot affect a CFG node that's not at a dominated control
   if (u->is_CFG()) {
-    if (_conditional_propagation.is_dominator(_current_ctrl, u_c)) {
+    if (is_dominator(_current_ctrl, u_c)) {
       return u_c;
     }
     return nullptr;
   }
-  if (_conditional_propagation.is_dominator(_current_ctrl, u_c)) {
+  if (is_dominator(_current_ctrl, u_c)) {
     // u's control is dominated by current control. Enqueue at early control so we keep track of the earliest control
     // at which its type can be narrowed
-    u_c = _phase->find_non_split_ctrl(_conditional_propagation.get_early_ctrl(u));
-    if (_conditional_propagation.is_dominator(_current_ctrl, u_c)) {
+    u_c = _phase->find_non_split_ctrl(_early_ctrls.get_early_ctrl(u));
+    if (is_dominator(_current_ctrl, u_c)) {
       return u_c;
     }
     return _current_ctrl;
   }
   // Process a data node whose control dominates the current control right away
-  if (_conditional_propagation.is_dominator(u_c, _current_ctrl)) {
+  if (is_dominator(u_c, _current_ctrl)) {
     return _current_ctrl;
   }
   // Type update at control c can't affect this node
@@ -562,7 +562,7 @@ void PhaseConditionalPropagation::Analyzer::enqueue_use(Node* n, Node* queue_con
         return;
       }
       assert(n->in(0)->is_CFG(), "control input of data node should be control node");
-      if (_conditional_propagation.is_dominator(n->in(0), _current_ctrl)) {
+      if (is_dominator(n->in(0), _current_ctrl)) {
         enqueue(n, _current_ctrl);
         return;
       }
@@ -681,7 +681,7 @@ void PhaseConditionalPropagation::Analyzer::maybe_enqueue_if_projections_from_cm
 }
 
 void PhaseConditionalPropagation::Analyzer::maybe_enqueue_if_projections(IfNode* iff) {
-  if (!_conditional_propagation.is_dominator(_current_ctrl, iff)) {
+  if (!is_dominator(_current_ctrl, iff)) {
     return;
   }
   if (iff->is_CountedLoopEnd() && iff->as_CountedLoopEnd()->loopnode() != nullptr &&
@@ -847,9 +847,9 @@ void PhaseConditionalPropagation::Analyzer::check_for_dead_path(bool &extra_loop
       return;
     }
     auto mark_dead_paths = [&](Node* c) {
-      if (_conditional_propagation.is_dominator(c, _current_ctrl)) {
+      if (is_dominator(c, _current_ctrl)) {
         _dead_paths.set(_current_ctrl->_idx);
-      } else if (_conditional_propagation.is_dominator(_current_ctrl, c)) {
+      } else if (is_dominator(_current_ctrl, c)) {
         _dead_paths.set(c->_idx);
       }
       return false;
@@ -899,7 +899,7 @@ void PhaseConditionalPropagation::Analyzer::propagate_types(bool &extra_loop_var
   sync_global_types_with_types_at_control(_current_ctrl);
   while (!_work_queue->is_empty(_current_ctrl)) {
     Node* n = _work_queue->pop(_current_ctrl);
-    assert(_verify || !n->is_CFG() || _conditional_propagation.is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), _current_ctrl),
+    assert(_verify || !n->is_CFG() || is_dominator(_phase->find_non_split_ctrl(_phase->ctrl_or_self(n)), _current_ctrl),
            "only CFG nodes that dominate current control");
     const Type* t = n->Value(this);
     const Type* current_type = PhaseValues::type(n);
@@ -1013,7 +1013,7 @@ void PhaseConditionalPropagation::Analyzer::handle_region(Node* dom, bool &extra
     if (n->is_CFG()) {
       return;
     }
-    if (!_conditional_propagation.is_dominator(_phase->get_ctrl(n), _current_ctrl) && !_conditional_propagation.is_dominator(_current_ctrl, _phase->get_ctrl(n))) {
+    if (!is_dominator(_phase->get_ctrl(n), _current_ctrl) && !is_dominator(_current_ctrl, _phase->get_ctrl(n))) {
       return;
     }
     const Type* t = _type_table->find_type_between(n, in, dom);
@@ -1192,7 +1192,7 @@ void PhaseConditionalPropagation::Analyzer::merge_with_dominator_types() {
         // During verification types can be narrowed at control dominating early control for the node. We have reached
         // the early control for the node, merging with dominating control results in the type before verification.
         if (verify() && _verify_wq.member(node) &&
-            _phase->find_non_split_ctrl(_conditional_propagation.get_early_ctrl(node)) == _current_ctrl &&
+            _phase->find_non_split_ctrl(_early_ctrls.get_early_ctrl(node)) == _current_ctrl &&
             _type_table->prev_iteration_type(node, _current_ctrl) == new_t) {
           _verify_wq.remove(node);
         }
@@ -1244,21 +1244,21 @@ void PhaseConditionalPropagation::Analyzer::verify(bool& extra_type_init) {
       assert(narrows_type(PhaseValues::type(node), t), "only type narrowing");
       const Type* prev_round_t = _type_table->prev_iteration_type(node, _current_ctrl);
       assert(prev_round_t == nullptr || narrows_type(prev_round_t, t), "should narrow from one round to the other");
-      assert(!verify() || !_conditional_propagation.is_dominator(_conditional_propagation.get_early_ctrl(node), _current_ctrl) ||
+      assert(!verify() || !is_dominator(_early_ctrls.get_early_ctrl(node), _current_ctrl) ||
              prev_round_t == t, "there should be no more progress once we've reached verification");
       // When verify() is true, prev round type is expected to be the final type
       if (prev_round_t != nullptr) {
         // Types at this round and at previous round are the same: verification doesn't find a narrower type so previous
         // pass did reach the best type for this node at this control. No need to track the node further.
         if (prev_round_t == t && verify() && _verify_wq.member(node) &&
-            _phase->find_non_split_ctrl(_conditional_propagation.get_early_ctrl(node)) == _current_ctrl) {
+            _phase->find_non_split_ctrl(_early_ctrls.get_early_ctrl(node)) == _current_ctrl) {
           _verify_wq.remove(node);
         }
       } else {
         // When verifying, nodes are enqueued for processing immediately (rather than at their early control), so new
         // types can be recorded at an earlier control than in previous passes. We keep track of them here.
         if (verify() &&
-            !_conditional_propagation.is_dominator(_conditional_propagation.get_early_ctrl(node), _current_ctrl)) {
+            !is_dominator(_early_ctrls.get_early_ctrl(node), _current_ctrl)) {
           _verify_wq.push(node);
         }
       }
@@ -1505,7 +1505,7 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement(Node* c, 
         if (opaque != nullptr && opaque->in(1) == node) {
           const Type* cmp_t = _type_table->find_type_between(cmp, cl->loopexit(), _phase->idom(c));
           if (cmp_t == nullptr || !cmp_t->singleton()) {
-            return _conditional_propagation.is_dominator(c, _phase->get_ctrl(opaque));
+            return _phase->is_dominator(c, _phase->get_ctrl(opaque));
           }
         }
       }
@@ -1560,7 +1560,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           Node* r = use->in(0);
           int nb_deleted = 0;
           for (uint j = 1; j < use->req(); ++j) {
-            if (use->in(j) == node && !r->in(j)->is_top() && _conditional_propagation.is_dominator(c, r->in(j)) &&
+            if (use->in(j) == node && !r->in(j)->is_top() && _phase->is_dominator(c, r->in(j)) &&
                 is_safe_for_replacement_at_phi(node, use, r, j)) {
               if (con == nullptr) {
                 con = _phase->igvn().makecon(t);
@@ -1589,7 +1589,7 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           if (nb_deleted > 0) {
             --i;
           }
-        } else if (_conditional_propagation.is_dominator(c, _phase->ctrl_or_self(use)) &&
+        } else if (_phase->is_dominator(c, _phase->ctrl_or_self(use)) &&
                    is_safe_for_replacement(c, node, use)) {
           if (t != Type::TOP) {
             if (node->is_Bool()) {
@@ -1672,7 +1672,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
     if (n->is_div_or_mod()) {
       if (n->in(0) != nullptr && n->in(0) != c) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
-        if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
+        if (early_ctrl != c && _phase->is_dominator(early_ctrl, c)) {
           if (n->depends_only_on_test()) {
             Node* clone = n->pin_node_under_control();
             clone->set_req(0, c);
@@ -1687,7 +1687,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
       const TypePtr* adr_type = n->adr_type();
       if (n->in(0) != nullptr && n->in(0) != c && adr_type != nullptr && adr_type->isa_aryptr()) {
         Node* early_ctrl = _phase->compute_early_ctrl(n, _phase->get_ctrl(n));
-        if (early_ctrl != c && _conditional_propagation.is_dominator(early_ctrl, c)) {
+        if (early_ctrl != c && _phase->is_dominator(early_ctrl, c)) {
           if (n->depends_only_on_test()) {
             Node* clone = n->pin_node_under_control();
             if (clone != nullptr) {
@@ -1703,7 +1703,7 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
     }
     for (DUIterator_Fast jmax, j = n->fast_outs(jmax); j < jmax; j++) {
       Node* u = n->fast_out(j);
-      if (_conditional_propagation.is_dominator(c, _phase->ctrl_or_self(u))) {
+      if (_phase->is_dominator(c, _phase->ctrl_or_self(u))) {
         _wq.push(u);
       }
     }
@@ -1757,12 +1757,12 @@ Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
 }
 
 // Compute and cache early control for data nodes
-PhaseConditionalPropagation::EarlyCtrls::EarlyCtrls(Node_Stack& nstack, PhaseConditionalPropagation& conditional_propagation)
-  : _nstack(nstack), _phase(conditional_propagation._phase), _conditional_propagation(conditional_propagation) {
+PhaseConditionalPropagation::Analyzer::EarlyCtrls::EarlyCtrls(Node_Stack& nstack, Analyzer& analyzer)
+  : _nstack(nstack), _phase(analyzer._phase), _analyzer(analyzer) {
   _node_to_ctrl_table = new NodeToCtrl(8, _phase->C->live_nodes());
 }
 
-Node* PhaseConditionalPropagation::EarlyCtrls::known_early_ctrl(Node* n) const {
+Node* PhaseConditionalPropagation::Analyzer::EarlyCtrls::known_early_ctrl(Node* n) const {
   if (n->is_CFG()) {
     return n;
   }
@@ -1780,7 +1780,7 @@ Node* PhaseConditionalPropagation::EarlyCtrls::known_early_ctrl(Node* n) const {
   return nullptr;
 }
 
-Node* PhaseConditionalPropagation::EarlyCtrls::compute_early_ctrl(Node* u) {
+Node* PhaseConditionalPropagation::Analyzer::EarlyCtrls::compute_early_ctrl(Node* u) {
   _nstack.push(u, 0);
   Node* early_c = nullptr;
   _intermediate_results.push(nullptr); // current early ctrl: unknown
@@ -1818,7 +1818,7 @@ Node* PhaseConditionalPropagation::EarlyCtrls::compute_early_ctrl(Node* u) {
 }
 
 // Compute and cache early control for data node
-Node* PhaseConditionalPropagation::EarlyCtrls::get_early_ctrl(Node* u) {
+Node* PhaseConditionalPropagation::Analyzer::EarlyCtrls::get_early_ctrl(Node* u) {
   assert(_nstack.is_empty(), "non empty stack");
   Node* early_c = known_early_ctrl(u);
   if (early_c != nullptr) {
@@ -1827,23 +1827,23 @@ Node* PhaseConditionalPropagation::EarlyCtrls::get_early_ctrl(Node* u) {
   return compute_early_ctrl(u);
 }
 
-Node* PhaseConditionalPropagation::EarlyCtrls::update_early_ctrl(Node* early_c, Node* in_c) {
-  if (early_c == nullptr || _conditional_propagation.is_dominator(early_c, in_c)) {
+Node* PhaseConditionalPropagation::Analyzer::EarlyCtrls::update_early_ctrl(Node* early_c, Node* in_c) {
+  if (early_c == nullptr || _analyzer.is_dominator(early_c, in_c)) {
     return in_c;
   }
   return early_c;
 }
 
-const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::analyze(int rounds) {
-  Analyzer analyzer(*this, _visited, _rpo_list);
+const PhaseConditionalPropagation::TypeTable* PhaseConditionalPropagation::analyze(int rounds, Analyzer::DominatorTree& dominator_tree) {
+  Analyzer analyzer(*this, _visited, _rpo_list, dominator_tree);
   return analyzer.analyze(rounds);
 }
 
-void PhaseConditionalPropagation::analyze_and_transform(int rounds) {
+void PhaseConditionalPropagation::analyze_and_transform(int rounds, Analyzer::DominatorTree& dominator_tree) {
   const TypeTable* type_table;
   {
     Compile::TracePhase tp(Phase::_t_conditionalElimAnalysis);
-    type_table = analyze(rounds);
+    type_table = analyze(rounds, dominator_tree);
   }
   {
     Compile::TracePhase tp(Phase::_t_conditionalElimTransform);
@@ -1894,7 +1894,7 @@ void PhaseConditionalPropagation::do_transform(const TypeTable* type_table) {
   transformer.do_transform();
 }
 
-PhaseConditionalPropagation::DominatorTree::DominatorTree(const Node_List& rpo_list, PhaseIdealLoop* phase):
+PhaseConditionalPropagation::Analyzer::DominatorTree::DominatorTree(const Node_List& rpo_list, PhaseIdealLoop* phase):
   _nodes(nullptr) {
   _nodes = new DomTreeTable(rpo_list.size(), rpo_list.size());
 
@@ -1945,13 +1945,9 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
                                                          Node_List &rpo_list)
   : _phase(phase),
     _visited(visited),
-    _rpo_list(rpo_list),
-    _early_ctrls(nstack, *this),
-    _dominator_tree(nullptr) {
+    _nstack(nstack),
+    _rpo_list(rpo_list) {
   assert(nstack.is_empty(), "non empty stack as argument");
-  assert(_rpo_list.size() == 0, "non empty list as argument");
-  phase->rpo(phase->C->root(), nstack, _visited, _rpo_list);
-  _dominator_tree = new DominatorTree(_rpo_list, _phase);
   // Remove control nodes at which no type update is possible
   int shift = 0;
   for (uint i = 0; i < _rpo_list.size(); ++i) {
@@ -1971,8 +1967,11 @@ PhaseConditionalPropagation::PhaseConditionalPropagation(PhaseIdealLoop* phase, 
 
 void PhaseIdealLoop::conditional_elimination(VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list, int rounds) {
   Compile::TracePhase tp(Phase::_t_conditionalElim);
+  assert(rpo_list.size() == 0, "non empty list as argument");
+  rpo(C->root(), nstack, visited, rpo_list);
+  PhaseConditionalPropagation::Analyzer::DominatorTree* dominator_tree = new PhaseConditionalPropagation::Analyzer::DominatorTree(rpo_list, this);
   PhaseConditionalPropagation pcp(this, visited, nstack, rpo_list);
-  pcp.analyze_and_transform(rounds);
+  pcp.analyze_and_transform(rounds, *dominator_tree);
 }
 
 

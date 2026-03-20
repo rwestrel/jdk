@@ -150,9 +150,9 @@ private:
         return _prev;
       }
 
-      bool below(NodeTypesList* dom_node_types_list, PhaseConditionalPropagation& conditional_propagation) const {
+      bool below(NodeTypesList* dom_node_types_list, PhaseIdealLoop* phase) const {
         return this != dom_node_types_list && (dom_node_types_list == nullptr ||
-          !conditional_propagation.is_dominator(control(), dom_node_types_list->control()));
+          !phase->is_dominator(control(), dom_node_types_list->control()));
       }
 
       void set_prev(NodeTypesList* prev) {
@@ -221,128 +221,202 @@ private:
       }
       return node_types_list->type_if_present(n);
     }
-
   };
 
-  // A TypeTable that can be updated. First phase of the transformation analyzes the graph and collects new types. It
-  // uses a WriteableTypeTable. Second phase transforms the graph based on the new types but doesn't make any updates
-  // to types: it uses the read only TypeTable.
-  class WriteableTypeTable : public TypeTable {
-  private:
-    // To avoid repetitive queries, we cache some pointers to NodeTypesList
-    NodeTypesList* _current_node_types_list; // the one we're currently updating (at _current_ctrl)
-    NodeTypesList* _dom_node_types_list; // The one at the immediate dominator
-    NodeTypesList* _prev_node_types_list; // The one from the previous iterations of the main algorithm
-#ifdef ASSERT
-    NodeTypesListTable* _backup;
-#endif
-
-  public:
-
-    WriteableTypeTable(PhaseConditionalPropagation &conditional_propagation)
-            : TypeTable(conditional_propagation),
-              _current_node_types_list(nullptr),
-              _dom_node_types_list(nullptr),
-              _prev_node_types_list(nullptr) {
-    }
-
-    void set_current_control(Node* c, bool verify, int iterations);
-    bool record_type(Node* c, Node* n, const Type* prev_t,
-                     const Type* new_t, int iterations);
-    bool types_improved(Node* c, int iterations, bool verify) const;
-    const Type* type_at_current_ctrl(Node* n) const;
-
-    const Type* prev_iteration_type(Node* n) const;
-    const Type* prev_iteration_type(Node* n, Node* c) const;
-
-    int iterations_at(Node* c) {
-      NodeTypesList* node_types_list = node_types_list_at(c);
-      if (node_types_list == nullptr) {
-        return -1;
-      }
-      return node_types_list->iterations();
-    }
-
-    template <class Callback> void apply_between_controls(Node* c, Node* dom, Callback callback) const;
-    int count_updates_between_controls(Node* c, Node* dom) const;
-    template <class Callback> void apply_at_prev_iteration(Callback callback) const;
-#ifdef ASSERT
-    void save();
-    void restore();
-#endif
-  };
-
-  // When the type of a node is narrowed, there is usually an opportunity to narrow the type of other nodes that depend
-  // on that node but, in the general case, processing those nodes only make sense once the main algorithm has reached
-  // a particular control. With this WorkQueue implementation, nodes are enqueued for processing at some particular
-  // control.
-  class WorkQueue : public ResourceObj {
-  private:
-    // A mapping from some control to a list of nodes that need processing
-    using WorkQueues = ResizeableHashTable<Node*, GrowableArray<Node*>*, AnyObj::RESOURCE_AREA, mtInternal>;
-    WorkQueues* _work_queues;
-    // A cheap way to check if a node was already enqueued
-    VectorSet _enqueued;
-    // As an optimization, keep track of the current control the main algorithm is analyzing and if a node is enqueued
-    // at _current_ctrl, push it on the Unique_Node_List below
-    Unique_Node_List _wq;
-    Node* _current_ctrl;
-
-    GrowableArray<Node*>* work_queue_at(Node* c) const {
-      GrowableArray<Node*>** work_queue_ptr = _work_queues->get(c);
-      if (work_queue_ptr == nullptr) {
-        return nullptr;
-      }
-      return *work_queue_ptr;
-    }
-
-    bool enqueue_for_delayed_processing(Node* n, Node* c);
-
-  public:
-    WorkQueue(Node* root, uint max_elements) :
-            _current_ctrl(root) {
-      _work_queues = new WorkQueues(8, max_elements);
-    }
-
-    bool enqueued(const Node* n) {
-      return _enqueued.test(n->_idx) || _wq.member(n);
-    }
-
-    bool is_empty(Node* c) const {
-      if (c == _current_ctrl) {
-        assert(work_queue_at(c) == nullptr, "");
-        return _wq.size() == 0;
-      }
-      return work_queue_at(c) == nullptr;
-    }
-
-    bool all_empty() const {
-      assert((_work_queues->number_of_entries() == 0) == _enqueued.is_empty(), "inconsistency");
-      return _work_queues->number_of_entries() == 0;
-    }
-
-    Node* pop(Node* c) {
-      assert(c == _current_ctrl && work_queue_at(c) == nullptr, "");
-      return _wq.pop();
-    }
-
-    void dump() const PRODUCT_RETURN;
-
-    void set_current_control(Node* c);
-    bool enqueue(Node* n, Node* c);
-  };
-
+public:
   // First phase of the transformation: collect types
   class Analyzer : public PhaseIterGVN {
-  private:
+  public:
+    // Utility class: main algorithm makes heavy use of dominator check. This provides a faster check. It requires a new
+    // tree structure to be constructed (A node in the tree is for one control and it is an immediate dominator for its
+    // children: it is the existing idom structure upside down) and traversed so each node of the tree is annotated with
+    // its pre and post order positions.
+    class DominatorTree : public ResourceObj {
+    private:
+      class DomTreeNode : public ResourceObj {
+      public:
+        DomTreeNode* _child;
+        DomTreeNode* _sibling;
+        Node* _node;
+        uint _pre;
+        uint _post;
 
-    PhaseConditionalPropagation& _conditional_propagation;
+        DomTreeNode(Node* node) : _child(nullptr), _sibling(nullptr), _node(node), _pre(0), _post(0) {
+        }
+      };
+
+      // Node to tree node hash table
+      using DomTreeTable = ResizeableHashTable<Node*, DomTreeNode*, AnyObj::RESOURCE_AREA, mtInternal>;
+      DomTreeTable* _nodes;
+
+    public:
+      DominatorTree(const Node_List &rpo_list, PhaseIdealLoop* phase);
+
+      //           n1 (pre =0, post = 13)
+      //         /                 \
+      //        n2 (1,6)             n5 (7, 12)
+      //       /  \                 /  \
+      //(2,3) n3    n4 (4,5) (8,9) n6   n7 (10, 11)
+      //
+      // n1 dominates n4 because 0 < 4 and 5 < 13
+      // n2 doesn't dominates n7: 1 < 10 but 11 > 6
+      bool is_dominator(Node* dominator, Node* m) const {
+        DomTreeNode* dom_n = *_nodes->get(dominator);
+        DomTreeNode* dom_m = *_nodes->get(m);
+        return dom_n->_pre < dom_m->_pre && dom_n->_post > dom_m->_post;
+      }
+    };
+
+  private:
+    // Utility class: main algorithm needs early control for some nodes. Rather than recompute it, cache the result
+    class EarlyCtrls {
+    private:
+      Node_Stack &_nstack;
+      Node_List _intermediate_results;
+      PhaseIdealLoop* _phase;
+      Analyzer &_analyzer;
+      using NodeToCtrl = ResizeableHashTable<Node*, Node*, AnyObj::RESOURCE_AREA, mtInternal>;
+      NodeToCtrl* _node_to_ctrl_table;
+
+      Node* known_early_ctrl(Node* n) const;
+
+      Node* compute_early_ctrl(Node* u);
+
+      Node* update_early_ctrl(Node* early_c, Node* in_c);
+
+    public:
+      EarlyCtrls(Node_Stack &nstack, Analyzer &analyzer);
+
+      Node* get_early_ctrl(Node* u);
+    };
+
+    // A TypeTable that can be updated. First phase of the transformation analyzes the graph and collects new types. It
+    // uses a WriteableTypeTable. Second phase transforms the graph based on the new types but doesn't make any updates
+    // to types: it uses the read only TypeTable.
+    class WriteableTypeTable : public TypeTable {
+    private:
+      Analyzer &_analyzer;
+      // To avoid repetitive queries, we cache some pointers to NodeTypesList
+      NodeTypesList* _current_node_types_list; // the one we're currently updating (at _current_ctrl)
+      NodeTypesList* _dom_node_types_list; // The one at the immediate dominator
+      NodeTypesList* _prev_node_types_list; // The one from the previous iterations of the main algorithm
+#ifdef ASSERT
+      NodeTypesListTable* _backup;
+#endif
+
+    public:
+      WriteableTypeTable(PhaseConditionalPropagation &conditional_propagation, Analyzer &analyzer)
+        : TypeTable(conditional_propagation),
+          _analyzer(analyzer),
+          _current_node_types_list(nullptr),
+          _dom_node_types_list(nullptr),
+          _prev_node_types_list(nullptr) {
+      }
+
+      void set_current_control(Node* c, bool verify, int iterations);
+
+      bool record_type(Node* c, Node* n, const Type* prev_t,
+                       const Type* new_t, int iterations);
+
+      bool types_improved(Node* c, int iterations, bool verify) const;
+
+      const Type* type_at_current_ctrl(Node* n) const;
+
+      const Type* prev_iteration_type(Node* n) const;
+
+      const Type* prev_iteration_type(Node* n, Node* c) const;
+
+      int iterations_at(Node* c) {
+        NodeTypesList* node_types_list = node_types_list_at(c);
+        if (node_types_list == nullptr) {
+          return -1;
+        }
+        return node_types_list->iterations();
+      }
+
+      template<class Callback>
+      void apply_between_controls(Node* c, Node* dom, Callback callback) const;
+
+      int count_updates_between_controls(Node* c, Node* dom) const;
+
+      template<class Callback>
+      void apply_at_prev_iteration(Callback callback) const;
+#ifdef ASSERT
+      void save();
+
+      void restore();
+#endif
+    };
+
+    // When the type of a node is narrowed, there is usually an opportunity to narrow the type of other nodes that depend
+    // on that node but, in the general case, processing those nodes only make sense once the main algorithm has reached
+    // a particular control. With this WorkQueue implementation, nodes are enqueued for processing at some particular
+    // control.
+    class WorkQueue : public ResourceObj {
+    private:
+      // A mapping from some control to a list of nodes that need processing
+      using WorkQueues = ResizeableHashTable<Node*, GrowableArray<Node*>*, AnyObj::RESOURCE_AREA, mtInternal>;
+      WorkQueues* _work_queues;
+      // A cheap way to check if a node was already enqueued
+      VectorSet _enqueued;
+      // As an optimization, keep track of the current control the main algorithm is analyzing and if a node is enqueued
+      // at _current_ctrl, push it on the Unique_Node_List below
+      Unique_Node_List _wq;
+      Node* _current_ctrl;
+
+      GrowableArray<Node*>* work_queue_at(Node* c) const {
+        GrowableArray<Node*>** work_queue_ptr = _work_queues->get(c);
+        if (work_queue_ptr == nullptr) {
+          return nullptr;
+        }
+        return *work_queue_ptr;
+      }
+
+      bool enqueue_for_delayed_processing(Node* n, Node* c);
+
+    public:
+      WorkQueue(Node* root, uint max_elements) : _current_ctrl(root) {
+        _work_queues = new WorkQueues(8, max_elements);
+      }
+
+      bool enqueued(const Node* n) {
+        return _enqueued.test(n->_idx) || _wq.member(n);
+      }
+
+      bool is_empty(Node* c) const {
+        if (c == _current_ctrl) {
+          assert(work_queue_at(c) == nullptr, "");
+          return _wq.size() == 0;
+        }
+        return work_queue_at(c) == nullptr;
+      }
+
+      bool all_empty() const {
+        assert((_work_queues->number_of_entries() == 0) == _enqueued.is_empty(), "inconsistency");
+        return _work_queues->number_of_entries() == 0;
+      }
+
+      Node* pop(Node* c) {
+        assert(c == _current_ctrl && work_queue_at(c) == nullptr, "");
+        return _wq.pop();
+      }
+
+      void dump() const PRODUCT_RETURN;
+
+      void set_current_control(Node* c);
+
+      bool enqueue(Node* n, Node* c);
+    };
+
+    PhaseConditionalPropagation &_conditional_propagation;
     PhaseIdealLoop* _phase;
+    EarlyCtrls _early_ctrls;
+    DominatorTree &_dominator_tree;
     int _iterations;
     WorkQueue* _work_queue;
     bool _verify;
 #ifdef ASSERT
-    VectorSet& _visited;
+    VectorSet &_visited;
     bool _progress;
 #endif
     Node_List &_rpo_list;
@@ -351,24 +425,39 @@ private:
     VectorSet _dead_paths;
 
     void enqueue_use(Node* n, Node* queue_control);
-    Node* compute_queue_control(Node* u) const;
+
+    Node* compute_queue_control(Node* u);
+
     Node* compute_queue_control(Node* u, bool at_current_ctrl);
+
     void maybe_enqueue_if_projections_from_cmp(const Node* u);
+
     void maybe_enqueue_if_projections(IfNode* iff);
+
     void handle_region(Node* dom, bool &extra_loop_variable);
+
     void handle_ifproj();
+
     void propagate_types(bool &extra_type_init);
+
     void analyze_allocate_array(const AllocateArrayNode* alloc);
+
     void analyze_if(const Node* cmp, Node* n);
+
     bool one_iteration(bool &extra_loop_variable, bool &extra_type_init);
+
     void merge_with_dominator_types();
-    void verify(bool& extra_type_init) PRODUCT_RETURN;
+
+    void verify(bool &extra_type_init) PRODUCT_RETURN;
+
     struct NodeTypePair {
       Node* _n;
       const Type* _t;
     };
+
     GrowableArray<NodeTypePair> _stack; // This is needed by sync()
     void sync_global_types_with_types_at_control(Node* c);
+
     Node* _current_types_ctrl;
 
 #ifdef ASSERT
@@ -377,33 +466,37 @@ private:
     // can't happen. Track nodes for which that happens and make sure they all have the same type during and before
     // verification at early control for the node.
     Unique_Node_List _verify_wq;
+
     bool verify_wq_empty() const {
       return _verify_wq.size() == 0;
     }
 #endif
 
-  private:
     const Type* type_at_current_ctrl(Node* n) const;
 
   public:
-    Analyzer(PhaseConditionalPropagation &conditional_propagation, VectorSet& visited, Node_List& rpo_list)
-    : PhaseIterGVN(&conditional_propagation._phase->igvn()),
-      _conditional_propagation(conditional_propagation),
-      _phase(conditional_propagation._phase),
-      _iterations(0),
-      _work_queue(nullptr),
-      _verify(false),
+    Analyzer(PhaseConditionalPropagation &conditional_propagation, VectorSet &visited, Node_List &rpo_list,
+             DominatorTree &dominator_tree)
+      : PhaseIterGVN(&conditional_propagation._phase->igvn()),
+        _conditional_propagation(conditional_propagation),
+        _phase(conditional_propagation._phase),
+        _early_ctrls(_conditional_propagation._nstack, *this),
+        _dominator_tree(dominator_tree),
+        _iterations(0),
+        _work_queue(nullptr),
+        _verify(false),
 #ifdef ASSERT
-      _visited(visited),
-      _progress(true),
+        _visited(visited),
+        _progress(true),
 #endif
-      _rpo_list(rpo_list),
-      _type_table(nullptr),
-      _current_ctrl(nullptr),
-      _current_types_ctrl(conditional_propagation._phase->C->root()) {
+        _rpo_list(rpo_list),
+        _type_table(nullptr),
+        _current_ctrl(nullptr),
+        _current_types_ctrl(conditional_propagation._phase->C->root()) {
       _work_queue = new WorkQueue(_phase->C->root(), _conditional_propagation._rpo_list.size());
-      _type_table = new WriteableTypeTable(_conditional_propagation);
+      _type_table = new WriteableTypeTable(_conditional_propagation, *this);
     }
+
     const TypeTable* analyze(int rounds);
 
     void check_for_dead_path(bool &extra_loop_variable);
@@ -426,6 +519,7 @@ private:
     bool verify() const {
       return _verify;
     }
+
     const Type* type(const Node* n, Node* c) const;
 
     void set_type(Node* n, const Type* t, const Type* old_t) {
@@ -434,6 +528,20 @@ private:
     }
 
     void enqueue(Node* n, Node* c);
+
+    bool is_dominator(Node* dominator, Node* m) {
+      assert(_phase->is_dominator(dominator, m) == (dominator == m || _dominator_tree.is_dominator(dominator, m)), "");
+      return (dominator == m || _dominator_tree.is_dominator(dominator, m));
+    }
+
+    bool is_strict_dominator(Node* dominator, Node* m) const {
+      assert(_phase->is_strict_dominator(dominator, m) == _dominator_tree.is_dominator(dominator, m), "");
+      return _dominator_tree.is_dominator(dominator, m);
+    }
+
+    Node* get_early_ctrl(Node* u) {
+      return _early_ctrls.get_early_ctrl(u);
+    }
   };
 
   // Second phase of the transformation: transform the graph from types collected by first phase
@@ -470,107 +578,33 @@ private:
     void do_transform();
   };
 
-  // Utility class: main algorithm needs early control for some nodes. Rather than recompute it, cache the result
-  class EarlyCtrls {
-  private:
-    Node_Stack& _nstack;
-    Node_List _intermediate_results;
-    PhaseIdealLoop* _phase;
-    PhaseConditionalPropagation& _conditional_propagation;
-    using NodeToCtrl = ResizeableHashTable<Node*, Node*, AnyObj::RESOURCE_AREA, mtInternal>;
-    NodeToCtrl* _node_to_ctrl_table;
-
-    Node* known_early_ctrl(Node* n) const;
-
-    Node* compute_early_ctrl(Node* u);
-
-    Node* update_early_ctrl(Node* early_c, Node* in_c);
-
-  public:
-    EarlyCtrls(Node_Stack& nstack, PhaseConditionalPropagation& conditional_propagation);
-    Node* get_early_ctrl(Node* u);
-  };
-
   Node* known_updates(Node* c) const {
     return _phase->find_non_split_ctrl(c);
   }
 
   PhaseIdealLoop* _phase;
   VectorSet& _visited;
-  Node_List &_rpo_list;
+  Node_Stack& _nstack;
+  Node_List& _rpo_list;
 
   Unique_Node_List _wq;
   template <class Callback> bool apply_to_cfg_uses(Node* n, Callback callback);
 
-  EarlyCtrls _early_ctrls;
-  Node* get_early_ctrl(Node* u) {
-    return _early_ctrls.get_early_ctrl(u);
-  }
-
-  const TypeTable* analyze(int rounds);
+  const TypeTable* analyze(int rounds, Analyzer::DominatorTree &dominator_tree);
   void do_transform(const TypeTable* type_table);
 
   static const int load_factor = 8;
-
-  // Utility class: main algorithm makes heavy use of dominator check. This provides a faster check. It requires a new
-  // tree structure to be constructed (A node in the tree is for one control and it is an immediate dominator for its
-  // children: it is the existing idom structure upside down) and traversed so each node of the tree is annotated with
-  // its pre and post order positions.
-  class DominatorTree : public ResourceObj {
-  private:
-    class DomTreeNode : public ResourceObj {
-    public:
-      DomTreeNode* _child;
-      DomTreeNode* _sibling;
-      Node* _node;
-      uint _pre;
-      uint _post;
-
-      DomTreeNode(Node* node) : _child(nullptr), _sibling(nullptr), _node(node), _pre(0), _post(0) {
-      }
-    };
-    // Node to tree node hash table
-    using DomTreeTable = ResizeableHashTable<Node*, DomTreeNode*, AnyObj::RESOURCE_AREA, mtInternal>;
-    DomTreeTable* _nodes;
-  public:
-    DominatorTree(const Node_List& rpo_list, PhaseIdealLoop* phase);
-
-    //           n1 (pre =0, post = 13)
-    //         /                 \
-    //        n2 (1,6)             n5 (7, 12)
-    //       /  \                 /  \
-    //(2,3) n3    n4 (4,5) (8,9) n6   n7 (10, 11)
-    //
-    // n1 dominates n4 because 0 < 4 and 5 < 13
-    // n2 doesn't dominates n7: 1 < 10 but 11 > 6
-    bool is_dominator(Node* dominator, Node* m) const {
-      DomTreeNode* dom_n = *_nodes->get(dominator);
-      DomTreeNode* dom_m = *_nodes->get(m);
-      return dom_n->_pre < dom_m->_pre && dom_n->_post > dom_m->_post;
-    }
-  };
-  DominatorTree* _dominator_tree;
 
   VectorSet _divisor_candidates;
 
 public:
   PhaseConditionalPropagation(PhaseIdealLoop* phase, VectorSet &visited, Node_Stack &nstack, Node_List &rpo_list);
 
-  void analyze_and_transform(int rounds);
+  void analyze_and_transform(int rounds, Analyzer::DominatorTree &dominator_tree);
 
 #ifdef ASSERT
   static bool narrows_type(const Type* old_t, const Type* new_t, bool strictly = false);
 #endif
-
-  bool is_dominator(Node* dominator, Node* m) const {
-    assert(_phase->is_dominator(dominator, m) == (dominator == m || _dominator_tree->is_dominator(dominator, m)), "");
-    return (dominator == m || _dominator_tree->is_dominator(dominator, m));
-  }
-
-  bool is_strict_dominator(Node* dominator, Node* m) const {
-    assert(_phase->is_strict_dominator(dominator, m) == _dominator_tree->is_dominator(dominator, m), "");
-    return _dominator_tree->is_dominator(dominator, m);
-  }
 
   void record_divisor(const Node* n) {
     _divisor_candidates.set(n->_idx);
