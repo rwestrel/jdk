@@ -447,7 +447,6 @@ private:
     uint _unique;
     VectorSet _constant_folded_ifs;
 
-    void transform_when_top_seen(Node* c, Node* node, const Type* t);
     void transform_when_constant_seen(Node* c, Node* node, const Type* t, const Type* prev_t);
     void transform_div_mod_uses(Node* c, Node* node, const Type* t, const Type* prev_t);
     Node* transform_helper(Node* c);
@@ -456,9 +455,7 @@ private:
     static bool should_make_path_dead(Node* node);
 
     bool is_safe_for_replacement_at_phi(Node* node, Node* use, Node* r, uint j) const;
-    void pin_array_access_nodes(Node* c, const IfNode* iff, int con) const;
     void pin_uses_if_needed(const Type* t, Node* use, Node* c);
-    void pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use, Node* c) const;
     Node* create_halt_node(Node* c) const;
 
   public:
@@ -506,18 +503,7 @@ private:
   Node_List &_rpo_list;
 
   Unique_Node_List _wq;
-  bool related_node(Node* n, Node* c);
   template <class Callback> bool apply_to_cfg_uses(Node* n, Callback callback);
-
-#ifdef ASSERT
-  VectorSet _conditions;
-  void record_condition(Node* c) {
-    _conditions.set(c->_idx);
-  }
-  bool condition_recorded(Node* c) const {
-    return _conditions.test(c->_idx);
-  }
-#endif
 
   EarlyCtrls _early_ctrls;
   Node* get_early_ctrl(Node* u) {

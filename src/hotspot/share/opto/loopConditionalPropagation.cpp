@@ -1106,9 +1106,6 @@ void PhaseConditionalPropagation::Analyzer::analyze_if(const Node* cmp, Node* n)
     assert(narrows_type(n_t, new_n_t), "new type should be narrower");
     if (n_t != new_n_t) {
       assert(narrows_type(n_t, new_n_t, true), "");
-#ifdef ASSERT
-      _conditional_propagation.record_condition(_current_ctrl);
-#endif
       if (_type_table->record_type(_current_ctrl, n, n_t, new_n_t, _iterations) || _verify) {
         enqueue_uses(n);
       }
@@ -1124,9 +1121,6 @@ void PhaseConditionalPropagation::Analyzer::analyze_if(const Node* cmp, Node* n)
         const Type* new_in_t = in_t->filter(t_as_long);
         assert(narrows_type(in_t, new_in_t), "new type should be narrower");
         if (in_t != new_in_t) {
-#ifdef ASSERT
-          _conditional_propagation.record_condition(_current_ctrl);
-#endif
           if (_type_table->record_type(_current_ctrl, in, in_t, new_in_t, _iterations) || _verify) {
             enqueue_uses(in);
           }
@@ -1320,24 +1314,7 @@ Node* PhaseConditionalPropagation::Transformer::always_taken_if_proj(IfNode* iff
 }
 
 Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(IfNode* iff, ProjNode* proj) {
-  auto look_for_top = [&](Node* node, const Type* t, const Type* prev_t) {
-    if (node->is_CFG()) {
-      return false;
-    }
-    if (t != Type::TOP) {
-      return false;
-    }
-    return true;
-    // auto is_dom_path = [&](Node* c) {
-    //   if (_conditional_propagation.is_dominator(c, iff)) {
-    //     return true;
-    //   }
-    //   return false;
-    // };
-    // return _conditional_propagation.apply_to_cfg_uses(node, is_dom_path);
-  };
-
-  if (_type_table->type_if_present(proj, proj) == Type::TOP/* && _type_table->find_at_control(proj, look_for_top) != nullptr*/) {
+  if (_type_table->type_if_present(proj, proj) == Type::TOP) {
     Node* bol = iff->in(1);
     const Type* bol_t = bol->bottom_type();
     if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
@@ -1355,8 +1332,6 @@ Node* PhaseConditionalPropagation::Transformer::maybe_constant_fold_condition(If
     }
 #endif
     if (bol_t != new_bol_t) {
-      // assert(_conditional_propagation.condition_recorded(proj),
-             // "only for conditions that saw some type narrowing");
       jint new_bol_con = new_bol_t->is_int()->get_con();
       if (bol_t->is_int()->is_con() && bol_t->is_int()->get_con() != new_bol_con) {
         // We already constant folded the condition to the opposite constant: this path is dead
@@ -1475,39 +1450,6 @@ void PhaseConditionalPropagation::Transformer::do_transform() {
   }
 }
 
-bool PhaseConditionalPropagation::related_node(Node* n, Node* c) {
-  assert(_wq.size() == 0, "need to start from an empty work list");
-  _wq.push(n);
-  for (uint i = 0; i < _wq.size(); i++) {
-    Node* node = _wq.at(i);
-    assert(!node->is_CFG(), "only following data nodes");
-    for (DUIterator_Fast jmax, j = node->fast_outs(jmax); j < jmax; j++) {
-      Node* u = node->fast_out(j);
-      if (!_phase->has_node(u)) {
-        continue;
-      }
-      if (u->is_CFG()) {
-        if (is_dominator(u, c) || is_dominator(c, u)) {
-          _wq.clear();
-          return true;
-        }
-      } else if (u->is_Phi()) {
-        for (uint k = 1; k < u->req(); k++) {
-          if (u->in(k) == node && !u->in(0)->in(k)->is_top() &&
-              (is_dominator(u->in(0)->in(k), c) || is_dominator(c, u->in(0)->in(k)))) {
-            _wq.clear();
-            return true;
-          }
-        }
-      } else {
-        _wq.push(u);
-      }
-    }
-  }
-  _wq.clear();
-  return false;
-}
-
 template <class Callback> bool PhaseConditionalPropagation::apply_to_cfg_uses(Node* n, Callback callback) {
   assert(_wq.size() == 0, "need to start from an empty work list");
   _wq.push(n);
@@ -1612,54 +1554,6 @@ bool PhaseConditionalPropagation::Transformer::should_make_path_dead(Node* node)
   return false;
 }
 
-/*
- With the following code snippet:
- if (i - 1) > 0) {
-    // i - 1 in [1, max]
-   if (i == 0) {
-     // i - 1 is both -1 and [1, max] so top
-
- The second if is redundant but first if updates the type of i-1, not i alone, we can't tell i != 0.
- Because i-1 becomes top in the second if branch, we can tell that branch is dead
- */
-void PhaseConditionalPropagation::Transformer::transform_when_top_seen(Node* c, Node* node, const Type* t) {
-  if (t->singleton()) {
-    if (node->is_CFG()) {
-      return;
-    }
-    if (t == Type::TOP) {
-#ifdef ASSERT
-      if (PrintLoopConditionalPropagation) {
-        tty->print("top at %d", c->_idx);
-        node->dump();
-      }
-#endif
-      if (c->is_IfProj()) {
-        // make sure the node has some use that dominates or are dominated by the current control
-        if (!_conditional_propagation.related_node(node, c)) {
-          return;
-        }
-        IfNode* iff = c->in(0)->as_If();
-        if (iff->in(0)->is_top()) {
-          return;
-        }
-        Node* bol = iff->in(1);
-        const Type* bol_t = bol->bottom_type();
-        if (bol->Opcode() == Op_OpaqueInitializedAssertionPredicate) {
-          bol_t = TypeInt::ONE;
-        }
-        const Type* new_bol_t = TypeInt::make(1 - c->as_IfProj()->_con);
-        if (bol_t != new_bol_t) {
-          ShouldNotReachHere();
-        }
-      } else if (should_make_path_dead(node) && _conditional_propagation.related_node(node, c)) {
-        node->make_paths_from_here_dead(&_phase->igvn(), _phase, "conditional propagation");
-        _phase->C->set_major_progress();
-      }
-    }
-  }
-}
-
 Node* PhaseConditionalPropagation::Transformer::create_halt_node(Node* c) const {
   Node* frame = new ParmNode(_phase->C->start(), TypeFunc::FramePtr);
   _phase->register_new_node(frame, _phase->C->start());
@@ -1712,13 +1606,11 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
           }
         } else if (_conditional_propagation.is_dominator(c, _phase->ctrl_or_self(use)) &&
                    is_safe_for_replacement(c, node, use)) {
-          // pin_array_access_nodes_if_needed(node, t, use, c);
           if (t != Type::TOP) {
             if (node->is_Bool()) {
               if (use->is_If()) {
                 IfNode* iff = use->as_If();
                 int con = t->is_int()->get_con();
-                // pin_array_access_nodes(c, iff, con);
                 ProjNode* proj = iff->proj_out(con);
                 assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
                 _constant_folded_ifs.set(iff->_idx);
@@ -1730,7 +1622,6 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
                 for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
                   Node* u = use->fast_out(i);
                   if (u->is_If()) {
-                    // pin_array_access_nodes(c, u->as_If(), bol->_test.cc2logical(t)->is_int()->get_con());
                     IfNode* iff = u->as_If();
                     ProjNode* proj = iff->proj_out(bol->_test.cc2logical(t)->is_int()->get_con());
                     assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
@@ -1739,8 +1630,6 @@ void PhaseConditionalPropagation::Transformer::transform_when_constant_seen(Node
               }
             }
           }
-          // pin_array_access_nodes_if_needed(node, t, use, c);
-
           pin_uses_if_needed(t, use, c);
           if (con == nullptr) {
             con = _phase->igvn().makecon(t);
@@ -1798,32 +1687,6 @@ void PhaseConditionalPropagation::Transformer::transform_div_mod_uses(Node* c, N
         _phase->register_new_node(clone, c);
         _phase->igvn().replace_node(u, clone);
         --i;
-      }
-    }
-  }
-}
-
-// Eliminating a condition that guards an array access: we need to pin the array access otherwise, it could float if it's
-// dependent on a new condition that ends up being replaced by an identical dominating one.
-void PhaseConditionalPropagation::Transformer::pin_array_access_nodes_if_needed(const Node* node, const Type* t, const Node* use,
-                                                                                Node* c) const {
-  if (t == Type::TOP) {
-    return;
-  }
-  if (node->is_Bool()) {
-    if (use->is_RangeCheck() && node->in(1)->is_Cmp()) {
-      IfNode* iff = use->as_If();
-      int con = t->is_int()->get_con();
-      pin_array_access_nodes(c, iff, con);
-    }
-  } else if (node->is_Cmp()) {
-    if (use->is_Bool()) {
-      BoolNode* bol = use->as_Bool();
-      for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
-        Node* u = use->fast_out(i);
-        if (u->is_RangeCheck()) {
-          pin_array_access_nodes(c, u->as_If(), bol->_test.cc2logical(t)->is_int()->get_con());
-        }
       }
     }
   }
@@ -1890,23 +1753,6 @@ void PhaseConditionalPropagation::Transformer::pin_uses_if_needed(const Type* t,
   _wq.clear();
 }
 
-void PhaseConditionalPropagation::Transformer::pin_array_access_nodes(Node* c, const IfNode* iff, int con) const {
-  ProjNode* proj = iff->proj_out(con);
-  assert(_type_table->type(proj->as_IfProj()->other_if_proj(), proj->as_IfProj()->other_if_proj()) == Type::TOP, "");
-  for (DUIterator i = proj->outs(); proj->has_out(i); i++) {
-    Node* u = proj->out(i);
-    if (u->depends_only_on_test()) {
-      Node* clone = u->pin_node_under_control();
-      if (clone != nullptr) {
-        clone->set_req(0, c);
-        _phase->register_new_node(clone, _phase->get_ctrl(u));
-        _phase->igvn().replace_node(u, clone);
-        --i;
-      }
-    }
-  }
-}
-
 // We don't want to constant fold only the iv incr if the cmp doesn't constant fold as well
 bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement_at_phi(Node* node, Node* use, Node* r, uint j) const {
   if (!(r->is_BaseCountedLoop() &&
@@ -1926,17 +1772,12 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement_at_phi(No
 
 Node* PhaseConditionalPropagation::Transformer::transform_helper(Node* c) {
   if (!c->is_MultiBranch()) {
-    // auto transform_top = [&](Node* node, const Type* t, const Type* prev_t) {
-    //   transform_when_top_seen(c, node, t);
-    // };
-    // _type_table->apply_at_control(c, transform_top);
     if (c->unique_ctrl_out()->Opcode() == Op_Halt) {
       // dead end
       return c;
     }
     auto transform_constant = [&](Node* node, const Type* t, const Type* prev_t) {
       transform_when_constant_seen(c, node, t, prev_t);
-      // transform_div_mod_uses(c, node, t, prev_t);
     };
     _type_table->apply_at_control(c, transform_constant);
     return c;
