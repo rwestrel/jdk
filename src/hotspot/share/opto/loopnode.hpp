@@ -1184,6 +1184,7 @@ public:
       assert(ctrl->is_CFG(), "CFG");
     }
     return ctrl;
+  }
 
   void remove_dead_data_node(Node* dead) {
     assert(dead->outcnt() == 0 && !dead->is_top(), "must be dead");
