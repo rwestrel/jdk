@@ -1511,22 +1511,28 @@ bool PhaseConditionalPropagation::Transformer::is_safe_for_replacement(Node* c, 
       }
     }
   }
-  if (use->is_CallStaticJava() && use->as_CallStaticJava()->is_uncommon_trap()) {
-    // Constant folding at uncommon traps can go wrong:
-    //
-    // if (0 >=u array.length) {  // range check from array[0]
-    //   uncommon_trap(); // array.length constant folded as 0 here
-    // }
-    // ..
-    // if (1 >=u array.length) {  // range check from array[1]
-    //   uncommon_trap();
-    // }
-    // transformed by RC smearing into:
-    // if (1 >=u array.length) {
-    //   uncommon_trap(); // array.length constant folded as 0 here but could actually be 1
-    // }
-    // ..
-    return false;
+  // Constant folding at uncommon traps can go wrong:
+  //
+  // if (0 >=u array.length) {  // range check from array[0]
+  //   uncommon_trap(); // array.length constant folded as 0 here
+  // }
+  // ..
+  // if (1 >=u array.length) {  // range check from array[1]
+  //   uncommon_trap();
+  // }
+  // transformed by RC smearing into:
+  // if (1 >=u array.length) {
+  //   uncommon_trap(); // array.length constant folded as 0 here but could actually be 1
+  // }
+  // ..
+  if (c->is_IfProj() || c->is_Region()) {
+    Node* next_c = c;
+    do {
+      next_c = next_c->unique_ctrl_out();
+      if (next_c->is_CallStaticJava() && next_c->as_CallStaticJava()->is_uncommon_trap()) {
+        return false;
+      }
+    } while (next_c->is_Region());
   }
   const Type* node_t = _type_table->find_type_between(node, _phase->ctrl_or_self(use), c);
   if (node_t == Type::TOP) {
