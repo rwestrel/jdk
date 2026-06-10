@@ -2245,8 +2245,16 @@ void PhaseIterGVN::maybe_make_dependent_paths(Node* k, const Type* t) {
             }
             // We reached this CFG path through data nodes, record it in dead path to later insert an Halt node, if it
             // doesn't die in the meantime
-            dead_path()->add_req(n->in(0)->in(j));
-            _worklist.push(dead_path());
+            if (UseNewCode) {
+              Node* frame = C->start()->proj_out( TypeFunc::FramePtr);
+              stringStream ss;
+              ss.print("dead path discovered by TypeNode during igvn");
+              Node* halt = register_new_node_with_optimizer(new HaltNode(n->in(0)->in(j), frame, ss.as_string(C->comp_arena())));
+              C->root()->add_req(halt);
+            } else {
+              dead_path()->add_req(n->in(0)->in(j));
+              _worklist.push(dead_path());
+            }
             replace_input_of(n, j, C->top());
             replace_input_of(n->in(0), j, C->top());
             if (in->outcnt() == 0) {
@@ -2262,8 +2270,16 @@ void PhaseIterGVN::maybe_make_dependent_paths(Node* k, const Type* t) {
           continue;
         }
         // record it in dead path to later insert an Halt node, if it doesn't die in the meantime
-        dead_path()->add_req(n->in(0));
-        _worklist.push(dead_path());
+        if (UseNewCode) {
+          Node* frame = C->start()->proj_out( TypeFunc::FramePtr);
+          stringStream ss;
+          ss.print("dead path discovered by TypeNode during igvn");
+          Node* halt = register_new_node_with_optimizer(new HaltNode(n->in(0), frame, ss.as_string(C->comp_arena())));
+          C->root()->add_req(halt);
+        } else {
+          dead_path()->add_req(n->in(0));
+          _worklist.push(dead_path());
+        }
         replace_input_of(n, 0, C->top());
         n->remove_dead_region(this, true);
         continue;
