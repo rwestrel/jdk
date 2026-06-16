@@ -467,6 +467,10 @@ public:
   // by if_proj and returns a more refined type if one is produced.
   // Returns null is it couldn't improve the type.
   static const Type* filtered_int_type(PhaseValues* phase, Node* val, Node* if_proj, BasicType bt);
+  static const TypeInt* filtered_int_type(PhaseValues* phase, Node* val, Node* if_proj) {
+    const Type* t = filtered_int_type(phase, val, if_proj, T_INT);
+    return t != nullptr && t->isa_int() ? t->is_int() : nullptr;
+  }
 
   AssertionPredicateType assertion_predicate_type() const {
     return _assertion_predicate_type;
