@@ -458,7 +458,7 @@ class JavaThread: public Thread {
   };
 #endif // ASSERT
 
-  jlong _profile_context;
+  ProfileContext _profile_context;
 
 private:
   friend class VMThread;
@@ -627,8 +627,8 @@ private:
     _unlocked_inflated_monitor = nullptr;
   }
 
-  jlong profile_context() const { return _profile_context; }
-  void set_profile_context(jlong context) { _profile_context = context; }
+  ProfileContext profile_context() const { return _profile_context; }
+  void set_profile_context(ProfileContext context) { _profile_context = context; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;

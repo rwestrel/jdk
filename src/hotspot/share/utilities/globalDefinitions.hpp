@@ -1431,4 +1431,16 @@ bool IEEE_subnormal_handling_OK();
 
 #endif // HOTSPOT_GTEST
 
+class ProfileContext {
+private:
+  jlong _context;
+public:
+  explicit ProfileContext(jlong context) : _context(context) {
+  }
+
+  jlong context() const {
+    return _context;
+  }
+};
+
 #endif // SHARE_UTILITIES_GLOBALDEFINITIONS_HPP
