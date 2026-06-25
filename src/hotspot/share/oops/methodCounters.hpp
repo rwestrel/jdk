@@ -62,17 +62,17 @@ class MethodCounters : public Metadata {
   u1                _highest_comp_level;          // Highest compile level this method has ever seen.
   u1                _highest_osr_comp_level;      // Same for OSR level
 
-  jlong _profile_context;
+  ProfileContext _profile_context;
   MethodCounters* _next;
 
-  MethodCounters(const methodHandle& mh, jlong profile_context);
+  MethodCounters(const methodHandle& mh, ProfileContext profile_context);
   MethodCounters();
 
  public:
   virtual bool is_methodCounters() const { return true; }
   Method* method() const { return _method; }
-  static MethodCounters* allocate_no_exception(const methodHandle& mh, jlong profile_context);
-  static MethodCounters* allocate_with_exception(const methodHandle& mh, jlong profile_context, TRAPS);
+  static MethodCounters* allocate_no_exception(const methodHandle& mh, ProfileContext profile_context);
+  static MethodCounters* allocate_with_exception(const methodHandle& mh, ProfileContext profile_context, TRAPS);
 
   void deallocate_contents(ClassLoaderData* loader_data) {}
 
@@ -123,7 +123,7 @@ class MethodCounters : public Metadata {
   MethodCounters* next() const { return _next; }
   void set_next(MethodCounters* next) { _next = next; }
 
-  jlong profile_context() const { return _profile_context; }
+  ProfileContext profile_context() const { return _profile_context; }
 
   static ByteSize invocation_counter_offset()    {
     return byte_offset_of(MethodCounters, _invocation_counter);

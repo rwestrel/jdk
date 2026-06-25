@@ -3564,7 +3564,7 @@ void InstanceKlass::adjust_default_methods(bool* trace_name_printed) {
 #endif // INCLUDE_JVMTI
 
 // On-stack replacement stuff
-void InstanceKlass::add_osr_nmethod(nmethod* n, jlong profile_context) {
+void InstanceKlass::add_osr_nmethod(nmethod* n, ProfileContext profile_context) {
   assert_lock_strong(NMethodState_lock);
 #ifndef PRODUCT
   nmethod* prev = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), n->comp_level(), true);

@@ -385,7 +385,7 @@ void xmlStream::stamp() {
 // ------------------------------------------------------------------
 // Output a method attribute, in the form " method='pkg/cls name sig'".
 // This is used only when there is no ciMethod available.
-void xmlStream::method(Method* method, jlong profile_context) {
+void xmlStream::method(Method* method, ProfileContext profile_context) {
   assert_if_no_error(inside_attrs(), "printing attributes");
   if (method == nullptr)  return;
   print_raw(" method='");

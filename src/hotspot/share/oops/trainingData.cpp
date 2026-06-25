@@ -51,7 +51,7 @@ TrainingData::DumptimeTrainingDataDictionary* TrainingData::_dumptime_training_d
 int TrainingData::TrainingDataLocker::_lock_mode;
 volatile bool TrainingData::TrainingDataLocker::_snapshot = false;
 
-MethodTrainingData::MethodTrainingData() {
+MethodTrainingData::MethodTrainingData() : _profile_context(0) {
   // Used by cppVtables.cpp only
   assert(CDSConfig::is_dumping_static_archive() || UseSharedSpaces, "only for CDS");
 }
@@ -129,7 +129,7 @@ static bool is_excluded(InstanceKlass* k) {
   return false;
 }
 
-MethodTrainingData* MethodTrainingData::make(const methodHandle& method, jlong profile_context, bool null_if_not_found, bool use_cache) {
+MethodTrainingData* MethodTrainingData::make(const methodHandle& method, ProfileContext profile_context, bool null_if_not_found, bool use_cache) {
   if (!have_data() && !need_data()) {
     return nullptr;
   }

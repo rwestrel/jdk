@@ -44,8 +44,8 @@ class InterpreterRuntime: AllStatic {
 
   static void      set_bcp_and_mdp(address bcp, JavaThread* current);
   static void note_trap_inner(JavaThread* current, int reason, const methodHandle &trap_method, int trap_bci,
-                              jlong profile_context);
-  static void note_trap(JavaThread* current, int reason, jlong profile_context);
+                              ProfileContext profile_context);
+  static void note_trap(JavaThread* current, int reason, ProfileContext profile_context);
 
   // Inner work method for Interpreter's frequency counter overflow.
   static nmethod* frequency_counter_overflow_inner(JavaThread* current, address branch_bcp);

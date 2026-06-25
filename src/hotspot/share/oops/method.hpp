@@ -283,10 +283,10 @@ class Method : public Metadata {
 
 #ifdef COMPILER2
   // Count of times method was exited via exception while interpreting
-  inline void interpreter_throwout_increment(Thread* current, jlong profile_context);
+  inline void interpreter_throwout_increment(Thread* current, ProfileContext profile_context);
 #endif // COMPILER2
 
-  inline int interpreter_throwout_count(jlong profile_context) const;
+  inline int interpreter_throwout_count(ProfileContext profile_context) const;
 
   u2 size_of_parameters() const { return constMethod()->size_of_parameters(); }
 
@@ -331,17 +331,17 @@ class Method : public Metadata {
                               TRAPS);
 
   // method data access
-  MethodData* method_data(jlong profile_context) const;
+  MethodData* method_data(ProfileContext profile_context) const;
   MethodData* method_data_head() const { return _method_data; }
   void set_method_data(MethodData* data);
 
-  MethodTrainingData* training_data_or_null(jlong profile_context) const;
-  bool init_training_data(MethodTrainingData* td, jlong profile_context);
+  MethodTrainingData* training_data_or_null(ProfileContext profile_context) const;
+  bool init_training_data(MethodTrainingData* td, ProfileContext profile_context);
 
   // mark an exception handler as entered (used to prune dead catch blocks in C2)
-  void set_exception_handler_entered(int handler_bci, jlong profile_context);
+  void set_exception_handler_entered(int handler_bci, ProfileContext profile_context);
 
-  MethodCounters* method_counters(jlong profile_context) const;
+  MethodCounters* method_counters(ProfileContext profile_context) const;
   MethodCounters* method_counters_head() const { return _method_counters; }
   MethodCounters2* method_counters2() const;
 
@@ -365,27 +365,27 @@ class Method : public Metadata {
   bool init_method_counters2(MethodCounters2* counters);
   bool init_method_data(MethodData* md);
 
-  inline int prev_event_count(jlong profile_context) const;
-  inline void set_prev_event_count(int count, jlong profile_context);
-  inline jlong prev_time(jlong profile_context) const;
-  inline void set_prev_time(jlong time, jlong profile_context);
-  inline float rate(jlong profile_context) const;
-  inline void set_rate(float rate, jlong profile_context);
+  inline int prev_event_count(ProfileContext profile_context) const;
+  inline void set_prev_event_count(int count, ProfileContext profile_context);
+  inline jlong prev_time(ProfileContext profile_context) const;
+  inline void set_prev_time(jlong time, ProfileContext profile_context);
+  inline float rate(ProfileContext profile_context) const;
+  inline void set_rate(float rate, ProfileContext profile_context);
 
-  inline int invocation_count(jlong profile_context) const;
-  inline int backedge_count(jlong profile_context) const;
+  inline int invocation_count(ProfileContext profile_context) const;
+  inline int backedge_count(ProfileContext profile_context) const;
   int total_invocation_count() const;
   CompLevel max_comp_level() const;
 
-  bool was_executed_more_than(int n, jlong profile_context);
-  bool was_never_executed(jlong profile_context) { return !was_executed_more_than(0, profile_context);  }
+  bool was_executed_more_than(int n, ProfileContext profile_context);
+  bool was_never_executed(ProfileContext profile_context) { return !was_executed_more_than(0, profile_context);  }
 
-  static void build_profiling_method_data(const methodHandle& method, jlong profile_context, TRAPS);
-  static bool install_training_method_data(const methodHandle& method);
-  static MethodCounters* build_method_counters(Thread* current, Method* m, jlong profile_context);
+  static void build_profiling_method_data(const methodHandle& method, ProfileContext profile_context, TRAPS);
+  static bool install_training_method_data(const methodHandle& method, ProfileContext profile_context);
+  static MethodCounters* build_method_counters(Thread* current, Method* m, ProfileContext profile_context);
   static MethodCounters2* build_method_counters2(Thread* current, Method* m);
 
-  int interpreter_invocation_count(jlong profile_context) const;
+  int interpreter_invocation_count(ProfileContext profile_context) const;
 
 #ifndef PRODUCT
   int64_t  compiled_invocation_count() const    { return _compiled_invocation_count;}
@@ -398,7 +398,7 @@ class Method : public Metadata {
   // nmethod/verified compiler entry
   address verified_code_entry();
   bool check_code() const;      // Not inline to avoid circular ref
-  nmethod* code(jlong profile_context) const;
+  nmethod* code(ProfileContext profile_context) const;
 
   // Locks NMethodState_lock if not held.
   void unlink_code(nmethod *compare);
@@ -483,7 +483,7 @@ public:
 
   // Must specify a real function (not null).
   // Use clear_native_function() to unregister.
-  void set_native_function(address function, bool post_event_flag, jlong profile_context);
+  void set_native_function(address function, bool post_event_flag, ProfileContext profile_context);
   bool has_native_function() const;
   void clear_native_function();
 
@@ -637,7 +637,7 @@ public:
   // compiled code support
   // NOTE: code() is inherently racy as deopt can be clearing code
   // simultaneously. Use with caution.
-  bool has_compiled_code(jlong profile_context) const;
+  bool has_compiled_code(ProfileContext profile_context) const;
 
   bool needs_clinit_barrier() const;
 
@@ -847,10 +847,10 @@ public:
   bool is_always_compilable() const;
 
  private:
-  void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, jlong profile_context);
+  void print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, ProfileContext profile_context);
 
  public:
-  MethodCounters* get_method_counters(jlong profile_context, Thread* current) {
+  MethodCounters* get_method_counters(ProfileContext profile_context, Thread* current) {
     if (_method_counters == nullptr) {
       build_method_counters(current, this, profile_context);
     }

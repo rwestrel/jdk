@@ -148,7 +148,7 @@ static void print_method_profiling_data() {
         m->print_invocation_count(&ss);
         MethodData* md = m->method_data_head();
         while (md != nullptr) {
-          ss.print_cr("  context: " JLONG_FORMAT " mdo size: %d bytes", md->profile_context(), md->size_in_bytes());
+          ss.print_cr("  context: " JLONG_FORMAT " mdo size: %d bytes", md->profile_context().context(), md->size_in_bytes());
           ss.cr();
           // Dump data on parameters if any
           if (md != nullptr && md->parameters_type_data() != nullptr) {

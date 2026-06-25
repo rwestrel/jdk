@@ -833,8 +833,8 @@ WB_ENTRY(jint, WB_DeoptimizeMethod(JNIEnv* env, jobject o, jobject method, jbool
       result += mh->method_holder()->mark_osr_nmethods(&deopt_scope, mh());
     } else {
       MutexLocker ml(NMethodState_lock, Mutex::_no_safepoint_check_flag);
-      if (mh->code(0) != nullptr) { // FIXME
-        deopt_scope.mark(mh->code(0)); //FIXME
+      if (mh->code(ProfileContext(0)) != nullptr) { // FIXME
+        deopt_scope.mark(mh->code(ProfileContext(0))); //FIXME
         ++result;
       }
     }
@@ -851,7 +851,7 @@ WB_ENTRY(jboolean, WB_IsMethodCompiled(JNIEnv* env, jobject o, jobject method, j
   CHECK_JNI_EXCEPTION_(env, JNI_FALSE);
   MutexLocker mu(Compile_lock);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0);  // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0));  // FIXME
   if (code == nullptr) {
     return JNI_FALSE;
   }
@@ -955,7 +955,7 @@ WB_ENTRY(jint, WB_GetMethodCompilationLevel(JNIEnv* env, jobject o, jobject meth
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, CompLevel_none);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0);  // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0));  // FIXME
   return (code != nullptr ? code->comp_level() : CompLevel_none);
 WB_END
 
@@ -1096,7 +1096,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
   bool is_blocking = !matcher.directive_set()->BackgroundCompilationOption;
 
   // Compile method and check result
-  nmethod* nm = CompileBroker::compile_method(mh, bci, comp_level, mh->invocation_count(0), CompileTask::Reason_Whitebox, 0, CHECK_false);
+  nmethod* nm = CompileBroker::compile_method(mh, bci, comp_level, mh->invocation_count(ProfileContext(0)), CompileTask::Reason_Whitebox, ProfileContext(0), CHECK_false);
   MutexLocker mu(THREAD, Compile_lock);
   bool is_queued = mh->queued_for_compilation();
   if ((!is_blocking && is_queued) || nm != nullptr) {
@@ -1104,7 +1104,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
   }
   // Check code again because compilation may be finished before Compile_lock is acquired.
   if (bci == InvocationEntryBci) {
-    nmethod* code = mh->code(0); // FIXME
+    nmethod* code = mh->code(ProfileContext(0)); // FIXME
     if (code != nullptr) {
       return true;
     }
@@ -1208,10 +1208,10 @@ WB_ENTRY(void, WB_MarkMethodProfiled(JNIEnv* env, jobject o, jobject method))
   CHECK_JNI_EXCEPTION(env);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
 
-  MethodData* mdo = mh->method_data(0);
+  MethodData* mdo = mh->method_data(ProfileContext(0));
   if (mdo == nullptr) {
-    Method::build_profiling_method_data(mh, 0, CHECK_AND_CLEAR);
-    mdo = mh->method_data(0);
+    Method::build_profiling_method_data(mh, ProfileContext(0), CHECK_AND_CLEAR);
+    mdo = mh->method_data(ProfileContext(0));
   }
   mdo->init();
   InvocationCounter* icnt = mdo->invocation_counter();
@@ -1573,7 +1573,7 @@ WB_ENTRY(jobjectArray, WB_GetNMethod(JNIEnv* env, jobject o, jobject method, jbo
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, nullptr);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(0); // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0)); // FIXME
   jobjectArray result = nullptr;
   if (code == nullptr) {
     return result;
@@ -1619,7 +1619,7 @@ WB_ENTRY(void, WB_RelocateNMethodFromMethod(JNIEnv* env, jobject o, jobject meth
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION(env);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = mh->code(0);
+  nmethod* code = mh->code(ProfileContext(0));
   if (code != nullptr) {
     MutexLocker ml_Compile_lock(Compile_lock);
     CompiledICLocker ic_locker(code);
@@ -1741,7 +1741,7 @@ WB_ENTRY(jlong, WB_GetMethodData(JNIEnv* env, jobject wv, jobject method))
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, 0);
   methodHandle mh(thread, Method::checked_resolve_jmethod_id(jmid));
-  return (jlong) mh->method_data(0);
+  return (jlong) mh->method_data(ProfileContext(0));
 WB_END
 
 WB_ENTRY(jlong, WB_GetThreadStackSize(JNIEnv* env, jobject o))

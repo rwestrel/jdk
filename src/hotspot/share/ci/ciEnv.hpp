@@ -471,7 +471,7 @@ public:
   // RedefineClasses support
   void metadata_do(MetadataClosure* f) { _factory->metadata_do(f); }
 
-  jlong profile_context() const;
+  ProfileContext profile_context() const;
 
   // Replay support
 private:

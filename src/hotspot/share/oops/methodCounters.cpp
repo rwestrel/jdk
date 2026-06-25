@@ -32,7 +32,7 @@
 #include "oops/trainingData.hpp"
 #include "runtime/handles.inline.hpp"
 
-MethodCounters::MethodCounters(const methodHandle& mh, jlong profile_context) :
+MethodCounters::MethodCounters(const methodHandle& mh, ProfileContext profile_context) :
   _method(mh()),
   _method_training_data(method_training_data_sentinel()),
   _prev_time(0),
@@ -53,18 +53,18 @@ MethodCounters::MethodCounters(const methodHandle& mh, jlong profile_context) :
 }
 
 #if INCLUDE_CDS
-MethodCounters::MethodCounters() {
+MethodCounters::MethodCounters() : _profile_context(0) {
   // Used by cppVtables.cpp only
   assert(CDSConfig::is_dumping_static_archive() || UseSharedSpaces, "only for CDS");
 }
 #endif
 
-MethodCounters* MethodCounters::allocate_no_exception(const methodHandle& mh, jlong profile_context) {
+MethodCounters* MethodCounters::allocate_no_exception(const methodHandle& mh, ProfileContext profile_context) {
   ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
   return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType) MethodCounters(mh, profile_context);
 }
 
-MethodCounters* MethodCounters::allocate_with_exception(const methodHandle& mh, jlong profile_context, TRAPS) {
+MethodCounters* MethodCounters::allocate_with_exception(const methodHandle& mh, ProfileContext profile_context, TRAPS) {
   ClassLoaderData* loader_data = mh->method_holder()->class_loader_data();
   return new(loader_data, method_counters_size(), MetaspaceObj::MethodCountersType, THREAD) MethodCounters(mh, profile_context);
 }

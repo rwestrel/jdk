@@ -1118,7 +1118,7 @@ bool ciMethod::can_be_compiled() {
 
 // ------------------------------------------------------------------
 // ciMethod::has_compiled_code
-bool ciMethod::has_compiled_code(jlong profile_context) {
+bool ciMethod::has_compiled_code(ProfileContext profile_context) {
   return inline_instructions_size(profile_context) > 0;
 }
 
@@ -1152,18 +1152,18 @@ int ciMethod::code_size_for_inlining() {
 // specific accessor nmethod::insts_size.
 // Also some instructions inside the code are excluded from inline
 // heuristic (e.g. post call nop instructions; see InlineSkippedInstructionsCounter)
-int ciMethod::inline_instructions_size(jlong profile_context) {
+int ciMethod::inline_instructions_size(ProfileContext profile_context) {
   if (_inline_instructions_size == -1) {
     if (TrainingData::have_data()) {
       GUARDED_VM_ENTRY(
         CompLevel level = static_cast<CompLevel>(CURRENT_ENV->comp_level());
         methodHandle top_level_mh(Thread::current(), CURRENT_ENV->task()->method());
-        MethodTrainingData* mtd = MethodTrainingData::find(top_level_mh);
+        MethodTrainingData* mtd = MethodTrainingData::find(top_level_mh, profile_context);
         if (mtd != nullptr) {
           CompileTrainingData* ctd = mtd->last_toplevel_compile(level);
           if (ctd != nullptr) {
             methodHandle mh(Thread::current(), get_Method());
-            MethodTrainingData* this_mtd = MethodTrainingData::find(mh);
+            MethodTrainingData* this_mtd = MethodTrainingData::find(mh, profile_context);
             if (this_mtd != nullptr) {
               auto r = ctd->ci_records().ciMethod__inline_instructions_size.find(this_mtd);
               if (r.is_valid()) {

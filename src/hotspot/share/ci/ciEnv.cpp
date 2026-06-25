@@ -1698,4 +1698,4 @@ void ciEnv::dump_replay_data_version(outputStream* out) {
   out->print_cr("version %d", REPLAY_VERSION);
 }
 
-jlong ciEnv::profile_context() const { return _task->profile_context(); }
+ProfileContext ciEnv::profile_context() const { return _task->profile_context(); }

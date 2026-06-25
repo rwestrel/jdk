@@ -3755,11 +3755,11 @@ JVM_LEAF(jboolean, JVM_PrintWarningAtDynamicAgentLoad(void))
 JVM_END
 
 JVM_LEAF(void, JVM_SetProfileContext(JNIEnv *env, jclass ignored, jlong context))
-  JavaThread::current()->set_profile_context(context);
+  JavaThread::current()->set_profile_context(ProfileContext(context));
   // JavaThread::current()->set_profile_context(ProfileContext(context));
 JVM_END
 
 JVM_LEAF(jlong , JVM_GetProfileContext(JNIEnv *env, jclass ignored))
-  return JavaThread::current()->profile_context();
+  return JavaThread::current()->profile_context().context();
   // return JavaThread::current()->profile_context().context();
 JVM_END

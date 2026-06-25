@@ -137,7 +137,7 @@ class xmlStream : public outputStream {
 
   // commonly used XML attributes
   void          stamp();                 // stamp='1.234'
-  void          method(Method* m, jlong profile_context);       // method='k n s' ...
+  void          method(Method* m, ProfileContext profile_context);       // method='k n s' ...
   void          klass(Klass* k);         // klass='name'
   void          name(const Symbol* s);   // name='name'
   void          object(const char* attr, Metadata* val);

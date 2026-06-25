@@ -714,7 +714,7 @@ void SpeculativeTrapData::print_data_on(outputStream* st, const char* extra) con
 // A MethodData* holds information which has been collected about
 // a method.
 
-MethodData* MethodData::allocate(ClassLoaderData* loader_data, const methodHandle& method, jlong profile_context, TRAPS) {
+MethodData* MethodData::allocate(ClassLoaderData* loader_data, const methodHandle& method, ProfileContext profile_context, TRAPS) {
   assert(!THREAD->owns_locks(), "Should not own any locks");
   int size = MethodData::compute_allocation_size_in_words(method);
 
@@ -1166,7 +1166,7 @@ void MethodData::post_initialize(BytecodeStream* stream) {
 }
 
 // Initialize the MethodData* corresponding to a given method.
-MethodData::MethodData(const methodHandle& method, jlong profile_context)
+MethodData::MethodData(const methodHandle& method, ProfileContext profile_context)
   : _method(method()),
     // Holds Compile_lock
     _profile_context(profile_context),
@@ -1178,7 +1178,7 @@ MethodData::MethodData(const methodHandle& method, jlong profile_context)
 }
 
 #if INCLUDE_CDS
-MethodData::MethodData() {
+MethodData::MethodData() : _profile_context(0) {
   // Used by cppVtables.cpp only
   assert(CDSConfig::is_dumping_static_archive() || UseSharedSpaces, "only for CDS");
 }

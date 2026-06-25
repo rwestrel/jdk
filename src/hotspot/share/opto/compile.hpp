@@ -1385,7 +1385,7 @@ public:
     return make_debug_print_call(str, call_addr, gvn, in...);
   }
 #endif
-  jlong profile_context() const {
+  ProfileContext profile_context() const {
     return env()->profile_context();
   }
 };

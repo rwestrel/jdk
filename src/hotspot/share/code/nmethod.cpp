@@ -1091,7 +1091,7 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
   AbstractCompiler* compiler,
   CompLevel comp_level,
   Flags flags,
-  jlong profile_context)
+  ProfileContext profile_context)
 {
   assert(debug_info->oop_recorder() == code_buffer->oop_recorder(), "shared OR");
   code_buffer->finalize_oop_references(method);
@@ -1231,14 +1231,14 @@ nmethod::nmethod(
   _gc_epoch(CodeCache::gc_epoch()),
   _method(method),
   _native_receiver_sp_offset(basic_lock_owner_sp_offset),
-  _native_basic_lock_sp_offset(basic_lock_sp_offset)
+  _native_basic_lock_sp_offset(basic_lock_sp_offset),
+  _profile_context(0)
 {
   {
     DEBUG_ONLY(NoSafepointVerifier nsv;)
     assert_locked_or_safepoint(CodeCache_lock);
 
     init_defaults(code_buffer, offsets);
-    _profile_context         = 0;
 
     _osr_entry_point         = nullptr;
     _verified_entry_point         = nullptr;
@@ -1326,7 +1326,8 @@ nmethod::nmethod(
 
 
 nmethod::nmethod(const nmethod &nm) : CodeBlob(nm._name, nm._kind, nm._size, nm._header_size),
-  _flags(nm._flags)
+                                      _profile_context(nm._profile_context),
+                                      _flags(nm._flags)
 {
 
   if (nm._oop_maps != nullptr) {
@@ -1615,13 +1616,14 @@ nmethod::nmethod(
   AbstractCompiler* compiler,
   CompLevel comp_level,
   Flags flags,
-  jlong profile_context)
+  ProfileContext profile_context)
   : CodeBlob("nmethod", CodeBlobKind::Nmethod, code_buffer, nmethod_size, sizeof(nmethod),
              offsets->value(CodeOffsets::Frame_Complete), frame_size, oop_maps, false, mutable_data_size),
   _deoptimization_generation(0),
   _gc_epoch(CodeCache::gc_epoch()),
   _method(method),
   _osr_link(nullptr),
+  _profile_context(profile_context),
   _flags(flags)
 {
   assert(debug_info->oop_recorder() == code_buffer->oop_recorder(), "shared OR");
@@ -1630,7 +1632,6 @@ nmethod::nmethod(
     assert_locked_or_safepoint(CodeCache_lock);
 
     init_defaults(code_buffer, offsets);
-    _profile_context= profile_context;
 
     _osr_entry_point = code_begin() + offsets->value(CodeOffsets::OSR_Entry);
     _verified_entry_point = code_begin() + offsets->value(CodeOffsets::Verified_Entry);

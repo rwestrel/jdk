@@ -2571,7 +2571,7 @@ class BacktraceIterator : public StackObj {
 // Print stack trace element to the specified output stream.
 // The output is formatted into a stringStream and written to the outputStream in one step.
 static void print_stack_element_to_stream(outputStream* st, Handle mirror, int method_id,
-                                          int version, int bci, Symbol* name, jlong profile_context) {
+                                          int version, int bci, Symbol* name, ProfileContext profile_context) {
   ResourceMark rm;
   stringStream ss;
 
@@ -2628,7 +2628,7 @@ static void print_stack_element_to_stream(outputStream* st, Handle mirror, int m
   st->print_raw(ss.freeze(), ss.size());
 }
 
-void java_lang_Throwable::print_stack_element(outputStream* st, Method* method, int bci, jlong profile_context) {
+void java_lang_Throwable::print_stack_element(outputStream* st, Method* method, int bci, ProfileContext profile_context) {
   Handle mirror (Thread::current(),  method->method_holder()->java_mirror());
   int method_id = method->orig_method_idnum();
   int version = method->constants()->version();

@@ -573,7 +573,7 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   }
 
   if (entry != nullptr) {
-    method->set_native_function(entry, native_bind_event_is_interesting, 0); //FIXME
+    method->set_native_function(entry, native_bind_event_is_interesting, ProfileContext(0)); //FIXME
   } else {
     method->clear_native_function();
   }
@@ -586,7 +586,7 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
   return true;
 }
 
-bool Method::was_executed_more_than(int n, jlong profile_context) {
+bool Method::was_executed_more_than(int n, ProfileContext profile_context) {
   // Invocation counter is reset when the Method* is compiled.
   // If the method has compiled code we therefore assume it has
   // be executed more than n times.
@@ -633,8 +633,8 @@ void Method::print_invocation_count(outputStream* st) {
 
   MethodCounters* method_counters = _method_counters;
   while (method_counters != nullptr) {
-    jlong profile_context = method_counters->profile_context();
-    st->print_cr (" profile_context: " JLONG_FORMAT, profile_context);
+    ProfileContext profile_context = method_counters->profile_context();
+    st->print_cr (" profile_context: " JLONG_FORMAT, profile_context.context());
     st->print_cr ("  interpreter_invocation_count: " INT32_FORMAT_W(11), interpreter_invocation_count(profile_context));
     st->print_cr ("  invocation_counter:           " INT32_FORMAT_W(11), invocation_count(profile_context));
     st->print_cr ("  backedge_counter:             " INT32_FORMAT_W(11), backedge_count(profile_context));
@@ -652,7 +652,7 @@ void Method::print_invocation_count(outputStream* st) {
 #endif
 }
 
-MethodTrainingData* Method::training_data_or_null(jlong profile_context) const {
+MethodTrainingData* Method::training_data_or_null(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return nullptr;
@@ -665,7 +665,7 @@ MethodTrainingData* Method::training_data_or_null(jlong profile_context) const {
   }
 }
 
-bool Method::init_training_data(MethodTrainingData* td, jlong profile_context) {
+bool Method::init_training_data(MethodTrainingData* td, ProfileContext profile_context) {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return false;
@@ -674,8 +674,8 @@ bool Method::init_training_data(MethodTrainingData* td, jlong profile_context) {
   }
 }
 
-bool Method::install_training_method_data(const methodHandle& method) {
-  MethodTrainingData* mtd = MethodTrainingData::find(method);
+bool Method::install_training_method_data(const methodHandle& method, ProfileContext profile_context) {
+  MethodTrainingData* mtd = MethodTrainingData::find(method, profile_context);
   if (mtd != nullptr && mtd->final_profile() != nullptr) {
     AtomicAccess::replace_if_null(&method->_method_data, mtd->final_profile());
     return true;
@@ -685,8 +685,8 @@ bool Method::install_training_method_data(const methodHandle& method) {
 
 // Build a MethodData* object to hold profiling information collected on this
 // method when requested.
-void Method::build_profiling_method_data(const methodHandle& method, jlong profile_context, TRAPS) {
-  if (install_training_method_data(method)) {
+void Method::build_profiling_method_data(const methodHandle& method, ProfileContext profile_context, TRAPS) {
+  if (install_training_method_data(method, profile_context)) {
     return;
   }
   // Do not profile the method if metaspace has hit an OOM previously
@@ -732,7 +732,7 @@ void Method::build_profiling_method_data(const methodHandle& method, jlong profi
   }
 }
 
-MethodCounters* Method::build_method_counters(Thread* current, Method* m, jlong profile_context) {
+MethodCounters* Method::build_method_counters(Thread* current, Method* m, ProfileContext profile_context) {
   // Do not profile the method if metaspace has hit an OOM previously
   if (ClassLoaderDataGraph::has_metaspace_oom()) {
     return nullptr;
@@ -892,7 +892,7 @@ bool Method::init_method_data(MethodData* md) {
 //  return Atomic::replace_if_null(&_method_counters, counters);
 }
 
-void Method::set_exception_handler_entered(int handler_bci, jlong profile_context) {
+void Method::set_exception_handler_entered(int handler_bci, ProfileContext profile_context) {
   if (ProfileExceptionHandlers) {
     MethodData* mdo = method_data(profile_context);
     if (mdo != nullptr) {
@@ -1187,7 +1187,7 @@ bool Method::is_klass_loaded(int refinfo_index, Bytecodes::Code bc, bool must_be
 }
 
 
-void Method::set_native_function(address function, bool post_event_flag, jlong profile_context) {
+void Method::set_native_function(address function, bool post_event_flag, ProfileContext profile_context) {
   assert(function != nullptr, "use clear_native_function to unregister natives");
   assert(!is_special_native_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
   address* native_function = native_function_addr();
@@ -1230,7 +1230,7 @@ void Method::clear_native_function() {
   // Note: is_method_handle_intrinsic() is allowed here.
   set_native_function(
           SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
-          !native_bind_event_is_interesting, 0); // FIXME
+          !native_bind_event_is_interesting, ProfileContext(0)); // FIXME
   this->unlink_code();
 }
 
@@ -1242,7 +1242,7 @@ void Method::set_signature_handler(address handler) {
 
 
 void
-Method::print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, jlong profile_context) {
+Method::print_made_not_compilable(int comp_level, bool is_osr, bool report, const char* reason, ProfileContext profile_context) {
   assert(reason != nullptr, "must provide a reason");
   if (PrintCompilation && report) {
     ttyLocker ttyl;
@@ -1306,7 +1306,7 @@ void Method::set_not_compilable(const char* reason, int comp_level, bool report)
     // Don't mark a method which should be always compilable
     return;
   }
-  print_made_not_compilable(comp_level, /*is_osr*/ false, report, reason, 0); // FIXME
+  print_made_not_compilable(comp_level, /*is_osr*/ false, report, reason, ProfileContext(0)); // FIXME
   if (comp_level == CompLevel_all) {
     set_is_not_c1_compilable();
     set_is_not_c2_compilable();
@@ -1332,7 +1332,7 @@ bool Method::is_not_osr_compilable(int comp_level) const {
 }
 
 void Method::set_not_osr_compilable(const char* reason, int comp_level, bool report) {
-  print_made_not_compilable(comp_level, /*is_osr*/ true, report, reason, 0); // FIXME
+  print_made_not_compilable(comp_level, /*is_osr*/ true, report, reason, ProfileContext(0)); // FIXME
   if (comp_level == CompLevel_all) {
     set_is_not_c1_osr_compilable();
     set_is_not_c2_osr_compilable();
@@ -1470,7 +1470,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   if (is_native() && !has_native_function()) {
     set_native_function(
             SharedRuntime::native_method_throw_unsatisfied_link_error_entry(),
-            !native_bind_event_is_interesting, 0); // FIXME
+            !native_bind_event_is_interesting, ProfileContext(0)); // FIXME
   }
 
   // Setup compiler entrypoint.  This is made eagerly, so we do not need
@@ -1501,7 +1501,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
     if (Continuations::enabled()) {
       assert(!Threads::is_vm_complete(), "should only be called during vm init");
       AdapterHandlerLibrary::create_native_wrapper(h_method);
-      if (!h_method->has_compiled_code(0)) { // FIXME
+      if (!h_method->has_compiled_code(ProfileContext(0))) { // FIXME
         THROW_MSG(vmSymbols::java_lang_OutOfMemoryError(), "Initial size of CodeCache is too small");
       }
       assert(_from_interpreted_entry == get_i2c_entry(), "invariant");
@@ -2435,7 +2435,7 @@ void Method::print_on(outputStream* st) const {
   }
   MethodData* method_data = _method_data;
   while (method_data != nullptr) {
-    st->print_cr(" - method data:       " PTR_FORMAT " (" JLONG_FORMAT ")", p2i(method_data), method_data->profile_context());
+    st->print_cr(" - method data:       " PTR_FORMAT " (" JLONG_FORMAT ")", p2i(method_data), method_data->profile_context().context());
     method_data = method_data->next();
   }
   st->print_cr(" - checked ex length: %d",   checked_exceptions_length());
@@ -2475,7 +2475,7 @@ void Method::print_on(outputStream* st) const {
   }
   nmethod* code = _code;
   while (code != nullptr) {
-    st->print   (" - compiled code: (profile context = " JLONG_FORMAT ")", code->as_nmethod()->profile_context());
+    st->print   (" - compiled code: (profile context = " JLONG_FORMAT ")", code->as_nmethod()->profile_context().context());
     code->print_value_on(st);
     code = code->as_nmethod()->next();
   }
@@ -2604,7 +2604,7 @@ uint Method::trap_count(char* reason_str) const {
 }
 
 
-MethodCounters* Method::method_counters(jlong profile_context) const {
+MethodCounters* Method::method_counters(ProfileContext profile_context) const {
   MethodCounters* method_counters = _method_counters;
   while (method_counters != nullptr && method_counters->profile_context() != profile_context) {
     method_counters = method_counters->next();
@@ -2617,7 +2617,7 @@ MethodCounters2* Method::method_counters2() const {
   return method_counters2;
 }
 
-MethodData* Method::method_data(jlong profile_context) const {
+MethodData* Method::method_data(ProfileContext profile_context) const {
   MethodData* method_data = _method_data;
   while (method_data != nullptr && method_data->profile_context() != profile_context) {
     method_data = method_data->next();

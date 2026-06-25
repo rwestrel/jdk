@@ -746,10 +746,10 @@ class MethodTrainingData : public TrainingData {
 
   int _invocation_count;
   int _backedge_count;
-  jlong _profile_context;
+  ProfileContext _profile_context;
 
   MethodTrainingData();
-  MethodTrainingData(Method* method, KlassTrainingData* ktd, jlong profile_context) : TrainingData(method) {
+  MethodTrainingData(Method* method, KlassTrainingData* ktd, ProfileContext profile_context) : TrainingData(method), _profile_context(profile_context) {
     _klass = ktd;
     _holder = method;
     for (int i = 0; i < CompLevel_count - 1; i++) {
@@ -760,7 +760,6 @@ class MethodTrainingData : public TrainingData {
     _was_toplevel = false;
     _invocation_count = 0;
     _backedge_count = 0;
-    _profile_context = profile_context;
   }
 
   static int level_mask(int level) {
@@ -806,11 +805,11 @@ class MethodTrainingData : public TrainingData {
   }
 
   static MethodTrainingData *make(const methodHandle &method,
-                                  jlong profile_context,
+                                  ProfileContext profile_context,
                                   bool null_if_not_found = false,
                                   bool use_cache = true) NOT_CDS_RETURN_(nullptr);
-  static MethodTrainingData* find_fast(const methodHandle& method) { return make(method, true, true); }
-  static MethodTrainingData* find(const methodHandle& method) { return make(method, true, false); }
+  static MethodTrainingData* find_fast(const methodHandle& method, ProfileContext profile_context) { return make(method, profile_context, true, true); }
+  static MethodTrainingData* find(const methodHandle& method, ProfileContext profile_context) { return make(method, profile_context, true, false); }
 
   virtual MethodTrainingData* as_MethodTrainingData() const {
     return const_cast<MethodTrainingData*>(this);
@@ -850,7 +849,7 @@ class MethodTrainingData : public TrainingData {
 
   void verify(bool verify_dep_counter);
 
-  static MethodTrainingData* allocate(Method* m, KlassTrainingData* ktd, jlong profile_context) {
+  static MethodTrainingData* allocate(Method* m, KlassTrainingData* ktd, ProfileContext profile_context) {
     return TrainingData::allocate<MethodTrainingData>(m, ktd, profile_context);
   }
 };

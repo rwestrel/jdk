@@ -45,7 +45,7 @@ CompileTask::CompileTask(int compile_id,
                          int hot_count,
                          CompileReason compile_reason,
                          bool is_blocking,
-                         jlong profile_context) :
+                         ProfileContext profile_context) :
   _compile_id(compile_id),
   _method(method()),
   _method_holder(JNIHandles::make_weak_global(Handle(Thread::current(), method->method_holder()->klass_holder()))),
@@ -179,7 +179,7 @@ void CompileTask::print_post(outputStream* st) {
 
 // ------------------------------------------------------------------
 // CompileTask::print_impl
-void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, int comp_level, jlong profile_context,
+void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, int comp_level, ProfileContext profile_context,
                              bool is_osr_method, int osr_bci, bool is_blocking,
                              const char* compiler_name,
                              const char* msg, bool short_form, bool cr, bool after_compile_details,
@@ -279,7 +279,7 @@ void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, i
     sst.print(" (size %d/%d)", nm_total_size, nm_insts_size);
   }
 
-  st->print(" profile context:" JLONG_FORMAT, profile_context);
+  st->print(" profile context:" JLONG_FORMAT, profile_context.context());
 
   if (msg != nullptr) {
     sst.print("   %s", msg);

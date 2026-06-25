@@ -1955,14 +1955,14 @@ class MethodData : public Metadata {
 
   Mutex* volatile _extra_data_lock;
 
-  jlong _profile_context;
+  ProfileContext _profile_context;
   MethodData* _next;
 
-  MethodData(const methodHandle& method, jlong profile_context);
+  MethodData(const methodHandle& method, ProfileContext profile_context);
 public:
   MethodData();
 
-  static MethodData* allocate(ClassLoaderData* loader_data, const methodHandle& method, jlong profile_context, TRAPS);
+  static MethodData* allocate(ClassLoaderData* loader_data, const methodHandle& method, ProfileContext profile_context, TRAPS);
 
   virtual bool is_methodData() const { return true; }
   void initialize();
@@ -2295,7 +2295,7 @@ public:
 
   // Accessors
   Method* method() const { return _method; }
-  jlong profile_context() const { return _profile_context; }
+  ProfileContext profile_context() const { return _profile_context; }
   MethodData* next() const { return _next; }
   void set_next(MethodData* next) { _next = next; }
 

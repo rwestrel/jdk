@@ -42,7 +42,7 @@ inline address Method::from_interpreted_entry() const {
   return AtomicAccess::load_acquire(&_from_interpreted_entry);
 }
 
-inline nmethod* Method::code(jlong profile_context) const {
+inline nmethod* Method::code(ProfileContext profile_context) const {
   assert( check_code(), "" );
   nmethod* code = AtomicAccess::load_acquire(&_code);
   while (code != nullptr && code->as_nmethod()->profile_context() != profile_context) {
@@ -84,7 +84,7 @@ inline void CompressedLineNumberWriteStream::write_pair(int bci, int line) {
   write_pair_inline(bci, line);
 }
 
-inline bool Method::has_compiled_code(jlong profile_context) const { return code(profile_context) != nullptr; }
+inline bool Method::has_compiled_code(ProfileContext profile_context) const { return code(profile_context) != nullptr; }
 
 inline bool Method::is_empty_method() const {
   return  code_size() == 1
@@ -142,7 +142,7 @@ inline void Method::clear_number_of_breakpoints() {
 #endif // INCLUDE_JVMTI
 
 #ifdef COMPILER2
-inline void Method::interpreter_throwout_increment(Thread* current, jlong profile_context) {
+inline void Method::interpreter_throwout_increment(Thread* current, ProfileContext profile_context) {
   MethodCounters* mcs = get_method_counters(profile_context, current);
   if (mcs != nullptr) {
     mcs->interpreter_throwout_increment();
@@ -150,7 +150,7 @@ inline void Method::interpreter_throwout_increment(Thread* current, jlong profil
 }
 #endif // COMPILER2
 
-inline int Method::interpreter_throwout_count(jlong profile_context) const        {
+inline int Method::interpreter_throwout_count(ProfileContext profile_context) const        {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return 0;
@@ -159,43 +159,43 @@ inline int Method::interpreter_throwout_count(jlong profile_context) const      
   }
 }
 
-inline int Method::prev_event_count(jlong profile_context) const {
+inline int Method::prev_event_count(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->prev_event_count();
 }
 
-inline void Method::set_prev_event_count(int count, jlong profile_context) {
+inline void Method::set_prev_event_count(int count, ProfileContext profile_context) {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_prev_event_count(count);
   }
 }
 
-inline jlong Method::prev_time(jlong profile_context) const {
+inline jlong Method::prev_time(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->prev_time();
 }
 
-inline void Method::set_prev_time(jlong time, jlong profile_context) {
+inline void Method::set_prev_time(jlong time, ProfileContext profile_context) {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_prev_time(time);
   }
 }
 
-inline float Method::rate(jlong profile_context) const {
+inline float Method::rate(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   return mcs == nullptr ? 0 : mcs->rate();
 }
 
-inline void Method::set_rate(float rate, jlong profile_context) {
+inline void Method::set_rate(float rate, ProfileContext profile_context) {
   MethodCounters* mcs = method_counters(profile_context);
   if (mcs != nullptr) {
     mcs->set_rate(rate);
   }
 }
 
-inline int Method::invocation_count(jlong profile_context) const {
+inline int Method::invocation_count(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   MethodData* mdo = method_data(profile_context);
   if (((mcs != nullptr) ? mcs->invocation_counter()->carry() : false) ||
@@ -207,7 +207,7 @@ inline int Method::invocation_count(jlong profile_context) const {
   }
 }
 
-inline int Method::backedge_count(jlong profile_context) const {
+inline int Method::backedge_count(ProfileContext profile_context) const {
   MethodCounters* mcs = method_counters(profile_context);
   MethodData* mdo = method_data(profile_context);
   if (((mcs != nullptr) ? mcs->backedge_counter()->carry() : false) ||
@@ -228,7 +228,7 @@ inline int Method::highest_comp_level() const {
   }
 }
 
-inline int Method::interpreter_invocation_count(jlong profile_context) const {
+inline int Method::interpreter_invocation_count(ProfileContext profile_context) const {
   return invocation_count(profile_context);
 }
 

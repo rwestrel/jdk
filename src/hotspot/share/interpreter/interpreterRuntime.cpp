@@ -294,7 +294,7 @@ JRT_END
 // Exceptions
 
 void InterpreterRuntime::note_trap_inner(JavaThread* current, int reason, const methodHandle &trap_method, int trap_bci,
-                                         jlong profile_context) {
+                                         ProfileContext profile_context) {
   if (trap_method.not_null()) {
     MethodData* trap_mdo = trap_method->method_data(profile_context);
     if (trap_mdo == nullptr) {
@@ -320,7 +320,7 @@ void InterpreterRuntime::note_trap_inner(JavaThread* current, int reason, const 
 
 // Assume the compiler is (or will be) interested in this event.
 // If necessary, create an MDO to hold the information, and record it.
-void InterpreterRuntime::note_trap(JavaThread* current, int reason, jlong profile_context) {
+void InterpreterRuntime::note_trap(JavaThread* current, int reason, ProfileContext profile_context) {
   assert(ProfileTraps, "call me only if profiling");
   LastFrameAccessor last_frame(current);
   methodHandle trap_method(current, last_frame.method());
@@ -1135,7 +1135,7 @@ JRT_ENTRY(void, InterpreterRuntime::update_mdp_for_ret(JavaThread* current, int 
 JRT_END
 
 JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters(JavaThread* current, Method* m, jlong profile_context))
-  return Method::build_method_counters(current, m, UseNewCode ? profile_context : 0);
+  return Method::build_method_counters(current, m, ProfileContext(UseNewCode ? profile_context : 0));
 JRT_END
 
 //JRT_ENTRY(MethodCounters*, InterpreterRuntime::build_method_counters_for_profile_context(JavaThread* current, Method* m))

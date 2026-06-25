@@ -136,10 +136,10 @@ class CompileReplay : public StackObj {
   Method*  _imethod;
   int      _entry_bci;
   int      _comp_level;
-  jlong _profile_context;
+  ProfileContext _profile_context;
 
  public:
-  CompileReplay(const char* filename, TRAPS) {
+  CompileReplay(const char* filename, TRAPS) : _profile_context(0) {
     _thread = THREAD;
     _loader = Handle(_thread, SystemDictionary::java_system_loader());
 
@@ -180,7 +180,7 @@ class CompileReplay : public StackObj {
     assert(strcmp(parse_quoted_string(), "this is it") == 0, "what");
   }
 
-  jlong profile_context() const { return _profile_context; }
+  ProfileContext profile_context() const { return _profile_context; }
 
   bool had_error() {
     return _error_message != nullptr || _thread->has_pending_exception();

@@ -107,11 +107,11 @@ class CompileTask : public CHeapObj<mtCompiler> {
   bool                 _failure_reason_on_C_heap;
   CompileTrainingData* _training_data;
   size_t               _arena_bytes;  // peak size of temporary memory during compilation (e.g. node arenas)
-  jlong _profile_context;
+  ProfileContext _profile_context;
 
  public:
   CompileTask(int compile_id, const methodHandle& method, int osr_bci, int comp_level,
-              int hot_count, CompileReason compile_reason, bool is_blocking, jlong profile_context);
+              int hot_count, CompileReason compile_reason, bool is_blocking, ProfileContext profile_context);
   ~CompileTask();
 
   static void wait_for_no_active_tasks();
@@ -151,7 +151,7 @@ class CompileTask : public CHeapObj<mtCompiler> {
   void         set_comp_level(int comp_level)    { _comp_level = comp_level;}
 
   CompileReason compile_reason()                 { return _compile_reason; }
-  jlong profile_context() const { return _profile_context; }
+  ProfileContext profile_context() const { return _profile_context; }
 
   AbstractCompiler* compiler() const;
   CompileTask*      select_for_compilation();
@@ -176,7 +176,7 @@ class CompileTask : public CHeapObj<mtCompiler> {
   size_t       arena_bytes() const               { return _arena_bytes; }
 
 private:
-  static void  print_impl(outputStream* st, Method* method, int compile_id, int comp_level, jlong profile_context,
+  static void  print_impl(outputStream* st, Method* method, int compile_id, int comp_level, ProfileContext profile_context,
                                       bool is_osr_method = false, int osr_bci = -1, bool is_blocking = false,
                                       const char* compiler_name = nullptr,
                                       const char* msg = nullptr, bool short_form = false, bool cr = true,

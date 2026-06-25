@@ -4059,7 +4059,7 @@ class TransferNativeFunctionRegistration {
           // Redefine does not send events (except CFLH), certainly not this
           // behind the scenes re-registration.
           new_method->set_native_function(old_method->native_function(),
-                                          !Method::native_bind_event_is_interesting, 0); //FIXME
+                                          !Method::native_bind_event_is_interesting, ProfileContext(0)); //FIXME
         }
       }
     }

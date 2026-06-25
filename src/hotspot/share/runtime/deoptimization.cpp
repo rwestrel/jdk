@@ -1573,7 +1573,7 @@ JRT_END
 
 MethodData*
 Deoptimization::get_method_data(JavaThread* thread, const methodHandle &m, bool create_if_missing,
-                                jlong profile_context) {
+                                ProfileContext profile_context) {
   JavaThread* THREAD = thread; // For exception macros.
   MethodData* mdo = m()->method_data(profile_context);
   if (mdo == nullptr && create_if_missing && !HAS_PENDING_EXCEPTION) {

@@ -307,7 +307,7 @@ class ciMethod : public ciMetadata {
   bool has_option_value(CompileCommandEnum option, double& value);
   bool can_be_compiled();
   bool can_be_parsed() const { return _can_be_parsed; }
-  bool has_compiled_code(jlong profile_context);
+  bool has_compiled_code(ProfileContext profile_context);
   void log_nmethod_identity(xmlStream* log);
   bool is_not_reached(int bci);
   bool was_executed_more_than(int times);
@@ -317,7 +317,7 @@ class ciMethod : public ciMetadata {
   bool ensure_method_data();  // make sure it exists in the VM also
   MethodCounters* ensure_method_counters();
 
-  int inline_instructions_size(jlong profile_context);
+  int inline_instructions_size(ProfileContext profile_context);
   int scale_count(int count, float prof_factor = 1.);  // make MDO count commensurate with IIC
 
   // Stack walking support

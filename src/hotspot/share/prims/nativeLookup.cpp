@@ -410,7 +410,7 @@ address NativeLookup::lookup(const methodHandle& method, TRAPS) {
   if (!method->has_native_function()) {
     address entry = lookup_base(method, CHECK_NULL);
     method->set_native_function(entry,
-                                Method::native_bind_event_is_interesting, 0); // FIXME
+                                Method::native_bind_event_is_interesting, ProfileContext(0)); // FIXME
     // -verbose:jni printing
     if (log_is_enabled(Debug, jni, resolve)) {
       ResourceMark rm(THREAD);

@@ -108,7 +108,7 @@ private:
   bool is_speculated_klass(Klass* receiver_klass);
 
   // Inline cache states
-  void set_to_monomorphic(jlong profile_context);
+  void set_to_monomorphic(ProfileContext profile_context);
   void set_to_megamorphic(CallInfo* call_info);
 
 public:
@@ -130,7 +130,7 @@ public:
   // MT-safe patching of inline caches. Note: Only safe to call is_xxx when holding the CompiledICLocker
   // so you are guaranteed that no patching takes place. The same goes for verify.
   void set_to_clean();
-  void update(CallInfo* call_info, Klass* receiver_klass, jlong profile_context);
+  void update(CallInfo* call_info, Klass* receiver_klass, ProfileContext profile_context);
 
   // GC support
   void clean_metadata();
@@ -212,7 +212,7 @@ private:
   // Clean static call (will force resolving on next use)
   void set_to_clean();
 
-  void set(const methodHandle& callee_method, jlong profile_context);
+  void set(const methodHandle& callee_method, ProfileContext profile_context);
 
   // State
   bool is_clean() const;

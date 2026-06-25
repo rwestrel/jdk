@@ -244,7 +244,7 @@ class nmethod : public CodeBlob {
   int          _compile_id;            // which compilation made this nmethod
   CompLevel    _comp_level;            // compilation level (s1)
   CompilerType _compiler_type;         // which compiler made this nmethod (u1)
-  jlong _profile_context;
+  ProfileContext _profile_context;
 
   // Local state used to keep track of whether unloading is happening or not
   volatile uint8_t _is_unloading_state;
@@ -350,7 +350,7 @@ private:
           AbstractCompiler* compiler,
           CompLevel comp_level,
           Flags flags,
-          jlong profile_context);
+          ProfileContext profile_context);
 
   nmethod(const nmethod &nm);
 
@@ -572,7 +572,7 @@ public:
                               AbstractCompiler* compiler,
                               CompLevel comp_level,
                               Flags flags,
-                              jlong profile_context);
+                              ProfileContext profile_context);
 
   // Relocate the nmethod to the code heap identified by code_blob_type.
   // Returns nullptr if the code heap does not have enough space, the
@@ -751,7 +751,7 @@ public:
   }
 
   int   comp_level() const                        { return _comp_level; }
-  jlong profile_context() const                   { return _profile_context; }
+  ProfileContext profile_context() const                   { return _profile_context; }
 
   // Support for oops in scopes and relocs:
   // Note: index 0 is reserved for null.

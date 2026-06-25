@@ -2017,7 +2017,7 @@ Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
     // linkToNative doesn't have interpreter-specific implementation, so always has to go through compiled version.
     AdapterHandlerLibrary::create_native_wrapper(m);
     // Check if have the compiled code.
-    throw_error = (!m->has_compiled_code(0)); // FIXME
+    throw_error = (!m->has_compiled_code(ProfileContext(0))); // FIXME
   }
 
   {
@@ -2029,8 +2029,8 @@ Method* SystemDictionary::find_method_handle_intrinsic(vmIntrinsicID iid,
       ml.notify_all();
     } else {
       signature->make_permanent(); // The signature is never unloaded.
-      assert(Arguments::is_interpreter_only() || (m->has_compiled_code(0) && // FIXME
-             m->code(0)->entry_point() == m->from_compiled_entry()), // FIXME
+      assert(Arguments::is_interpreter_only() || (m->has_compiled_code(ProfileContext(0)) && // FIXME
+             m->code(ProfileContext(0))->entry_point() == m->from_compiled_entry()), // FIXME
              "MH intrinsic invariant");
       *met = m(); // insert the element
       ml.notify_all();
@@ -2058,7 +2058,7 @@ void SystemDictionary::get_all_method_handle_intrinsics(GrowableArray<Method*>* 
 void SystemDictionary::restore_archived_method_handle_intrinsics() {
   if (UseSharedSpaces) {
     EXCEPTION_MARK;
-    restore_archived_method_handle_intrinsics_impl(0, THREAD);
+    restore_archived_method_handle_intrinsics_impl(ProfileContext(0), THREAD);
     if (HAS_PENDING_EXCEPTION) {
       // This is probably caused by OOM -- other parts of the CDS archive have direct pointers to
       // the archived method handle intrinsics, so we can't really recover from this failure.
@@ -2067,7 +2067,7 @@ void SystemDictionary::restore_archived_method_handle_intrinsics() {
   }
 }
 
-void SystemDictionary::restore_archived_method_handle_intrinsics_impl(jlong profile_context, TRAPS) {
+void SystemDictionary::restore_archived_method_handle_intrinsics_impl(ProfileContext profile_context, TRAPS) {
   Array<Method*>* list = AOTMetaspace::archived_method_handle_intrinsics();
   for (int i = 0; i < list->length(); i++) {
     methodHandle m(THREAD, list->at(i));

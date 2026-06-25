@@ -1342,7 +1342,7 @@ methodHandle SharedRuntime::resolve_helper(bool is_virtual, bool is_optimized, T
   guarantee(caller_cb != nullptr && caller_cb->is_nmethod(), "must be called from compiled method");
   nmethod* caller_nm = caller_cb->as_nmethod();
   assert(caller_nm->profile_context() == current->profile_context(), "");
-  jlong profile_context = caller_nm->profile_context();
+  ProfileContext profile_context = caller_nm->profile_context();
 
   // determine call info & receiver
   // note: a) receiver is null for static calls
@@ -3087,7 +3087,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     // Perform the work while holding the lock, but perform any printing outside the lock
     MutexLocker mu(AdapterHandlerLibrary_lock);
     // See if somebody beat us to it
-    if (method->code(0) != nullptr) { // FIXME
+    if (method->code(ProfileContext(0)) != nullptr) { // FIXME
       return;
     }
 
