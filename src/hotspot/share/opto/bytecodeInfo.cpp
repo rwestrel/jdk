@@ -175,8 +175,8 @@ bool InlineTree::should_inline(ciMethod* callee_method, ciMethod* caller_method,
     }
   } else {
     // Not hot.  Check for medium-sized pre-existing nmethod at cold sites.
-    if (callee_method->has_compiled_code() &&
-        callee_method->inline_instructions_size() > inline_small_code_size) {
+    if (callee_method->has_compiled_code(C->profile_context()) &&
+        callee_method->inline_instructions_size(C->profile_context()) > inline_small_code_size) {
       set_msg("already compiled into a medium method");
       return false;
     }
@@ -271,8 +271,8 @@ bool InlineTree::should_not_inline(ciMethod* callee_method, ciMethod* caller_met
     return false;
   }
 
-  if (callee_method->has_compiled_code() &&
-      callee_method->inline_instructions_size() > InlineSmallCode) {
+  if (callee_method->has_compiled_code(C->profile_context()) &&
+      callee_method->inline_instructions_size(C->profile_context()) > InlineSmallCode) {
     set_msg("already compiled into a big method");
     return true;
   }
@@ -300,7 +300,7 @@ bool InlineTree::should_not_inline(ciMethod* callee_method, ciMethod* caller_met
     return false;
   }
 
-  if (!callee_method->has_compiled_code() &&
+  if (!callee_method->has_compiled_code(C->profile_context()) &&
       !callee_method->was_executed_more_than(0)) {
     set_msg("never executed");
     return true;

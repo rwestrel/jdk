@@ -207,6 +207,7 @@ class nmethod : public CodeBlob {
 
   // offsets for entry points
   address  _osr_entry_point;       // entry point for on stack replacement
+  address  _verified_entry_point;
   uint16_t _entry_offset;          // entry point with class check
   uint16_t _verified_entry_offset; // entry point without class check
   int      _entry_bci;             // != InvocationEntryBci if this nmethod is an on-stack replacement method
@@ -572,6 +573,12 @@ public:
                               CompLevel comp_level,
                               Flags flags,
                               jlong profile_context);
+
+  // Relocate the nmethod to the code heap identified by code_blob_type.
+  // Returns nullptr if the code heap does not have enough space, the
+  // nmethod is unrelocatable, or the nmethod is invalidated during relocation,
+  // otherwise the relocated nmethod. The original nmethod will be marked not entrant.
+  nmethod* relocate(CodeBlobType code_blob_type);
 
   static nmethod* new_native_nmethod(const methodHandle& method,
                                      int compile_id,
@@ -1040,6 +1047,7 @@ public:
 
   // support for code generation
   static ByteSize osr_entry_point_offset() { return byte_offset_of(nmethod, _osr_entry_point); }
+  static ByteSize verified_entry_point_offset() { return byte_offset_of(nmethod, _verified_entry_point); }
   static ByteSize state_offset()           { return byte_offset_of(nmethod, _state); }
   static ByteSize next_offset()                 { return byte_offset_of(nmethod, _next); }
   static ByteSize profile_context_offset()      { return byte_offset_of(nmethod, _profile_context); }

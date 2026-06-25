@@ -157,7 +157,7 @@ int HotCodeCollector::do_relocation(void* candidate, uint call_level) {
 
   // The candidate may have been recompiled or already relocated.
   // Retrieve the latest nmethod from the Method
-  nm = nm->method()->code();
+  nm = nm->method()->code(nm->profile_context());
 
   // Verify the nmethod is still valid for relocation
   if (nm == nullptr || !nm->is_in_use() || !nm->is_compiled_by_c2()) {

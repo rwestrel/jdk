@@ -262,7 +262,7 @@ class CompileBroker: AllStatic {
   static bool compilation_is_prohibited(const methodHandle& method, int osr_bci, int comp_level, bool excluded);
 
   static CompileTask* create_compile_task(CompileQueue* queue, int compile_id, const methodHandle &method, int osr_bci,
-                                          int comp_level, const methodHandle &hot_method, int hot_count,
+                                          int comp_level, int hot_count,
                                           CompileTask::CompileReason compile_reason, bool blocking,
                                           jlong profile_context);
   static void wait_for_completion(CompileTask* task);

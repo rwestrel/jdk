@@ -1118,8 +1118,8 @@ bool ciMethod::can_be_compiled() {
 
 // ------------------------------------------------------------------
 // ciMethod::has_compiled_code
-bool ciMethod::has_compiled_code() {
-  return inline_instructions_size() > 0;
+bool ciMethod::has_compiled_code(jlong profile_context) {
+  return inline_instructions_size(profile_context) > 0;
 }
 
 int ciMethod::highest_osr_comp_level() {
@@ -1152,7 +1152,7 @@ int ciMethod::code_size_for_inlining() {
 // specific accessor nmethod::insts_size.
 // Also some instructions inside the code are excluded from inline
 // heuristic (e.g. post call nop instructions; see InlineSkippedInstructionsCounter)
-int ciMethod::inline_instructions_size() {
+int ciMethod::inline_instructions_size(jlong profile_context) {
   if (_inline_instructions_size == -1) {
     if (TrainingData::have_data()) {
       GUARDED_VM_ENTRY(
@@ -1188,7 +1188,7 @@ int ciMethod::inline_instructions_size() {
         CompileTrainingData* ctd = CURRENT_ENV->task()->training_data();
         if (ctd != nullptr) {
           methodHandle mh(Thread::current(), get_Method());
-          MethodTrainingData* this_mtd = MethodTrainingData::make(mh);
+          MethodTrainingData* this_mtd = MethodTrainingData::make(mh, profile_context);
           ctd->ci_records().ciMethod__inline_instructions_size.append_if_missing(_inline_instructions_size, this_mtd);
         }
       }

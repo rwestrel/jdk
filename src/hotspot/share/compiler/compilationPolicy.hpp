@@ -260,22 +260,22 @@ class CompilationPolicy : AllStatic {
   inline static CompLevel limit_level(CompLevel level);
   // Common transition function. Given a predicate determines if a method should transition to another level.
   template<typename Predicate>
-  static CompLevel common(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD, jlong profile_context, bool disable_feedback = false);
+  static CompLevel common(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD, bool disable_feedback = false);
 
   template<typename Predicate>
-  static CompLevel transition_from_none(const methodHandle& method, CompLevel cur_level, bool disable_feedback);
+  static CompLevel transition_from_none(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context);
   template<typename Predicate>
-  static CompLevel transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, bool disable_feedback);
+  static CompLevel transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context);
   template<typename Predicate>
-  static CompLevel transition_from_full_profile(const methodHandle& method, CompLevel cur_level);
+  static CompLevel transition_from_full_profile(const methodHandle& method, CompLevel cur_level, jlong profile_context);
   template<typename Predicate>
-  static CompLevel standard_transition(const methodHandle& method, CompLevel cur_level, bool disable_feedback);
+  static CompLevel standard_transition(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context);
 
-  static bool should_delay_standard_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd);
-  static CompLevel trained_transition_from_none(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD);
-  static CompLevel trained_transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD);
-  static CompLevel trained_transition_from_full_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD);
-  static CompLevel trained_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD);
+  static bool should_delay_standard_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context);
+  static CompLevel trained_transition_from_none(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD);
+  static CompLevel trained_transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD);
+  static CompLevel trained_transition_from_full_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD);
+  static CompLevel trained_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD);
 
   // Transition functions.
   // call_event determines if a method should be compiled at a different
@@ -285,7 +285,7 @@ class CompilationPolicy : AllStatic {
   // level.
   static CompLevel loop_event(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD);
   static void print_counters_on(outputStream* st, const char* prefix, Method* m, jlong profile_context);
-  static void print_training_data_on(outputStream* st, const char* prefix, Method* method, CompLevel cur_level);
+  static void print_training_data_on(outputStream* st, const char* prefix, Method* method, CompLevel cur_level, jlong profile_context);
   // Has a method been long around?
   // We don't remove old methods from the compile queue even if they have
   // very low activity (see select_task()).
@@ -315,7 +315,7 @@ class CompilationPolicy : AllStatic {
   static void set_c2_count(int x) { _c2_count = x;    }
 
   enum EventType { CALL, LOOP, COMPILE, FORCE_COMPILE, FORCE_RECOMPILE, REMOVE_FROM_QUEUE, UPDATE_IN_QUEUE, REPROFILE, MAKE_NOT_ENTRANT };
-  static void print_event_on(outputStream *st, EventType type, Method* m, Method* im, int bci, CompLevel level);
+  static void print_event_on(outputStream *st, EventType type, Method* m, Method* im, int bci, CompLevel level, jlong profile_context);
   static void print_event(EventType type, Method* m, Method* im, int bci, CompLevel level,
                           jlong profile_context);
   // Check if the method can be compiled, change level if necessary
@@ -338,8 +338,8 @@ class CompilationPolicy : AllStatic {
 
   // m must be compiled before executing it
   static bool must_be_compiled(const methodHandle& m, jlong profile_context, int comp_level = CompLevel_any);
-  static void maybe_compile_early(const methodHandle& m, TRAPS);
-  static void replay_training_at_init_impl(InstanceKlass* klass, JavaThread* current);
+  static void maybe_compile_early(const methodHandle& m, jlong profile_context, TRAPS);
+  static void replay_training_at_init_impl(InstanceKlass* klass, jlong profile_context, JavaThread* current);
  public:
   static int min_invocations() { return Tier4MinInvocationThreshold; }
   static int c1_count() { return _c1_count; }
@@ -350,7 +350,7 @@ class CompilationPolicy : AllStatic {
   static void compile_if_required(const methodHandle &m, jlong profile_context, TRAPS);
 
   static void replay_training_at_init(InstanceKlass* klass, JavaThread* current);
-  static void replay_training_at_init_loop(JavaThread* current);
+  static void replay_training_at_init_loop(jlong profile_context, JavaThread* current);
 
   // m is allowed to be compiled
   static bool can_be_compiled(const methodHandle& m, int comp_level = CompLevel_any);

@@ -129,7 +129,7 @@ static bool is_excluded(InstanceKlass* k) {
   return false;
 }
 
-MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool null_if_not_found, bool use_cache) {
+MethodTrainingData* MethodTrainingData::make(const methodHandle& method, jlong profile_context, bool null_if_not_found, bool use_cache) {
   if (!have_data() && !need_data()) {
     return nullptr;
   }
@@ -147,7 +147,7 @@ MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool nu
   // 3. Cache value is not null.
   //    Return it, the value of training_data_lookup_failed doesn't matter.
   MethodTrainingData* mtd = nullptr;
-  MethodCounters* mcs = method->method_counters();
+  MethodCounters* mcs = method->method_counters(profile_context);
   if (mcs != nullptr) {
     mtd = mcs->method_training_data();
     if (mtd != nullptr && mtd != mcs->method_training_data_sentinel()) {
@@ -158,7 +158,7 @@ MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool nu
       return nullptr;
     }
   } else if (use_cache) {
-    mcs = Method::build_method_counters(Thread::current(), method());
+    mcs = Method::build_method_counters(Thread::current(), method(), profile_context);
   }
 
   TrainingData* td = nullptr;
@@ -172,7 +172,7 @@ MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool nu
       mtd = nullptr;
     }
     // Cache the pointer to MTD in MethodCounters for faster lookup (could be null if not found)
-    method->init_training_data(mtd);
+    method->init_training_data(mtd, profile_context);
   }
 
   if (need_data()) {
@@ -184,7 +184,7 @@ MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool nu
         if (ktd == nullptr) {
           return nullptr; // allocation failure
         }
-        mtd = MethodTrainingData::allocate(method(), ktd);
+        mtd = MethodTrainingData::allocate(method(), ktd, profile_context);
         if (mtd == nullptr) {
           return nullptr; // allocation failure
         }
@@ -198,7 +198,7 @@ MethodTrainingData* MethodTrainingData::make(const methodHandle& method, bool nu
       mtd = td->as_MethodTrainingData();
     }
     // Cache the pointer to MTD in MethodCounters for faster lookup (could be null if not found)
-    method->init_training_data(mtd);
+    method->init_training_data(mtd, profile_context);
   }
 
   return mtd;
@@ -231,7 +231,7 @@ CompileTrainingData* CompileTrainingData::make(CompileTask* task) {
   if (m->method_holder() == nullptr) {
     return nullptr; // do not record (dynamically generated method)
   }
-  MethodTrainingData* mtd = MethodTrainingData::make(m);
+  MethodTrainingData* mtd = MethodTrainingData::make(m, task->profile_context());
   if (mtd == nullptr) {
     return nullptr; // allocation failure
   }
@@ -314,7 +314,7 @@ void CompileTrainingData::print_on(outputStream* st, bool name_only) const {
 
 void CompileTrainingData::notice_inlined_method(CompileTask* task,
                                                 const methodHandle& method) {
-  MethodTrainingData* mtd = MethodTrainingData::make(method);
+  MethodTrainingData* mtd = MethodTrainingData::make(method, task->profile_context());
   if (mtd != nullptr) {
     mtd->notice_compilation(task->comp_level(), true);
   }
@@ -366,11 +366,11 @@ void MethodTrainingData::prepare(Visitor& visitor) {
   visitor.visit(this);
   klass()->prepare(visitor);
   if (has_holder()) {
-    _final_counters = holder()->method_counters();
-    _final_profile  = holder()->method_data();
+    _final_counters = holder()->method_counters(_profile_context);
+    _final_profile  = holder()->method_data(_profile_context);
     assert(_final_profile == nullptr || _final_profile->method() == holder(), "");
-    _invocation_count = holder()->invocation_count();
-    _backedge_count = holder()->backedge_count();
+    _invocation_count = holder()->invocation_count(_profile_context);
+    _backedge_count = holder()->backedge_count(_profile_context);
   }
   for (int i = 0; i < CompLevel_count - 1; i++) {
     CompileTrainingData* ctd = _last_toplevel_compiles[i];

@@ -83,7 +83,7 @@ bool CompilationPolicy::must_be_compiled(const methodHandle& m, jlong profile_co
          (AlwaysCompileLoopMethods && m->has_loops() && CompileBroker::should_compile_new_jobs()); // eagerly compile loop methods
 }
 
-void CompilationPolicy::maybe_compile_early(const methodHandle& m, TRAPS) {
+void CompilationPolicy::maybe_compile_early(const methodHandle& m, jlong profile_context, TRAPS) {
   if (m->method_holder()->is_not_initialized()) {
     // 'is_not_initialized' means not only '!is_initialized', but also that
     // initialization has not been started yet ('!being_initialized')
@@ -96,12 +96,12 @@ void CompilationPolicy::maybe_compile_early(const methodHandle& m, TRAPS) {
       return;              // there is no training data recorded for m
     }
     CompLevel cur_level = static_cast<CompLevel>(m->highest_comp_level());
-    CompLevel next_level = trained_transition(m, cur_level, mtd, THREAD);
+    CompLevel next_level = trained_transition(m, cur_level, mtd, profile_context, THREAD);
     if (next_level != cur_level && can_be_compiled(m, next_level) && !CompileBroker::compilation_is_in_queue(m)) {
       if (PrintTieredEvents) {
-        print_event(FORCE_COMPILE, m(), m(), InvocationEntryBci, next_level);
+        print_event(FORCE_COMPILE, m(), m(), InvocationEntryBci, next_level, profile_context);
       }
-      CompileBroker::compile_method(m, InvocationEntryBci, next_level, 0, CompileTask::Reason_MustBeCompiled, THREAD);
+      CompileBroker::compile_method(m, InvocationEntryBci, next_level, 0, CompileTask::Reason_MustBeCompiled, profile_context, THREAD);
       if (HAS_PENDING_EXCEPTION) {
         CLEAR_PENDING_EXCEPTION;
       }
@@ -135,7 +135,7 @@ void CompilationPolicy::compile_if_required(const methodHandle& m, jlong profile
   }
 }
 
-void CompilationPolicy::replay_training_at_init_impl(InstanceKlass* klass, JavaThread* current) {
+void CompilationPolicy::replay_training_at_init_impl(InstanceKlass* klass, jlong profile_context, JavaThread* current) {
   if (!klass->has_init_deps_processed()) {
     ResourceMark rm;
     log_debug(training)("Replay training: %s", klass->external_name());
@@ -151,7 +151,7 @@ void CompilationPolicy::replay_training_at_init_impl(InstanceKlass* klass, JavaT
             MethodTrainingData* mtd = ctd->method();
             if (mtd->has_holder()) {
               const methodHandle mh(current, const_cast<Method*>(mtd->holder()));
-              CompilationPolicy::maybe_compile_early(mh, current);
+              CompilationPolicy::maybe_compile_early(mh, profile_context, current);
             }
           }
         });
@@ -178,11 +178,11 @@ void CompilationPolicyUtils::Queue<InstanceKlass>::print_on(outputStream* st) {
   }
 }
 
-void CompilationPolicy::replay_training_at_init_loop(JavaThread* current) {
+void CompilationPolicy::replay_training_at_init_loop(jlong profile_context, JavaThread* current) {
   while (!CompileBroker::is_compilation_disabled_forever()) {
     InstanceKlass* ik = _training_replay_queue.pop(TrainingReplayQueue_lock, current);
     if (ik != nullptr) {
-      replay_training_at_init_impl(ik, current);
+      replay_training_at_init_impl(ik, profile_context, current);
     }
   }
 }
@@ -378,14 +378,14 @@ void CompilationPolicy::print_counters_on(outputStream* st, const char* prefix, 
   st->print(" %smax levels=%d,%d", prefix, m->highest_comp_level(), m->highest_osr_comp_level());
 }
 
-void CompilationPolicy::print_training_data_on(outputStream* st,  const char* prefix, Method* method, CompLevel cur_level) {
+void CompilationPolicy::print_training_data_on(outputStream* st,  const char* prefix, Method* method, CompLevel cur_level, jlong profile_context) {
   methodHandle m(Thread::current(), method);
   st->print(" %smtd: ", prefix);
   MethodTrainingData* mtd = MethodTrainingData::find(m);
   if (mtd == nullptr) {
     st->print("null");
   } else {
-    if (should_delay_standard_transition(m, cur_level, mtd)) {
+    if (should_delay_standard_transition(m, cur_level, mtd, profile_context)) {
       st->print("delayed, ");
     }
     MethodData* md = mtd->final_profile();
@@ -459,7 +459,7 @@ void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method*
 
   st->print(" rate=");
   if (m->prev_time(profile_context) == 0) st->print("n/a");
-  else st->print("%f", m->rate());
+  else st->print("%f", m->rate(profile_context));
 
   st->print(" k=%.2lf,%.2lf", threshold_scale(CompLevel_full_profile, Tier3LoadFeedback),
                               threshold_scale(CompLevel_full_optimization, Tier4LoadFeedback));
@@ -494,18 +494,18 @@ void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method*
       st->print("in-queue");
     } else st->print("idle");
 
-    print_training_data_on(st, "", m, level);
+    print_training_data_on(st, "", m, level, profile_context);
     if (inlinee_event) {
-      print_training_data_on(st, "inlinee ", im, level);
+      print_training_data_on(st, "inlinee ", im, level, profile_context);
     }
   }
   st->print_cr("]");
 
 }
 
-void CompilationPolicy::print_event(EventType type, Method* m, Method* im, int bci, CompLevel level) {
+void CompilationPolicy::print_event(EventType type, Method* m, Method* im, int bci, CompLevel level, jlong profile_context) {
   stringStream s;
-  print_event_on(&s, type, m, im, bci, level);
+  print_event_on(&s, type, m, im, bci, level, profile_context);
   ResourceMark rm;
   tty->print("%s", s.as_string());
 }
@@ -989,7 +989,7 @@ bool CompilationPolicy::is_method_profiled(const methodHandle &method, jlong pro
 
 
 // Determine is a method is mature.
-bool CompilationPolicy::is_mature(MethodData* mdo) {
+bool CompilationPolicy::is_mature(MethodData* mdo, jlong profile_context) {
   if (Arguments::is_compiler_only()) {
     // Always report profiles as immature with -Xcomp
     return false;
@@ -1069,7 +1069,7 @@ void CompilationPolicy::create_mdo(const methodHandle &mh, jlong profile_context
   }
 }
 
-CompLevel CompilationPolicy::trained_transition_from_none(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD) {
+CompLevel CompilationPolicy::trained_transition_from_none(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD) {
   precond(mtd != nullptr);
   precond(cur_level == CompLevel_none);
 
@@ -1104,7 +1104,7 @@ CompLevel CompilationPolicy::trained_transition_from_none(const methodHandle& me
   }
   const bool deopt = (static_cast<CompLevel>(method->highest_comp_level()) == CompLevel_full_optimization);
   // If we deopted, then we reprofile
-  if (deopt && !is_method_profiled(method)) {
+  if (deopt && !is_method_profiled(method, profile_context)) {
     return CompLevel_full_profile;
   }
 
@@ -1112,8 +1112,8 @@ CompLevel CompilationPolicy::trained_transition_from_none(const methodHandle& me
   assert(ctd != nullptr, "Should have CTD for CompLevel_full_optimization");
   // With SkipTier2IfPossible and all deps satisfied, go to level 4 immediately
   if (SkipTier2IfPossible && ctd->init_deps_left_acquire() == 0) {
-    if (method->method_data() == nullptr) {
-      create_mdo(method, THREAD);
+    if (method->method_data(profile_context) == nullptr) {
+      create_mdo(method, profile_context, THREAD);
     }
     return CompLevel_full_optimization;
   }
@@ -1123,7 +1123,7 @@ CompLevel CompilationPolicy::trained_transition_from_none(const methodHandle& me
 }
 
 
-CompLevel CompilationPolicy::trained_transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD) {
+CompLevel CompilationPolicy::trained_transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD) {
   precond(mtd != nullptr);
   precond(cur_level == CompLevel_limited_profile);
 
@@ -1140,8 +1140,8 @@ CompLevel CompilationPolicy::trained_transition_from_limited_profile(const metho
   // Check if the method is ready
   CompileTrainingData* ctd = mtd->last_toplevel_compile(CompLevel_full_optimization);
   if (ctd != nullptr && ctd->init_deps_left_acquire() == 0) {
-    if (method->method_data() == nullptr) {
-      create_mdo(method, THREAD);
+    if (method->method_data(profile_context) == nullptr) {
+      create_mdo(method, profile_context, THREAD);
     }
     return CompLevel_full_optimization;
   }
@@ -1151,7 +1151,7 @@ CompLevel CompilationPolicy::trained_transition_from_limited_profile(const metho
 }
 
 
-CompLevel CompilationPolicy::trained_transition_from_full_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD) {
+CompLevel CompilationPolicy::trained_transition_from_full_profile(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD) {
   precond(mtd != nullptr);
   precond(cur_level == CompLevel_full_profile);
 
@@ -1159,7 +1159,7 @@ CompLevel CompilationPolicy::trained_transition_from_full_profile(const methodHa
   // We have method at the full profile level and we also know that it's possibly an important method.
   if (highest_training_level == CompLevel_full_optimization && !mtd->only_inlined()) {
     // Check if it is adequately profiled
-    if (is_method_profiled(method)) {
+    if (is_method_profiled(method, profile_context)) {
       return CompLevel_full_optimization;
     }
   }
@@ -1168,7 +1168,7 @@ CompLevel CompilationPolicy::trained_transition_from_full_profile(const methodHa
   return CompLevel_full_profile;
 }
 
-CompLevel CompilationPolicy::trained_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, JavaThread* THREAD) {
+CompLevel CompilationPolicy::trained_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context, JavaThread* THREAD) {
   precond(MethodTrainingData::have_data());
 
   // If there is no training data recorded for this method, bail out.
@@ -1180,13 +1180,13 @@ CompLevel CompilationPolicy::trained_transition(const methodHandle& method, Comp
   switch(cur_level) {
     default: break;
     case CompLevel_none:
-      next_level = trained_transition_from_none(method, cur_level, mtd, THREAD);
+      next_level = trained_transition_from_none(method, cur_level, mtd, profile_context, THREAD);
       break;
     case CompLevel_limited_profile:
-      next_level = trained_transition_from_limited_profile(method, cur_level, mtd, THREAD);
+      next_level = trained_transition_from_limited_profile(method, cur_level, mtd, profile_context, THREAD);
       break;
     case CompLevel_full_profile:
-      next_level = trained_transition_from_full_profile(method, cur_level, mtd, THREAD);
+      next_level = trained_transition_from_full_profile(method, cur_level, mtd, profile_context, THREAD);
       break;
   }
 
@@ -1237,7 +1237,7 @@ CompLevel CompilationPolicy::trained_transition(const methodHandle& method, Comp
 
 // Common transition function. Given a predicate determines if a method should transition to another level.
 template<typename Predicate>
-CompLevel CompilationPolicy::common(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD, jlong profile_context, bool disable_feedback) {
+CompLevel CompilationPolicy::common(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD, bool disable_feedback) {
   CompLevel next_level = cur_level;
 
   if (is_trivial(method) || method->is_native()) {
@@ -1248,29 +1248,29 @@ CompLevel CompilationPolicy::common(const methodHandle& method, CompLevel cur_le
     if (mtd == nullptr) {
       // We haven't see compilations of this method in training. It's either very cold or the behavior changed.
       // Feed it to the standard TF with no profiling delay.
-      next_level = standard_transition<Predicate>(method, cur_level, disable_feedback);
+      next_level = standard_transition<Predicate>(method, cur_level, disable_feedback, profile_context);
     } else {
-      next_level = trained_transition(method, cur_level, mtd, THREAD);
-      if (cur_level == next_level && !should_delay_standard_transition(method, cur_level, mtd)) {
+      next_level = trained_transition(method, cur_level, mtd, profile_context, THREAD);
+      if (cur_level == next_level && !should_delay_standard_transition(method, cur_level, mtd, profile_context)) {
         // trained_transtion() is going to return the same level if no startup/warmup optimizations apply.
         // In order to catch possible pathologies due to behavior change we feed the event to the regular
         // TF but with profiling delay.
-        next_level = standard_transition<Predicate>(method, cur_level, disable_feedback);
+        next_level = standard_transition<Predicate>(method, cur_level, disable_feedback, profile_context);
       }
     }
   } else {
-    next_level = standard_transition<Predicate>(method, cur_level, disable_feedback);
+    next_level = standard_transition<Predicate>(method, cur_level, disable_feedback, profile_context);
   }
   return (next_level != cur_level) ? limit_level(next_level) : next_level;
 }
 
-bool CompilationPolicy::should_delay_standard_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd) {
+bool CompilationPolicy::should_delay_standard_transition(const methodHandle& method, CompLevel cur_level, MethodTrainingData* mtd, jlong profile_context) {
   precond(mtd != nullptr);
   CompLevel highest_training_level = static_cast<CompLevel>(mtd->highest_top_level());
   if (highest_training_level != CompLevel_full_optimization && cur_level == CompLevel_limited_profile) {
     // This is a lukewarm method - it hasn't been compiled with C2 during the tranining run and is currently
     // running at level 2. Delay any further state changes until its counters exceed the training run counts.
-    MethodCounters* mc = method->method_counters();
+    MethodCounters* mc = method->method_counters(profile_context);
     if (mc == nullptr) {
       return false;
     }
@@ -1286,31 +1286,31 @@ bool CompilationPolicy::should_delay_standard_transition(const methodHandle& met
 }
 
 template<typename Predicate>
-CompLevel CompilationPolicy::standard_transition(const methodHandle& method, CompLevel cur_level, bool disable_feedback) {
+CompLevel CompilationPolicy::standard_transition(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context) {
   CompLevel next_level = cur_level;
   switch(cur_level) {
   default: break;
   case CompLevel_none:
-    next_level = transition_from_none<Predicate>(method, cur_level, disable_feedback);
+    next_level = transition_from_none<Predicate>(method, cur_level, disable_feedback, profile_context);
     break;
   case CompLevel_limited_profile:
-    next_level = transition_from_limited_profile<Predicate>(method, cur_level, disable_feedback);
+    next_level = transition_from_limited_profile<Predicate>(method, cur_level, disable_feedback, profile_context);
     break;
   case CompLevel_full_profile:
-    next_level = transition_from_full_profile<Predicate>(method, cur_level);
+    next_level = transition_from_full_profile<Predicate>(method, cur_level, profile_context);
     break;
   }
   return next_level;
 }
 
 template<typename Predicate>
-CompLevel CompilationPolicy::transition_from_none(const methodHandle& method, CompLevel cur_level, bool disable_feedback) {
+CompLevel CompilationPolicy::transition_from_none(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context) {
   precond(cur_level == CompLevel_none);
   CompLevel next_level = cur_level;
-  int i = method->invocation_count();
-  int b = method->backedge_count();
+  int i = method->invocation_count(profile_context);
+  int b = method->backedge_count(profile_context);
   // If we were at full profile level, would we switch to full opt?
-  if (transition_from_full_profile<Predicate>(method, CompLevel_full_profile) == CompLevel_full_optimization) {
+  if (transition_from_full_profile<Predicate>(method, CompLevel_full_profile, profile_context) == CompLevel_full_optimization) {
     next_level = CompLevel_full_optimization;
   } else if (!CompilationModeFlag::disable_intermediate() && Predicate::apply(method, cur_level, i, b)) {
     // C1-generated fully profiled code is about 30% slower than the limited profile
@@ -1330,10 +1330,10 @@ CompLevel CompilationPolicy::transition_from_none(const methodHandle& method, Co
 }
 
 template<typename Predicate>
-CompLevel CompilationPolicy::transition_from_full_profile(const methodHandle& method, CompLevel cur_level) {
+CompLevel CompilationPolicy::transition_from_full_profile(const methodHandle& method, CompLevel cur_level, jlong profile_context) {
   precond(cur_level == CompLevel_full_profile);
   CompLevel next_level = cur_level;
-  MethodData* mdo = method->method_data();
+  MethodData* mdo = method->method_data(profile_context);
   if (mdo != nullptr) {
     if (mdo->would_profile() || CompilationModeFlag::disable_intermediate()) {
       int mdo_i = mdo->invocation_count_delta();
@@ -1349,12 +1349,12 @@ CompLevel CompilationPolicy::transition_from_full_profile(const methodHandle& me
 }
 
 template<typename Predicate>
-CompLevel CompilationPolicy::transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, bool disable_feedback) {
+CompLevel CompilationPolicy::transition_from_limited_profile(const methodHandle& method, CompLevel cur_level, bool disable_feedback, jlong profile_context) {
   precond(cur_level == CompLevel_limited_profile);
   CompLevel next_level = cur_level;
-  int i = method->invocation_count();
-  int b = method->backedge_count();
-  MethodData* mdo = method->method_data();
+  int i = method->invocation_count(profile_context);
+  int b = method->backedge_count(profile_context);
+  MethodData* mdo = method->method_data(profile_context);
   if (mdo != nullptr) {
     if (mdo->would_profile()) {
       if (disable_feedback || (CompileBroker::queue_size(CompLevel_full_optimization) <=
@@ -1373,7 +1373,7 @@ CompLevel CompilationPolicy::transition_from_limited_profile(const methodHandle&
       next_level = CompLevel_full_profile;
     }
   }
-  if (next_level == CompLevel_full_profile && is_method_profiled(method)) {
+  if (next_level == CompLevel_full_profile && is_method_profiled(method, profile_context)) {
     next_level = CompLevel_full_optimization;
   }
   return next_level;
@@ -1381,9 +1381,9 @@ CompLevel CompilationPolicy::transition_from_limited_profile(const methodHandle&
 
 
 // Determine if a method should be compiled with a normal entry point at a different level.
-CompLevel CompilationPolicy::call_event(const methodHandle& method, CompLevel cur_level, JavaThread* THREAD) {
+CompLevel CompilationPolicy::call_event(const methodHandle& method, CompLevel cur_level, jlong profile_context, JavaThread* THREAD) {
   CompLevel osr_level = MIN2((CompLevel) method->highest_osr_comp_level(), common<LoopPredicate>(method, cur_level, profile_context, THREAD, true));
-  CompLevel next_level = common<CallPredicate>(method, cur_level, THREAD, is_old(method, profile_context));
+  CompLevel next_level = common<CallPredicate>(method, cur_level, is_old(method, profile_context), THREAD);
 
   // If OSR method level is greater than the regular method level, the levels should be
   // equalized by raising the regular method level in order to avoid OSRs during each

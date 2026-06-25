@@ -335,8 +335,8 @@ class Method : public Metadata {
   MethodData* method_data_head() const { return _method_data; }
   void set_method_data(MethodData* data);
 
-  MethodTrainingData* training_data_or_null() const;
-  bool init_training_data(MethodTrainingData* td);
+  MethodTrainingData* training_data_or_null(jlong profile_context) const;
+  bool init_training_data(MethodTrainingData* td, jlong profile_context);
 
   // mark an exception handler as entered (used to prune dead catch blocks in C2)
   void set_exception_handler_entered(int handler_bci, jlong profile_context);
@@ -375,6 +375,7 @@ class Method : public Metadata {
   inline int invocation_count(jlong profile_context) const;
   inline int backedge_count(jlong profile_context) const;
   int total_invocation_count() const;
+  CompLevel max_comp_level() const;
 
   bool was_executed_more_than(int n, jlong profile_context);
   bool was_never_executed(jlong profile_context) { return !was_executed_more_than(0, profile_context);  }
@@ -384,7 +385,7 @@ class Method : public Metadata {
   static MethodCounters* build_method_counters(Thread* current, Method* m, jlong profile_context);
   static MethodCounters2* build_method_counters2(Thread* current, Method* m);
 
-  int interpreter_invocation_count(jlong profile_context) { return invocation_count(profile_context);          }
+  int interpreter_invocation_count(jlong profile_context) const;
 
 #ifndef PRODUCT
   int64_t  compiled_invocation_count() const    { return _compiled_invocation_count;}

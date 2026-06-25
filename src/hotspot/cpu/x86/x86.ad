@@ -16684,7 +16684,7 @@ instruct cmpFastLock(rFlagsReg cr, rRegP object, rbx_RegP box, rax_RegI rax_reg,
   ins_cost(300);
   format %{ "fastlock $object,$box\t! kills $box,$rax_reg,$tmp" %}
   ins_encode %{
-    __ fast_lock($object$$Register, $box$$Register, $rax_reg$$Register, $tmp$$Register, r15_thread, ((Method*)(ra_->C->method()->constant_encoding()))->method_data(Compile::current()->profile_context()));
+    __ fast_lock($object$$Register, $box$$Register, $rax_reg$$Register, $tmp$$Register, r15_thread/*, ((Method*)(ra_->C->method()->constant_encoding()))->method_data(Compile::current()->profile_context())*/);
   %}
   ins_pipe(pipe_slow);
 %}

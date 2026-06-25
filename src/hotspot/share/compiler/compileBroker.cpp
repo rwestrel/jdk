@@ -712,7 +712,7 @@ void CompileBroker::compilation_init(JavaThread* THREAD) {
 }
 
 void TrainingReplayThread::training_replay_thread_entry(JavaThread* thread, TRAPS) {
-  CompilationPolicy::replay_training_at_init_loop(thread);
+  CompilationPolicy::replay_training_at_init_loop(0, thread);
 }
 
 #if defined(ASSERT) && defined(COMPILER2)

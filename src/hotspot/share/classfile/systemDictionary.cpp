@@ -2058,7 +2058,7 @@ void SystemDictionary::get_all_method_handle_intrinsics(GrowableArray<Method*>* 
 void SystemDictionary::restore_archived_method_handle_intrinsics() {
   if (UseSharedSpaces) {
     EXCEPTION_MARK;
-    restore_archived_method_handle_intrinsics_impl(THREAD);
+    restore_archived_method_handle_intrinsics_impl(0, THREAD);
     if (HAS_PENDING_EXCEPTION) {
       // This is probably caused by OOM -- other parts of the CDS archive have direct pointers to
       // the archived method handle intrinsics, so we can't really recover from this failure.
@@ -2067,7 +2067,7 @@ void SystemDictionary::restore_archived_method_handle_intrinsics() {
   }
 }
 
-void SystemDictionary::restore_archived_method_handle_intrinsics_impl(TRAPS) {
+void SystemDictionary::restore_archived_method_handle_intrinsics_impl(jlong profile_context, TRAPS) {
   Array<Method*>* list = AOTMetaspace::archived_method_handle_intrinsics();
   for (int i = 0; i < list->length(); i++) {
     methodHandle m(THREAD, list->at(i));
@@ -2075,7 +2075,7 @@ void SystemDictionary::restore_archived_method_handle_intrinsics_impl(TRAPS) {
     m->constants()->restore_unshareable_info(CHECK);
     if (!Arguments::is_interpreter_only() || m->intrinsic_id() == vmIntrinsics::_linkToNative) {
       AdapterHandlerLibrary::create_native_wrapper(m);
-      if (!m->has_compiled_code()) {
+      if (!m->has_compiled_code(profile_context)) {
         ResourceMark rm(THREAD);
         vm_exit_during_initialization(err_msg("Failed to initialize method %s", m->external_name()));
       }

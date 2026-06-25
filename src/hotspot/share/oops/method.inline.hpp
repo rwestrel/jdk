@@ -195,9 +195,9 @@ inline void Method::set_rate(float rate, jlong profile_context) {
   }
 }
 
-inline int Method::invocation_count() const {
-  MethodCounters* mcs = method_counters();
-  MethodData* mdo = method_data();
+inline int Method::invocation_count(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
+  MethodData* mdo = method_data(profile_context);
   if (((mcs != nullptr) ? mcs->invocation_counter()->carry() : false) ||
       ((mdo != nullptr) ? mdo->invocation_counter()->carry() : false)) {
     return InvocationCounter::count_limit;
@@ -207,9 +207,9 @@ inline int Method::invocation_count() const {
   }
 }
 
-inline int Method::backedge_count() const {
-  MethodCounters* mcs = method_counters();
-  MethodData* mdo = method_data();
+inline int Method::backedge_count(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
+  MethodData* mdo = method_data(profile_context);
   if (((mcs != nullptr) ? mcs->backedge_counter()->carry() : false) ||
       ((mdo != nullptr) ? mdo->backedge_counter()->carry() : false)) {
     return InvocationCounter::count_limit;
@@ -220,7 +220,7 @@ inline int Method::backedge_count() const {
 }
 
 inline int Method::highest_comp_level() const {
-  const MethodCounters* mcs = method_counters();
+  const MethodCounters2* mcs = method_counters2();
   if (mcs != nullptr) {
     return mcs->highest_comp_level();
   } else {
@@ -228,8 +228,8 @@ inline int Method::highest_comp_level() const {
   }
 }
 
-inline int Method::interpreter_invocation_count() const {
-  return invocation_count();
+inline int Method::interpreter_invocation_count(jlong profile_context) const {
+  return invocation_count(profile_context);
 }
 
 #endif // SHARE_OOPS_METHOD_INLINE_HPP

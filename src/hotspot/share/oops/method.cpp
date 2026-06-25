@@ -445,11 +445,15 @@ void Method::metaspace_pointers_do(MetaspaceClosure* it) {
 
 void Method::remove_unshareable_info() {
   unlink_method();
-  if (method_data() != nullptr) {
-    method_data()->remove_unshareable_info();
+  MethodData* md = method_data_head();
+  while (md != nullptr) {
+    md->remove_unshareable_info();
+    md = md->next();
   }
-  if (method_counters() != nullptr) {
-    method_counters()->remove_unshareable_info();
+  MethodCounters* mc = method_counters_head();
+  if (mc != nullptr) {
+    mc->remove_unshareable_info();
+    mc = mc->next();
   }
   if (CDSConfig::is_dumping_adapters() && _adapter != nullptr) {
     _adapter->remove_unshareable_info();
@@ -460,11 +464,15 @@ void Method::remove_unshareable_info() {
 
 void Method::restore_unshareable_info(TRAPS) {
   assert(is_method() && is_valid_method(this), "ensure C++ vtable is restored");
-  if (method_data() != nullptr) {
-    method_data()->restore_unshareable_info(CHECK);
+  MethodData* md = method_data_head();
+  while (md != nullptr) {
+    md->restore_unshareable_info(CHECK);
+    md = md->next();
   }
-  if (method_counters() != nullptr) {
-    method_counters()->restore_unshareable_info(CHECK);
+  MethodCounters* mc = method_counters_head();
+  if (mc != nullptr) {
+    mc->restore_unshareable_info(CHECK);
+    mc = mc->next();
   }
   if (_adapter != nullptr) {
     assert(_adapter->is_linked(), "must be");
@@ -644,8 +652,8 @@ void Method::print_invocation_count(outputStream* st) {
 #endif
 }
 
-MethodTrainingData* Method::training_data_or_null() const {
-  MethodCounters* mcs = method_counters();
+MethodTrainingData* Method::training_data_or_null(jlong profile_context) const {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return nullptr;
   } else {
@@ -657,8 +665,8 @@ MethodTrainingData* Method::training_data_or_null() const {
   }
 }
 
-bool Method::init_training_data(MethodTrainingData* td) {
-  MethodCounters* mcs = method_counters();
+bool Method::init_training_data(MethodTrainingData* td, jlong profile_context) {
+  MethodCounters* mcs = method_counters(profile_context);
   if (mcs == nullptr) {
     return false;
   } else {
@@ -857,13 +865,13 @@ bool Method::init_method_counters(MethodCounters* counters) {
       return false;
     }
     counters->set_next(current_method_counters);
-  } while (Atomic::cmpxchg(&_method_counters, current_method_counters, counters) != current_method_counters);
+  } while (AtomicAccess::cmpxchg(&_method_counters, current_method_counters, counters) != current_method_counters);
   return true;
 }
 
 bool Method::init_method_counters2(MethodCounters2* counters) {
   // Try to install a pointer to MethodCounters, return true on success.
-  return Atomic::replace_if_null(&_method_counters2, counters);
+  return AtomicAccess::replace_if_null(&_method_counters2, counters);
 }
 
 bool Method::init_method_data(MethodData* md) {
@@ -879,7 +887,7 @@ bool Method::init_method_data(MethodData* md) {
       return false;
     }
     md->set_next(current_md);
-  } while (Atomic::cmpxchg(&_method_data, current_md, md) != current_md);
+  } while (AtomicAccess::cmpxchg(&_method_data, current_md, md) != current_md);
   return true;
 //  return Atomic::replace_if_null(&_method_counters, counters);
 }
@@ -2615,4 +2623,37 @@ MethodData* Method::method_data(jlong profile_context) const {
     method_data = method_data->next();
   }
   return method_data;
+}
+
+int Method::total_invocation_count() const {
+  MethodCounters* mcs = _method_counters;
+  MethodData* mdo = _method_data;
+  bool carry = false;
+  uint count = 0;
+  while (mcs != nullptr) {
+    carry = carry || mcs->invocation_counter()->carry();
+    count += mcs->invocation_counter()->count();
+    mcs = mcs->next();
+  }
+  while (mdo != nullptr) {
+    carry = carry || mdo->invocation_counter()->carry();
+    count += mdo->invocation_counter()->count();
+    mdo = mdo->next();
+  }
+
+  if (carry) {
+    return InvocationCounter::count_limit;
+  } else {
+    return count;
+  }
+}
+
+CompLevel Method::max_comp_level() const {
+  nmethod* code = _code;
+  CompLevel max = CompLevel_any;
+  while (code != nullptr) {
+    max = (CompLevel)MAX2((int)max, code->comp_level());
+    code = code->next();
+  }
+  return max;
 }

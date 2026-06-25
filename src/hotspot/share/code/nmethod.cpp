@@ -1241,6 +1241,7 @@ nmethod::nmethod(
     _profile_context         = 0;
 
     _osr_entry_point         = nullptr;
+    _verified_entry_point         = nullptr;
     _pc_desc_container       = nullptr;
     _entry_bci               = InvocationEntryBci;
     _compile_id              = compile_id;
@@ -1383,6 +1384,11 @@ nmethod::nmethod(const nmethod &nm) : CodeBlob(nm._name, nm._kind, nm._size, nm.
   } else {
     _osr_entry_point            = nullptr;
   }
+  if (nm._verified_entry_point != nullptr) {
+    _verified_entry_point            = (nm._verified_entry_point - (address) &nm) + (address) this;
+  } else {
+    _verified_entry_point            = nullptr;
+  }
 
   _entry_offset                 = nm._entry_offset;
   _verified_entry_offset        = nm._verified_entry_offset;
@@ -1521,7 +1527,7 @@ nmethod* nmethod::relocate(CodeBlobType code_blob_type) {
 
   // Verify the nm we copied from is still valid
   if (!is_marked_for_deoptimization() && is_in_use()) {
-    assert(method() != nullptr && method()->code() == this, "should be if is in use");
+    assert(method() != nullptr && method()->code(profile_context()) == this, "should be if is in use");
 
     // Attempt to start using the copy
     if (nm_copy->make_in_use()) {
@@ -1627,6 +1633,7 @@ nmethod::nmethod(
     _profile_context= profile_context;
 
     _osr_entry_point = code_begin() + offsets->value(CodeOffsets::OSR_Entry);
+    _verified_entry_point = code_begin() + offsets->value(CodeOffsets::Verified_Entry);
     _entry_bci       = entry_bci;
     _compile_id      = compile_id;
     _comp_level      = comp_level;
@@ -1786,7 +1793,7 @@ void nmethod::log_relocated_nmethod(nmethod* original) const {
     LOG_OFFSET(xtty, oops);
     LOG_OFFSET(xtty, metadata);
 
-    xtty->method(method());
+    xtty->method(method(), profile_context());
     xtty->stamp();
     xtty->end_elem();
   }

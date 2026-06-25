@@ -113,8 +113,7 @@ static int compare_methods(Method** a, Method** b) {
 }
 
 inline CompLevel method_code_comp_level(const Method* m) {
-  const nmethod* code = m->code();
-  return code != nullptr ? static_cast<CompLevel>(code->comp_level()) : CompLevel_any;
+  return m->max_comp_level();
 }
 
 static void collect_profiled_methods(Method* m) {

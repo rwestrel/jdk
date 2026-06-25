@@ -222,6 +222,7 @@ public:
   virtual const char* internal_name() const { return "{method counters 2}"; }
   virtual void print_value_on(outputStream* st) const;
   MetaspaceObj::Type type() const { return MethodCountersType; }
+  void metaspace_pointers_do(MetaspaceClosure* iter);
 
   virtual int size() const {
     return method_counters2_size();

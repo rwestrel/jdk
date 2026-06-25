@@ -84,6 +84,9 @@ void MethodCounters::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_method_training_data);
 }
 
+void MethodCounters2::metaspace_pointers_do(MetaspaceClosure* it) {
+}
+
 #if INCLUDE_CDS
 void MethodCounters::remove_unshareable_info() {
 }

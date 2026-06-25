@@ -85,19 +85,19 @@ typedef void (*ThreadFunction)(JavaThread*, TRAPS);
 class EventVirtualThreadPinned;
 class ThreadWXEnable;
 
-class ProfileContext {
-private:
-  jlong _context;
-public:
-  explicit ProfileContext(jlong context) : _context(context) {
-  }
-
-  jlong context() const {
-    return _context;
-  }
-
-  static ByteSize context_offset() { return byte_offset_of(ProfileContext, _context); }
-};
+// class ProfileContext {
+// private:
+//   jlong _context;
+// public:
+//   explicit ProfileContext(jlong context) : _context(context) {
+//   }
+//
+//   jlong context() const {
+//     return _context;
+//   }
+//
+//   static ByteSize context_offset() { return byte_offset_of(ProfileContext, _context); }
+// };
 
 class JavaThread: public Thread {
   friend class VMStructs;
@@ -472,7 +472,8 @@ class JavaThread: public Thread {
   };
 #endif // ASSERT
 
-  ProfileContext _profile_context;
+  // ProfileContext _profile_context;
+  jlong _profile_context;
 
 private:
   friend class VMThread;
@@ -641,8 +642,10 @@ private:
     _unlocked_inflated_monitor = nullptr;
   }
 
-  ProfileContext profile_context() const { return _profile_context; }
-  void set_profile_context(ProfileContext context) { _profile_context = context; }
+  // ProfileContext profile_context() const { return _profile_context; }
+  // void set_profile_context(ProfileContext context) { _profile_context = context; }
+  jlong profile_context() const { return _profile_context; }
+  void set_profile_context(jlong context) { _profile_context = context; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
@@ -855,7 +858,8 @@ public:
   static ByteSize unlocked_inflated_monitor_offset() { return byte_offset_of(JavaThread, _unlocked_inflated_monitor); }
   static ByteSize is_in_vthread_transition_offset()     { return byte_offset_of(JavaThread, _is_in_vthread_transition); }
 
-  static ByteSize profile_context_offset() { return byte_offset_of(JavaThread, _profile_context) + ProfileContext::context_offset(); }
+  static ByteSize profile_context_offset() { return byte_offset_of(JavaThread, _profile_context); }
+  // static ByteSize profile_context_offset() { return byte_offset_of(JavaThread, _profile_context) + ProfileContext::context_offset(); }
 
 #if INCLUDE_JVMTI
   static ByteSize is_disable_suspend_offset()        { return byte_offset_of(JavaThread, _is_disable_suspend); }

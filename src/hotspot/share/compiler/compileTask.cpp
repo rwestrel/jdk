@@ -44,7 +44,8 @@ CompileTask::CompileTask(int compile_id,
                          int comp_level,
                          int hot_count,
                          CompileReason compile_reason,
-                         bool is_blocking) :
+                         bool is_blocking,
+                         jlong profile_context) :
   _compile_id(compile_id),
   _method(method()),
   _method_holder(JNIHandles::make_weak_global(Handle(Thread::current(), method->method_holder()->klass_holder()))),
@@ -70,7 +71,8 @@ CompileTask::CompileTask(int compile_id,
   _failure_reason(nullptr),
   _failure_reason_on_C_heap(false),
   _training_data(nullptr),
-  _arena_bytes(0)
+  _arena_bytes(0),
+  _profile_context(profile_context)
 {
   AtomicAccess::add(&_active_tasks, 1, memory_order_relaxed);
 }
@@ -167,7 +169,7 @@ void CompileTask::print_tty() {
 
 void CompileTask::print_post(outputStream* st) {
   bool is_osr_method = osr_bci() != InvocationEntryBci;
-  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(),
+  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(), profile_context(),
              is_osr_method, osr_bci(), is_blocking(),
              compiler()->name(), nullptr, false /* short_form */, true /* cr */,
              true /* after_compile_details */,
@@ -292,7 +294,7 @@ void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, i
 // CompileTask::print_compilation
 void CompileTask::print(outputStream* st, const char* msg, bool short_form, bool cr) {
   bool is_osr_method = osr_bci() != InvocationEntryBci;
-  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(), profile_context,
+  print_impl(st, is_unloaded() ? nullptr : method(), compile_id(), comp_level(), profile_context(),
              is_osr_method, osr_bci(), is_blocking(),
              compiler()->name(), msg, short_form, cr);
 }
