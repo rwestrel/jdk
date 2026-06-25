@@ -1917,13 +1917,13 @@ void MachPrologNode::emit(C2_MacroAssembler *masm, PhaseRegAlloc *ra_) const {
   }
 
 #ifdef ASSERT
-if (C->is_method_compilation()) {
-  Label cont;
-  __ cmpq(Address(r15_thread, JavaThread::profile_context_offset()), C->profile_context());
-  __ jcc(Assembler::equal, cont);
-  __ stop("wrong profile context for compiled code");
-  __ bind(cont);
- }
+  if (C->is_method_compilation()) {
+    Label cont;
+    __ cmpq(Address(r15_thread, JavaThread::profile_context_offset()), C->profile_context());
+    __ jcc(Assembler::equal, cont);
+    __ stop("wrong profile context for compiled code");
+    __ bind(cont);
+  }
 #endif
 }
 

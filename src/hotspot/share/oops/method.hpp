@@ -331,7 +331,6 @@ class Method : public Metadata {
                               TRAPS);
 
   // method data access
-<<<<<<< HEAD
   MethodData* method_data(jlong profile_context) const;
   MethodData* method_data_head() const { return _method_data; }
   void set_method_data(MethodData* data);
