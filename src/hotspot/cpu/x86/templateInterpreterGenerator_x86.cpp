@@ -565,7 +565,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   if (ProfileInterpreter) {
     Label method_data_continue;
 //    __ movptr(rdx, Address(rbx, in_bytes(Method::method_data_offset())));
-    __ load_method_counters<MethodData>(rbx, rdx, rax);
+    __ load_method_counters<MethodData>(rbx, rdx, rcx);
     __ testptr(rdx, rdx);
     __ jccb(Assembler::zero, method_data_continue);
     __ addptr(rdx, in_bytes(MethodData::data_offset()));

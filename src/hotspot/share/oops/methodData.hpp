@@ -2456,7 +2456,7 @@ public:
   }
 
   static ByteSize profile_context_offset() {
-    return byte_offset_of(MethodData, _profile_context);
+    return byte_offset_of(MethodData, _profile_context) + ProfileContext::context_offset();
   }
 
   static ByteSize next_offset() {

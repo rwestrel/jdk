@@ -1050,7 +1050,7 @@ public:
   static ByteSize verified_entry_point_offset() { return byte_offset_of(nmethod, _verified_entry_point); }
   static ByteSize state_offset()           { return byte_offset_of(nmethod, _state); }
   static ByteSize next_offset()                 { return byte_offset_of(nmethod, _next); }
-  static ByteSize profile_context_offset()      { return byte_offset_of(nmethod, _profile_context); }
+  static ByteSize profile_context_offset()      { return byte_offset_of(nmethod, _profile_context) + ProfileContext::context_offset(); }
 
   void metadata_do(MetadataClosure* f);
 

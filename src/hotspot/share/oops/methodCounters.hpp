@@ -146,7 +146,7 @@ class MethodCounters : public Metadata {
   }
 
   static ByteSize profile_context_offset() {
-    return byte_offset_of(MethodCounters, _profile_context);
+    return byte_offset_of(MethodCounters, _profile_context) + ProfileContext::context_offset();
   }
 
   static ByteSize offset_in_method() {

@@ -10114,6 +10114,7 @@ void MacroAssembler::setcc(Assembler::Condition comparison, Register dst) {
 
 void MacroAssembler::load_code_for_profile_context(Register method, Register profile_context, Register code,
                                                    Label &no_code, Label &done) {
+  block_comment("load_code_for_profile_context { ");
   const Register java_thread = r15_thread;
   assert_different_registers(profile_context, code, method);
   Label loop;
@@ -10126,4 +10127,5 @@ void MacroAssembler::load_code_for_profile_context(Register method, Register pro
   jcc(equal, done);
   movptr(code, Address(code, nmethod::next_offset()));
   jmp(loop);
+  block_comment("load_code_for_profile_context } ");
 }

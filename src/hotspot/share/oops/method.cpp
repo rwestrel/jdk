@@ -477,6 +477,7 @@ void Method::restore_unshareable_info(TRAPS) {
   if (_adapter != nullptr) {
     assert(_adapter->is_linked(), "must be");
     _from_compiled_entry = _adapter->get_c2i_entry();
+    _i2c_entry = _adapter->get_i2c_entry();
   }
   assert(!queued_for_compilation(), "method's queued_for_compilation flag should not be set");
 }
@@ -1351,8 +1352,10 @@ void Method::clear_code() {
   // Only should happen at allocate time.
   if (adapter() == nullptr) {
     _from_compiled_entry = nullptr;
+    _i2c_entry = nullptr;
   } else {
     _from_compiled_entry = adapter()->get_c2i_entry();
+    _i2c_entry = adapter()->get_i2c_entry();
   }
   OrderAccess::storestore();
   _from_interpreted_entry = _i2i_entry;
@@ -1489,6 +1492,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
     assert(adapter()->is_linked(), "Adapter must have been linked");
 #endif
     h_method->_from_compiled_entry = adapter()->get_c2i_entry();
+    h_method->_i2c_entry = adapter()->get_i2c_entry();
   }
 
   // ONLY USE the h_method now as make_adapter may have blocked

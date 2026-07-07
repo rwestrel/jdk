@@ -1232,6 +1232,7 @@ nmethod::nmethod(
   _method(method),
   _native_receiver_sp_offset(basic_lock_owner_sp_offset),
   _native_basic_lock_sp_offset(basic_lock_sp_offset),
+  _next(nullptr),
   _profile_context(0)
 {
   {
@@ -1241,7 +1242,7 @@ nmethod::nmethod(
     init_defaults(code_buffer, offsets);
 
     _osr_entry_point         = nullptr;
-    _verified_entry_point         = nullptr;
+    _verified_entry_point = code_begin() + offsets->value(CodeOffsets::Verified_Entry);
     _pc_desc_container       = nullptr;
     _entry_bci               = InvocationEntryBci;
     _compile_id              = compile_id;
@@ -1372,6 +1373,7 @@ nmethod::nmethod(const nmethod &nm) : CodeBlob(nm._name, nm._kind, nm._size, nm.
   _deoptimization_generation    = 0;
   _gc_epoch                     = CodeCache::gc_epoch();
   _method                       = nm._method;
+  _next = nullptr;
   _osr_link                     = nullptr;
 
   _exception_cache              = nullptr;
@@ -1623,6 +1625,7 @@ nmethod::nmethod(
   _gc_epoch(CodeCache::gc_epoch()),
   _method(method),
   _osr_link(nullptr),
+  _next(nullptr),
   _profile_context(profile_context),
   _flags(flags)
 {

@@ -279,7 +279,7 @@ void CompileTask::print_impl(outputStream* st, Method* method, int compile_id, i
     sst.print(" (size %d/%d)", nm_total_size, nm_insts_size);
   }
 
-  st->print(" profile context:" JLONG_FORMAT, profile_context.context());
+  st->print(" profile context:" JLONG_FORMAT " ", profile_context.context());
 
   if (msg != nullptr) {
     sst.print("   %s", msg);
