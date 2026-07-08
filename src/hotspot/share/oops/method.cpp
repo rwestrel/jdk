@@ -705,7 +705,7 @@ void Method::build_profiling_method_data(const methodHandle& method, ProfileCont
     return;   // return the exception (which is cleared)
   }
 
-  if (!AtomicAccess::replace_if_null(&method->_method_data, method_data)) {
+  if (!method->init_method_data(method_data)) {
     MetadataFactory::free_metadata(loader_data, method_data);
     return;
   }

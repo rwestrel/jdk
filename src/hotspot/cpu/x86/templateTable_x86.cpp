@@ -3263,7 +3263,7 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ profile_final_call(rax);
   __ profile_arguments_type(rax, method, rbcp, true);
 
-  __ jump_from_interpreted(method, rax, rbcp);
+  __ jump_from_interpreted(method, rax, rcx);
 
   __ bind(notFinal);
 
@@ -3276,7 +3276,7 @@ void TemplateTable::invokevirtual_helper(Register index,
   __ lookup_virtual_method(rax, index, method);
 
   __ profile_arguments_type(rdx, method, rbcp, true);
-  __ jump_from_interpreted(method, rdx, rbcp);
+  __ jump_from_interpreted(method, rdx, rcx);
 }
 
 void TemplateTable::invokevirtual(int byte_no) {
@@ -3312,7 +3312,7 @@ void TemplateTable::invokespecial(int byte_no) {
   // do the call
   __ profile_call(rax);
   __ profile_arguments_type(rax, rbx, rbcp, false);
-  __ jump_from_interpreted(rbx, rax, rbcp);
+  __ jump_from_interpreted(rbx, rax, rcx);
 }
 
 void TemplateTable::invokestatic(int byte_no) {
@@ -3328,7 +3328,7 @@ void TemplateTable::invokestatic(int byte_no) {
   // do the call
   __ profile_call(rax);
   __ profile_arguments_type(rax, rbx, rbcp, false);
-  __ jump_from_interpreted(rbx, rax, rbcp);
+  __ jump_from_interpreted(rbx, rax, rcx);
 }
 
 
@@ -3389,7 +3389,7 @@ void TemplateTable::invokeinterface(int byte_no) {
   __ profile_final_call(rdx);
   __ profile_arguments_type(rdx, rbx, rbcp, true);
 
-  __ jump_from_interpreted(rbx, rdx, rbcp);
+  __ jump_from_interpreted(rbx, rdx, rcx);
   // no return from above
   __ bind(notVFinal);
 
@@ -3442,7 +3442,7 @@ void TemplateTable::invokeinterface(int byte_no) {
   // do the call
   // rcx: receiver
   // rbx,: Method*
-  __ jump_from_interpreted(rbx, rdx, rbcp);
+  __ jump_from_interpreted(rbx, rdx, rcx);
   __ should_not_reach_here();
 
   // exception handling code follows...
@@ -3503,7 +3503,7 @@ void TemplateTable::invokehandle(int byte_no) {
   __ profile_final_call(rax);
   __ profile_arguments_type(rdx, rbx_method, rbcp, true);
 
-  __ jump_from_interpreted(rbx_method, rdx, rbcp);
+  __ jump_from_interpreted(rbx_method, rdx, rcx);
 }
 
 void TemplateTable::invokedynamic(int byte_no) {
@@ -3526,7 +3526,7 @@ void TemplateTable::invokedynamic(int byte_no) {
 
   __ verify_oop(rax_callsite);
 
-  __ jump_from_interpreted(rbx_method, rdx, rbcp);
+  __ jump_from_interpreted(rbx_method, rdx, rcx);
 }
 
 //-----------------------------------------------------------------------------
