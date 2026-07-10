@@ -127,8 +127,22 @@ VtableStub* VtableStubs::create_vtable_stub(int vtable_index) {
   // rax: receiver klass
   // method (rbx): Method*
   // rcx: receiver
-  address ame_addr = __ pc();
-  __ jmp( Address(rbx, Method::from_compiled_offset()));
+  address ame_addr;
+  if (UseNewCode) {
+    Label found, not_found, do_call;
+    __ load_code_for_profile_context(method, r13, r11, not_found, found);
+    __ bind(not_found);
+    __ movptr(r11, Address(method, Method::c2i_entry_offset()));
+    __ jmp(do_call);
+    __ bind(found);
+    __ movptr(r11, Address(r11, nmethod::verified_entry_point_offset()));
+    __ bind(do_call);
+    ame_addr = __ pc();
+    __ jmp(r11);
+  } else {
+    ame_addr = __ pc();
+    __ jmp( Address(rbx, Method::from_compiled_offset()));
+  }
 
   masm->flush();
   slop_bytes += index_dependent_slop; // add'l slop for size variance due to large itable offsets
@@ -235,8 +249,22 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   }
 #endif // ASSERT
 
-  address ame_addr = __ pc();
-  __ jmp(Address(method, Method::from_compiled_offset()));
+  address ame_addr;
+  if (UseNewCode) {
+    Label found, not_found, do_call;
+    __ load_code_for_profile_context(method, r13, r11, not_found, found);
+    __ bind(not_found);
+    __ movptr(r11, Address(method, Method::c2i_entry_offset()));
+    __ jmp(do_call);
+    __ bind(found);
+    __ movptr(r11, Address(r11, nmethod::verified_entry_point_offset()));
+    __ bind(do_call);
+    ame_addr = __ pc();
+    __ jmp(r11);
+  } else {
+    ame_addr = __ pc();
+    __ jmp(Address(method, Method::from_compiled_offset()));
+  }
 
   __ bind(L_no_such_interface);
   // Handle IncompatibleClassChangeError in itable stubs.

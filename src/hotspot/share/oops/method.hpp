@@ -111,6 +111,7 @@ class Method : public Metadata {
   // Entry point for calling both from and to the interpreter.
   address _i2i_entry;           // All-args-on-stack calling convention
   address _i2c_entry;
+  address _c2i_entry;
   // Entry point for calling from compiled code, to compiled code if it exists
   // or else the interpreter.
   volatile address _from_compiled_entry;     // Cache of: _code ? _code->entry_point() : _adapter->c2i_entry()
@@ -396,7 +397,7 @@ class Method : public Metadata {
 #endif // not PRODUCT
 
   // nmethod/verified compiler entry
-  address verified_code_entry();
+  address verified_code_entry(ProfileContext context);
   bool check_code() const;      // Not inline to avoid circular ref
   nmethod* code(ProfileContext profile_context) const;
 
@@ -669,6 +670,7 @@ public:
   static ByteSize from_interpreted_offset()      { return byte_offset_of(Method, _from_interpreted_entry ); }
   static ByteSize interpreter_entry_offset()     { return byte_offset_of(Method, _i2i_entry ); }
   static ByteSize compiler_entry_offset()        { return byte_offset_of(Method, _i2c_entry ); }
+  static ByteSize c2i_entry_offset()        { return byte_offset_of(Method, _c2i_entry ); }
   static ByteSize signature_handler_offset()     { return in_ByteSize(sizeof(Method) + wordSize);      }
   static ByteSize itable_index_offset()          { return byte_offset_of(Method, _vtable_index ); }
 

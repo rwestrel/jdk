@@ -478,6 +478,7 @@ void Method::restore_unshareable_info(TRAPS) {
     assert(_adapter->is_linked(), "must be");
     _from_compiled_entry = _adapter->get_c2i_entry();
     _i2c_entry = _adapter->get_i2c_entry();
+    _c2i_entry = _adapter->get_c2i_entry();
   }
   assert(!queued_for_compilation(), "method's queued_for_compilation flag should not be set");
 }
@@ -1353,9 +1354,11 @@ void Method::clear_code() {
   if (adapter() == nullptr) {
     _from_compiled_entry = nullptr;
     _i2c_entry = nullptr;
+    _c2i_entry = nullptr;
   } else {
     _from_compiled_entry = adapter()->get_c2i_entry();
     _i2c_entry = adapter()->get_i2c_entry();
+    _c2i_entry = adapter()->get_c2i_entry();
   }
   OrderAccess::storestore();
   _from_interpreted_entry = _i2i_entry;
@@ -1406,6 +1409,7 @@ void Method::unlink_method() {
   }
   _i2i_entry = nullptr;
   _i2c_entry = nullptr;
+  _c2i_entry = nullptr;
   _from_compiled_entry = nullptr;
   _from_interpreted_entry = nullptr;
 
@@ -1493,6 +1497,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
 #endif
     h_method->_from_compiled_entry = adapter()->get_c2i_entry();
     h_method->_i2c_entry = adapter()->get_i2c_entry();
+    h_method->_c2i_entry = adapter()->get_c2i_entry();
   }
 
   // ONLY USE the h_method now as make_adapter may have blocked
@@ -1502,6 +1507,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
     _from_compiled_entry = nullptr;
     _i2i_entry = nullptr;
     _i2c_entry = nullptr;
+    _c2i_entry = nullptr;
     if (Continuations::enabled()) {
       assert(!Threads::is_vm_complete(), "should only be called during vm init");
       AdapterHandlerLibrary::create_native_wrapper(h_method);
@@ -1543,9 +1549,16 @@ address Method::make_adapters(const methodHandle& mh, TRAPS) {
 // This function is called after potential safepoints so that nmethod
 // or adapter that it points to is still live and valid.
 // This function must not hit a safepoint!
-address Method::verified_code_entry() {
+address Method::verified_code_entry(ProfileContext context) {
   DEBUG_ONLY(NoSafepointVerifier nsv;)
   assert(_from_compiled_entry != nullptr, "must be set");
+  if (UseNewCode && !is_native()) {
+    nmethod* nm = code(context);
+    if (nm == nullptr) {
+      return get_c2i_entry();
+    }
+    return nm->verified_entry_point();
+  }
   return _from_compiled_entry;
 }
 

@@ -45,6 +45,10 @@ inline address Method::from_interpreted_entry() const {
 inline nmethod* Method::code(ProfileContext profile_context) const {
   assert( check_code(), "" );
   nmethod* code = AtomicAccess::load_acquire(&_code);
+  if (is_native()) {
+    assert(code == nullptr || code->next() == nullptr, "");
+    return code;
+  }
   while (code != nullptr && code->as_nmethod()->profile_context() != profile_context) {
     code = code->as_nmethod()->next();
   }

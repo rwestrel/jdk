@@ -3856,7 +3856,7 @@ void MacroAssembler::lookup_interface_method_stub(Register recv_klass,
   cmpptr(holder_klass, resolved_klass);
   jccb(Assembler::notEqual, L_loop_scan_resolved_entry);
   testptr(temp_itbl_klass, temp_itbl_klass);
-  jccb(Assembler::zero, L_no_such_interface);
+  jcc(Assembler::zero, L_no_such_interface);
   cmpptr(holder_klass, temp_itbl_klass);
   jccb(Assembler::equal, L_holder_found);
 
@@ -3878,7 +3878,7 @@ void MacroAssembler::lookup_interface_method_stub(Register recv_klass,
     testptr(temp_itbl_klass, temp_itbl_klass);
     jccb(Assembler::notZero, L_scan_holder);
 
-  jmpb(L_no_such_interface);
+  jmp(L_no_such_interface);
 
   // Loop: Look for resolved_class record in itable
   //   do {
@@ -3906,7 +3906,7 @@ void MacroAssembler::lookup_interface_method_stub(Register recv_klass,
     testptr(temp_itbl_klass, temp_itbl_klass);
     jccb(Assembler::notZero, L_loop_scan_resolved);
 
-  jmpb(L_no_such_interface);
+  jmp(L_no_such_interface);
 
   Label L_ready;
 

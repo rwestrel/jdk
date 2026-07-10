@@ -49,8 +49,13 @@
 // -----------------------------------------------------
 // Implementation of JavaCallWrapper
 
-JavaCallWrapper::JavaCallWrapper(const methodHandle& callee_method, Handle receiver, JavaValue* result, TRAPS) {
+JavaCallWrapper::JavaCallWrapper(const methodHandle& callee_method, Handle receiver, JavaValue* result, TRAPS)
+  : _context(THREAD->profile_context()) {
   JavaThread* thread = THREAD;
+  _context = thread->profile_context();
+  if (StressProfileContext > 0) {
+    thread->set_profile_context(ProfileContext(os::random() % StressProfileContext));
+  }
 
   guarantee(thread->is_Java_thread(), "crucial check - the VM thread cannot and must not escape to Java code");
   assert(!thread->owns_locks(), "must release all locks when leaving VM");
@@ -121,6 +126,12 @@ JavaCallWrapper::~JavaCallWrapper() {
     // StackWatermark barriers. Therefore, we process any such deferred unwind
     // requests here.
     StackWatermarkSet::after_unwind(_thread);
+  }
+
+  if (StressProfileContext > 0) {
+    _thread->set_profile_context(_context);
+  } else {
+    assert(_thread->profile_context() == _context, "");
   }
 }
 
@@ -389,7 +400,15 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
         } else {
           // Since the call stub sets up like the interpreter we call the from_interpreted_entry
           // so we can go compiled via a i2c.
-          entry_point = method->from_interpreted_entry();
+          if (UseNewCode) {
+            if (method->code(thread->profile_context()) != nullptr) {
+              entry_point = method->from_interpreted_entry();
+            } else {
+              entry_point = method->interpreter_entry();
+            }
+          } else {
+            entry_point = method->from_interpreted_entry();
+          }
         }
       }
       {

@@ -50,6 +50,7 @@ class JavaCallWrapper: StackObj {
   JavaFrameAnchor  _anchor;                 // last thread anchor state that we must restore
 
   JavaValue*       _result;                 // result value
+  ProfileContext   _context;
 
  public:
   // Construction/destruction

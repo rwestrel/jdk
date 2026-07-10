@@ -1541,8 +1541,8 @@ address SharedRuntime::get_resolved_entry(JavaThread* current, methodHandle call
     // The c2i won't patch in this mode -- see fixup_callers_callsite
     return callee_method->get_c2i_entry();
   }
-  assert(callee_method->verified_code_entry() != nullptr, " Jump to zero!");
-  return callee_method->verified_code_entry();
+  assert(callee_method->verified_code_entry(current->profile_context()) != nullptr, " Jump to zero!");
+  return callee_method->verified_code_entry(current->profile_context());
 }
 
 // resolve a static call and patch code

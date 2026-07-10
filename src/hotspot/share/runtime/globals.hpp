@@ -1991,6 +1991,9 @@ const int ObjectAlignmentInBytes = 8;
           "Minimal number of elements in a sorted collection to prefer"     \
           "binary search over simple linear search." )                      \
                                                                             \
+  develop(int, StressProfileContext, 0,                                  \
+          "" )                      \
+                                                                            \
 
 // end of RUNTIME_FLAGS
 
