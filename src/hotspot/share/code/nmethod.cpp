@@ -1243,6 +1243,7 @@ nmethod::nmethod(
 
     _osr_entry_point         = nullptr;
     _verified_entry_point = code_begin() + offsets->value(CodeOffsets::Verified_Entry);
+    _entry_point = code_begin() + offsets->value(CodeOffsets::Entry);
     _pc_desc_container       = nullptr;
     _entry_bci               = InvocationEntryBci;
     _compile_id              = compile_id;
@@ -1391,6 +1392,11 @@ nmethod::nmethod(const nmethod &nm) : CodeBlob(nm._name, nm._kind, nm._size, nm.
     _verified_entry_point            = (nm._verified_entry_point - (address) &nm) + (address) this;
   } else {
     _verified_entry_point            = nullptr;
+  }
+  if (nm._entry_point != nullptr) {
+    _entry_point            = (nm._entry_point - (address) &nm) + (address) this;
+  } else {
+    _entry_point            = nullptr;
   }
 
   _entry_offset                 = nm._entry_offset;
@@ -1638,6 +1644,7 @@ nmethod::nmethod(
 
     _osr_entry_point = code_begin() + offsets->value(CodeOffsets::OSR_Entry);
     _verified_entry_point = code_begin() + offsets->value(CodeOffsets::Verified_Entry);
+    _entry_point = code_begin() + offsets->value(CodeOffsets::Entry);
     _entry_bci       = entry_bci;
     _compile_id      = compile_id;
     _comp_level      = comp_level;

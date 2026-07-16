@@ -170,7 +170,7 @@ void MethodHandles::verify_method(MacroAssembler* _masm, Register method, Regist
 }
 #endif // ASSERT
 
-void MethodHandles::jump_from_method_handle(MacroAssembler* _masm, Register method, Register temp,
+void MethodHandles::jump_from_method_handle(MacroAssembler* _masm, Register method, Register temp1, Register temp2,
                                             bool for_compiler_entry, vmIntrinsics::ID iid) {
   assert(method == rbx, "interpreter calling convention");
 
@@ -178,7 +178,7 @@ void MethodHandles::jump_from_method_handle(MacroAssembler* _masm, Register meth
    __ testptr(rbx, rbx);
    __ jcc(Assembler::zero, L_no_such_method);
 
-  verify_method(_masm, method, temp, iid);
+  verify_method(_masm, method, temp1, iid);
 
   if (!for_compiler_entry && JvmtiExport::can_post_interpreter_events()) {
     Label run_compiled_code;
@@ -193,9 +193,32 @@ void MethodHandles::jump_from_method_handle(MacroAssembler* _masm, Register meth
     __ BIND(run_compiled_code);
   }
 
-  const ByteSize entry_offset = for_compiler_entry ? Method::from_compiled_offset() :
-                                                     Method::from_interpreted_offset();
-  __ jmp(Address(method, entry_offset));
+  if (UseNewCode) {
+    Label no_code, done;
+    __ load_code_for_profile_context(method, temp1, temp2, no_code, done);
+    __ bind(done);
+
+    if (for_compiler_entry) {
+      __ jmp(Address(temp2, nmethod::verified_entry_point_offset()));
+    } else {
+      __ jmp(Address(method, Method::compiler_entry_offset()));
+    }
+
+    __ bind(no_code);
+    if (for_compiler_entry) {
+      __ jmp(Address(method, Method::c2i_entry_offset()));
+    } else {
+      __ jmp(Address(method, Method::interpreter_entry_offset()));
+    }
+
+    const ByteSize entry_offset = for_compiler_entry ? Method::from_compiled_offset() :
+                                                       Method::from_interpreted_offset();
+    __ jmp(Address(method, entry_offset));
+  } else {
+    const ByteSize entry_offset = for_compiler_entry ? Method::from_compiled_offset() :
+                                                       Method::from_interpreted_offset();
+    __ jmp(Address(method, entry_offset));
+  }
 
   __ bind(L_no_such_method);
   __ jump(RuntimeAddress(SharedRuntime::throw_AbstractMethodError_entry()));
@@ -203,7 +226,7 @@ void MethodHandles::jump_from_method_handle(MacroAssembler* _masm, Register meth
 
 void MethodHandles::jump_to_lambda_form(MacroAssembler* _masm,
                                         Register recv, Register method_temp,
-                                        Register temp2,
+                                        Register temp2, Register temp3,
                                         bool for_compiler_entry) {
   BLOCK_COMMENT("jump_to_lambda_form {");
   // This is the initial entry point of a lazy method handle.
@@ -239,7 +262,7 @@ void MethodHandles::jump_to_lambda_form(MacroAssembler* _masm,
     __ BIND(L);
   }
 
-  jump_from_method_handle(_masm, method_temp, temp2, for_compiler_entry, vmIntrinsics::_invokeBasic);
+  jump_from_method_handle(_masm, method_temp, temp2, temp3, for_compiler_entry, vmIntrinsics::_invokeBasic);
   BLOCK_COMMENT("} jump_to_lambda_form");
 }
 
@@ -380,7 +403,7 @@ void MethodHandles::generate_method_handle_dispatch(MacroAssembler* _masm,
 
   if (iid == vmIntrinsics::_invokeBasic) {
     // indirect through MH.form.vmentry.vmtarget
-    jump_to_lambda_form(_masm, receiver_reg, rbx_method, temp1, for_compiler_entry);
+    jump_to_lambda_form(_masm, receiver_reg, rbx_method, temp1, temp2, for_compiler_entry);
   } else if (iid == vmIntrinsics::_linkToNative) {
     assert(for_compiler_entry, "only compiler entry is supported");
     jump_to_native_invoker(_masm, member_reg, temp1);
@@ -531,7 +554,7 @@ void MethodHandles::generate_method_handle_dispatch(MacroAssembler* _masm,
     // After figuring out which concrete method to call, jump into it.
     // Note that this works in the interpreter with no data motion.
     // But the compiled version will require that rcx_recv be shifted out.
-    jump_from_method_handle(_masm, rbx_method, temp1, for_compiler_entry, iid);
+    jump_from_method_handle(_masm, rbx_method, temp1, temp2, for_compiler_entry, iid);
 
     if (iid == vmIntrinsics::_linkToInterface) {
       __ bind(L_incompatible_class_change_error);

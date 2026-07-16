@@ -1371,20 +1371,20 @@ void Method::unlink_code(nmethod *compare) {
   // We need to check if either the _code or _from_compiled_code_entry_point
   // refer to this nmethod because there is a race in setting these two fields
   // in Method* as seen in bugid 4947125.
-  if (UseNewCode) {
+  if (UseNewCode && !is_native()) {
     nmethod* code = _code;
     nmethod* prev = nullptr;
     while (code != nullptr) {
       if (code == compare) {
         if (code == _code) {
-          _code = _code->as_nmethod()->next();
+          _code = _code->next();
         } else {
-          prev->as_nmethod()->set_next(code->as_nmethod()->next());
+          prev->as_nmethod()->set_next(code->next());
         }
         break;
       }
       prev = code;
-      code = code->as_nmethod()->next();
+      code = code->next();
     }
   } else {
     if (_code == compare ||
@@ -1622,6 +1622,8 @@ void Method::set_code(const methodHandle& mh, nmethod *code) {
   } else if (!mh->is_method_handle_intrinsic()) {
     // Instantly compiled code can execute.
     mh->_from_interpreted_entry = mh->get_i2c_entry();
+  } else {
+    mh->_c2i_entry = code->verified_entry_point();
   }
 }
 

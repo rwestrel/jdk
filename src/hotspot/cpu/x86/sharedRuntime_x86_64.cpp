@@ -881,12 +881,14 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
   __ movptr(saved_sp, r11);
 
   if (UseNewCode) {
-    Label found, not_found;
+    Label found, not_found, done;
     __ load_code_for_profile_context(rbx, r13, r11, not_found, found);
     __ bind(not_found);
-    __ stop("compiled code for profile context not found");
+    __ movptr(r11, Address(rbx, Method::c2i_entry_offset()));
+    __ jmp(done);
     __ bind(found);
     __ movptr(r11, Address(r11, nmethod::verified_entry_point_offset()));
+    __ bind(done);
   } else {
     // Will jump to the compiled code just as if compiled code was doing it.
     // Pre-load the register-jump target early, to schedule it better.

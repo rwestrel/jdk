@@ -49,12 +49,12 @@ public:
 
   // Similar to InterpreterMacroAssembler::jump_from_interpreted.
   // Takes care of special dispatch from single stepping too.
-  static void jump_from_method_handle(MacroAssembler* _masm, Register method, Register temp,
+  static void jump_from_method_handle(MacroAssembler* _masm, Register method, Register temp, Register temp2,
                                       bool for_compiler_entry, vmIntrinsics::ID iid);
 
   static void jump_to_lambda_form(MacroAssembler* _masm,
                                   Register recv, Register method_temp,
-                                  Register temp2,
+                                  Register temp2, Register temp3,
                                   bool for_compiler_entry);
 
   static void jump_to_native_invoker(MacroAssembler* _masm,
