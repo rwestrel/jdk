@@ -8,19 +8,25 @@ public final class ProfileContext {
         this.context = context;
     }
 
-    public void run(Runnable op) {
-        long currentContext = getProfileContext();
-        setProfileContext(context);
-        try {
-            op.run();
-        } finally {
-            setProfileContext(currentContext);
-        }
+    // public void run(Runnable op) {
+    //     long currentContext = getProfileContext();
+    //     setProfileContext(context);
+    //     try {
+    //         op.run();
+    //     } finally {
+    //         setProfileContext(currentContext);
+    //     }
+    // }
+
+    private void run(Runnable op);
+    
+    static private void run(Runnable op) {
+        op.run();
     }
 
-    private native void setProfileContext(long context);
+    // private native void setProfileContext(long context);
 
-    private native long getProfileContext();
+    // private native long getProfileContext();
 
     static synchronized public ProfileContext acquire() {
         uniqueContext++;

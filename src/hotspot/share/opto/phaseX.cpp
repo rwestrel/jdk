@@ -38,7 +38,6 @@
 #include "opto/machnode.hpp"
 #include "opto/opcodes.hpp"
 #include "opto/phaseX.hpp"
-#include "opto/regalloc.hpp"
 #include "opto/rootnode.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"

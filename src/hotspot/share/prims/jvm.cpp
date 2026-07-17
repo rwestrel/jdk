@@ -3754,12 +3754,32 @@ JVM_LEAF(jboolean, JVM_PrintWarningAtDynamicAgentLoad(void))
   return (EnableDynamicAgentLoading && !FLAG_IS_CMDLINE(EnableDynamicAgentLoading)) ? JNI_TRUE : JNI_FALSE;
 JVM_END
 
-JVM_LEAF(void, JVM_SetProfileContext(JNIEnv *env, jclass ignored, jlong context))
-  JavaThread::current()->set_profile_context(ProfileContext(context));
-  // JavaThread::current()->set_profile_context(ProfileContext(context));
-JVM_END
+// JVM_LEAF(void, JVM_SetProfileContext(JNIEnv *env, jclass ignored, jlong context))
+//   JavaThread::current()->set_profile_context(ProfileContext(context));
+//   // JavaThread::current()->set_profile_context(ProfileContext(context));
+// JVM_END
 
-JVM_LEAF(jlong , JVM_GetProfileContext(JNIEnv *env, jclass ignored))
-  return JavaThread::current()->profile_context().context();
-  // return JavaThread::current()->profile_context().context();
+// JVM_LEAF(jlong , JVM_GetProfileContext(JNIEnv *env, jclass ignored))
+//   return JavaThread::current()->profile_context().context();
+//   // return JavaThread::current()->profile_context().context();
+// JVM_END
+
+class SwitchToProfileContext {
+private:
+  JavaThread* _thread;
+  ProfileContext _context;
+public:
+  SwitchToProfileContext(JavaThread *thread, ProfileContext context) : _thread(thread),
+                                                                       _context(thread->profile_context()) {
+    thread->set_profile_context(context);
+  }
+
+  ~SwitchToProfileContext() {
+    _thread->set_profile_context(_context);
+  }
+};
+
+JVM_ENTRY(void, JVM_ProfileContextRun(JNIEnv *env, jobject context_object, jobject op))
+  SwitchToProfileContext stpc(THREAD, ProfileContext(context));
+
 JVM_END
