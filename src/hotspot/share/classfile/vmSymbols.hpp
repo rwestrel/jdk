@@ -746,6 +746,8 @@ class SerializeClosure;
   template(jdk_internal_vm_JcmdVThreadCommands,    "jdk/internal/vm/JcmdVThreadCommands")                         \
   template(printScheduler_name,                    "printScheduler")                                              \
   template(printPollers_name,                      "printPollers")                                                \
+                                                                                                                  \
+  template(jdk_internal_misc_ProfileContext,       "jdk/internal/misc/ProfileContext")                            \
 
   /*end*/
 

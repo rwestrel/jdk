@@ -525,6 +525,14 @@ abstract class AbstractPipeline<E_IN, E_OUT, S extends BaseStream<E_OUT, S>>
         return p.getOutputShape();
     }
 
+    final Class getSourceType() {
+        AbstractPipeline p = AbstractPipeline.this;
+        while (p.depth > 0) {
+            p = p.previousStage;
+        }
+        return p.getOutputType();
+    }
+    
     @Override
     final <P_IN> long exactOutputSizeIfKnown(Spliterator<P_IN> spliterator) {
         int flags = getStreamAndOpFlags();
@@ -648,6 +656,10 @@ abstract class AbstractPipeline<E_IN, E_OUT, S extends BaseStream<E_OUT, S>>
      * @return the output shape
      */
     abstract StreamShape getOutputShape();
+
+    Class getOutputType() {
+        return sourceSpliterator.getOutputType();
+    }
 
     /**
      * Collect elements output from a pipeline into a Node that holds elements

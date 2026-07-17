@@ -193,6 +193,8 @@
   /* Scoped Values */                                                                                           \
   do_klass(ScopedValue_Carrier_klass,                   java_lang_ScopedValue_Carrier                         ) \
                                                                                                                 \
+  do_klass(ProfileContext_klass,                        jdk_internal_misc_ProfileContext                      ) \
+                                                                                                                \
   /*end*/
 
 #endif // SHARE_CLASSFILE_VMCLASSMACROS_HPP

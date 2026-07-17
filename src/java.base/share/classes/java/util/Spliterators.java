@@ -43,6 +43,11 @@ public final class Spliterators {
     // Suppresses default constructor, ensuring non-instantiability.
     private Spliterators() {}
 
+    @SuppressWarnings({"rawtypes","unchecked"})
+    public Class getOutputType() {
+        return null;
+    }
+
     // Empty spliterators
 
     /**
@@ -1001,6 +1006,11 @@ public final class Spliterators {
             this.estimatedSize = estimatedSize;
         }
 
+        @SuppressWarnings({"rawtypes","unchecked"})
+        public Class getOutputType() {
+            return array.getClass();
+        }
+        
         @Override
         public Spliterator<T> trySplit() {
             int lo = index, mid = (lo + fence) >>> 1;

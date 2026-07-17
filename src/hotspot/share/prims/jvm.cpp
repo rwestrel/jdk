@@ -3779,7 +3779,10 @@ public:
   }
 };
 
-JVM_ENTRY(void, JVM_ProfileContextRun(JNIEnv *env, jobject context_object, jobject op))
+JVM_ENTRY(void, JVM_SwitchContextAndRun(JNIEnv *env, jclass ignored, jlong context, jobject op)) {
   SwitchToProfileContext stpc(THREAD, ProfileContext(context));
-
+  Handle oph(THREAD, JNIHandles::resolve(op));
+  JavaValue result(T_VOID);
+  JavaCalls::call_static(&result, vmClasses::ProfileContext_klass(), vmSymbols::run_method_name(), vmSymbols::runnable_void_signature(), oph, CHECK);
+}
 JVM_END

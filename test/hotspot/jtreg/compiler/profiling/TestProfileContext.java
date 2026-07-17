@@ -18,8 +18,8 @@ public class TestProfileContext {
         for (int i = 0; i < 20_000; i++) {
             test1(b);
             test1(a);
-            pc1.run(() -> test1(c));
-            pc2.run(() -> test1(d));
+            pc1.switchAndRun(() -> test1(c));
+            pc2.switchAndRun(() -> test1(d));
         }
     }
 

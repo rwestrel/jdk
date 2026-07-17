@@ -18,8 +18,12 @@ public final class ProfileContext {
     //     }
     // }
 
-    private void run(Runnable op);
+    public void switchAndRun(Runnable op) {
+        switchAndRun(context, op);
+    }
     
+    static native private void switchAndRun(long context, Runnable op);
+
     static private void run(Runnable op) {
         op.run();
     }

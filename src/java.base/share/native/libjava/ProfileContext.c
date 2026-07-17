@@ -6,7 +6,7 @@
 static JNINativeMethod methods[] = {
     /* {"setProfileContext",           "(J)V",        (void *)&JVM_SetProfileContext}, */
     /* {"getProfileContext",           "()J",         (void *)&JVM_GetProfileContext}, */
-  {"run",           "(JLjava/lang/Runnable;)V",         (void *)&JVM_ProfileContextRun}, 
+  {"switchAndRun",           "(JLjava/lang/Runnable;)V",         (void *)&JVM_SwitchContextAndRun}, 
 };
 
 JNIEXPORT void JNICALL

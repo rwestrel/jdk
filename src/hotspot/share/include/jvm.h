@@ -1142,7 +1142,7 @@ JVM_PrintWarningAtDynamicAgentLoad(void);
 /* JVM_GetProfileContext(JNIEnv *env, jclass ignored); */
 
 JNIEXPORT void JNICALL
-JVM_ProfileContextRun(JNIEnv *env, jobject context_object, jobject op);
+JVM_SwitchContextAndRun(JNIEnv *env, jclass ignored, jlong context, jobject op);
 
 /*
  * This structure is used by the launcher to get the default thread
