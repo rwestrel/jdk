@@ -823,7 +823,7 @@ nmethod* CompilationPolicy::event(const methodHandle& method, const methodHandle
     }
     CompLevel max_osr_level = static_cast<CompLevel>(inlinee->highest_osr_comp_level());
     if (max_osr_level >= expected_comp_level) { // fast check to avoid locking in a typical scenario
-      nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, expected_comp_level, false);
+      nmethod* osr_nm = inlinee->lookup_osr_nmethod_for(bci, expected_comp_level, false, profile_context);
       assert(osr_nm == nullptr || osr_nm->comp_level() >= expected_comp_level, "lookup_osr_nmethod_for is broken");
       if (osr_nm != nullptr && osr_nm->comp_level() != comp_level) {
         // Perform OSR with new nmethod
@@ -874,7 +874,7 @@ void CompilationPolicy::compile(const methodHandle& mh, int bci, CompLevel level
   if ((bci != InvocationEntryBci && !can_be_osr_compiled(mh, level))) {
     if (!CompilationModeFlag::disable_intermediate() &&
         level == CompLevel_full_optimization && can_be_osr_compiled(mh, CompLevel_simple)) {
-      nmethod* osr_nm = mh->lookup_osr_nmethod_for(bci, CompLevel_simple, false);
+      nmethod* osr_nm = mh->lookup_osr_nmethod_for(bci, CompLevel_simple, false, profile_context);
       if (osr_nm != nullptr && osr_nm->comp_level() > CompLevel_simple) {
         // Invalidate the existing OSR nmethod so that a compile at CompLevel_simple is permitted.
         osr_nm->make_not_entrant(nmethod::InvalidationReason::OSR_INVALIDATION_FOR_COMPILING_WITH_C1);

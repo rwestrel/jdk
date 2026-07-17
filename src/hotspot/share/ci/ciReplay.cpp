@@ -803,7 +803,7 @@ class CompileReplay : public StackObj {
       }
     }
     // Make sure the existence of a prior compile doesn't stop this one
-    nmethod* nm = (entry_bci != InvocationEntryBci) ? method->lookup_osr_nmethod_for(entry_bci, comp_level, true) : method->code(profile_context());
+    nmethod* nm = (entry_bci != InvocationEntryBci) ? method->lookup_osr_nmethod_for(entry_bci, comp_level, true, profile_context()) : method->code(profile_context());
     if (nm != nullptr) {
       nm->make_not_entrant(nmethod::InvalidationReason::CI_REPLAY);
     }

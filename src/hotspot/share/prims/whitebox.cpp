@@ -851,7 +851,7 @@ WB_ENTRY(jboolean, WB_IsMethodCompiled(JNIEnv* env, jobject o, jobject method, j
   CHECK_JNI_EXCEPTION_(env, JNI_FALSE);
   MutexLocker mu(Compile_lock);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0));  // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false, ProfileContext(0)) : mh->code(ProfileContext(0));  // FIXME
   if (code == nullptr) {
     return JNI_FALSE;
   }
@@ -955,7 +955,7 @@ WB_ENTRY(jint, WB_GetMethodCompilationLevel(JNIEnv* env, jobject o, jobject meth
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, CompLevel_none);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0));  // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false, ProfileContext(0)) : mh->code(ProfileContext(0));  // FIXME
   return (code != nullptr ? code->comp_level() : CompLevel_none);
 WB_END
 
@@ -1010,7 +1010,7 @@ WB_ENTRY(jint, WB_GetMethodEntryBci(JNIEnv* env, jobject o, jobject method))
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, InvocationEntryBci);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false);
+  nmethod* code = mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false, ProfileContext(0));
   return (code != nullptr && code->is_osr_method() ? code->osr_entry_bci() : InvocationEntryBci);
 WB_END
 
@@ -1108,7 +1108,7 @@ bool WhiteBox::compile_method(Method* method, int comp_level, int bci, JavaThrea
     if (code != nullptr) {
       return true;
     }
-  } else if (mh->lookup_osr_nmethod_for(bci, comp_level, false) != nullptr) {
+  } else if (mh->lookup_osr_nmethod_for(bci, comp_level, false, ProfileContext(0)) != nullptr) {
     return true;
   }
   tty->print("WB error: failed to%s compile at level %d method ", is_blocking ? " blocking" : "", comp_level);
@@ -1573,7 +1573,7 @@ WB_ENTRY(jobjectArray, WB_GetNMethod(JNIEnv* env, jobject o, jobject method, jbo
   jmethodID jmid = reflected_method_to_jmid(thread, env, method);
   CHECK_JNI_EXCEPTION_(env, nullptr);
   methodHandle mh(THREAD, Method::checked_resolve_jmethod_id(jmid));
-  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false) : mh->code(ProfileContext(0)); // FIXME
+  nmethod* code = is_osr ? mh->lookup_osr_nmethod_for(InvocationEntryBci, CompLevel_none, false, ProfileContext(0)) : mh->code(ProfileContext(0)); // FIXME
   jobjectArray result = nullptr;
   if (code == nullptr) {
     return result;

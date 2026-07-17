@@ -1022,7 +1022,7 @@ nmethod* InterpreterRuntime::frequency_counter_overflow(JavaThread* current, add
     LastFrameAccessor last_frame(current);
     Method* method =  last_frame.method();
     int bci = method->bci_from(last_frame.bcp());
-    nm = method->lookup_osr_nmethod_for(bci, CompLevel_none, false);
+    nm = method->lookup_osr_nmethod_for(bci, CompLevel_none, false, current->profile_context());
     BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
     if (nm != nullptr) {
       // in case the transition passed a safepoint we need to barrier this again

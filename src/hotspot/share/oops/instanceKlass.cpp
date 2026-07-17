@@ -3567,7 +3567,7 @@ void InstanceKlass::adjust_default_methods(bool* trace_name_printed) {
 void InstanceKlass::add_osr_nmethod(nmethod* n, ProfileContext profile_context) {
   assert_lock_strong(NMethodState_lock);
 #ifndef PRODUCT
-  nmethod* prev = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), n->comp_level(), true);
+  nmethod* prev = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), n->comp_level(), true, profile_context);
   assert(prev == nullptr || !prev->is_in_use() COMPILER2_PRESENT(|| StressRecompilation),
       "redundant OSR recompilation detected. memory leak in CodeCache!");
 #endif
@@ -3580,7 +3580,7 @@ void InstanceKlass::add_osr_nmethod(nmethod* n, ProfileContext profile_context) 
 
   // Get rid of the osr methods for the same bci that have lower levels.
   for (int l = CompLevel_limited_profile; l < n->comp_level(); l++) {
-    nmethod *inv = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), l, true);
+    nmethod *inv = lookup_osr_nmethod(n->method(), n->osr_entry_bci(), l, true, profile_context);
     if (inv != nullptr && inv->is_in_use()) {
       inv->make_not_entrant(nmethod::InvalidationReason::OSR_INVALIDATION_OF_LOWER_LEVEL);
     }
@@ -3645,7 +3645,7 @@ int InstanceKlass::mark_osr_nmethods(DeoptimizationScope* deopt_scope, const Met
   return found;
 }
 
-nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_level, bool match_level) const {
+nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int level, bool match_level, ProfileContext context) const {
   ConditionalMutexLocker ml(NMethodState_lock, !NMethodState_lock->owned_by_self(), Mutex::_no_safepoint_check_flag);
   nmethod* osr = osr_nmethods_head();
   nmethod* best = nullptr;
@@ -3658,9 +3658,10 @@ nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_le
     // try and switch to the same code as we are already running
 
     if (osr->method() == m &&
+        osr->profile_context() == context &&
         (bci == InvocationEntryBci || osr->osr_entry_bci() == bci)) {
       if (match_level) {
-        if (osr->comp_level() == comp_level) {
+        if (osr->comp_level() == level) {
           // Found a match - return it.
           return osr;
         }
@@ -3678,7 +3679,7 @@ nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_le
   }
 
   assert(match_level == false || best == nullptr, "shouldn't pick up anything if match_level is set");
-  if (best != nullptr && best->comp_level() >= comp_level) {
+  if (best != nullptr && best->comp_level() >= level) {
     return best;
   }
   return nullptr;

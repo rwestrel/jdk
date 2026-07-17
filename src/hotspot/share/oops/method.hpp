@@ -821,12 +821,12 @@ public:
   bool is_overpass() const { return method_type() == ConstMethod::OVERPASS; }
 
   // On-stack replacement support
-  bool has_osr_nmethod(int level, bool match_level) {
-   return method_holder()->lookup_osr_nmethod(this, InvocationEntryBci, level, match_level) != nullptr;
+  bool has_osr_nmethod(int level, bool match_level, ProfileContext context) {
+   return method_holder()->lookup_osr_nmethod(this, InvocationEntryBci, level, match_level, context) != nullptr;
   }
 
-  nmethod* lookup_osr_nmethod_for(int bci, int level, bool match_level) {
-    return method_holder()->lookup_osr_nmethod(this, bci, level, match_level);
+  nmethod* lookup_osr_nmethod_for(int bci, int level, bool match_level, ProfileContext context) {
+    return method_holder()->lookup_osr_nmethod(this, bci, level, match_level, context);
   }
 
   // Find if klass for method is loaded

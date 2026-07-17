@@ -867,7 +867,7 @@ public:
   void add_osr_nmethod(nmethod* n, ProfileContext profile_context);
   bool remove_osr_nmethod(nmethod* n);
   int mark_osr_nmethods(DeoptimizationScope* deopt_scope, const Method* m);
-  nmethod* lookup_osr_nmethod(const Method* m, int bci, int level, bool match_level) const;
+  nmethod* lookup_osr_nmethod(const Method* m, int bci, int level, bool match_level, ProfileContext context) const;
 
 #if INCLUDE_JVMTI
   // Breakpoint support (see methods on Method* for details)
