@@ -720,16 +720,7 @@ abstract class ReferencePipeline<P_IN, P_OUT>
             forEach(u -> accumulator.accept(container, u));
         }
         else {
-            Class c = getSourceType();
-            if (c == null) {
-                container = evaluate(ReduceOps.makeRef(collector));
-            } else {
-                container = evaluate(ReduceOps.makeRef(collector));
-            }
-            
-            // if (sourceStage.sourceSpliterator != null && sourceStage.sourceSpliterator instanceof java.util.Spliterators$ArraySpliterator<?>) {
-            // }
-
+            container = evaluate(ReduceOps.makeRef(collector));
         }
         return collector.characteristics().contains(Collector.Characteristics.IDENTITY_FINISH)
                ? (R) container
