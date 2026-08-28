@@ -30,6 +30,7 @@
 #include "opto/opcodes.hpp"
 #include "opto/predicates_enums.hpp"
 #include "opto/type.hpp"
+#include "runtime/arguments.hpp"
 
 // Portions of code courtesy of Clifford Click
 
@@ -231,6 +232,7 @@ public:
     }
     return uin;
   }
+  Node* unique_constant_input_recursive(PhaseGVN* phase);
 
   // Check for a simple dead loop.
   enum LoopSafety { Safe = 0, Unsafe, UnsafeLoop };
@@ -256,6 +258,13 @@ public:
            inst_offset() == offset &&
            type()->higher_equal(tp);
   }
+
+  bool can_be_inline_type() const {
+    return Arguments::is_valhalla_enabled() && _type->isa_instptr() && _type->is_instptr()->can_be_inline_type();
+  }
+
+  Node* try_push_inline_types_down(PhaseGVN* phase, bool can_reshape);
+  DEBUG_ONLY(bool can_push_inline_types_down(PhaseGVN* phase);)
 
   virtual const Type* Value(PhaseGVN* phase) const;
   virtual Node* Identity(PhaseGVN* phase);
@@ -471,6 +480,8 @@ public:
     const Type* t = filtered_int_type(phase, val, if_proj, T_INT);
     return t != nullptr && t->isa_int() ? t->is_int() : nullptr;
   }
+
+  bool is_flat_array_check(PhaseTransform* phase, Node** array = nullptr);
 
   AssertionPredicateType assertion_predicate_type() const {
     return _assertion_predicate_type;
@@ -761,6 +772,7 @@ class BlackholeNode : public MultiNode {
 public:
   BlackholeNode(Node* ctrl) : MultiNode(1) {
     init_req(TypeFunc::Control, ctrl);
+    init_class_id(Class_Blackhole);
   }
   virtual int   Opcode() const;
   virtual uint ideal_reg() const { return 0; } // not matched in the AD file
