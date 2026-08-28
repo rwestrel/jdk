@@ -1082,7 +1082,7 @@ void PhaseConditionalPropagation::Analyzer::analyze_allocate_array(const Allocat
   Node* klass = alloc->in(AllocateNode::KlassNode);
   const Type* klass_t = PhaseValues::type(klass);
   if (klass_t != Type::TOP) {
-    const TypeOopPtr* ary_type = klass_t->is_klassptr()->as_instance_type();
+    const TypeOopPtr* ary_type = klass_t->is_klassptr()->as_exact_instance_type();
     const TypeInt* length_type = PhaseValues::type(length)->isa_int();
     if (ary_type->isa_aryptr() && length_type != nullptr) {
       const Type* narrow_length_type = ary_type->is_aryptr()->narrow_size_type(length_type);
