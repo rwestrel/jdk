@@ -1460,9 +1460,6 @@ public:
   }
 
   bool is_data_proj_of_pure_function(const Node* maybe_pure_function) const;
-  void make_path_dead(PhaseIterGVN* igvn, PhaseIdealLoop* loop, Node* ctrl_use, uint j, const char* phase_str);
-  void make_paths_from_here_dead(PhaseIterGVN* igvn, PhaseIdealLoop* loop, const char* phase_str);
-  void create_halt_path(PhaseIterGVN* igvn, Node* c, PhaseIdealLoop* loop, const char* phase_str) const;
 
 //----------------- Printing, etc
 #ifndef PRODUCT
@@ -2231,10 +2228,13 @@ public:
   virtual const Type *bottom_type() const;
   virtual       uint  ideal_reg() const;
 
+  void make_path_dead(PhaseIterGVN* igvn, PhaseIdealLoop* loop, Node* ctrl_use, uint j, const char* phase_str);
 #ifndef PRODUCT
   virtual void dump_spec(outputStream *st) const;
   virtual void dump_compact_spec(outputStream *st) const;
 #endif
+  void make_paths_from_here_dead(PhaseIterGVN* igvn, PhaseIdealLoop* loop, const char* phase_str);
+  void create_halt_path(PhaseIterGVN* igvn, Node* c, PhaseIdealLoop* loop, const char* phase_str) const;
 };
 
 #include "opto/opcodes.hpp"

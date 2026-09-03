@@ -5671,7 +5671,6 @@ int PhaseIdealLoop::_loop_invokes=0;// Count of PhaseIdealLoop invokes
 int PhaseIdealLoop::_loop_work=0; // Sum of PhaseIdealLoop x unique
 volatile int PhaseIdealLoop::_long_loop_candidates=0; // Number of long loops seen
 volatile int PhaseIdealLoop::_long_loop_nests=0; // Number of long loops successfully transformed to a nest
-
 // Number of long loops successfully transformed to a counted loop
 volatile int CountedLoopConverter::_long_loop_counted_loops = 0;
 volatile int PhaseIdealLoop::_loop_conditional_constants = 0;
