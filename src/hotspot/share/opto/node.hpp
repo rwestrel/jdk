@@ -1531,6 +1531,14 @@ public:
   uint        _del_tick;               // Bumped when a deletion happens..
   #endif
 #endif
+
+  // If this instruction is a 2-address instruction, then return the
+  // index of the input which must match the output.  Not necessary
+  // for instructions which bind the input and output register to the
+  // same singleton register (e.g., Intel IDIV which binds AX to be
+  // both an input and an output).  It is necessary when the input and
+  // output have choices - but they must use the same choice.
+  virtual uint two_adr( ) const { return 0; }
 };
 
 inline bool not_a_node(const Node* n) {

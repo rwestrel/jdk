@@ -319,7 +319,7 @@ void PhaseAggressiveCoalesce::insert_copies( Matcher &matcher ) {
 
         // Now check for 2-address instructions
         uint idx;
-        if( n->is_Mach() && (idx=n->as_Mach()->two_adr()) ) {
+        if ((idx = n->two_adr())) {
           // Get the chosen name for the Node
           uint name = _phc._lrg_map.find(n);
           assert (name, "no 2-address specials");
@@ -334,8 +334,25 @@ void PhaseAggressiveCoalesce::insert_copies( Matcher &matcher ) {
                 m->as_Mach()->rematerialize()) {
               copy = m->clone();
               // Insert the copy in the basic block, just before us
-              b->insert_node(copy, l++);
-              l += _phc.clone_projs(b, l, m, copy, _phc._lrg_map);
+              if (n->is_MachProj()) {
+                assert(n->req() == 2 && idx == 1, "");
+                Node* nn = n->in(0);
+                for (uint i = 1; i < nn->req(); ++i) {
+                  if (nn->in(i) == n->in(idx)) {
+                    nn->set_req(i, copy);
+                  }
+                }
+                uint pos = l-1;
+                while (b->get_node(pos) != nn) {
+                  pos--;
+                }
+                b->insert_node(copy, pos++);
+                uint projs = _phc.clone_projs(b, pos, m, copy, _phc._lrg_map);
+                l += projs + 1;
+              } else {
+                b->insert_node(copy, l++);
+                l += _phc.clone_projs(b, l, m, copy, _phc._lrg_map);
+              }
             } else {
               uint ireg = m->ideal_reg();
               if (ireg == 0 || ireg == Op_RegFlags) {
@@ -347,7 +364,23 @@ void PhaseAggressiveCoalesce::insert_copies( Matcher &matcher ) {
               const RegMask *rm = C->matcher()->idealreg2spillmask[ireg];
               copy = new MachSpillCopyNode(MachSpillCopyNode::TwoAddress, m, *rm, *rm);
               // Insert the copy in the basic block, just before us
-              b->insert_node(copy, l++);
+              if (n->is_MachProj()) {
+                assert(n->req() == 2 && idx == 1, "");
+                Node* m = n->in(0);
+                for (uint i = 1; i < m->req(); ++i) {
+                  if (m->in(i) == n->in(idx)) {
+                    m->set_req(i, copy);
+                  }
+                }
+                uint pos = l-1;
+                while (b->get_node(pos) != m) {
+                  pos--;
+                }
+                b->insert_node(copy, pos);
+                l++;
+              } else {
+                b->insert_node(copy, l++);
+              }
             }
             // Insert the copy in the use-def chain
             n->set_req(idx, copy);
@@ -473,9 +506,8 @@ void PhaseAggressiveCoalesce::coalesce( Block *b ) {
     uint idx;
     // 2-address instructions have a virtual Copy matching their input
     // to their output
-    if (n->is_Mach() && (idx = n->as_Mach()->two_adr())) {
-      MachNode *mach = n->as_Mach();
-      combine_these_two(mach, mach->in(idx));
+    if ((idx = n->two_adr())) {
+      combine_these_two(n, n->in(idx));
     }
   } // End of for all instructions in block
 }

@@ -1756,14 +1756,14 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
         const char *regmask    = reg_mask(*op);
         const char *ideal_type = op->ideal_type(_globalNames, _register);
 
-        if (!op->is_bound_register()) {
-          assert(comp->isa(Component::USE), "should be an input");
-          continue;
-        }
-
         fprintf(fp,"  kill = ");
         fprintf(fp,"new MachProjNode( %s, %d, (%s), Op_%s );\n",
                 machNode, proj_no++, regmask, ideal_type);
+        if (!op->is_bound_register() || comp->isa(Component::USE)) {
+          assert(comp->isa(Component::USE), "should be an input");
+          fprintf(fp,"  kill->add_req(in(operand_index(%d) - oper_input_base() + 1));\n", node->_components.operand_position(comp->_name));
+        }
+
         fprintf(fp,"  proj_list.push(kill);\n");
       }
     }
