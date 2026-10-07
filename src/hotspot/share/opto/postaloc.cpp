@@ -690,7 +690,7 @@ void PhaseChaitin::post_allocate_copy_removal() {
         }
       }
 
-      const uint two_adr = n->is_Mach() ? n->as_Mach()->two_adr() : 0;
+      const uint two_adr = n->two_adr();
 
       // Remove copies along input edges
       for (k = 1; k < n->req(); k++) {

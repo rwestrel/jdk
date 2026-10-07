@@ -305,7 +305,7 @@ int PhaseChaitin::clone_projs(Block* b, uint idx, Node* orig, Node* copy, uint& 
   uint cnt = orig->outcnt();
   for (uint i = 0; i < cnt; i++) {
     Node* proj = orig->raw_out(i);
-    if (proj->is_MachProj()) {
+    if (proj->is_MachProj() && proj->in(0) == orig) {
       assert(proj->outcnt() == 0, "only kill projections are expected here");
       assert(_cfg.get_block_for_node(proj) == borig, "incorrect block for kill projections");
       found_projs++;

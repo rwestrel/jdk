@@ -248,7 +248,7 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
     int inp = use->cisc_operand();
     if( inp != AdlcVMDeps::Not_cisc_spillable )
       // Convert operand number to edge index number
-      inp = use->as_Mach()->operand_index(inp);
+        inp = use->as_Mach()->operand_index(inp);
     if( inp == (int)useidx ) {
       use->set_req(useidx, def);
 #ifndef PRODUCT
@@ -270,6 +270,8 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
   if( use->is_Phi() ) {
     b = _cfg.get_block_for_node(b->pred(useidx));
     bindex = b->end_idx();
+  } else if (use->is_MachProj()) {
+    bindex = b->find_node(use->in(0));
   } else {
     // Put the clone just prior to use
     bindex = b->find_node(use);
@@ -281,8 +283,25 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
   // its input, and defs a new live range, which is used by this node.
   insert_proj( b, bindex, spill, maxlrg );
   // Use the spill/clone
+  if (use->is_MachProj()) {
+    Node* n = use->in(0);
+    for (uint j = 1; j < n->req(); ++j) {
+      if (n->in(j) == use->in(1)) {
+        n->set_req(j, spill);
+      }
+    }
+  } else {
+    for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
+      Node* maybe_proj = use->fast_out(i);
+      if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
+        assert(maybe_proj->req() == 2, "");
+        if (maybe_proj->in(1) == use->in(useidx)) {
+          maybe_proj->set_req(1, spill);
+        }
+      }
+    }
+  }
   use->set_req(useidx,spill);
-
   return 1;
 }
 
@@ -1103,6 +1122,15 @@ uint PhaseChaitin::Split(uint maxlrg, ResourceArea* split_arena) {
             if( dup == uup ) {
               if( dmask.overlap(umask) ) {
                 // Both are either up or down, and there is overlap, No Split
+                for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
+                  Node* maybe_proj = n->fast_out(i);
+                  if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
+                    assert(maybe_proj->req() == 2, "");
+                    if (n->in(inpidx) == maybe_proj->in(1)) {
+                      maybe_proj->set_req(1, def);
+                    }
+                  }
+                }
                 n->set_req(inpidx, def);
               }
               else {  // Both are either up or down, and there is no overlap
@@ -1429,7 +1457,7 @@ uint PhaseChaitin::Split(uint maxlrg, ResourceArea* split_arena) {
     // Grab the def
     n1 = defs.at(insidx);
     // Set new lidx for DEF & handle 2-addr instructions
-    if (n1->is_Mach() && ((twoidx = n1->as_Mach()->two_adr()) != 0)) {
+    if ((twoidx = n1->two_adr()) != 0) {
       assert(_lrg_map.find(n1->in(twoidx)) < maxlrg,"Assigning bad live range index");
       // Union the input and output live ranges
       uint lr1 = _lrg_map.find(n1);

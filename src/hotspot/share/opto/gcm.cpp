@@ -57,7 +57,7 @@ void PhaseCFG::schedule_node_into_block( Node *n, Block *b ) {
   // float to another block below this one.  Move them up.
   for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
     Node*  use  = n->fast_out(i);
-    if (use->is_Proj()) {
+    if (use->is_Proj() && use->in(0) == n) {
       Block* buse = get_block_for_node(use);
       if (buse != b) {              // In wrong block?
         if (buse != nullptr) {

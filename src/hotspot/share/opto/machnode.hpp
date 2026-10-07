@@ -275,14 +275,6 @@ public:
   // cisc-spillable instructions redefine for use by in_RegMask
   virtual const RegMask *cisc_RegMask() const { return nullptr; }
 
-  // If this instruction is a 2-address instruction, then return the
-  // index of the input which must match the output.  Not necessary
-  // for instructions which bind the input and output register to the
-  // same singleton register (e.g., Intel IDIV which binds AX to be
-  // both an input and an output).  It is necessary when the input and
-  // output have choices - but they must use the same choice.
-  virtual uint two_adr( ) const { return 0; }
-
   // Does this node's implementation cause some of its inputs to be killed?
   virtual bool has_killed_inputs() const { return false; }
   // If that's the case, is input i killed?
@@ -814,11 +806,28 @@ public:
   virtual int   Opcode() const;
   virtual const Type *bottom_type() const;
   virtual const TypePtr *adr_type() const;
-  virtual const RegMask& in_RegMask(uint) const { return RegMask::EMPTY; }
-  virtual const RegMask &out_RegMask() const { return _rout; }
+  virtual const RegMask& in_RegMask(uint i) const {
+    if (i == 1) {
+      return in(i)->out_RegMask();
+    }
+    return RegMask::EMPTY;
+  }
+  virtual const RegMask &out_RegMask() const {
+    if (req() > 1) {
+      return in(1)->out_RegMask();
+    }
+    return _rout;
+  }
   virtual uint  ideal_reg() const { return _ideal_reg; }
   // Need size_of() for virtual ProjNode::clone()
   virtual uint  size_of() const { return sizeof(MachProjNode); }
+  virtual uint two_adr( ) const {
+    if (req() > 1) {
+      return 1;
+    }
+    return 0;
+  }
+
 #ifndef PRODUCT
   virtual void dump_spec(outputStream *st) const;
 #endif
