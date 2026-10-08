@@ -409,6 +409,14 @@ void Matcher::match( ) {
           if (!C->node_arena()->contains(in)) {
             proj->set_req(1, new_node(in));
           }
+          Node* m = proj->in(0);
+          bool found = false;
+          for (uint k = 1; k < m->req(); ++k) {
+            if (m->in(k) == proj->in(1) && m->as_Mach()->is_killed_input(k)) {
+              found = true;
+            }
+          }
+          assert(found, "");
         }
       }
 

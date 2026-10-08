@@ -1873,8 +1873,9 @@ void ArchDesc::defineIsKilledInput(FILE* fp, InstructForm* node) {
       assert(form, "component type must be a defined form");
       OperandForm *op = form->is_operand();
       assert(op, "Support additional KILLS for base operands");
-      if (!op->is_bound_register()) {
-        assert(comp->isa(Component::USE), "must be an input");
+      // if (!op->is_bound_register()) {
+      if (comp->isa(Component::USE)) {
+      assert(comp->isa(Component::USE), "must be an input");
         fprintf(fp, "  if (operand_index(%d) == (int)idx) {\n", node->_components.operand_position(comp->_name));
         fprintf(fp, "    return true;\n");
         fprintf(fp, "  }\n");

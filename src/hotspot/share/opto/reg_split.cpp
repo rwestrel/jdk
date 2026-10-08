@@ -351,7 +351,7 @@ Node *PhaseChaitin::split_Rematerialize(Node *def, Block *b, uint insidx, uint &
       bool killed = false;
       for (DUIterator_Fast jmax, j = in->fast_outs(jmax); j < jmax && !killed; j++) {
         Node* u = in->fast_out(j);
-        if (u != def && u->is_Mach() && u->as_Mach()->has_killed_inputs()) {
+        if (u != def && u->is_Mach() && u->as_Mach()->has_killed_inputs() && 0) {
           MachNode* mach = u->as_Mach();
           for (uint k = 0; k < u->req(); ++k) {
             Node* m_in = mach->in(k);
@@ -1072,7 +1072,7 @@ uint PhaseChaitin::Split(uint maxlrg, ResourceArea* split_arena) {
             // Need special logic to handle bound USES and killed inputs. Insert a split at this use if we can't
             // rematerialize the def, or if we need the split to form a misaligned pair.
             if (((!umask.is_infinite_stack() &&
-                (int)umask.size() <= lrgs(useidx).num_regs()) || (mach && mach->has_killed_inputs() && mach->is_killed_input(inpidx))) &&
+                (int)umask.size() <= lrgs(useidx).num_regs()) || (mach && mach->has_killed_inputs() && mach->is_killed_input(inpidx) && 0)) &&
                 (!def->rematerialize() ||
                  (!is_vect && umask.is_misaligned_pair()))) {
               // These need a Split regardless of overlap or pressure

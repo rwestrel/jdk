@@ -366,16 +366,50 @@ void PhaseChaitin::verify_killed_inputs(PhaseLive& live) {
       Node *n = block->get_node(location);
       uint lid = _lrg_map.live_range_id(n);
 
+      if (n->is_MachProj() && n->req() > 1) {
+        assert(n->req() == 2, "");
+        uint lidx = _lrg_map.live_range_id(n->in(1));
+        if (liveout.member(lidx)) {
+          tty->print("input %d of", 1); DEBUG_ONLY(n->dump();)
+          failed = true;
+        }
+        Node* m = n->in(0);
+        assert(m->as_Mach()->has_killed_inputs(), "");
+        bool found = false;
+        for (uint k = 1; k < m->req(); ++k) {
+          if (m->in(k) == n->in(1) && m->as_Mach()->is_killed_input(k)) {
+            found = true;
+          }
+        }
+        // assert(found, "");
+        uint k = location;
+        while (block->get_node(k)->is_Proj()) {
+          assert(block->get_node(k)->in(0) == n->in(0), "");
+          k--;
+        }
+        assert(block->get_node(k) == n->in(0), "");
+      }
+
       if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
         const MachNode* mach = n->as_Mach();
         for (uint j = 1; j < n->req(); j++) {
           if (mach->is_killed_input(j)) {
-            uint lidx = _lrg_map.live_range_id(n->in(j));
-            assert(lidx != 0, "");
-            if (liveout.member(lidx)) {
-              tty->print("input %d of", j); DEBUG_ONLY(n->dump();)
-              failed = true;
+            uint k = location+1;
+            bool found = false;
+            while (block->get_node(k)->is_Proj() && !found) {
+              Node* proj = block->get_node(k);
+              if (proj->req() > 1 && proj->in(1) == n->in(j)) {
+                found = true;
+              }
+              k++;
             }
+            assert(found, "");
+            // uint lidx = _lrg_map.live_range_id(n->in(j));
+            // assert(lidx != 0, "");
+            // if (liveout.member(lidx)) {
+            //   tty->print("input %d of", j); DEBUG_ONLY(n->dump();)
+            //   failed = true;
+            // }
           }
         }
       }

@@ -137,18 +137,18 @@ bool InstructForm::needs_projections(ArchDesc& AD) {
 }
 
 bool InstructForm::kills_some_inputs(ArchDesc& AD) {
-  // _components.reset();
-  // for( Component *comp; (comp = _components.iter()) != nullptr; ) {
-  //   if (comp->isa(Component::KILL) && comp->isa(Component::USE)) {
-  //     Form *form = (Form*)AD.globalNames()[comp->_type];
-  //     assert(form, "component type must be a defined form");
-  //     OperandForm *op = form->is_operand();
-  //     assert(op, "Support additional KILLS for base operands");
-  //     if (!op->is_bound_register()) {
-  //       return true;
-  //     }
-  //   }
-  // }
+  _components.reset();
+  for( Component *comp; (comp = _components.iter()) != nullptr; ) {
+    if (comp->isa(Component::KILL) && comp->isa(Component::USE)) {
+      Form *form = (Form*)AD.globalNames()[comp->_type];
+      assert(form, "component type must be a defined form");
+      OperandForm *op = form->is_operand();
+      assert(op, "Support additional KILLS for base operands");
+      // if (!op->is_bound_register()) {
+      return true;
+      // }
+    }
+  }
   return false;
 }
 
