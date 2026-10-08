@@ -694,9 +694,20 @@ void PhaseChaitin::post_allocate_copy_removal() {
 
       // Remove copies along input edges
       for (k = 1; k < n->req(); k++) {
-        j -= elide_copy(n, k, block, &value, &regnd, (two_adr != k) && !(n->is_Mach() && n->as_Mach()->has_killed_inputs() && n->as_Mach()->is_killed_input(k)));
+        // j -= elide_copy(n, k, block, &value, &regnd, (two_adr != k) && !(n->is_Mach() && n->as_Mach()->has_killed_inputs() && n->as_Mach()->is_killed_input(k)));
+        bool can_change_regs = (two_adr != k);
+        for (uint l = j+1; l < block->number_of_nodes() && can_change_regs; ++l) {
+          Node* maybe_proj = block->get_node(l);
+          if (!maybe_proj->is_MachProj()) {
+            break;
+          }
+          if (maybe_proj->req() > 1 && maybe_proj->in(1) == n->in(k)) {
+            can_change_regs = false;
+          }
+        }
+        j -= elide_copy(n, k, block, &value, &regnd, can_change_regs);
       }
-      if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
+      if (n->is_Mach() && n->as_Mach()->has_killed_inputs() && 0) {
         for (k = 1; k < n->req(); k++) {
           if (n->as_Mach()->is_killed_input(k)) {
             Node* in = n->in(k);
