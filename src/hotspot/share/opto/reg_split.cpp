@@ -286,7 +286,7 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
   if (use->is_MachProj()) {
     Node* n = use->in(0);
     for (uint j = 1; j < n->req(); ++j) {
-      if (n->in(j) == use->in(1)) {
+      if (n->in(j) == use->in(1) && n->in_RegMask(j).overlap(use->out_RegMask())) {
         n->set_req(j, spill);
       }
     }
@@ -295,7 +295,7 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
       Node* maybe_proj = use->fast_out(i);
       if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
         assert(maybe_proj->req() == 2, "");
-        if (maybe_proj->in(1) == use->in(useidx)) {
+        if (maybe_proj->in(1) == use->in(useidx) && use->in_RegMask(useidx).overlap(maybe_proj->out_RegMask())) {
           maybe_proj->set_req(1, spill);
         }
       }
@@ -1126,7 +1126,7 @@ uint PhaseChaitin::Split(uint maxlrg, ResourceArea* split_arena) {
                   Node* maybe_proj = n->fast_out(i);
                   if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
                     assert(maybe_proj->req() == 2, "");
-                    if (n->in(inpidx) == maybe_proj->in(1)) {
+                    if (n->in(inpidx) == maybe_proj->in(1) && n->in_RegMask(inpidx).overlap(maybe_proj->out_RegMask())) {
                       maybe_proj->set_req(1, def);
                     }
                   }

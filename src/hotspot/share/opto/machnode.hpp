@@ -334,6 +334,8 @@ public:
   // instructions and compute the same value.
   virtual MachNode *Expand( State *, Node_List &proj_list, Node* mem ) { return this; }
 
+  bool already_has_kill_projection(Node* killed) const;
+
   // Bottom_type call; value comes from operand0
   virtual const Type* bottom_type() const {
     if (_bottom_type != nullptr) {
@@ -813,9 +815,9 @@ public:
     return RegMask::EMPTY;
   }
   virtual const RegMask &out_RegMask() const {
-    if (req() > 1) {
-      return in(1)->out_RegMask();
-    }
+    // if (req() > 1) {
+    //   return in(1)->out_RegMask();
+    // }
     return _rout;
   }
   virtual uint  ideal_reg() const { return _ideal_reg; }
