@@ -334,8 +334,6 @@ public:
   // instructions and compute the same value.
   virtual MachNode *Expand( State *, Node_List &proj_list, Node* mem ) { return this; }
 
-  bool already_has_kill_projection(Node* killed) const;
-
   // Bottom_type call; value comes from operand0
   virtual const Type* bottom_type() const {
     if (_bottom_type != nullptr) {
