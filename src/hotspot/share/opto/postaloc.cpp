@@ -376,7 +376,7 @@ bool PhaseChaitin::eliminate_copy_of_constant(Node* val, Node* n,
     // have been transferred to the old[value].
     for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
       Node* use = n->fast_out(i);
-      if (use->is_Proj() && use->outcnt() == 0) {
+      if (use->is_Proj() && use->in(0) == n && use->outcnt() == 0) {
         // Kill projections have no users and one input
         use->set_req(0, C->top());
         yank_if_dead(use, current_block, &value, &regnd);

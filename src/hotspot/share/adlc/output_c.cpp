@@ -1744,8 +1744,6 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
           assert(false, "can't have temps which aren't registers");
         }
       } else if (comp->isa(Component::KILL)) {
-        fprintf(fp, "  // DEF/KILL %s\n", comp->_name);
-
         if (!declared_kill) {
           // Define the variable "kill" to hold new MachProjNodes
           fprintf(fp, "  MachProjNode *kill;\n");
@@ -1756,15 +1754,25 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
         const char *regmask    = reg_mask(*op);
         const char *ideal_type = op->ideal_type(_globalNames, _register);
 
-        fprintf(fp,"  kill = ");
-        fprintf(fp,"new MachProjNode( %s, %d, (%s), Op_%s );\n",
+        fprintf(fp, "  // DEF/KILL %s\n", comp->_name);
+        const char* extra_spaces = "";
+        if (comp->isa(Component::USE)) {
+          fprintf(fp, "  if (!already_has_kill_projection(in(operand_index(%d) - oper_input_base() + 1))) {\n", node->_components.operand_position(comp->_name));
+          extra_spaces = "  ";
+        }
+
+        fprintf(fp, "  %skill = ", extra_spaces);
+        fprintf(fp, "new MachProjNode( %s, %d, (%s), Op_%s );\n",
                 machNode, proj_no++, regmask, ideal_type);
         if (!op->is_bound_register() || comp->isa(Component::USE)) {
           assert(comp->isa(Component::USE), "should be an input");
-          fprintf(fp,"  kill->add_req(in(operand_index(%d) - oper_input_base() + 1));\n", node->_components.operand_position(comp->_name));
+          fprintf(fp, "  %skill->add_req(in(operand_index(%d) - oper_input_base() + 1));\n", extra_spaces, node->_components.operand_position(comp->_name));
         }
 
-        fprintf(fp,"  proj_list.push(kill);\n");
+        fprintf(fp, "  %sproj_list.push(kill);\n", extra_spaces);
+        if (comp->isa(Component::USE)) {
+          fprintf(fp, "  }\n");
+        }
       }
     }
   }

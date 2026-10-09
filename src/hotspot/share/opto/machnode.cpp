@@ -201,6 +201,17 @@ void MachNode::fill_new_machnode(MachNode* node) const {
   C->set_unique(C->unique() - 1);
 }
 
+bool MachNode::already_has_kill_projection(Node* killed) const {
+  return false;
+  for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+    Node* u = fast_out(i);
+    if (u->is_MachProj() && u->in(0) == this && u->req() > 1 && u->in(1) == killed) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Return an equivalent instruction using memory for cisc_operand position
 MachNode *MachNode::cisc_version(int offset) {
   ShouldNotCallThis();

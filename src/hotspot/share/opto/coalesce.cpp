@@ -338,7 +338,7 @@ void PhaseAggressiveCoalesce::insert_copies( Matcher &matcher ) {
                 assert(n->req() == 2 && idx == 1, "");
                 Node* nn = n->in(0);
                 for (uint i = 1; i < nn->req(); ++i) {
-                  if (nn->in(i) == n->in(idx)) {
+                  if (nn->in(i) == n->in(idx) && nn->in_RegMask(i).overlap(n->out_RegMask())) {
                     nn->set_req(i, copy);
                   }
                 }
@@ -368,7 +368,7 @@ void PhaseAggressiveCoalesce::insert_copies( Matcher &matcher ) {
                 assert(n->req() == 2 && idx == 1, "");
                 Node* m = n->in(0);
                 for (uint i = 1; i < m->req(); ++i) {
-                  if (m->in(i) == n->in(idx)) {
+                  if (m->in(i) == n->in(idx) && m->in_RegMask(i).overlap(n->out_RegMask())) {
                     m->set_req(i, copy);
                   }
                 }
