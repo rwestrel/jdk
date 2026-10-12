@@ -270,8 +270,6 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
   if( use->is_Phi() ) {
     b = _cfg.get_block_for_node(b->pred(useidx));
     bindex = b->end_idx();
-  } else if (use->is_MachProj()) {
-    bindex = b->find_node(use->in(0));
   } else {
     // Put the clone just prior to use
     bindex = b->find_node(use);
@@ -283,24 +281,6 @@ int PhaseChaitin::split_USE(MachSpillCopyNode::SpillType spill_type, Node *def, 
   // its input, and defs a new live range, which is used by this node.
   insert_proj( b, bindex, spill, maxlrg );
   // Use the spill/clone
-  if (use->is_MachProj()) {
-    Node* n = use->in(0);
-    for (uint j = 1; j < n->req(); ++j) {
-      if (n->in(j) == use->in(1) && n->in_RegMask(j).overlap(use->out_RegMask())) {
-        n->set_req(j, spill);
-      }
-    }
-  } else {
-    for (DUIterator_Fast imax, i = use->fast_outs(imax); i < imax; i++) {
-      Node* maybe_proj = use->fast_out(i);
-      if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
-        assert(maybe_proj->req() == 2, "");
-        if (maybe_proj->in(1) == use->in(useidx) && use->in_RegMask(useidx).overlap(maybe_proj->out_RegMask())) {
-          maybe_proj->set_req(1, spill);
-        }
-      }
-    }
-  }
   use->set_req(useidx,spill);
 
   return 1;
@@ -1113,15 +1093,6 @@ uint PhaseChaitin::Split(uint maxlrg, ResourceArea* split_arena) {
             if( dup == uup ) {
               if( dmask.overlap(umask) ) {
                 // Both are either up or down, and there is overlap, No Split
-                for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
-                  Node* maybe_proj = n->fast_out(i);
-                  if (maybe_proj->is_MachProj() && maybe_proj->req() > 1) {
-                    assert(maybe_proj->req() == 2, "");
-                    if (n->in(inpidx) == maybe_proj->in(1) && n->in_RegMask(inpidx).overlap(maybe_proj->out_RegMask())) {
-                      maybe_proj->set_req(1, def);
-                    }
-                  }
-                }
                 n->set_req(inpidx, def);
               }
               else {  // Both are either up or down, and there is no overlap

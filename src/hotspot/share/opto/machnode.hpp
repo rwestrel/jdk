@@ -806,28 +806,11 @@ public:
   virtual int   Opcode() const;
   virtual const Type *bottom_type() const;
   virtual const TypePtr *adr_type() const;
-  virtual const RegMask& in_RegMask(uint i) const {
-    if (i == 1) {
-      return in(i)->out_RegMask();
-    }
-    return RegMask::EMPTY;
-  }
-  virtual const RegMask &out_RegMask() const {
-    // if (req() > 1) {
-    //   return in(1)->out_RegMask();
-    // }
-    return _rout;
-  }
+  virtual const RegMask& in_RegMask(uint) const { return RegMask::EMPTY; }
+  virtual const RegMask &out_RegMask() const { return _rout; }
   virtual uint  ideal_reg() const { return _ideal_reg; }
   // Need size_of() for virtual ProjNode::clone()
   virtual uint  size_of() const { return sizeof(MachProjNode); }
-  virtual uint two_adr( ) const {
-    if (req() > 1) {
-      return 1;
-    }
-    return 0;
-  }
-
 #ifndef PRODUCT
   virtual void dump_spec(outputStream *st) const;
 #endif

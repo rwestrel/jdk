@@ -401,24 +401,6 @@ void Matcher::match( ) {
       assert(_mach_null != nullptr || C->failure_is_artificial(), ""); // bailouts are handled below.
 
       C->set_root(xroot->is_Root() ? xroot->as_Root() : nullptr);
-      for (uint i = 0; i < number_of_projections(); ++i) {
-        Node* proj = get_projection(i);
-        if (proj->req() > 1) {
-          assert(proj->req() == 2, "");
-          Node* in = proj->in(1);
-          if (!C->node_arena()->contains(in)) {
-            proj->set_req(1, new_node(in));
-          }
-          Node* m = proj->in(0);
-          bool found = false;
-          for (uint k = 1; k < m->req(); ++k) {
-            if (m->in(k) == proj->in(1) && m->as_Mach()->is_killed_input(k)) {
-              found = true;
-            }
-          }
-          assert(found, "");
-        }
-      }
 
 #ifdef ASSERT
       verify_new_nodes_only(xroot);

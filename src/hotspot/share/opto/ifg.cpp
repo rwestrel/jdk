@@ -894,8 +894,6 @@ uint PhaseChaitin::build_ifg_physical( ResourceArea *a ) {
       Node* n = block->get_node(location);
       uint lid = _lrg_map.live_range_id(n);
 
-      assert(!(n->is_MachProj() && n->req() > 1) || n->in(0)->find_edge(n->in(1)) != -1, "");
-
       if (lid) {
         LRG& lrg = lrgs(lid);
 
