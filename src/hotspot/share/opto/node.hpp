@@ -115,6 +115,7 @@ class MachCallStaticJavaNode;
 class MachConstantBaseNode;
 class MachConstantNode;
 class MachGotoNode;
+class MachKillNode;
 class MachIfNode;
 class MachJumpNode;
 class MachNode;
@@ -842,6 +843,7 @@ public:
     DEFINE_CLASS_ID(LShift,   Node, 21)
     DEFINE_CLASS_ID(Neg,      Node, 22)
     DEFINE_CLASS_ID(ReachabilityFence, Node, 23)
+    DEFINE_CLASS_ID(MachKill, Node, 24)
 
     _max_classes  = ClassMask_Neg
   };
@@ -996,6 +998,7 @@ public:
   DEFINE_CLASS_QUERY(MachConstant)
   DEFINE_CLASS_QUERY(MachGoto)
   DEFINE_CLASS_QUERY(MachIf)
+  DEFINE_CLASS_QUERY(MachKill)
   DEFINE_CLASS_QUERY(MachJump)
   DEFINE_CLASS_QUERY(MachNullCheck)
   DEFINE_CLASS_QUERY(MachProj)

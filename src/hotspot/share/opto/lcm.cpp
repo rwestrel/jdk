@@ -664,7 +664,7 @@ Node* PhaseCFG::select(
     }
 
     // MachTemps should be scheduled last so they are near their uses
-    if (n->is_MachTemp()) {
+    if (n->is_MachTemp() || n->is_MachKill()) {
       n_choice = 1;
     }
 

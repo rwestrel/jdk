@@ -816,6 +816,33 @@ public:
 #endif
 };
 
+class MachKillNode : public Node {
+private:
+  RegMask _mask;
+  const uint  _ideal_reg;
+public:
+  MachKillNode(Node* in, const RegMask &mask, uint ideal_reg) : Node(nullptr, in), _mask(mask), _ideal_reg(ideal_reg) {
+    init_class_id(Class_MachKill);
+  }
+
+  virtual int   Opcode() const;
+  virtual const Type *bottom_type() const {
+    return in(1)->bottom_type();
+  }
+  virtual const RegMask& in_RegMask(uint i) const {
+    assert(i == 1, "");
+    return _mask;
+  }
+  virtual const RegMask &out_RegMask() const {
+    return _mask;
+  }
+  virtual uint  ideal_reg() const { return _ideal_reg; }
+  virtual uint two_adr( ) const {
+    return 1;
+  }
+  virtual uint  size_of() const { return sizeof(MachKillNode); }
+};
+
 //------------------------------MachIfNode-------------------------------------
 // Machine-specific versions of IfNodes
 class MachIfNode : public MachBranchNode {

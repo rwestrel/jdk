@@ -1680,6 +1680,12 @@ void PhaseCFG::schedule_late(VectorSet &visited, Node_Stack &stack) {
       continue;
     }
 
+    if (self->is_MachKill()) {
+      map_node_to_block(self, LCA);
+      LCA->add_inst(self);
+      continue;
+    }
+
     // Check if 'self' could be anti-dependent on memory
     if (self->needs_anti_dependence_check()) {
       // Hoist LCA above possible-defs and insert anti-dependences to

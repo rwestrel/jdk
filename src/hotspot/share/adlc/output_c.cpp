@@ -1715,6 +1715,7 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
     int proj_no = 1;
     bool declared_def  = false;
     bool declared_kill = false;
+    bool declared_proj = false;
 
     while ((comp = node->_components.iter()) != nullptr) {
       // Lookup register class associated with operand type
@@ -1746,26 +1747,34 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
       } else if (comp->isa(Component::KILL)) {
         fprintf(fp, "  // DEF/KILL %s\n", comp->_name);
 
-        if (!declared_kill) {
-          // Define the variable "kill" to hold new MachProjNodes
-          fprintf(fp, "  MachProjNode *kill;\n");
-          declared_kill = true;
-        }
-
         assert(op, "Support additional KILLS for base operands");
         const char *regmask    = reg_mask(*op);
         const char *ideal_type = op->ideal_type(_globalNames, _register);
 
+        if (!comp->isa(Component::USE)) {
+          if (!declared_proj) {
+            // Define the variable "kill" to hold new MachProjNodes
+            fprintf(fp, "  MachProjNode* proj;\n");
+            declared_proj = true;
+          }
 
-        fprintf(fp, "  kill = ");
-        fprintf(fp, "new MachProjNode( %s, %d, (%s), Op_%s );\n",
-                machNode, proj_no++, regmask, ideal_type);
-        if (!op->is_bound_register() || comp->isa(Component::USE)) {
-          assert(comp->isa(Component::USE), "should be an input");
-          fprintf(fp, "  kill->add_req(in(operand_index(%d) - oper_input_base() + 1));\n", node->_components.operand_position(comp->_name));
+          fprintf(fp, "  proj = ");
+          fprintf(fp, "new MachProjNode( %s, %d, (%s), Op_%s );\n",
+                  machNode, proj_no++, regmask, ideal_type);
+          fprintf(fp, "  proj_list.push(proj);\n");
+          continue;
         }
 
-        fprintf(fp, "  proj_list.push(kill);\n");
+        if (!declared_kill) {
+          // Define the variable "kill" to hold new MachProjNodes
+          fprintf(fp, "  MachKillNode* kill;\n");
+          declared_kill = true;
+        }
+
+        fprintf(fp, "  kill = ");
+        fprintf(fp, "new MachKillNode(in(operand_index(%d) - oper_input_base() + 1), %s, Op_%s);\n",
+                node->_components.operand_position(comp->_name), regmask, ideal_type);
+        fprintf(fp, "  set_req(operand_index(%d) - oper_input_base() + 1, kill);\n", node->_components.operand_position(comp->_name));
       }
     }
   }
