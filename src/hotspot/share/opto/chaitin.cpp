@@ -370,6 +370,16 @@ void PhaseChaitin::verify_killed_inputs(PhaseLive& live) {
         const MachNode* mach = n->as_Mach();
         for (uint j = 1; j < n->req(); j++) {
           if (mach->is_killed_input(j)) {
+            assert(n->in(j)->is_MachKill(), "");
+            bool found = false;
+            for (int k = location-1; k > 0 && !found; k--) {
+              Node* m = block->get_node(k);
+              if (m == n->in(j)) {
+                found = true;
+              } else {
+                assert(m->is_MachSpillCopy() || m->is_MachKill() || m->is_MachTemp() || m->rematerialize() || (m->is_MachProj() && m->in(0)->rematerialize()), "");
+              }
+            }
             uint lidx = _lrg_map.live_range_id(n->in(j));
             assert(lidx != 0, "");
             if (liveout.member(lidx)) {
@@ -2040,9 +2050,6 @@ Node* PhaseChaitin::find_base_for_derived(Node** derived_base_map, Node* derived
 
   // Check for AddP-related opcodes
   if (!derived->is_Phi()) {
-    if (derived->is_MachKill()) {
-      derived = derived->in(1);
-    }
     assert(derived->as_Mach()->ideal_Opcode() == Op_AddP, "but is: %s", derived->Name());
     Node *base = derived->in(AddPNode::Base);
     derived_base_map[derived->_idx] = base;

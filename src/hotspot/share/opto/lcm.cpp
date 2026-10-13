@@ -664,7 +664,7 @@ Node* PhaseCFG::select(
     }
 
     // MachTemps should be scheduled last so they are near their uses
-    if (n->is_MachTemp() || n->is_MachKill()) {
+    if (n->is_MachTemp()) {
       n_choice = 1;
     }
 
@@ -1100,6 +1100,14 @@ bool PhaseCFG::schedule_local(Block* block, GrowableArray<int>& ready_cnt, Vecto
         // worklist so they are selected first and scheduled at the block start.
         worklist.insert(0, m);
       } else {
+        if (m->is_MachKill()) {
+          m = m->unique_out();
+          int m_cnt = ready_cnt.at(m->_idx) - 1;
+          ready_cnt.at_put(m->_idx, m_cnt);
+          if (m_cnt > 0) {
+            continue;
+          }
+        }
         worklist.push(m);         // Then on to worklist!
       }
     }
@@ -1152,7 +1160,14 @@ bool PhaseCFG::schedule_local(Block* block, GrowableArray<int>& ready_cnt, Vecto
 
     // Select and pop a ready guy from worklist
     Node* n = select(block, worklist, ready_cnt, next_call, phi_cnt, recalc_pressure_nodes);
-    block->map_node(n, phi_cnt++);    // Schedule him next
+    assert(!n->is_MachKill(), "");
+    for (uint i = 1; i < n->req(); ++i) {
+      Node* in = n->in(i);
+      if (in->is_MachKill()) {
+        block->map_node(in, phi_cnt++);
+      }
+    }
+    block->map_node(n, phi_cnt++); // Schedule him next
 
     if (OptoRegScheduling && block_size_threshold_ok) {
       n->add_flag(Node::Flag_is_scheduled);
@@ -1210,6 +1225,11 @@ bool PhaseCFG::schedule_local(Block* block, GrowableArray<int>& ready_cnt, Vecto
       }
       int m_cnt = ready_cnt.at(m->_idx) - 1;
       ready_cnt.at_put(m->_idx, m_cnt);
+      if (m->is_MachKill()) {
+        m = m->unique_out();
+        m_cnt = ready_cnt.at(m->_idx) - 1;
+        ready_cnt.at_put(m->_idx, m_cnt);
+      }
       if( m_cnt == 0 )
         worklist.push(m);
     }
