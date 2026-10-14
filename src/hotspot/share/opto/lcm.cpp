@@ -922,8 +922,15 @@ uint PhaseCFG::sched_call(Block* block, uint node_cnt, Node_List& worklist, Grow
       if( m->is_Phi() ) continue;
       int m_cnt = ready_cnt.at(m->_idx) - 1;
       ready_cnt.at_put(m->_idx, m_cnt);
-      if( m_cnt == 0 )
+      if (m->is_MachKill()) {
+        m = m->unique_out();
+        m_cnt = ready_cnt.at(m->_idx) - 1;
+        ready_cnt.at_put(m->_idx, m_cnt);
+      }
+      if (m_cnt == 0) {
+        assert(!m->is_MachKill(), "");
         worklist.push(m);
+      }
     }
 
   }
@@ -1108,6 +1115,7 @@ bool PhaseCFG::schedule_local(Block* block, GrowableArray<int>& ready_cnt, Vecto
             continue;
           }
         }
+        assert(!m->is_MachKill(), "");
         worklist.push(m);         // Then on to worklist!
       }
     }
@@ -1230,8 +1238,10 @@ bool PhaseCFG::schedule_local(Block* block, GrowableArray<int>& ready_cnt, Vecto
         m_cnt = ready_cnt.at(m->_idx) - 1;
         ready_cnt.at_put(m->_idx, m_cnt);
       }
-      if( m_cnt == 0 )
+      if (m_cnt == 0) {
+        assert(!m->is_MachKill(), "");
         worklist.push(m);
+      }
     }
   }
 
