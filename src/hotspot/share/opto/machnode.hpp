@@ -818,12 +818,13 @@ public:
 
 class MachKillNode : public Node {
 private:
-  RegMask _mask;
   const uint  _ideal_reg;
 public:
-  MachKillNode(Node* in, const RegMask &mask, uint ideal_reg) : Node(nullptr, in), _mask(mask), _ideal_reg(ideal_reg) {
+  MachKillNode(Node* in, const RegMask &mask, uint ideal_reg) : Node(nullptr, in), _ideal_reg(ideal_reg), _mask(mask) {
     init_class_id(Class_MachKill);
   }
+
+  RegMask _mask;
 
   virtual int   Opcode() const;
   virtual const Type *bottom_type() const {
