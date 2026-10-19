@@ -370,7 +370,11 @@ void PhaseChaitin::verify_killed_inputs(PhaseLive& live) {
         const MachNode* mach = n->as_Mach();
         for (uint j = 1; j < n->req(); j++) {
           if (mach->is_killed_input(j)) {
-            assert(n->in(j)->is_MachKill(), "");
+            Node* in = n->in(j);
+            while (in->is_Copy()) {
+              in = in->in(1);
+            }
+            assert(in->is_MachKill(), "");
             bool found = false;
             for (int k = location-1; k > 0 && !found; k--) {
               Node* m = block->get_node(k);
