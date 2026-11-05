@@ -1666,10 +1666,6 @@ bool ciMethod::needs_stack_repair() const {
   GUARDED_VM_ENTRY(return get_Method()->needs_stack_repair();)
 }
 
-bool ciMethod::scalarized_return() const {
-  VM_ENTRY_MARK;
-  return get_Method()->scalarized_return();
-}
 // ciMethod::is_old
 //
 // Return true for redefined methods
