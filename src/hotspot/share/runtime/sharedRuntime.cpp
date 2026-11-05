@@ -2984,7 +2984,7 @@ void CompiledEntrySignature::compute_calling_conventions(bool link_time) {
   _args_on_stack = SharedRuntime::java_calling_convention(_sig, _regs);
 
   // Compute the scalarized calling conventions if there are scalarized value types in the signature
-  if (has_scalarized && !_method->is_native()) {
+  if (has_scalarized) {
     _regs_cc = NEW_RESOURCE_ARRAY(VMRegPair, _sig_cc->length());
     _args_on_stack_cc = SharedRuntime::java_calling_convention(_sig_cc, _regs_cc);
 
