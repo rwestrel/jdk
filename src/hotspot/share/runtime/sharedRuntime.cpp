@@ -2867,7 +2867,7 @@ bool CompiledEntrySignature::check_supers_and_deoptimize(int arg_num) {
   assert(JavaThread::current()->thread_state() == _thread_in_vm, "must be in vm state");
 
   bool scalar_super = false;
-  bool non_scalar = _method->is_native();
+  bool non_scalar_super = false;
 
   GrowableArray<Method*>* supers = get_supers();
   for (int i = 0; i < supers->length(); ++i) {
@@ -2875,20 +2875,20 @@ bool CompiledEntrySignature::check_supers_and_deoptimize(int arg_num) {
     if (super_method->is_scalarized_arg(arg_num)) {
       scalar_super = true;
     } else {
-      non_scalar = true;
+      non_scalar_super = true;
     }
   }
 #ifdef ASSERT
   // Randomly enable below code paths for stress testing
   bool stress = StressCallingConvention;
   if (stress && (os::random() & 1) == 1) {
-    non_scalar = true;
+    non_scalar_super = true;
     if ((os::random() & 1) == 1) {
       scalar_super = true;
     }
   }
 #endif
-  if (non_scalar) {
+  if (non_scalar_super) {
     // Found a super method with a non-scalarized argument. Fall back to the non-scalarized calling convention.
     if (scalar_super) {
       // Found non-scalar *and* scalar super methods. We can't handle both.
@@ -2913,7 +2913,7 @@ bool CompiledEntrySignature::check_supers_and_deoptimize(int arg_num) {
     }
   }
 
-  return non_scalar;
+  return non_scalar_super;
 }
 
 // Iterate over arguments and compute scalarized and non-scalarized signatures
