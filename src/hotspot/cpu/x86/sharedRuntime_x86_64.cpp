@@ -2171,12 +2171,90 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // as far as the interpreter and the compiler(s) are concerned.
 
   const Register receiver = j_rarg0;
+  assert_different_registers(receiver, rscratch1, rscratch2);
 
   Label exception_pending;
 
-  assert_different_registers(receiver, rscratch1, rscratch2);
-  __ verify_oop(receiver);
-  __ ic_check(8 /* end_alignment */);
+  if (method()->has_scalarized_args()) {
+    assert(ValueTypePassFieldsAsArgs, "must be");
+    CompiledEntrySignature ces(method());
+    ces.compute_calling_conventions(false);
+    CodeOffsets::Entries ro_entry_type = ces.c1_value_ro_entry_type();
+    CodeOffsets offsets;
+    Label verified_value_entry;
+
+    // UEP: check icache and fall-through
+    if (ro_entry_type != CodeOffsets::Verified_Value_Entry) {
+      offsets.set_value(CodeOffsets::Entry, __ offset());
+      if (!method->is_static()) {
+        __ verify_oop(receiver);
+        __ ic_check(8 /* end_alignment */);
+      }
+    }
+
+    // VIEP_RO: pack all value parameters, except the receiver
+    if (ro_entry_type == CodeOffsets::Verified_Value_Entry_RO) {
+      offsets.set_value(CodeOffsets::Verified_Value_Entry_RO, __ offset());
+      assert(!(VM_Version::supports_fast_class_init_checks() && method->needs_clinit_barrier()), "");
+      __ scalarized_entry(&ces, stack_size - 2 * wordSize, 0, -1, verified_value_entry, true);
+    }
+    // VEP: pack all value parameters
+    __ align(CodeEntryAlignment);
+    if (method->needs_clinit_barrier()) {
+      assert(VM_Version::supports_fast_class_init_checks(), "sanity");
+      Label L_skip_barrier;
+      Register klass = r10;
+      __ mov_metadata(klass, method->method_holder()); // InstanceKlass*
+      __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
+
+      __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
+
+      __ bind(L_skip_barrier);
+    }
+    __ scalarized_entry(&ces, stack_size - 2 * wordSize, 0, -1, verified_value_entry, false);
+
+    // UIEP: check icache and fall-through
+    __ align(CodeEntryAlignment);
+    offsets.set_value(CodeOffsets::Value_Entry, __ offset());
+    if (ro_entry_type == CodeOffsets::Verified_Value_Entry) {
+      // Special case if we have VIEP == VIEP(RO):
+      // this means UIEP (called by C1) == UEP (called by C2).
+      offsets.set_value(CodeOffsets::Entry, __ offset());
+    }
+    if (!method->is_static()) {
+      __ verify_oop(receiver);
+      __ ic_check(8 /* end_alignment */);
+    }
+
+    // VIEP: all value parameters are passed as refs - no packing.
+    if (method->needs_clinit_barrier()) {
+      assert(VM_Version::supports_fast_class_init_checks(), "sanity");
+      Label L_skip_barrier;
+      Register klass = r10;
+      __ mov_metadata(klass, method->method_holder()); // InstanceKlass*
+      __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
+
+      __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
+
+      __ bind(L_skip_barrier);
+    }
+    // Generate stack overflow check
+    __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
+
+    // Generate a new frame for the wrapper.
+    __ enter();
+    // -2 because return address is already present and so is saved rbp
+    __ subptr(rsp, stack_size - 2*wordSize);
+    offsets.set_value(CodeOffsets::Frame_Complete, __ offset());
+
+    if (ro_entry_type != CodeOffsets::Verified_Value_Entry_RO) {
+      // The VIEP(RO) is the same as VEP or VIEP
+      assert(ro_entry_type == CodeOffsets::Verified_Entry ||
+             ro_entry_type == CodeOffsets::Verified_Value_Entry, "must be");
+      offsets.set_value(CodeOffsets::Verified_Value_Entry_RO,
+                           offsets.value(ro_entry_type));
+    }
+  }
 
   int vep_offset = ((intptr_t)__ pc()) - start;
 

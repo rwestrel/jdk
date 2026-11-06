@@ -10822,7 +10822,7 @@ void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_f
   }
   decrement(rsp, frame_size_in_bytes);
 
-  if (reset_orig_pc) {
+  if (reset_orig_pc && sp_offset_for_orig_pc >= 0) {
     // Zero orig_pc to detect deoptimization during buffering in the entry points
     movptr(Address(rsp, sp_offset_for_orig_pc), 0);
   }
