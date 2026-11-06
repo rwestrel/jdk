@@ -109,6 +109,8 @@
   do_blob(throw_delayed_StackOverflowError, RuntimeStub)               \
   /* value types stub */                                               \
   do_blob(store_value_type_fields_to_buf, RuntimeStub)                 \
+  do_blob(buffer_value_args, RuntimeStub)                              \
+  do_blob(buffer_value_args_no_receiver, RuntimeStub)                  \
   /* other stubs */                                                    \
   SHARED_JFR_STUBS_DO(do_blob)                                         \
 

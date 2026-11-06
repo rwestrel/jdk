@@ -126,6 +126,12 @@ void SharedRuntime::generate_initial_stubs() {
     _store_value_type_fields_to_buf_blob =
       generate_return_value_stub(CAST_FROM_FN_PTR(address, SharedRuntime::store_value_type_fields_to_buf));
   }
+  if (ValueTypePassFieldsAsArgs) {
+    _buffer_value_args_blob =
+      generate_buffer_value_args_stub(CAST_FROM_FN_PTR(address, SharedRuntime::allocate_value_types), true);
+    _buffer_value_args_no_receiver_blob =
+      generate_buffer_value_args_stub(CAST_FROM_FN_PTR(address, SharedRuntime::allocate_value_types), false);
+  }
 }
 
 void SharedRuntime::generate_stubs() {
@@ -250,6 +256,8 @@ uint SharedRuntime::_slow_array_copy_ctr=0;
 uint SharedRuntime::_find_handler_ctr=0;
 uint SharedRuntime::_rethrow_ctr=0;
 uint SharedRuntime::_unsafe_set_memory_ctr=0;
+uint SharedRuntime::_buffer_value_args_slowcase_cnt = 0;
+uint SharedRuntime::_buffer_value_args_no_receiver_slowcase_cnt = 0;
 
 int     SharedRuntime::_ICmiss_index                    = 0;
 int     SharedRuntime::_ICmiss_count[SharedRuntime::maxICmiss_count];
@@ -2164,6 +2172,8 @@ void SharedRuntime::print_statistics() {
   if (_find_handler_ctr) tty->print_cr("%5u find exception handler", _find_handler_ctr);
   if (_rethrow_ctr) tty->print_cr("%5u rethrow handler", _rethrow_ctr);
   if (_unsafe_set_memory_ctr) tty->print_cr("%5u unsafe set memorys", _unsafe_set_memory_ctr);
+  if (_buffer_value_args_no_receiver_slowcase_cnt) tty->print_cr("%5u buffer value args no receiver slow case", _buffer_value_args_no_receiver_slowcase_cnt);
+  if (_buffer_value_args_slowcase_cnt) tty->print_cr("%5u buffer value args slow case", _buffer_value_args_no_receiver_slowcase_cnt);
 
   AdapterHandlerLibrary::print_statistics();
 
@@ -2984,7 +2994,7 @@ void CompiledEntrySignature::compute_calling_conventions(bool link_time) {
   _args_on_stack = SharedRuntime::java_calling_convention(_sig, _regs);
 
   // Compute the scalarized calling conventions if there are scalarized value types in the signature
-  if (has_scalarized) {
+  if (has_scalarized && !_method->is_native()) {
     _regs_cc = NEW_RESOURCE_ARRAY(VMRegPair, _sig_cc->length());
     _args_on_stack_cc = SharedRuntime::java_calling_convention(_sig_cc, _regs_cc);
 
@@ -4067,7 +4077,7 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
                        RegisterMap::WalkContinuation::skip);
   frame stubFrame = THREAD->last_frame();
   frame callerFrame = stubFrame.sender(&reg_map2);
-  if (from_c1) {
+  if (from_c1 || (callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1())) {
     callerFrame = callerFrame.sender(&reg_map2);
   }
   int arg_size;
@@ -4174,7 +4184,14 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
 
 JRT_ENTRY(void, SharedRuntime::allocate_value_types(JavaThread* current, Method* callee_method, bool allocate_receiver))
   methodHandle callee(current, callee_method);
-  oop array = SharedRuntime::allocate_value_types_impl(current, callee, allocate_receiver, false, CHECK);
+#ifndef PRODUCT
+  if (allocate_receiver) {
+    _buffer_value_args_slowcase_cnt++;
+  } else {
+    _buffer_value_args_no_receiver_slowcase_cnt++;
+  }
+#endif
+  oop array = allocate_value_types_impl(current, callee, allocate_receiver, false, CHECK);
   current->set_vm_result_oop(array);
 JRT_END
 

@@ -301,9 +301,9 @@ int C1_MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int f
 
   mov_metadata(rbx, ces->method());
   if (is_value_ro_entry) {
-    call(RuntimeAddress(Runtime1::entry_for(StubId::c1_buffer_value_args_no_receiver_id)));
+    call(RuntimeAddress(SharedRuntime::buffer_value_args_no_receiver_entry()));
   } else {
-    call(RuntimeAddress(Runtime1::entry_for(StubId::c1_buffer_value_args_id)));
+    call(RuntimeAddress(SharedRuntime::buffer_value_args_entry()));
   }
   int rt_call_offset = offset();
 

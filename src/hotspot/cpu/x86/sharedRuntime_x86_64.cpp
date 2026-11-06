@@ -4022,6 +4022,63 @@ RuntimeStub* SharedRuntime::generate_return_value_stub(address destination) {
   return stub;
 }
 
+RuntimeStub* SharedRuntime::generate_buffer_value_args_stub(address destination, bool allocate_receiver) {
+  StubId id = allocate_receiver ? StubId::shared_buffer_value_args_id : StubId::shared_buffer_value_args_no_receiver_id;
+
+  const char* name = SharedRuntime::stub_name(id);
+  CodeBlob* blob = AOTCodeCache::load_code_blob(AOTCodeEntry::SharedBlob, StubInfo::blob(id));
+  if (blob != nullptr) {
+    return blob->as_runtime_stub();
+  }
+
+  ResourceMark rm;
+  CodeBuffer buffer(name, 1552, 512);
+  MacroAssembler* masm = new MacroAssembler(&buffer);
+
+  int frame_size_in_words;
+
+  OopMapSet *oop_maps = new OopMapSet();
+  OopMap* map = nullptr;
+
+  int start = __ offset();
+
+  // No need to save vector registers since they are caller-saved anyway.
+  map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words, /*save_wide_vectors*/ false);
+
+  int frame_complete = __ offset();
+
+  __ set_last_Java_frame(noreg, noreg, nullptr, rscratch1);
+
+  __ mov(c_rarg0, r15_thread);
+  __ mov(c_rarg1, rbx);
+  __ movl(c_rarg2, allocate_receiver);
+  __ call(RuntimeAddress(destination));
+  oop_maps->add_gc_map( __ offset() - start, map);
+
+  __ reset_last_Java_frame(false);
+
+  RegisterSaver::restore_live_registers(masm);
+
+  Label no_exception;
+  __ cmpptr(Address(r15_thread, Thread::pending_exception_offset()), NULL_WORD);
+  __ jcc(Assembler::equal, no_exception);
+
+  __ movptr(Address(r15_thread, JavaThread::vm_result_oop_offset()), NULL_WORD);
+  __ movptr(rax, Address(r15_thread, Thread::pending_exception_offset()));
+  __ jump(RuntimeAddress(StubRoutines::forward_exception_entry()));
+
+  __ bind(no_exception);
+
+  __ get_vm_result_oop(rax);
+  __ verify_oop(rax);  // rax: an array of buffered value objects
+  __ ret(0);
+
+  RuntimeStub* rs_blob = RuntimeStub::new_runtime_stub(name, &buffer, frame_complete, frame_size_in_words, oop_maps, false);
+
+  AOTCodeCache::store_code_blob(*rs_blob, AOTCodeEntry::SharedBlob, StubInfo::blob(id));
+  return rs_blob;
+}
+
 #if INCLUDE_JFR
 
 // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
