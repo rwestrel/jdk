@@ -2239,28 +2239,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     // VIEP: all value parameters are passed as refs - no packing.
     __ align(CodeEntryAlignment);
     offsets.set_value(CodeOffsets::Verified_Value_Entry, __ offset());
-    // if (method->needs_clinit_barrier()) {
-    //   assert(VM_Version::supports_fast_class_init_checks(), "sanity");
-    //   Label L_skip_barrier;
-    //   Register klass = r10;
-    //   __ mov_metadata(klass, method->method_holder()); // InstanceKlass*
-    //   __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
-    //
-    //   __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
-    //
-    //   __ bind(L_skip_barrier);
-    // }
-    // // Generate stack overflow check
-    // __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
-    //
-    // // Generate a new frame for the wrapper.
-    // __ enter();
-    // // -2 because return address is already present and so is saved rbp
-    // __ subptr(rsp, stack_size - 2*wordSize);
-    //
-    // BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    // // native wrapper is not hot enough to micro optimize the nmethod entry barrier with an out-of-line stub
-    // bs->nmethod_entry_barrier(masm, nullptr /* slow_path */, nullptr /* continuation */);
 
 
     if (ro_entry_type != CodeOffsets::Verified_Value_Entry_RO) {
