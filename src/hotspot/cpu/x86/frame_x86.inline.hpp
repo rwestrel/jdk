@@ -487,9 +487,7 @@ ALWAYSINLINE frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 #ifdef ASSERT
       NativeCall* call = nativeCall_before(pc());
       address dest = call->destination();
-      assert(dest == Runtime1::entry_for(StubId::c1_buffer_value_args_no_receiver_id) ||
-             dest == Runtime1::entry_for(StubId::c1_buffer_value_args_id) ||
-             dest == SharedRuntime::buffer_value_args_entry() ||
+      assert(dest == SharedRuntime::buffer_value_args_entry() ||
              dest == SharedRuntime::buffer_value_args_no_receiver_entry(), "unexpected safepoint in entry point");
 #endif
     }

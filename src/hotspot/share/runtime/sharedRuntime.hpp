@@ -554,6 +554,9 @@ class SharedRuntime: AllStatic {
   static void    save_native_result(MacroAssembler *_masm, BasicType ret_type, int frame_slots);
   static void restore_native_result(MacroAssembler *_masm, BasicType ret_type, int frame_slots);
 
+  static void emit_std_entries(MacroAssembler* masm, const methodHandle& method, OopMapSet* oop_maps, int stack_size,
+                               Register receiver, Label& verified_value_entry, CodeOffsets& offsets);
+
   // Generate a native wrapper for a given method.  The method takes arguments
   // in the Java compiled code convention, marshals them to the native
   // convention (handlizes oops, etc), transitions to native, makes the call,

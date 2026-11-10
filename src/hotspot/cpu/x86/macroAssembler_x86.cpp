@@ -10810,9 +10810,6 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
   // setup code in the verified_value_entry (which has a different real_frame_size).
   build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false, preserve_frame_pointer);
 
-  if (is_value_ro_entry && sp_offset_for_orig_pc == -1) {
-    should_not_reach_here();
-  }
   jmp(verified_value_entry_label);
   return rt_call_offset;
 }

@@ -26,7 +26,6 @@
 #include "asm/macroAssembler.inline.hpp"
 #include "classfile/javaClasses.hpp"
 #include "compiler/disassembler.hpp"
-#include "compiler/compiler_globals.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
 #include "interpreter/bytecodeHistogram.hpp"
 #include "interpreter/interpreter.hpp"
@@ -34,8 +33,6 @@
 #include "interpreter/interp_masm.hpp"
 #include "interpreter/templateInterpreterGenerator.hpp"
 #include "interpreter/templateTable.hpp"
-#include "interpreter/bytecodeTracer.hpp"
-#include "memory/resourceArea.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/method.hpp"
 #include "oops/methodCounters.hpp"
@@ -43,23 +40,16 @@
 #include "oops/oop.inline.hpp"
 #include "oops/resolvedIndyEntry.hpp"
 #include "oops/resolvedMethodEntry.hpp"
-#include "oops/valueKlass.hpp"
-#include "prims/jvmtiExport.hpp"
 #include "prims/jvmtiThreadState.hpp"
-#include "runtime/arguments.hpp"
 #include "runtime/deoptimization.hpp"
-#include "runtime/frame.inline.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/synchronizer.hpp"
-#include "runtime/timer.hpp"
-#include "runtime/vframeArray.hpp"
 #include "utilities/checkedCast.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/powerOfTwo.hpp"
-#include <sys/types.h>
 
 // Size of interpreter code.  Increase if too small.  Interpreter will
 // fail with a guarantee ("not enough space for interpreter generation");
@@ -568,7 +558,38 @@ address TemplateInterpreterGenerator::generate_result_handler_for(
     __ ldr(r0, Address(rfp, frame::interpreter_frame_oop_temp_offset*wordSize));
     // and verify it
     __ verify_oop(r0);
-    break;
+      if (ValueTypeReturnedAsFields) {
+        Label skip;
+        Label not_null;
+        __ cbnz(r0, not_null);
+        // Returned value is null, zero all return registers because they may belong to oop fields
+        __ mov(j_rarg0, zr);
+        __ mov(j_rarg1, zr);
+        __ mov(j_rarg2, zr);
+        __ mov(j_rarg3, zr);
+        __ mov(j_rarg4, zr);
+        __ mov(j_rarg5, zr);
+        __ mov(j_rarg6, zr);
+        __ mov(j_rarg7, zr);
+        __ b(skip);
+        __ bind(not_null);
+
+        // Check if we are returning a non-null value type and load its fields into registers
+        __ test_oop_is_not_value_type(r0, rscratch2, skip, /* can_be_null= */ false);
+
+        // Load fields from a buffered value with a value class specific handler
+        __ load_klass(rscratch1 /*dst*/, r0 /*src*/, rscratch2 /*tmp*/);
+        __ ldr(rscratch1, Address(rscratch1, ValueKlass::adr_members_offset()));
+        __ ldr(rscratch1, Address(rscratch1, ValueKlass::unpack_handler_offset()));
+        // Unpack handler can be null if value type is not scalarizable in returns
+        __ cbz(rscratch1, skip);
+
+        __ blr(rscratch1);
+        __ bind(skip);
+        // Check above kills sender esp in rscratch2. Reload it.
+        __ ldr(rscratch2, Address(rfp, frame::interpreter_frame_sender_sp_offset * wordSize));
+      }
+      break;
   default       : ShouldNotReachHere();
   }
   __ ret(lr);                                  // return from result handler

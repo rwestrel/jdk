@@ -56,6 +56,10 @@ public class TestCCMismatchNativeMethods {
         return a.m2().sum();
     }
 
+    static public int test5(I i, V1 v1) {
+        return i.add(v1);
+    }
+    
     static final Random RAND = Utils.getRandomInstance();
     static public V1 v1 = new V1(RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt());
     
@@ -103,6 +107,15 @@ public class TestCCMismatchNativeMethods {
             if (test4(c2) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
+            if (test5(v1, v1) != v1.sum() * 2) {
+                throw new RuntimeException("incorrect result");
+            }
+            if (test5(new A3(), v1) != v1.sum() * 2) {
+                throw new RuntimeException("incorrect result");
+            }
+            if (test5(new A4(), v1) != v1.sum() * 2) {
+                throw new RuntimeException("incorrect result");
+            }
         }
         UnloadedClass.loadClassAndRerun();
     }
@@ -146,11 +159,32 @@ class UnloadedClass {
     }
 }
 
+interface I {
+    int add(V1 v1);
+}
 
-value record V1(int x0, int x1, int x2, int x3, int x4, int x5) {
-    int sum() {
+value class V1 implements I {
+    int x0;
+    int x1;
+    int x2;
+    int x3;
+    int x4;
+    int x5;
+
+    V1(int x0, int x1, int x2, int x3, int x4, int x5) {
+        this.x0 = x0;
+        this.x1 = x1;
+        this.x2 = x2;
+        this.x3 = x3;
+        this.x4 = x4;
+        this.x5 = x5;
+    }
+    
+    public int sum() {
         return x0 + x1 + x2 + x3 + x4 + x5;
     }
+
+    public native int add(V1 v1);
 }
 
 class A1 {
@@ -194,4 +228,16 @@ class C2 extends A2 {
 class D2 extends A2 {
     native int m1(V1 v1, V1 v2);
     native V1 m2();
+}
+
+class A3 implements I {
+    public int add(V1 v1) {
+        return TestCCMismatchNativeMethods.v1.sum() + v1.sum();
+    }
+}
+
+class A4 implements I {
+    public int add(V1 v1) {
+        return TestCCMismatchNativeMethods.v1.sum() + v1.sum();
+    }
 }

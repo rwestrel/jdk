@@ -4273,3 +4273,4 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::check_special_condition_for_native_trans(Ja
   // before_unwind are not met.
   StackWatermarkSet::before_unwind(current);
 JRT_END
+

@@ -5947,12 +5947,12 @@ void MacroAssembler::load_aotrc_address(Register reg, address a) {
 }
 
 #ifdef ASSERT
-void MacroAssembler::build_frame(int framesize) {
-  build_frame(framesize, false);
+void MacroAssembler::build_frame(int framesize, bool preserve_frame_pointer) {
+  build_frame(framesize, false, preserve_frame_pointer);
 }
 #endif
 
-void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills)) {
+void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills), bool preserve_frame_pointer) {
   assert(framesize >= 2 * wordSize, "framesize must include space for FP/LR");
   assert(framesize % (2*wordSize) == 0, "must preserve 2*wordSize alignment");
   protect_return_address();
@@ -5964,7 +5964,7 @@ void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_
     } else {
       stp(rfp, lr, Address(sp, framesize - 2 * wordSize));
     }
-    if (PreserveFramePointer) add(rfp, sp, framesize - 2 * wordSize);
+    if (preserve_frame_pointer) add(rfp, sp, framesize - 2 * wordSize);
   } else {
     if (DEBUG_ONLY(zap_rfp_lr_spills ||) false) {
       mov_immediate64(rscratch1, ((uint64_t)badRegWordVal) << 32 | (uint64_t)badRegWordVal);
@@ -5972,7 +5972,7 @@ void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_
     } else {
       stp(rfp, lr, Address(pre(sp, -2 * wordSize)));
     }
-    if (PreserveFramePointer) mov(rfp, sp);
+    if (preserve_frame_pointer) mov(rfp, sp);
     if (framesize < ((1 << 12) + 2 * wordSize))
       sub(sp, sp, framesize - 2 * wordSize);
     else {
@@ -8082,3 +8082,70 @@ void MacroAssembler::try_to_replace_prev_vector_copy_with_movprfx(FloatRegister 
   Instruction_aarch64::patch(prev, 31, 0,
                              NativeInstruction::encode_sve_movprfx(rd, rn));
 }
+
+void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer) {
+  MacroAssembler::build_frame(frame_size_in_bytes, preserve_frame_pointer);
+
+  if (reset_orig_pc) {
+    // Zero orig_pc to detect deoptimization during buffering in the entry points
+    str(zr, Address(sp, sp_offset_for_orig_pc));
+  }
+}
+
+int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool preserve_frame_pointer) {
+  assert(ValueTypePassFieldsAsArgs, "sanity");
+  // Make sure there is enough stack space for this method's activation.
+  assert(bang_size_in_bytes >= frame_size_in_bytes, "stack bang size incorrect");
+  generate_stack_overflow_check(bang_size_in_bytes);
+
+  GrowableArray<SigEntry>* sig    = ces->sig();
+  GrowableArray<SigEntry>* sig_cc = is_value_ro_entry ? ces->sig_cc_ro() : ces->sig_cc();
+  VMRegPair* regs      = ces->regs();
+  VMRegPair* regs_cc   = is_value_ro_entry ? ces->regs_cc_ro() : ces->regs_cc();
+  int args_on_stack    = ces->args_on_stack();
+  int args_on_stack_cc = is_value_ro_entry ? ces->args_on_stack_cc_ro() : ces->args_on_stack_cc();
+
+  assert(sig->length() <= sig_cc->length(), "Zero-sized value class not allowed!");
+  BasicType* sig_bt = NEW_RESOURCE_ARRAY(BasicType, sig_cc->length());
+  int args_passed = sig->length();
+  int args_passed_cc = SigEntry::fill_sig_bt(sig_cc, sig_bt);
+
+  // Create a temp frame so we can call into the runtime. It must be properly set up to accommodate GC.
+  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true, preserve_frame_pointer);
+
+  // The runtime call might safepoint, make sure nmethod entry barrier is executed
+  BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+  // C1 code is not hot enough to micro optimize the nmethod entry barrier with an out-of-line stub
+  bs->nmethod_entry_barrier(this, nullptr /* slow_path */, nullptr /* continuation */, nullptr /* guard */);
+
+  mov_metadata(r19, ces->method());
+  if (is_value_ro_entry) {
+    far_call(RuntimeAddress(SharedRuntime::buffer_value_args_no_receiver_entry()));
+  } else {
+    far_call(RuntimeAddress(SharedRuntime::buffer_value_args_entry()));
+  }
+  int rt_call_offset = offset();
+
+  // The runtime call returns the new array in r20 instead of the usual r0
+  // because r0 is also j_rarg7 which may be holding a live argument here.
+  Register val_array = r20;
+
+  // Remove the temp frame
+  MacroAssembler::remove_frame(frame_size_in_bytes);
+
+  assert(args_on_stack <= args_on_stack_cc, "Sanity check");
+
+  shuffle_value_args(true, is_value_ro_entry, sig_cc,
+                     args_passed_cc, args_on_stack_cc, regs_cc, // from
+                     args_passed, args_on_stack, regs,          // to
+                     0, val_array);
+
+  // Create the real frame. Below jump will then skip over the stack banging and frame
+  // setup code in the verified_value_entry (which has a different real_frame_size).
+  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false, preserve_frame_pointer);
+
+  b(verified_value_entry_label);
+  return rt_call_offset;
+}
+
+
