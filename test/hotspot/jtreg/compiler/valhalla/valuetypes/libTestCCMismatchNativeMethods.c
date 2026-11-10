@@ -26,8 +26,18 @@
 JNIEXPORT jint JNICALL
 Java_compiler_valhalla_valuetypes_B1_m1(JNIEnv* env, jobject receiver, jobject vt1, jobject vt2) {
   jclass cls = (*env)->GetObjectClass(env, vt2);
-  jfieldID fid = (*env)->GetFieldID(env, cls, "x", "I");
-  return (*env)->GetIntField(env, vt2, fid);
+  jfieldID fid0 = (*env)->GetFieldID(env, cls, "x0", "I");
+  jfieldID fid1 = (*env)->GetFieldID(env, cls, "x1", "I");
+  jfieldID fid2 = (*env)->GetFieldID(env, cls, "x2", "I");
+  jfieldID fid3 = (*env)->GetFieldID(env, cls, "x3", "I");
+  jfieldID fid4 = (*env)->GetFieldID(env, cls, "x4", "I");
+  jfieldID fid5 = (*env)->GetFieldID(env, cls, "x5", "I");
+  return (*env)->GetIntField(env, vt2, fid0) +
+    (*env)->GetIntField(env, vt2, fid1) +
+    (*env)->GetIntField(env, vt2, fid2) +
+    (*env)->GetIntField(env, vt2, fid3) +
+    (*env)->GetIntField(env, vt2, fid4) +
+    (*env)->GetIntField(env, vt2, fid5);
 }
 
 JNIEXPORT jobject JNICALL
@@ -40,8 +50,18 @@ Java_compiler_valhalla_valuetypes_B1_m2(JNIEnv* env, jobject receiver) {
 JNIEXPORT jint JNICALL
 Java_compiler_valhalla_valuetypes_D2_m1(JNIEnv* env, jobject receiver, jobject vt1, jobject vt2) {
   jclass cls = (*env)->GetObjectClass(env, vt2);
-  jfieldID fid = (*env)->GetFieldID(env, cls, "x", "I");
-  return (*env)->GetIntField(env, vt2, fid);
+  jfieldID fid0 = (*env)->GetFieldID(env, cls, "x0", "I");
+  jfieldID fid1 = (*env)->GetFieldID(env, cls, "x1", "I");
+  jfieldID fid2 = (*env)->GetFieldID(env, cls, "x2", "I");
+  jfieldID fid3 = (*env)->GetFieldID(env, cls, "x3", "I");
+  jfieldID fid4 = (*env)->GetFieldID(env, cls, "x4", "I");
+  jfieldID fid5 = (*env)->GetFieldID(env, cls, "x5", "I");
+  return (*env)->GetIntField(env, vt2, fid0) +
+    (*env)->GetIntField(env, vt2, fid1) +
+    (*env)->GetIntField(env, vt2, fid2) +
+    (*env)->GetIntField(env, vt2, fid3) +
+    (*env)->GetIntField(env, vt2, fid4) +
+    (*env)->GetIntField(env, vt2, fid5);
 }
 
 JNIEXPORT jobject JNICALL

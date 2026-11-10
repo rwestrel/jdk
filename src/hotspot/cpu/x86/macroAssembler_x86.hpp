@@ -2122,9 +2122,9 @@ public:
   void restore_legacy_gprs();
   void load_aotrc_address(Register reg, address a);
   void setcc(Assembler::Condition comparison, Register dst);
-  int scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry);
+  int scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool preserve_frame_pointer = PreserveFramePointer);
 protected:
-  void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc);
+  void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer = PreserveFramePointer);
 };
 
 #endif // CPU_X86_MACROASSEMBLER_X86_HPP

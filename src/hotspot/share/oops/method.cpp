@@ -775,9 +775,6 @@ int Method::extra_stack_words() {
 // locations the GC is unaware of.
 ValueKlass* Method::returns_value_type() const {
   assert(ValueTypeReturnedAsFields, "Value types should never be returned as fields");
-  if (is_native()) {
-    return nullptr;
-  }
   NoSafepointVerifier nsv;
   SignatureStream ss(signature());
   ss.skip_to_return_type();

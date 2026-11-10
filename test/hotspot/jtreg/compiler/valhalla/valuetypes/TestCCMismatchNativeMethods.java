@@ -22,12 +22,15 @@
  */
 
 package compiler.valhalla.valuetypes;
+import java.util.Random;
+import jdk.test.lib.Utils;
 
 /*
  * @test
  * @bug 8395610 8396567
  * @summary native method calls are not scalarized and cause mismatches
  * @enablePreview
+ * @library /test/lib
  * @run main/othervm -Xbatch ${test.main.class}
  */
 
@@ -46,13 +49,16 @@ public class TestCCMismatchNativeMethods {
     }
 
     static public int test3(A1 a) {
-        return a.m2().x();
+        return a.m2().sum();
     }
 
     static public int test4(A2 a) {
-        return a.m2().x();
+        return a.m2().sum();
     }
 
+    static final Random RAND = Utils.getRandomInstance();
+    static public V1 v1 = new V1(RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt(), RAND.nextInt());
+    
     public static void main(String[] args) {
         A1 a1 = new A1();
         B1 b1 = new B1();
@@ -61,40 +67,40 @@ public class TestCCMismatchNativeMethods {
         B2 b2 = new B2();
         C2 c2 = new C2();
         for (int i = 0; i < 20_000; i++) {
-            if (test1(a1, new V1(42)) != 42) {
+            if (test1(a1, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test1(b1, new V1(42)) != 42) {
+            if (test1(b1, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test1(c1, new V1(42)) != 42) {
+            if (test1(c1, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test2(a2, new V1(42)) != 42) {
+            if (test2(a2, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test2(b2, new V1(42)) != 42) {
+            if (test2(b2, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test2(c2, new V1(42)) != 42) {
+            if (test2(c2, v1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test3(a1) != 42) {
+            if (test3(a1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test3(b1) != 42) {
+            if (test3(b1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test3(c1) != 42) {
+            if (test3(c1) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test4(a2) != 42) {
+            if (test4(a2) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test4(b2) != 42) {
+            if (test4(b2) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (test4(c2) != 42) {
+            if (test4(c2) != v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
         }
@@ -112,28 +118,28 @@ class UnloadedClass {
         C2 c2 = new C2();
         D2 d2 = new D2();
         for (int i = 0; i < 20_000; i++) {
-            if (TestCCMismatchNativeMethods.test2(a2, new V1(42)) != 42) {
+            if (TestCCMismatchNativeMethods.test2(a2, TestCCMismatchNativeMethods.v1) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test2(b2, new V1(42)) != 42) {
+            if (TestCCMismatchNativeMethods.test2(b2, TestCCMismatchNativeMethods.v1) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test2(c2, new V1(42)) != 42) {
+            if (TestCCMismatchNativeMethods.test2(c2, TestCCMismatchNativeMethods.v1) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test2(d2, new V1(42)) != 42) {
+            if (TestCCMismatchNativeMethods.test2(d2, TestCCMismatchNativeMethods.v1) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test4(a2) != 42) {
+            if (TestCCMismatchNativeMethods.test4(a2) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test4(b2) != 42) {
+            if (TestCCMismatchNativeMethods.test4(b2) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test4(c2) != 42) {
+            if (TestCCMismatchNativeMethods.test4(c2) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
-            if (TestCCMismatchNativeMethods.test4(d2) != 42) {
+            if (TestCCMismatchNativeMethods.test4(d2) != TestCCMismatchNativeMethods.v1.sum()) {
                 throw new RuntimeException("incorrect result");
             }
         }
@@ -141,13 +147,17 @@ class UnloadedClass {
 }
 
 
-value record V1(int x) { }
+value record V1(int x0, int x1, int x2, int x3, int x4, int x5) {
+    int sum() {
+        return x0 + x1 + x2 + x3 + x4 + x5;
+    }
+}
 
 class A1 {
-    static V1 fieldV1 = new V1(42);
+    static V1 fieldV1 = TestCCMismatchNativeMethods.v1;
 
     int m1(V1 v1, V1 v2) {
-        return v1.x();
+        return v1.sum();
     }
 
     V1 m2() {
@@ -164,10 +174,10 @@ class C1 extends A1 {
 }
 
 class A2 {
-    static V1 fieldV1 = new V1(42);
+    static V1 fieldV1 = TestCCMismatchNativeMethods.v1;
 
     int m1(V1 v1, V1 v2) {
-        return v1.x();
+        return v1.sum();
     }
 
     V1 m2() {

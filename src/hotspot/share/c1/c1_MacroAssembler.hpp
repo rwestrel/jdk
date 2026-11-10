@@ -43,14 +43,20 @@ class C1_MacroAssembler: public MacroAssembler {
   void verified_entry(bool breakAtEntry);
   void verify_stack_oop(int offset) PRODUCT_RETURN;
   void verify_not_null_oop(Register r)  PRODUCT_RETURN;
- int verified_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label) {
-  assert(sp_offset_for_orig_pc >= 0, "");
-  return scalarized_entry(ces, frame_size_in_bytes, bang_size_in_bytes, sp_offset_for_orig_pc, verified_value_entry_label, false);
- }
- int verified_value_ro_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label) {
-  assert(sp_offset_for_orig_pc >= 0, "");
-  return scalarized_entry(ces, frame_size_in_bytes, bang_size_in_bytes, sp_offset_for_orig_pc, verified_value_entry_label, true);
- }
+
+  int verified_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes,
+                     int sp_offset_for_orig_pc, Label &verified_value_entry_label) {
+   assert(sp_offset_for_orig_pc >= 0, "");
+   return scalarized_entry(ces, frame_size_in_bytes, bang_size_in_bytes, sp_offset_for_orig_pc,
+                           verified_value_entry_label, false);
+  }
+
+  int verified_value_ro_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes,
+                              int sp_offset_for_orig_pc, Label &verified_value_entry_label) {
+   assert(sp_offset_for_orig_pc >= 0, "");
+   return scalarized_entry(ces, frame_size_in_bytes, bang_size_in_bytes, sp_offset_for_orig_pc,
+                           verified_value_entry_label, true);
+  }
 
 #include CPU_HEADER(c1_MacroAssembler)
 

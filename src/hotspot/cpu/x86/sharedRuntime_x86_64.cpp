@@ -2021,17 +2021,19 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     assert(vep_offset != -1,        "Must be set");
 #endif
 
+    CodeOffsets offsets;
+    offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
+    offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
+    offsets.set_value(CodeOffsets::Exceptions, exception_offset);
     // Code will be copied. No ICache sync required.
     nmethod* nm = nmethod::new_native_nmethod(method,
                                               compile_id,
                                               masm->code(),
-                                              vep_offset,
-                                              frame_complete,
+                                              offsets,
                                               stack_slots,
                                               in_ByteSize(-1),
                                               in_ByteSize(-1),
-                                              oop_maps,
-                                              exception_offset);
+                                              oop_maps);
     if (nm == nullptr) return nm;
     if (method->is_continuation_enter_intrinsic()) {
       ContinuationEntry::set_enter_code(nm, interpreted_entry_offset);
@@ -2042,7 +2044,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   }
 
   if (method->is_method_handle_intrinsic()) {
-    vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();
     int vep_offset = ((intptr_t)__ pc()) - start;
     gen_special_dispatch(masm,
@@ -2052,11 +2053,14 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     int frame_complete = ((intptr_t)__ pc()) - start;  // not complete, period
     // Code will be copied. No ICache sync required.
     int stack_slots = SharedRuntime::out_preserve_stack_slots();  // no out slots at all, actually
+    CodeOffsets offsets;
+    offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
+    offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
+
     return nmethod::new_native_nmethod(method,
                                        compile_id,
                                        masm->code(),
-                                       vep_offset,
-                                       frame_complete,
+                                       offsets,
                                        stack_slots / VMRegImpl::slots_per_word,
                                        in_ByteSize(-1),
                                        in_ByteSize(-1),
@@ -2175,14 +2179,15 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
   Label exception_pending;
 
+  Label verified_value_entry;
+  CodeOffsets offsets;
   if (method()->has_scalarized_args()) {
     assert(ValueTypePassFieldsAsArgs, "must be");
     CompiledEntrySignature ces(method());
     ces.compute_calling_conventions(false);
     CodeOffsets::Entries ro_entry_type = ces.c1_value_ro_entry_type();
-    CodeOffsets offsets;
-    Label verified_value_entry;
 
+    __ align(CodeEntryAlignment);
     // UEP: check icache and fall-through
     if (ro_entry_type != CodeOffsets::Verified_Value_Entry) {
       offsets.set_value(CodeOffsets::Entry, __ offset());
@@ -2196,10 +2201,13 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     if (ro_entry_type == CodeOffsets::Verified_Value_Entry_RO) {
       offsets.set_value(CodeOffsets::Verified_Value_Entry_RO, __ offset());
       assert(!(VM_Version::supports_fast_class_init_checks() && method->needs_clinit_barrier()), "");
-      __ scalarized_entry(&ces, stack_size - 2 * wordSize, 0, -1, verified_value_entry, true);
+      int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, true, true);
+      OopMap* oop_map = new OopMap(0, 0);
+      oop_maps->add_gc_map(offset, oop_map);
     }
     // VEP: pack all value parameters
     __ align(CodeEntryAlignment);
+    offsets.set_value(CodeOffsets::Verified_Entry, __ offset());
     if (method->needs_clinit_barrier()) {
       assert(VM_Version::supports_fast_class_init_checks(), "sanity");
       Label L_skip_barrier;
@@ -2211,7 +2219,9 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
       __ bind(L_skip_barrier);
     }
-    __ scalarized_entry(&ces, stack_size - 2 * wordSize, 0, -1, verified_value_entry, false);
+    int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, false, true);
+    OopMap* oop_map = new OopMap(0, 0);
+    oop_maps->add_gc_map(offset, oop_map);
 
     // UIEP: check icache and fall-through
     __ align(CodeEntryAlignment);
@@ -2227,25 +2237,31 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     }
 
     // VIEP: all value parameters are passed as refs - no packing.
-    if (method->needs_clinit_barrier()) {
-      assert(VM_Version::supports_fast_class_init_checks(), "sanity");
-      Label L_skip_barrier;
-      Register klass = r10;
-      __ mov_metadata(klass, method->method_holder()); // InstanceKlass*
-      __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
+    __ align(CodeEntryAlignment);
+    offsets.set_value(CodeOffsets::Verified_Value_Entry, __ offset());
+    // if (method->needs_clinit_barrier()) {
+    //   assert(VM_Version::supports_fast_class_init_checks(), "sanity");
+    //   Label L_skip_barrier;
+    //   Register klass = r10;
+    //   __ mov_metadata(klass, method->method_holder()); // InstanceKlass*
+    //   __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
+    //
+    //   __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
+    //
+    //   __ bind(L_skip_barrier);
+    // }
+    // // Generate stack overflow check
+    // __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
+    //
+    // // Generate a new frame for the wrapper.
+    // __ enter();
+    // // -2 because return address is already present and so is saved rbp
+    // __ subptr(rsp, stack_size - 2*wordSize);
+    //
+    // BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+    // // native wrapper is not hot enough to micro optimize the nmethod entry barrier with an out-of-line stub
+    // bs->nmethod_entry_barrier(masm, nullptr /* slow_path */, nullptr /* continuation */);
 
-      __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
-
-      __ bind(L_skip_barrier);
-    }
-    // Generate stack overflow check
-    __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
-
-    // Generate a new frame for the wrapper.
-    __ enter();
-    // -2 because return address is already present and so is saved rbp
-    __ subptr(rsp, stack_size - 2*wordSize);
-    offsets.set_value(CodeOffsets::Frame_Complete, __ offset());
 
     if (ro_entry_type != CodeOffsets::Verified_Value_Entry_RO) {
       // The VIEP(RO) is the same as VEP or VIEP
@@ -2254,9 +2270,19 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       offsets.set_value(CodeOffsets::Verified_Value_Entry_RO,
                            offsets.value(ro_entry_type));
     }
-  }
+  } else {
+    offsets.set_value(CodeOffsets::Entry, __ offset());
+    offsets.set_value(CodeOffsets::Value_Entry, __ offset());
 
-  int vep_offset = ((intptr_t)__ pc()) - start;
+    if (!method->is_static()) {
+      __ verify_oop(receiver);
+      __ ic_check(8 /* end_alignment */);
+    }
+
+    offsets.set_value(CodeOffsets::Verified_Entry, __ offset());
+    offsets.set_value(CodeOffsets::Verified_Value_Entry_RO, __ offset());
+    offsets.set_value(CodeOffsets::Verified_Value_Entry, __ offset());
+  }
 
   if (method->needs_clinit_barrier()) {
     assert(VM_Version::supports_fast_class_init_checks(), "sanity");
@@ -2272,7 +2298,8 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
 #ifdef COMPILER1
   // For Object.hashCode, System.identityHashCode try to pull hashCode from object header if available.
-  if ((InlineObjectHash && method->intrinsic_id() == vmIntrinsics::_hashCode) || (method->intrinsic_id() == vmIntrinsics::_identityHashCode)) {
+  if ((InlineObjectHash && method->intrinsic_id() == vmIntrinsics::_hashCode) || (
+        method->intrinsic_id() == vmIntrinsics::_identityHashCode)) {
     inline_check_hashcode_from_object_header(masm, method, j_rarg0 /*obj_reg*/, rax /*result*/);
   }
 #endif // COMPILER1
@@ -2282,16 +2309,17 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // instruction fits that requirement.
 
   // Generate stack overflow check
-  __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
-
+  __ bang_stack_with_offset((int) StackOverflow::stack_shadow_zone_size());
   // Generate a new frame for the wrapper.
   __ enter();
   // -2 because return address is already present and so is saved rbp
-  __ subptr(rsp, stack_size - 2*wordSize);
+  __ subptr(rsp, stack_size - 2 * wordSize);
 
   BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   // native wrapper is not hot enough to micro optimize the nmethod entry barrier with an out-of-line stub
   bs->nmethod_entry_barrier(masm, nullptr /* slow_path */, nullptr /* continuation */);
+
+  __ bind(verified_value_entry);
 
   // Frame is now completed as far as size and linkage.
   int frame_complete = ((intptr_t)__ pc()) - start;
@@ -2673,6 +2701,15 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ cmpptr(Address(r15_thread, in_bytes(Thread::pending_exception_offset())), NULL_WORD);
   __ jcc(Assembler::notEqual, exception_pending);
 
+  if (ValueTypeReturnedAsFields) {
+    ValueKlass* vk = method->returns_value_type();
+    if (vk != nullptr && vk->can_be_returned_as_fields()) {
+      address unpack_handler = vk->unpack_handler();
+      assert(unpack_handler != nullptr, "must be");
+      __ call(RuntimeAddress(unpack_handler));
+    }
+  }
+
   // Return
 
   __ ret(0);
@@ -2789,12 +2826,11 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
 
   // Code will be copied. No ICache sync required.
-
+  offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
   nmethod *nm = nmethod::new_native_nmethod(method,
                                             compile_id,
                                             masm->code(),
-                                            vep_offset,
-                                            frame_complete,
+                                            offsets,
                                             stack_slots / VMRegImpl::slots_per_word,
                                             (is_static ? in_ByteSize(klass_offset) : in_ByteSize(receiver_offset)),
                                             in_ByteSize(lock_slot_offset*VMRegImpl::stack_slot_size),

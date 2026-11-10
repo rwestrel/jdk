@@ -1047,26 +1047,17 @@ static int required_mutable_data_size(CodeBuffer* code_buffer) {
 nmethod* nmethod::new_native_nmethod(const methodHandle& method,
   int compile_id,
   CodeBuffer *code_buffer,
-  int vep_offset,
-  int frame_complete,
+  const CodeOffsets& offsets,
   int frame_size,
   ByteSize basic_lock_owner_sp_offset,
   ByteSize basic_lock_sp_offset,
-  OopMapSet* oop_maps,
-  int exception_handler) {
+  OopMapSet* oop_maps) {
   code_buffer->finalize_oop_references(method);
   // create nmethod
   nmethod* nm = nullptr;
   int native_nmethod_size = CodeBlob::allocation_size(code_buffer, sizeof(nmethod));
   {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-
-    CodeOffsets offsets;
-    offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
-    offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
-    if (exception_handler != -1) {
-      offsets.set_value(CodeOffsets::Exceptions, exception_handler);
-    }
 
     int mutable_data_size = required_mutable_data_size(code_buffer);
 
@@ -1235,7 +1226,7 @@ nmethod* nmethod::new_nmethod(nmethod* archived_nm,
 #endif // INCLUDE_CDS
 
 // Fill in default values for various fields
-void nmethod::init_defaults(CodeBuffer *code_buffer, CodeOffsets* offsets) {
+void nmethod::init_defaults(CodeBuffer *code_buffer, const CodeOffsets* offsets) {
   assert(frame_complete_offset() == offsets->value(CodeOffsets::Frame_Complete), "offset truncated?");
 
   // avoid uninitialized fields, even for short time periods
@@ -1298,7 +1289,7 @@ nmethod::nmethod(
   CompilerType type,
   int nmethod_size,
   int compile_id,
-  CodeOffsets* offsets,
+  const CodeOffsets* offsets,
   CodeBuffer* code_buffer,
   int frame_size,
   ByteSize basic_lock_owner_sp_offset,
@@ -1316,8 +1307,16 @@ nmethod::nmethod(
   {
     DEBUG_ONLY(NoSafepointVerifier nsv;)
     assert_locked_or_safepoint(CodeCache_lock);
-    assert(!method->has_scalarized_args(), "scalarized native wrappers not supported yet");
     init_defaults(code_buffer, offsets);
+    if (offsets->value(CodeOffsets::Value_Entry) != CodeOffsets::no_such_entry_point) {
+      CHECKED_CAST(_value_entry_offset            , uint16_t, offsets->value(CodeOffsets::Value_Entry));
+    }
+    if (offsets->value(CodeOffsets::Verified_Value_Entry) != CodeOffsets::no_such_entry_point) {
+      CHECKED_CAST(_verified_value_entry_offset   , uint16_t, offsets->value(CodeOffsets::Verified_Value_Entry));
+    }
+    if (offsets->value(CodeOffsets::Verified_Value_Entry_RO) != CodeOffsets::no_such_entry_point) {
+      CHECKED_CAST(_verified_value_ro_entry_offset, uint16_t, offsets->value(CodeOffsets::Verified_Value_Entry_RO));
+    }
 
     _osr_entry_point         = nullptr;
     _pc_desc_container       = nullptr;
@@ -1697,7 +1696,7 @@ nmethod::nmethod(
   int compile_id,
   int entry_bci,
   address immutable_data,
-  CodeOffsets* offsets,
+  const CodeOffsets* offsets,
   int orig_pc_offset,
   DebugInformationRecorder* debug_info,
   Dependencies* dependencies,

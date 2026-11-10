@@ -10761,7 +10761,7 @@ void MacroAssembler::setcc(Assembler::Condition comparison, Register dst) {
   movzbl(dst, dst);
 }
 
-int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry) {
+int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool preserve_frame_pointer) {
   assert(ValueTypePassFieldsAsArgs, "sanity");
   // Make sure there is enough stack space for this method's activation.
   assert(bang_size_in_bytes >= frame_size_in_bytes, "stack bang size incorrect");
@@ -10780,7 +10780,7 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
   int args_passed_cc = SigEntry::fill_sig_bt(sig_cc, sig_bt);
 
   // Create a temp frame so we can call into the runtime. It must be properly set up to accommodate GC.
-  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true);
+  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true, preserve_frame_pointer);
 
   // The runtime call might safepoint, make sure nmethod entry barrier is executed
   BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
@@ -10808,16 +10808,19 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
 
   // Create the real frame. Below jump will then skip over the stack banging and frame
   // setup code in the verified_value_entry (which has a different real_frame_size).
-  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false);
+  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false, preserve_frame_pointer);
 
+  if (is_value_ro_entry && sp_offset_for_orig_pc == -1) {
+    should_not_reach_here();
+  }
   jmp(verified_value_entry_label);
   return rt_call_offset;
 }
 
-void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc) {
+void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer) {
   push(rbp);
 
-  if (PreserveFramePointer) {
+  if (preserve_frame_pointer) {
     mov(rbp, rsp);
   }
   decrement(rsp, frame_size_in_bytes);
