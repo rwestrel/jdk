@@ -32,6 +32,7 @@ import jdk.test.lib.Utils;
  * @enablePreview
  * @library /test/lib
  * @run main/othervm -Xbatch ${test.main.class}
+ * @run main/othervm -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:ThrowOOEMAtC2iC1NativeEntryPooints=3 ${test.main.class} oome
  */
 
 
@@ -70,54 +71,62 @@ public class TestCCMismatchNativeMethods {
         A2 a2 = new A2();
         B2 b2 = new B2();
         C2 c2 = new C2();
-        for (int i = 0; i < 20_000; i++) {
-            if (test1(a1, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
+        boolean oom = false;
+        try {
+            for (int i = 0; i < 20_000; i++) {
+                if (test1(a1, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test1(b1, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test1(c1, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test2(a2, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test2(b2, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test2(c2, v1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test3(a1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test3(b1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test3(c1) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test4(a2) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test4(b2) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test4(c2) != v1.sum()) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test5(v1, v1) != v1.sum() * 2) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test5(new A3(), v1) != v1.sum() * 2) {
+                    throw new RuntimeException("incorrect result");
+                }
+                if (test5(new A4(), v1) != v1.sum() * 2) {
+                    throw new RuntimeException("incorrect result");
+                }
             }
-            if (test1(b1, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test1(c1, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test2(a2, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test2(b2, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test2(c2, v1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test3(a1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test3(b1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test3(c1) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test4(a2) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test4(b2) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test4(c2) != v1.sum()) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test5(v1, v1) != v1.sum() * 2) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test5(new A3(), v1) != v1.sum() * 2) {
-                throw new RuntimeException("incorrect result");
-            }
-            if (test5(new A4(), v1) != v1.sum() * 2) {
-                throw new RuntimeException("incorrect result");
-            }
+            UnloadedClass.loadClassAndRerun();
+        } catch (OutOfMemoryError oome) {
+            oom = true;
         }
-        UnloadedClass.loadClassAndRerun();
+        if (oom != (args.length == 1)) {
+            throw new RuntimeException(oom ? "unexpected OOME" : "no OOME");
+        }
     }
 }
 

@@ -2122,9 +2122,6 @@ public:
   void restore_legacy_gprs();
   void load_aotrc_address(Register reg, address a);
   void setcc(Assembler::Condition comparison, Register dst);
-  int scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes,
-                       int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry,
-                       bool for_native_wrapper = false);
   void maybe_return_value_as_fields();
 protected:
   void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc);

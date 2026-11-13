@@ -109,8 +109,6 @@ static void init_AOTAddressTable(GrowableArray<address>& external_addresses);
   static void load_flat_array(JavaThread* current, flatArrayOopDesc* array, int index);
   static void store_flat_array(JavaThread* current, flatArrayOopDesc* array, int index, oopDesc* value);
   static int  substitutability_check(JavaThread* current, oopDesc* left, oopDesc* right);
-  static void buffer_value_args(JavaThread* current, Method* method);
-  static void buffer_value_args_no_receiver(JavaThread* current, Method* method);
 
   static address counter_overflow(JavaThread* current, int bci, Method* method);
 

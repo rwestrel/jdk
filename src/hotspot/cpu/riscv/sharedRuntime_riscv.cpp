@@ -395,6 +395,11 @@ BufferedValueTypeBlob* SharedRuntime::generate_buffered_value_type_adapter(const
   return nullptr;
 }
 
+RuntimeStub* SharedRuntime::generate_buffer_value_args_stub(address destination, bool allocate_receiver) {
+  Unimplemented();
+  return nullptr;
+}
+
 // Patch the callers callsite with entry to compiled code if it exists.
 static void patch_callers_callsite(MacroAssembler *masm) {
   Label L;

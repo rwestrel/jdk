@@ -3881,6 +3881,12 @@ RuntimeStub* SharedRuntime::generate_return_value_stub(address destination) {
   Unimplemented();
   return nullptr;
 }
+
+RuntimeStub* SharedRuntime::generate_buffer_value_args_stub(address destination, bool allocate_receiver) {
+  Unimplemented();
+  return nullptr;
+}
+
 #if INCLUDE_JFR
 
 // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
