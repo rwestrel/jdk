@@ -786,7 +786,7 @@ bool Method::may_return_value_type() const {
   NoSafepointVerifier nsv;
   SignatureStream ss(signature());
   ss.skip_to_return_type();
-  return ss.as_value_klass(method_holder());
+  return ss.maybe_value_klass(method_holder());
 }
 
 bool Method::compute_has_loops_flag() {

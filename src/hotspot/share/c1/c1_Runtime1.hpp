@@ -62,8 +62,6 @@ public:
   static uint _load_flat_array_slowcase_cnt;
   static uint _store_flat_array_slowcase_cnt;
   static uint _substitutability_check_slowcase_cnt;
-  static uint _buffer_value_args_slowcase_cnt;
-  static uint _buffer_value_args_no_receiver_slowcase_cnt;
   static uint _monitorenter_slowcase_cnt;
   static uint _monitorexit_slowcase_cnt;
   static uint _patch_code_slowcase_cnt;

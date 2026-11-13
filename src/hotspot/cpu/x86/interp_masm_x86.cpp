@@ -846,34 +846,9 @@ void InterpreterMacroAssembler::narrow(Register result) {
 }
 
 void InterpreterMacroAssembler::return_value_as_fields() {
-  Label skip;
-  Label not_null;
-  testptr(rax, rax);
-  jcc(Assembler::notZero, not_null);
-  // Returned value is null, zero all return registers because they may belong to oop fields
-  xorq(j_rarg0, j_rarg0);
-  xorq(j_rarg1, j_rarg1);
-  xorq(j_rarg2, j_rarg2);
-  xorq(j_rarg3, j_rarg3);
-  xorq(j_rarg4, j_rarg4);
-  xorq(j_rarg5, j_rarg5);
-  jmp(skip);
-  bind(not_null);
-
-  // Check if we are returning a non-null value type and load its fields into registers
-  test_oop_is_not_value_type(rax, rscratch1, skip, /* can_be_null= */ false);
-
-  // Load fields from a buffered value with a value class specific handler
-  load_klass(rdi, rax, rscratch1);
-  movptr(rdi, Address(rdi, ValueKlass::adr_members_offset()));
-  movptr(rdi, Address(rdi, ValueKlass::unpack_handler_offset()));
-  // Unpack handler can be null if value type is not scalarizable in returns
-  testptr(rdi, rdi);
-  jcc(Assembler::zero, skip);
-  call(rdi);
+  maybe_return_value_as_fields();
   // call above kills the value in rbx. Reload it.
   movptr(rbx, Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
-  bind(skip);
 }
 
 // remove activation

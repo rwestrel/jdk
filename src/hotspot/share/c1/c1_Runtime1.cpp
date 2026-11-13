@@ -125,8 +125,6 @@ uint Runtime1::_new_multi_array_slowcase_cnt = 0;
 uint Runtime1::_load_flat_array_slowcase_cnt = 0;
 uint Runtime1::_store_flat_array_slowcase_cnt = 0;
 uint Runtime1::_substitutability_check_slowcase_cnt = 0;
-uint Runtime1::_buffer_value_args_slowcase_cnt = 0;
-uint Runtime1::_buffer_value_args_no_receiver_slowcase_cnt = 0;
 uint Runtime1::_monitorenter_slowcase_cnt = 0;
 uint Runtime1::_monitorexit_slowcase_cnt = 0;
 uint Runtime1::_patch_code_slowcase_cnt = 0;
@@ -187,8 +185,6 @@ void Runtime1::init_AOTAddressTable(GrowableArray<address>& external_addresses) 
   ADD(_load_flat_array_slowcase_cnt);
   ADD(_store_flat_array_slowcase_cnt);
   ADD(_substitutability_check_slowcase_cnt);
-  ADD(_buffer_value_args_slowcase_cnt);
-  ADD(_buffer_value_args_no_receiver_slowcase_cnt);
   ADD(_monitorenter_slowcase_cnt);
   ADD(_monitorexit_slowcase_cnt);
   ADD(_patch_code_slowcase_cnt);
@@ -1755,8 +1751,6 @@ void Runtime1::print_statistics() {
   tty->print_cr(" _load_flat_array_slowcase_cnt:   %u", _load_flat_array_slowcase_cnt);
   tty->print_cr(" _store_flat_array_slowcase_cnt:  %u", _store_flat_array_slowcase_cnt);
   tty->print_cr(" _substitutability_check_slowcase_cnt: %u", _substitutability_check_slowcase_cnt);
-  tty->print_cr(" _buffer_value_args_slowcase_cnt:%u", _buffer_value_args_slowcase_cnt);
-  tty->print_cr(" _buffer_value_args_no_receiver_slowcase_cnt:%u", _buffer_value_args_no_receiver_slowcase_cnt);
 
   tty->print_cr(" _monitorenter_slowcase_cnt:      %u", _monitorenter_slowcase_cnt);
   tty->print_cr(" _monitorexit_slowcase_cnt:       %u", _monitorexit_slowcase_cnt);

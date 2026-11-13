@@ -2173,7 +2173,7 @@ void SharedRuntime::print_statistics() {
   if (_rethrow_ctr) tty->print_cr("%5u rethrow handler", _rethrow_ctr);
   if (_unsafe_set_memory_ctr) tty->print_cr("%5u unsafe set memorys", _unsafe_set_memory_ctr);
   if (_buffer_value_args_no_receiver_slowcase_cnt) tty->print_cr("%5u buffer value args no receiver slow case", _buffer_value_args_no_receiver_slowcase_cnt);
-  if (_buffer_value_args_slowcase_cnt) tty->print_cr("%5u buffer value args slow case", _buffer_value_args_no_receiver_slowcase_cnt);
+  if (_buffer_value_args_slowcase_cnt) tty->print_cr("%5u buffer value args slow case", _buffer_value_args_slowcase_cnt);
 
   AdapterHandlerLibrary::print_statistics();
 
@@ -4078,7 +4078,7 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
   frame stubFrame = THREAD->last_frame();
   frame callerFrame = stubFrame.sender(&reg_map2);
   if ((callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) ||
-      (callerFrame.cb() != __null && callerFrame.cb()->as_nmethod()->is_native_method())) {
+      (callerFrame.cb() != nullptr && callerFrame.cb()->is_nmethod() && callerFrame.cb()->as_nmethod()->is_native_method())) {
     callerFrame = callerFrame.sender(&reg_map2);
   }
   int arg_size;

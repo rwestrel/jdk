@@ -8158,14 +8158,9 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
     enter();
     sub(sp, sp, frame_size_in_bytes - 2*wordSize);
   } else {
-    build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true);
+    build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false);
   }
 
-  // if (is_value_ro_entry) {
-  //   should_not_reach_here();
-  // } else {
-  //   should_not_reach_here();
-  // }
   b(verified_value_entry_label);
   return rt_call_offset;
 }
