@@ -2293,7 +2293,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     offsets.set_value(CodeOffsets::Exceptions, __ offset());
     __ leave();
     __ str(r0, Address(rthread, in_bytes(Thread::pending_exception_offset())));
-    __ b(RuntimeAddress(StubRoutines::forward_exception_entry()));
+    __ far_jump(RuntimeAddress(StubRoutines::forward_exception_entry()));
   }
 
 // Code will be copied. No ICache sync required.
