@@ -601,7 +601,7 @@ class SharedRuntime: AllStatic {
   static address handle_wrong_method_abstract(JavaThread* current);
   static address handle_wrong_method_ic_miss(JavaThread* current);
   static void allocate_value_types(JavaThread* current, Method* callee, bool allocate_receiver);
-  static oop allocate_value_types_impl(JavaThread* current, methodHandle callee, bool allocate_receiver, bool from_c1, TRAPS);
+  static oop allocate_value_types_impl(JavaThread* current, methodHandle callee, bool allocate_receiver, TRAPS);
 
   static address handle_unsafe_access(JavaThread* thread, address next_pc);
 

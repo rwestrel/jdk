@@ -626,23 +626,6 @@ JRT_ENTRY(int, Runtime1::substitutability_check(JavaThread* current, oopDesc* le
   return result.get_jboolean() ? 1 : 0;
 JRT_END
 
-void Runtime1::buffer_value_args_impl(JavaThread* current, Method* m, bool allocate_receiver) {
-  JavaThread* THREAD = current;
-  methodHandle method(current, m); // We are inside the verified_entry or verified_value_ro_entry of this method.
-  oop obj = SharedRuntime::allocate_value_types_impl(current, method, allocate_receiver, true, CHECK);
-  current->set_vm_result_oop(obj);
-}
-
-JRT_ENTRY(void, Runtime1::buffer_value_args(JavaThread* current, Method* method))
-  NOT_PRODUCT(_buffer_value_args_slowcase_cnt++;)
-  buffer_value_args_impl(current, method, true);
-JRT_END
-
-JRT_ENTRY(void, Runtime1::buffer_value_args_no_receiver(JavaThread* current, Method* method))
-  NOT_PRODUCT(_buffer_value_args_no_receiver_slowcase_cnt++;)
-  buffer_value_args_impl(current, method, false);
-JRT_END
-
 JRT_ENTRY(void, Runtime1::unimplemented_entry(JavaThread* current, StubId id))
   tty->print_cr("Runtime1::entry_for(%d) returned unimplemented entry point", (int)id);
 JRT_END

@@ -4066,7 +4066,7 @@ void SharedRuntime::on_slowpath_allocation_exit(JavaThread* current) {
 // buffers for all value type arguments. Allocate an object array to
 // hold them (convenient because once we're done with it we don't have
 // to worry about freeing it).
-oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle callee, bool allocate_receiver, bool from_c1, TRAPS) {
+oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle callee, bool allocate_receiver, TRAPS) {
   assert(ValueTypePassFieldsAsArgs, "no reason to call this");
   ResourceMark rm;
 
@@ -4077,7 +4077,8 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
                        RegisterMap::WalkContinuation::skip);
   frame stubFrame = THREAD->last_frame();
   frame callerFrame = stubFrame.sender(&reg_map2);
-  if (from_c1 || (callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) || (callerFrame.cb() != __null && callerFrame.cb()->as_nmethod()->is_native_method())) {
+  if ((callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) ||
+      (callerFrame.cb() != __null && callerFrame.cb()->as_nmethod()->is_native_method())) {
     callerFrame = callerFrame.sender(&reg_map2);
   }
   int arg_size;
@@ -4191,7 +4192,7 @@ JRT_ENTRY(void, SharedRuntime::allocate_value_types(JavaThread* current, Method*
     _buffer_value_args_no_receiver_slowcase_cnt++;
   }
 #endif
-  oop array = allocate_value_types_impl(current, callee, allocate_receiver, false, CHECK);
+  oop array = allocate_value_types_impl(current, callee, allocate_receiver, CHECK);
   current->set_vm_result_oop(array);
 JRT_END
 

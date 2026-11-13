@@ -8092,7 +8092,10 @@ void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_f
   }
 }
 
-int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool for_native_wrapper) {
+int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes,
+                                     int bang_size_in_bytes, int sp_offset_for_orig_pc,
+                                     Label& verified_value_entry_label, bool is_value_ro_entry,
+                                     bool for_native_wrapper) {
   assert(ValueTypePassFieldsAsArgs, "sanity");
   // Make sure there is enough stack space for this method's activation.
   assert(bang_size_in_bytes >= frame_size_in_bytes, "stack bang size incorrect");

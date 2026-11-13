@@ -2575,6 +2575,17 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ movptr(rcx, Address(r15_thread, JavaThread::active_handles_offset()));
   __ movl(Address(rcx, JNIHandleBlock::top_offset()), NULL_WORD);
 
+  if (ValueTypeReturnedAsFields) {
+    ValueKlass* vk = method->returns_value_type();
+    if (vk != nullptr && vk->can_be_returned_as_fields()) {
+      address unpack_handler = vk->unpack_handler();
+      assert(unpack_handler != nullptr, "must be");
+      __ call(RuntimeAddress(unpack_handler));
+    } else if (method->is_returning_oop() && (method->may_return_value_type() || StressCallingConvention)) {
+      __ maybe_return_value_as_fields();
+    }
+  }
+
   // pop our frame
 
   __ leave();
@@ -2599,15 +2610,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // Any exception pending?
   __ cmpptr(Address(r15_thread, in_bytes(Thread::pending_exception_offset())), NULL_WORD);
   __ jcc(Assembler::notEqual, exception_pending);
-
-  if (ValueTypeReturnedAsFields) {
-    ValueKlass* vk = method->returns_value_type();
-    if (vk != nullptr && vk->can_be_returned_as_fields()) {
-      address unpack_handler = vk->unpack_handler();
-      assert(unpack_handler != nullptr, "must be");
-      __ call(RuntimeAddress(unpack_handler));
-    }
-  }
 
   // Return
 
@@ -2759,7 +2761,7 @@ void SharedRuntime::emit_std_entries(MacroAssembler* masm, const methodHandle& m
     if (ro_entry_type == CodeOffsets::Verified_Value_Entry_RO) {
       offsets.set_value(CodeOffsets::Verified_Value_Entry_RO, __ offset());
       assert(!(VM_Version::supports_fast_class_init_checks() && method->needs_clinit_barrier()), "");
-      int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, true, true);
+      int offset = __ scalarized_entry(&ces, stack_size, stack_size, -1, verified_value_entry, true, true);
       OopMap* oop_map = new OopMap(0, 0);
       oop_maps->add_gc_map(offset, oop_map);
     }
@@ -2777,7 +2779,7 @@ void SharedRuntime::emit_std_entries(MacroAssembler* masm, const methodHandle& m
 
       __ bind(L_skip_barrier);
     }
-    int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, false, true);
+    int offset = __ scalarized_entry(&ces, stack_size, stack_size, -1, verified_value_entry, false, true);
     OopMap* oop_map = new OopMap(0, 0);
     oop_maps->add_gc_map(offset, oop_map);
 

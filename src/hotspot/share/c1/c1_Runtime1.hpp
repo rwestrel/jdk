@@ -87,7 +87,6 @@ static void init_AOTAddressTable(GrowableArray<address>& external_addresses);
 
  private:
   static CodeBlob* _blobs[(int)StubInfo::C1_STUB_COUNT];
-  static void buffer_value_args_impl(JavaThread* current, Method* m, bool allocate_receiver);
 
   // stub generation
  public:
