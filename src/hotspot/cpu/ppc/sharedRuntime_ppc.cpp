@@ -2828,14 +2828,13 @@ nmethod *SharedRuntime::generate_native_wrapper(MacroAssembler *masm,
 
   // Code will be copied. No ICache sync required.
 
-    CodeOffsets offsets;
-    offsets.set_value(CodeOffsets::Verified_Entry, vep_start_pc-start_pc);
-    offsets.set_value(CodeOffsets::Frame_Complete, frame_done_pc-start_pc);
-    nmethod *nm = nmethod::new_native_nmethod(method,
+  CodeOffsets offsets;
+  offsets.set_value(CodeOffsets::Verified_Entry, vep_start_pc-start_pc);
+  offsets.set_value(CodeOffsets::Frame_Complete, frame_done_pc-start_pc);
+  nmethod *nm = nmethod::new_native_nmethod(method,
                                             compile_id,
                                             masm->code(),
-                                            vep_start_pc-start_pc,
-                                            frame_done_pc-start_pc,
+                                            offsets,
                                             stack_slots / VMRegImpl::slots_per_word,
                                             (method_is_static ? in_ByteSize(klass_offset) : in_ByteSize(receiver_offset)),
                                             in_ByteSize(lock_offset),

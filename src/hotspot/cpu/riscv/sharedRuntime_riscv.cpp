@@ -2082,10 +2082,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
   // Code will be copied. No ICache sync required.
 
-    CodeOffsets offsets;
-    offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
-    offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
-    nmethod *nm = nmethod::new_native_nmethod(method,
+  CodeOffsets offsets;
+  offsets.set_value(CodeOffsets::Verified_Entry, vep_offset);
+  offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
+  nmethod *nm = nmethod::new_native_nmethod(method,
                                             compile_id,
                                             masm->code(),
                                             offsets,
