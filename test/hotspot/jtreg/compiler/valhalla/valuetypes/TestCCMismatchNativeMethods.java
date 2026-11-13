@@ -31,8 +31,9 @@ import jdk.test.lib.Utils;
  * @summary native method calls are not scalarized and cause mismatches
  * @enablePreview
  * @library /test/lib
+ * @requires vm.debug
  * @run main/othervm -Xbatch ${test.main.class}
- * @run main/othervm -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:ThrowOOEMAtC2iC1NativeEntryPooints=3 ${test.main.class} oome
+ * @run main/othervm -Xbatch -XX:ThrowOOMEAtC2iC1NativeEntryPoints=3 ${test.main.class} oome
  */
 
 

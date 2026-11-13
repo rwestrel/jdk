@@ -4078,16 +4078,16 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
   frame callerFrame = stubFrame.sender(&reg_map2);
   assert(stubFrame.cb() != nullptr, "called from c2i or c1/native method through runtime stub");
   if (!stubFrame.cb()->is_adapter_blob()) {
-    if (ThrowOOEMAtC2iC1NativeEntryPooints == 2 && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) {
+    if (ThrowOOMEAtC2iC1NativeEntryPoints == 2 && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) {
       THROW_MSG_NULL(vmSymbols::java_lang_OutOfMemoryError(), "ThrowOOEMAtC2iC1NativeEntryPooints OOME");
     }
-    if (ThrowOOEMAtC2iC1NativeEntryPooints == 3 && callerFrame.cb()->as_nmethod()->is_native_method()) {
+    if (ThrowOOMEAtC2iC1NativeEntryPoints == 3 && callerFrame.cb()->as_nmethod()->is_native_method()) {
       THROW_MSG_NULL(vmSymbols::java_lang_OutOfMemoryError(), "ThrowOOEMAtC2iC1NativeEntryPooints OOME");
     }
     assert(callerFrame.cb()->as_nmethod()->is_compiled_by_c1() || callerFrame.cb()->as_nmethod()->is_native_method(), "");
     callerFrame = callerFrame.sender(&reg_map2);
   } else {
-    if (ThrowOOEMAtC2iC1NativeEntryPooints == 1) {
+    if (ThrowOOMEAtC2iC1NativeEntryPoints == 1) {
       THROW_MSG_NULL(vmSymbols::java_lang_OutOfMemoryError(), "ThrowOOEMAtC2iC1NativeEntryPooints OOME");
     }
   }

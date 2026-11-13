@@ -1966,7 +1966,7 @@ const int ObjectAlignmentInBytes = 8;
   develop(bool, StressCallingConvention, false,                             \
           "Stress the scalarized calling convention.")                      \
                                                                             \
-  develop(int, ThrowOOEMAtC2iC1NativeEntryPooints, 0,                       \
+  develop(int, ThrowOOMEAtC2iC1NativeEntryPoints, 0,                        \
           "Throw an OOME on method entry when buffering incoming values"    \
           "c2i, C1 and native nmethods only"                                \
           "1: c2i, 2: c1, 3: native")                                       \
