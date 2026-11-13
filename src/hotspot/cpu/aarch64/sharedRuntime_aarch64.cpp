@@ -2099,6 +2099,17 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ ldr(r2, Address(rthread, JavaThread::active_handles_offset()));
   __ str(zr, Address(r2, JNIHandleBlock::top_offset()));
 
+  if (ValueTypeReturnedAsFields) {
+    ValueKlass* vk = method->returns_value_type();
+    if (vk != nullptr && vk->can_be_returned_as_fields()) {
+      address unpack_handler = vk->unpack_handler();
+      assert(unpack_handler != nullptr, "must be");
+      __ far_call(RuntimeAddress(unpack_handler));
+    } else if (method->is_returning_oop() && (method->may_return_value_type() || StressCallingConvention)) {
+      __ maybe_return_value_as_fields();
+    }
+  }
+
   __ leave();
 
   #if INCLUDE_JFR
@@ -2121,17 +2132,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // Any exception pending?
   __ ldr(rscratch1, Address(rthread, in_bytes(Thread::pending_exception_offset())));
   __ cbnz(rscratch1, exception_pending);
-
-  if (ValueTypeReturnedAsFields) {
-    ValueKlass* vk = method->returns_value_type();
-    if (vk != nullptr && vk->can_be_returned_as_fields()) {
-      address unpack_handler = vk->unpack_handler();
-      assert(unpack_handler != nullptr, "must be");
-      __ mov(r20, lr);
-      __ far_call(RuntimeAddress(unpack_handler));
-      __ mov(lr, r20);
-    }
-  }
 
   // We're done
   __ ret(lr);
@@ -3086,18 +3086,19 @@ BufferedValueTypeBlob* SharedRuntime::generate_buffered_value_type_adapter(const
     VMRegPair pair = regs->at(j);
     VMReg r_1 = pair.first();
     VMReg r_2 = pair.second();
+    Address from(r0, off);
     if (bt == T_FLOAT) {
-      __ ldrs(r_1->as_FloatRegister(), Address(r0, off));
+      __ ldrs(r_1->as_FloatRegister(), from);
     } else if (bt == T_DOUBLE) {
-      __ ldrd(r_1->as_FloatRegister(), Address(r0, off));
+      __ ldrd(r_1->as_FloatRegister(), from);
     } else if (bt == T_OBJECT || bt == T_ARRAY) {
       assert_different_registers(r0, r_1->as_Register());
-      __ load_heap_oop(r_1->as_Register(), Address(r0, off), rscratch1, rscratch2);
+      __ load_heap_oop(r_1->as_Register(), from, rscratch1, rscratch2);
     } else {
       assert(is_java_primitive(bt), "unexpected basic type");
       assert_different_registers(r0, r_1->as_Register());
       size_t size_in_bytes = type2aelembytes(bt);
-      __ load_sized_value(r_1->as_Register(), Address(r0, off), size_in_bytes, bt != T_CHAR && bt != T_BOOLEAN);
+      __ load_sized_value(r_1->as_Register(), from, size_in_bytes, bt != T_CHAR && bt != T_BOOLEAN);
     }
     j++;
   }

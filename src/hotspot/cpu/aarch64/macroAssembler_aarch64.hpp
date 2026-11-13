@@ -196,8 +196,8 @@ class MacroAssembler: public Assembler {
   void strw(Register Rx, const Address &adr);
 
   // Frame creation and destruction shared between JITs.
-  DEBUG_ONLY(void build_frame(int framesize, bool preserve_frame_pointer);)
-  void build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills), bool preserve_frame_pointer);
+  DEBUG_ONLY(void build_frame(int framesize);)
+  void build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills));
   void remove_frame(int framesize);
 
   virtual void _call_Unimplemented(address call_site) {
@@ -1925,8 +1925,9 @@ public:
   int scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes,
                        int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry,
                        bool for_native_wrapper = false);
+  void maybe_return_value_as_fields();
   protected:
-  void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer = PreserveFramePointer);
+  void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc);
 };
 
 #ifdef ASSERT

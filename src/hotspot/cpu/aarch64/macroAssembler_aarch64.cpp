@@ -5947,12 +5947,12 @@ void MacroAssembler::load_aotrc_address(Register reg, address a) {
 }
 
 #ifdef ASSERT
-void MacroAssembler::build_frame(int framesize, bool preserve_frame_pointer) {
-  build_frame(framesize, false, preserve_frame_pointer);
+void MacroAssembler::build_frame(int framesize) {
+  build_frame(framesize, false);
 }
 #endif
 
-void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills), bool preserve_frame_pointer) {
+void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_spills)) {
   assert(framesize >= 2 * wordSize, "framesize must include space for FP/LR");
   assert(framesize % (2*wordSize) == 0, "must preserve 2*wordSize alignment");
   protect_return_address();
@@ -5964,7 +5964,7 @@ void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_
     } else {
       stp(rfp, lr, Address(sp, framesize - 2 * wordSize));
     }
-    if (preserve_frame_pointer) add(rfp, sp, framesize - 2 * wordSize);
+    if (PreserveFramePointer) add(rfp, sp, framesize - 2 * wordSize);
   } else {
     if (DEBUG_ONLY(zap_rfp_lr_spills ||) false) {
       mov_immediate64(rscratch1, ((uint64_t)badRegWordVal) << 32 | (uint64_t)badRegWordVal);
@@ -5972,7 +5972,7 @@ void MacroAssembler::build_frame(int framesize DEBUG_ONLY(COMMA bool zap_rfp_lr_
     } else {
       stp(rfp, lr, Address(pre(sp, -2 * wordSize)));
     }
-    if (preserve_frame_pointer) mov(rfp, sp);
+    if (PreserveFramePointer) mov(rfp, sp);
     if (framesize < ((1 << 12) + 2 * wordSize))
       sub(sp, sp, framesize - 2 * wordSize);
     else {
@@ -8083,8 +8083,8 @@ void MacroAssembler::try_to_replace_prev_vector_copy_with_movprfx(FloatRegister 
                              NativeInstruction::encode_sve_movprfx(rd, rn));
 }
 
-void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer) {
-  MacroAssembler::build_frame(frame_size_in_bytes, preserve_frame_pointer);
+void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc) {
+  MacroAssembler::build_frame(frame_size_in_bytes);
 
   if (reset_orig_pc && sp_offset_for_orig_pc >= 0) {
     // Zero orig_pc to detect deoptimization during buffering in the entry points
@@ -8166,5 +8166,36 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
   b(verified_value_entry_label);
   return rt_call_offset;
 }
+
+void MacroAssembler::maybe_return_value_as_fields() {
+  Label skip;
+  Label not_null;
+  cbnz(r0, not_null);
+  // Returned value is null, zero all return registers because they may belong to oop fields
+  mov(j_rarg0, zr);
+  mov(j_rarg1, zr);
+  mov(j_rarg2, zr);
+  mov(j_rarg3, zr);
+  mov(j_rarg4, zr);
+  mov(j_rarg5, zr);
+  mov(j_rarg6, zr);
+  mov(j_rarg7, zr);
+  b(skip);
+  bind(not_null);
+
+  // Check if we are returning a non-null value type and load its fields into registers
+  test_oop_is_not_value_type(r0, rscratch2, skip, /* can_be_null= */ false);
+
+  // Load fields from a buffered value with a value class specific handler
+  load_klass(rscratch1 /*dst*/, r0 /*src*/, rscratch2 /*tmp*/);
+  ldr(rscratch1, Address(rscratch1, ValueKlass::adr_members_offset()));
+  ldr(rscratch1, Address(rscratch1, ValueKlass::unpack_handler_offset()));
+  // Unpack handler can be null if value type is not scalarizable in returns
+  cbz(rscratch1, skip);
+  blr(rscratch1);
+
+  bind(skip);
+}
+
 
 

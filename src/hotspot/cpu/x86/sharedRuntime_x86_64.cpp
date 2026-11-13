@@ -2197,8 +2197,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
 #ifdef COMPILER1
   // For Object.hashCode, System.identityHashCode try to pull hashCode from object header if available.
-  if ((InlineObjectHash && method->intrinsic_id() == vmIntrinsics::_hashCode) || (
-        method->intrinsic_id() == vmIntrinsics::_identityHashCode)) {
+  if ((InlineObjectHash && method->intrinsic_id() == vmIntrinsics::_hashCode) || (method->intrinsic_id() == vmIntrinsics::_identityHashCode)) {
     inline_check_hashcode_from_object_header(masm, method, j_rarg0 /*obj_reg*/, rax /*result*/);
   }
 #endif // COMPILER1
@@ -2208,11 +2207,12 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // instruction fits that requirement.
 
   // Generate stack overflow check
-  __ bang_stack_with_offset((int) StackOverflow::stack_shadow_zone_size());
+  __ bang_stack_with_offset((int)StackOverflow::stack_shadow_zone_size());
+
   // Generate a new frame for the wrapper.
   __ enter();
   // -2 because return address is already present and so is saved rbp
-  __ subptr(rsp, stack_size - 2 * wordSize);
+  __ subptr(rsp, stack_size - 2*wordSize);
 
   BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   // native wrapper is not hot enough to micro optimize the nmethod entry barrier with an out-of-line stub

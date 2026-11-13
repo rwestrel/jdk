@@ -4426,10 +4426,8 @@ void AOTCodeAddressTable::init_extrs() {
     ADD_EXTERNAL_ADDRESS(StubRoutines::verify_oop_count_addr()); // used by generate_verify_oop()
     ADD_EXTERNAL_ADDRESS(StubRoutines::verify_oop_subroutine_entry_address());
     if (ValueTypeReturnedAsFields) {
-      ADD_EXTERNAL_ADDRESS(SharedRuntime::
-                           store_value_type_fields_to_buf);
-      ADD_EXTERNAL_ADDRESS(SharedRuntime::
-                           allocate_value_types);
+      ADD_EXTERNAL_ADDRESS(SharedRuntime::store_value_type_fields_to_buf);
+      ADD_EXTERNAL_ADDRESS(SharedRuntime::allocate_value_types);
     }
   }
 
