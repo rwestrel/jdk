@@ -2289,7 +2289,14 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     }
   }
 
-  // Code will be copied. No ICache sync required.
+  if (method()->has_scalarized_args() && ValueTypePassFieldsAsArgs) {
+    offsets.set_value(CodeOffsets::Exceptions, __ offset());
+    __ leave();
+    __ str(r0, Address(rthread, in_bytes(Thread::pending_exception_offset())));
+    __ b(RuntimeAddress(StubRoutines::forward_exception_entry()));
+  }
+
+// Code will be copied. No ICache sync required.
   offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);
   nmethod *nm = nmethod::new_native_nmethod(method,
                                             compile_id,

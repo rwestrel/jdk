@@ -2724,7 +2724,12 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // and continue
   __ jmp(reguard_done);
 
-
+  if (method()->has_scalarized_args() && ValueTypePassFieldsAsArgs) {
+    offsets.set_value(CodeOffsets::Exceptions, __ offset());
+    __ leave();
+    __ movptr(Address(r15_thread, in_bytes(Thread::pending_exception_offset())), rax);
+    __ jump(RuntimeAddress(StubRoutines::forward_exception_entry()));
+  }
 
   // Code will be copied. No ICache sync required.
   offsets.set_value(CodeOffsets::Frame_Complete, frame_complete);

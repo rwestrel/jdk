@@ -598,7 +598,6 @@ address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* curr
   nmethod* nm = (blob != nullptr) ? blob->as_nmethod_or_null() : nullptr;
   if (nm != nullptr) {
     // native nmethods don't have exception handlers
-    assert(!nm->is_native_method() || nm->method()->is_continuation_enter_intrinsic(), "no exception handler");
     assert(nm->header_begin() != nm->exception_begin(), "no exception handler");
     // For platform threads, checking the return pc already covers the case
     // where only this compiled frame was deoptimized, as well as the case
@@ -4077,6 +4076,9 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
                        RegisterMap::WalkContinuation::skip);
   frame stubFrame = THREAD->last_frame();
   frame callerFrame = stubFrame.sender(&reg_map2);
+  if (callerFrame.cb() != nullptr && callerFrame.cb()->is_nmethod() && callerFrame.cb()->as_nmethod()->is_native_method()) {
+    THROW_MSG_NULL(vmSymbols::java_lang_OutOfMemoryError(), "");
+  }
   if ((callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) ||
       (callerFrame.cb() != nullptr && callerFrame.cb()->is_nmethod() && callerFrame.cb()->as_nmethod()->is_native_method())) {
     callerFrame = callerFrame.sender(&reg_map2);
