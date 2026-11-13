@@ -4076,9 +4076,6 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
                        RegisterMap::WalkContinuation::skip);
   frame stubFrame = THREAD->last_frame();
   frame callerFrame = stubFrame.sender(&reg_map2);
-  if (callerFrame.cb() != nullptr && callerFrame.cb()->is_nmethod() && callerFrame.cb()->as_nmethod()->is_native_method()) {
-    THROW_MSG_NULL(vmSymbols::java_lang_OutOfMemoryError(), "");
-  }
   if ((callerFrame.is_compiled_caller() && callerFrame.cb()->as_nmethod()->is_compiled_by_c1()) ||
       (callerFrame.cb() != nullptr && callerFrame.cb()->is_nmethod() && callerFrame.cb()->as_nmethod()->is_native_method())) {
     callerFrame = callerFrame.sender(&reg_map2);
