@@ -2127,7 +2127,9 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     if (vk != nullptr && vk->can_be_returned_as_fields()) {
       address unpack_handler = vk->unpack_handler();
       assert(unpack_handler != nullptr, "must be");
+      __ mov(r20, lr);
       __ far_call(RuntimeAddress(unpack_handler));
+      __ mov(lr, r20);
     }
   }
 
@@ -2333,14 +2335,16 @@ void SharedRuntime::emit_std_entries(MacroAssembler* masm, const methodHandle& m
     // VIEP_RO: pack all value parameters, except the receiver
     if (ro_entry_type == CodeOffsets::Verified_Value_Entry_RO) {
       offsets.set_value(CodeOffsets::Verified_Value_Entry_RO, __ offset());
+      __ nop();
       assert(!(VM_Version::supports_fast_class_init_checks() && method->needs_clinit_barrier()), "");
-      int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, true, true);
+      int offset = __ scalarized_entry(&ces, stack_size, stack_size, -1, verified_value_entry, true, true);
       OopMap* oop_map = new OopMap(0, 0);
       oop_maps->add_gc_map(offset, oop_map);
     }
     // VEP: pack all value parameters
     __ align(CodeEntryAlignment);
     offsets.set_value(CodeOffsets::Verified_Entry, __ offset());
+    __ nop();
     if (method->needs_clinit_barrier()) {
       assert(VM_Version::supports_fast_class_init_checks(), "sanity");
       Label L_skip_barrier;
@@ -2350,7 +2354,7 @@ void SharedRuntime::emit_std_entries(MacroAssembler* masm, const methodHandle& m
 
       __ bind(L_skip_barrier);
     }
-    int offset = __ scalarized_entry(&ces, stack_size - 2 * wordSize, stack_size - 2 * wordSize, -1, verified_value_entry, false, true);
+    int offset = __ scalarized_entry(&ces, stack_size, stack_size, -1, verified_value_entry, false, true);
     OopMap* oop_map = new OopMap(0, 0);
     oop_maps->add_gc_map(offset, oop_map);
 
@@ -3082,19 +3086,18 @@ BufferedValueTypeBlob* SharedRuntime::generate_buffered_value_type_adapter(const
     VMRegPair pair = regs->at(j);
     VMReg r_1 = pair.first();
     VMReg r_2 = pair.second();
-    Address from(r0, off);
     if (bt == T_FLOAT) {
-      __ ldrs(r_1->as_FloatRegister(), from);
+      __ ldrs(r_1->as_FloatRegister(), Address(r0, off));
     } else if (bt == T_DOUBLE) {
-      __ ldrd(r_1->as_FloatRegister(), from);
+      __ ldrd(r_1->as_FloatRegister(), Address(r0, off));
     } else if (bt == T_OBJECT || bt == T_ARRAY) {
       assert_different_registers(r0, r_1->as_Register());
-      __ load_heap_oop(r_1->as_Register(), from, rscratch1, rscratch2);
+      __ load_heap_oop(r_1->as_Register(), Address(r0, off), rscratch1, rscratch2);
     } else {
       assert(is_java_primitive(bt), "unexpected basic type");
       assert_different_registers(r0, r_1->as_Register());
       size_t size_in_bytes = type2aelembytes(bt);
-      __ load_sized_value(r_1->as_Register(), from, size_in_bytes, bt != T_CHAR && bt != T_BOOLEAN);
+      __ load_sized_value(r_1->as_Register(), Address(r0, off), size_in_bytes, bt != T_CHAR && bt != T_BOOLEAN);
     }
     j++;
   }
@@ -3407,8 +3410,6 @@ RuntimeStub* SharedRuntime::generate_buffer_value_args_stub(address destination,
 
   oop_maps->add_gc_map( __ offset() - start, map);
 
-  // r0 contains the address we are going to jump to assuming no exception got installed
-
   // clear last_Java_sp
   __ reset_last_Java_frame(false);
 
@@ -3424,8 +3425,7 @@ RuntimeStub* SharedRuntime::generate_buffer_value_args_stub(address destination,
 
   __ bind(no_exception);
 
-  __ get_vm_result_oop(r0, rthread);
-  __ leave();
+  __ get_vm_result_oop(r20, rthread);
   __ ret(lr);
 
   RuntimeStub* rs_blob = RuntimeStub::new_runtime_stub(name, &buffer, frame_complete, frame_size_in_words, oop_maps, false);

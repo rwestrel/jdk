@@ -8086,13 +8086,13 @@ void MacroAssembler::try_to_replace_prev_vector_copy_with_movprfx(FloatRegister 
 void MacroAssembler::build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer) {
   MacroAssembler::build_frame(frame_size_in_bytes, preserve_frame_pointer);
 
-  if (reset_orig_pc) {
+  if (reset_orig_pc && sp_offset_for_orig_pc >= 0) {
     // Zero orig_pc to detect deoptimization during buffering in the entry points
     str(zr, Address(sp, sp_offset_for_orig_pc));
   }
 }
 
-int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool preserve_frame_pointer) {
+int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes, int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry, bool for_native_wrapper) {
   assert(ValueTypePassFieldsAsArgs, "sanity");
   // Make sure there is enough stack space for this method's activation.
   assert(bang_size_in_bytes >= frame_size_in_bytes, "stack bang size incorrect");
@@ -8111,7 +8111,12 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
   int args_passed_cc = SigEntry::fill_sig_bt(sig_cc, sig_bt);
 
   // Create a temp frame so we can call into the runtime. It must be properly set up to accommodate GC.
-  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true, preserve_frame_pointer);
+  if (for_native_wrapper) {
+    enter();
+    sub(sp, sp, frame_size_in_bytes - 2*wordSize);
+  } else {
+    build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true);
+  }
 
   // The runtime call might safepoint, make sure nmethod entry barrier is executed
   BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
@@ -8131,7 +8136,11 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
   Register val_array = r20;
 
   // Remove the temp frame
-  MacroAssembler::remove_frame(frame_size_in_bytes);
+  if (for_native_wrapper) {
+    leave();
+  } else {
+    remove_frame(frame_size_in_bytes);
+  }
 
   assert(args_on_stack <= args_on_stack_cc, "Sanity check");
 
@@ -8142,8 +8151,18 @@ int MacroAssembler::scalarized_entry(const CompiledEntrySignature* ces, int fram
 
   // Create the real frame. Below jump will then skip over the stack banging and frame
   // setup code in the verified_value_entry (which has a different real_frame_size).
-  build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, false, preserve_frame_pointer);
+  if (for_native_wrapper) {
+    enter();
+    sub(sp, sp, frame_size_in_bytes - 2*wordSize);
+  } else {
+    build_frame_helper(frame_size_in_bytes, sp_offset_for_orig_pc, true);
+  }
 
+  // if (is_value_ro_entry) {
+  //   should_not_reach_here();
+  // } else {
+  //   should_not_reach_here();
+  // }
   b(verified_value_entry_label);
   return rt_call_offset;
 }

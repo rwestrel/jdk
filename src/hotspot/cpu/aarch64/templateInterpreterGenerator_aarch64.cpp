@@ -558,38 +558,38 @@ address TemplateInterpreterGenerator::generate_result_handler_for(
     __ ldr(r0, Address(rfp, frame::interpreter_frame_oop_temp_offset*wordSize));
     // and verify it
     __ verify_oop(r0);
-      if (ValueTypeReturnedAsFields) {
-        Label skip;
-        Label not_null;
-        __ cbnz(r0, not_null);
-        // Returned value is null, zero all return registers because they may belong to oop fields
-        __ mov(j_rarg0, zr);
-        __ mov(j_rarg1, zr);
-        __ mov(j_rarg2, zr);
-        __ mov(j_rarg3, zr);
-        __ mov(j_rarg4, zr);
-        __ mov(j_rarg5, zr);
-        __ mov(j_rarg6, zr);
-        __ mov(j_rarg7, zr);
-        __ b(skip);
-        __ bind(not_null);
+    if (ValueTypeReturnedAsFields) {
+      Label skip;
+      Label not_null;
+      __ cbnz(r0, not_null);
+      // Returned value is null, zero all return registers because they may belong to oop fields
+      __ mov(j_rarg0, zr);
+      __ mov(j_rarg1, zr);
+      __ mov(j_rarg2, zr);
+      __ mov(j_rarg3, zr);
+      __ mov(j_rarg4, zr);
+      __ mov(j_rarg5, zr);
+      __ mov(j_rarg6, zr);
+      __ mov(j_rarg7, zr);
+      __ b(skip);
+      __ bind(not_null);
 
-        // Check if we are returning a non-null value type and load its fields into registers
-        __ test_oop_is_not_value_type(r0, rscratch2, skip, /* can_be_null= */ false);
-
-        // Load fields from a buffered value with a value class specific handler
-        __ load_klass(rscratch1 /*dst*/, r0 /*src*/, rscratch2 /*tmp*/);
-        __ ldr(rscratch1, Address(rscratch1, ValueKlass::adr_members_offset()));
-        __ ldr(rscratch1, Address(rscratch1, ValueKlass::unpack_handler_offset()));
-        // Unpack handler can be null if value type is not scalarizable in returns
-        __ cbz(rscratch1, skip);
-
-        __ blr(rscratch1);
-        __ bind(skip);
-        // Check above kills sender esp in rscratch2. Reload it.
-        __ ldr(rscratch2, Address(rfp, frame::interpreter_frame_sender_sp_offset * wordSize));
-      }
-      break;
+      // Check if we are returning a non-null value type and load its fields into registers
+      __ test_oop_is_not_value_type(r0, rscratch2, skip, /* can_be_null= */ false);
+      
+      // Load fields from a buffered value with a value class specific handler
+      __ load_klass(rscratch1 /*dst*/, r0 /*src*/, rscratch2 /*tmp*/);
+      __ ldr(rscratch1, Address(rscratch1, ValueKlass::adr_members_offset()));
+      __ ldr(rscratch1, Address(rscratch1, ValueKlass::unpack_handler_offset()));
+      // Unpack handler can be null if value type is not scalarizable in returns
+      __ mov(esp, lr);
+      __ cbz(rscratch1, skip);
+      
+      __ blr(rscratch1);
+      __ mov(lr, esp);
+      __ bind(skip);
+    }
+    break;
   default       : ShouldNotReachHere();
   }
   __ ret(lr);                                  // return from result handler

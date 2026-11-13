@@ -1924,7 +1924,7 @@ public:
 
   int scalarized_entry(const CompiledEntrySignature* ces, int frame_size_in_bytes, int bang_size_in_bytes,
                        int sp_offset_for_orig_pc, Label& verified_value_entry_label, bool is_value_ro_entry,
-                       bool preserve_frame_pointer = PreserveFramePointer);
+                       bool for_native_wrapper = false);
   protected:
   void build_frame_helper(int frame_size_in_bytes, int sp_offset_for_orig_pc, bool reset_orig_pc, bool preserve_frame_pointer = PreserveFramePointer);
 };

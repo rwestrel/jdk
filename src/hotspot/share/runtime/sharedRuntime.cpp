@@ -3990,6 +3990,19 @@ void AdapterHandlerLibrary::print_statistics() {
 
 #endif /* PRODUCT */
 
+void SharedRuntime::on_slowpath_allocation_exit(JavaThread* current) {
+  // After any safepoint, just before going back to compiled code,
+  // we inform the GC that we will be doing initializing writes to
+  // this object in the future without emitting card-marks, so
+  // GC may take any compensating steps.
+
+  oop new_obj = current->vm_result_oop();
+  if (new_obj == nullptr) return;
+
+  BarrierSet *bs = BarrierSet::barrier_set();
+  bs->on_slowpath_allocation_exit(current, new_obj);
+}
+
 JRT_LEAF(void, SharedRuntime::enable_stack_reserved_zone(JavaThread* current))
   assert(current == JavaThread::current(), "pre-condition");
   StackOverflow* overflow_state = current->stack_overflow_state();
@@ -4049,18 +4062,76 @@ frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* curren
   return activation;
 }
 
-void SharedRuntime::on_slowpath_allocation_exit(JavaThread* current) {
-  // After any safepoint, just before going back to compiled code,
-  // we inform the GC that we will be doing initializing writes to
-  // this object in the future without emitting card-marks, so
-  // GC may take any compensating steps.
+// We've returned to an interpreted method, the interpreter needs a
+// reference to a value type instance. Allocate it and initialize it
+// from field's values in registers.
+JRT_BLOCK_ENTRY(void, SharedRuntime::store_value_type_fields_to_buf(JavaThread* current, intptr_t res))
+  {
+    if (!is_set_nth_bit(res, 0)) {
+      // We're not returning with value type fields in registers (the
+      // calling convention didn't allow it for this value klass)
+      assert(!Metaspace::contains((void*)res), "should be oop or pointer in buffer area");
+      current->set_vm_result_oop((oopDesc*)res);
+      current->set_vm_result_metadata(nullptr);
+      return;
+    }
 
-  oop new_obj = current->vm_result_oop();
-  if (new_obj == nullptr) return;
+    clear_nth_bit(res, 0);
+    ValueKlass* vk = (ValueKlass*)res;
+    assert(Metaspace::contains((void*)res), "should be klass");
 
-  BarrierSet *bs = BarrierSet::barrier_set();
-  bs->on_slowpath_allocation_exit(current, new_obj);
-}
+    if (!vk->contains_oops()) {
+      // No oop fields. Initialize the fields by calling the pack handler from
+      // the stub which is much faster (see 'generate_return_value_stub').
+      // Signal this by setting the metadata result to the value klass.
+      JRT_BLOCK;
+        {
+          oop vt = vk->allocate_instance(CHECK);
+          current->set_vm_result_oop(vt);
+          current->set_vm_result_metadata(vk);
+        }
+      JRT_BLOCK_END;
+      return;
+    }
+
+    ResourceMark rm;
+    RegisterMap reg_map(current,
+                        RegisterMap::UpdateMap::include,
+                        RegisterMap::ProcessFrames::include,
+                        RegisterMap::WalkContinuation::skip);
+    frame stubFrame = current->last_frame();
+    stubFrame.sender(&reg_map);
+
+    assert(vk == ValueKlass::returned_value_klass(reg_map), "broken calling convention");
+
+    // Allocate handles for every oop field so they are safe in case of
+    // a safepoint when allocating
+    GrowableArray<Handle> handles;
+    vk->save_oop_fields(reg_map, handles);
+
+    // It's unsafe to safepoint until we are here
+    JRT_BLOCK;
+      {
+        oop vt = vk->realloc_result(reg_map, handles, CHECK);
+        current->set_vm_result_oop(vt);
+        current->set_vm_result_metadata(nullptr);
+      }
+    JRT_BLOCK_END;
+  }
+JRT_END
+
+JRT_ENTRY(void, SharedRuntime::allocate_value_types(JavaThread* current, Method* callee_method, bool allocate_receiver))
+  methodHandle callee(current, callee_method);
+#ifndef PRODUCT
+  if (allocate_receiver) {
+    _buffer_value_args_slowcase_cnt++;
+  } else {
+    _buffer_value_args_no_receiver_slowcase_cnt++;
+  }
+#endif
+  oop array = allocate_value_types_impl(current, callee, allocate_receiver, false, CHECK);
+  current->set_vm_result_oop(array);
+JRT_END
 
 // We are at a compiled code to interpreter call. We need backing
 // buffers for all value type arguments. Allocate an object array to
@@ -4182,77 +4253,6 @@ oop SharedRuntime::allocate_value_types_impl(JavaThread* current, methodHandle c
   return array();
 }
 
-JRT_ENTRY(void, SharedRuntime::allocate_value_types(JavaThread* current, Method* callee_method, bool allocate_receiver))
-  methodHandle callee(current, callee_method);
-#ifndef PRODUCT
-  if (allocate_receiver) {
-    _buffer_value_args_slowcase_cnt++;
-  } else {
-    _buffer_value_args_no_receiver_slowcase_cnt++;
-  }
-#endif
-  oop array = allocate_value_types_impl(current, callee, allocate_receiver, false, CHECK);
-  current->set_vm_result_oop(array);
-JRT_END
-
-// We've returned to an interpreted method, the interpreter needs a
-// reference to a value type instance. Allocate it and initialize it
-// from field's values in registers.
-JRT_BLOCK_ENTRY(void, SharedRuntime::store_value_type_fields_to_buf(JavaThread* current, intptr_t res))
-{
-  if (!is_set_nth_bit(res, 0)) {
-    // We're not returning with value type fields in registers (the
-    // calling convention didn't allow it for this value klass)
-    assert(!Metaspace::contains((void*)res), "should be oop or pointer in buffer area");
-    current->set_vm_result_oop((oopDesc*)res);
-    current->set_vm_result_metadata(nullptr);
-    return;
-  }
-
-  clear_nth_bit(res, 0);
-  ValueKlass* vk = (ValueKlass*)res;
-  assert(Metaspace::contains((void*)res), "should be klass");
-
-  if (!vk->contains_oops()) {
-    // No oop fields. Initialize the fields by calling the pack handler from
-    // the stub which is much faster (see 'generate_return_value_stub').
-    // Signal this by setting the metadata result to the value klass.
-    JRT_BLOCK;
-    {
-      oop vt = vk->allocate_instance(CHECK);
-      current->set_vm_result_oop(vt);
-      current->set_vm_result_metadata(vk);
-    }
-    JRT_BLOCK_END;
-    return;
-  }
-
-  ResourceMark rm;
-  RegisterMap reg_map(current,
-                      RegisterMap::UpdateMap::include,
-                      RegisterMap::ProcessFrames::include,
-                      RegisterMap::WalkContinuation::skip);
-  frame stubFrame = current->last_frame();
-  stubFrame.sender(&reg_map);
-
-  assert(vk == ValueKlass::returned_value_klass(reg_map), "broken calling convention");
-
-  // Allocate handles for every oop field so they are safe in case of
-  // a safepoint when allocating
-  GrowableArray<Handle> handles;
-  vk->save_oop_fields(reg_map, handles);
-
-  // It's unsafe to safepoint until we are here
-  JRT_BLOCK;
-  {
-    oop vt = vk->realloc_result(reg_map, handles, CHECK);
-    current->set_vm_result_oop(vt);
-    current->set_vm_result_metadata(nullptr);
-  }
-  JRT_BLOCK_END;
-}
-JRT_END
-
 // Slow path when the native==>Java barriers detect a safepoint/handshake is
 // pending, when _suspend_flags is non-zero or when we need to process a stack
 // watermark. Also check for pending async exceptions (except unsafe access error).
@@ -4260,10 +4260,10 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::check_special_condition_for_native_trans(Ja
   assert(!current->has_last_Java_frame() || current->frame_anchor()->walkable(), "Unwalkable stack in native->Java transition");
 
   JRT_BLOCK
-  // This block looks empty, but the ThreadInVMfromJava hidden in the macro
-  // does all the heavy lifting.
+    // This block looks empty, but the ThreadInVMfromJava hidden in the macro
+    // does all the heavy lifting.
 
-  // On block exit, process safepoint, check for pending async exceptions, etc
+    // On block exit, process safepoint, check for pending async exceptions, etc
   JRT_BLOCK_END
 
   // After returning from native, it could be that the stack frames are not
