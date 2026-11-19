@@ -2071,7 +2071,7 @@ bool Compile::clear_argument_if_only_used_as_buffer_at_calls(const Node* result_
         uint nargs = call->tf()->domain_cc()->cnt();
         for (uint k = TypeFunc::Parms; k < nargs; k++) {
           Node* in = call->in(k);
-          if (in == n && (call->method() == nullptr || !call->method()->is_scalarized_buffer_arg(k - TypeFunc::Parms))) {
+          if (in == n && !call->method()->is_scalarized_buffer_arg(k - TypeFunc::Parms)) {
             return false;
           }
         }
@@ -2804,6 +2804,72 @@ void Compile::inline_string_calls(bool parse_time) {
   _string_late_inlines.trunc_to(0);
 }
 
+void Compile::try_make_result_unused(PhaseIterGVN &igvn, CallNode* call_node) {
+  if (!UseNewCode) {
+    return;
+  }
+  Node* result = call_node->proj_out_or_null(TypeFunc::Parms);
+  if (result == nullptr) {
+    return;
+  }
+  ResourceMark rm;
+  Unique_Node_List<Node> wq;
+  Unique_Node_List<ValueTypeNode> values;
+  wq.push(result);
+  for (uint i = 0; i < wq.size(); ++i) {
+    Node* n = wq.at(i);
+    for (DUIterator_Fast jmax, j = n->fast_outs(jmax); j < jmax; j++) {
+      Node* u = n->fast_out(j);
+      if (u->is_ValueType() && u->as_ValueType()->get_oop() == n) {
+        for (DUIterator_Fast kmax, k = u->fast_outs(kmax); k < kmax; k++) {
+          Node* uu = u->fast_out(k);
+          if (uu->is_SafePoint()) {
+            if (uu->is_CallJava()) {
+              CallJavaNode* call = uu->as_CallJava();
+              if (call->method() != nullptr && call->method()->mismatch()) {
+                return;
+              }
+              uint nargs = call->tf()->domain_cc()->cnt();
+              for (uint l = TypeFunc::Parms; l < nargs; l++) {
+                Node* in = uu->in(l);
+                if (in == n && !call->method()->is_scalarized_buffer_arg(l - TypeFunc::Parms)) {
+                  return;
+                }
+              }
+            } else {
+              SafePointNode* sfpt = uu->as_SafePoint();
+              int input = sfpt->find_edge(u);
+              JVMState* jvms = sfpt->jvms();
+              if (jvms != nullptr) {
+                if (input < (int)jvms->debug_start()) {
+                  return;
+                }
+              }
+            }
+          } else if (!uu->is_Blackhole()) {
+            return;
+          }
+        }
+        values.push(u->as_ValueType());
+      } else if (u->is_Phi()) {
+        wq.push(u);
+      } else {
+        return;
+      }
+    }
+  }
+  for (uint i = 0; i < values.size(); ++i) {
+    ValueTypeNode* value = values.at(i);
+    igvn.rehash_node_delayed(value);
+    value->set_is_buffered(igvn, false);
+    value->set_oop(igvn, igvn.zerocon(T_OBJECT));
+  }
+  for (uint i = 0; i < wq.size(); ++i) {
+    Node* n = wq.at(i);
+    igvn.replace_node(n, igvn.C->top());
+  }
+}
+
 // Late inlining of boxing methods
 void Compile::inline_boxing_calls(PhaseIterGVN& igvn) {
   if (_boxing_late_inlines.length() > 0) {
@@ -2819,6 +2885,9 @@ void Compile::inline_boxing_calls(PhaseIterGVN& igvn) {
 
     while (_boxing_late_inlines.length() > 0) {
       CallGenerator* cg = _boxing_late_inlines.pop();
+      CallNode* call_node = cg->call_node();
+      try_make_result_unused(igvn, call_node);
+      print_method(PHASE_DEBUG, 2);
       cg->do_late_inline();
       if (failing())  return;
       set_do_cleanup(false); // ignore and reset

@@ -1203,6 +1203,9 @@ public:
   bool should_stress_inlining() { return StressIncrementalInlining && (stress().random() % 2) == 0; }
   bool should_delay_inlining() { return AlwaysIncrementalInline || should_stress_inlining(); }
   void inline_string_calls(bool parse_time);
+
+  void try_make_result_unused(PhaseIterGVN &igvn, CallNode* call_node);
+
   void inline_boxing_calls(PhaseIterGVN& igvn);
   bool optimize_loops(PhaseIterGVN& igvn, LoopOptsMode mode);
   void remove_root_to_sfpts_edges(PhaseIterGVN& igvn);

@@ -823,7 +823,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
     return inline_getObjectSize();
 
   case vmIntrinsics::_blackhole:
-    return inline_blackhole();
+    return  inline_blackhole();
 
   default:
     // If you get here, it may be that someone has added a new intrinsic
